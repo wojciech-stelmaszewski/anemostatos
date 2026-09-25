@@ -25,6 +25,8 @@ interface UiStore {
   camera: CameraMode;
   overlays: Overlays;
   panelsHidden: boolean;
+  lesson: string | null;
+  setLesson: (id: string | null) => void;
   setPaused: (p: boolean) => void;
   setTimeScale: (s: number) => void;
   setWindow: (w: number) => void;
@@ -39,7 +41,7 @@ export const useUi = create<UiStore>((set) => ({
   timeScale: 1,
   window: 10,
   loop: 'alt',
-  camera: 'orbit',
+  camera: 'follow',
   overlays: {
     forces: true,
     terms: true,
@@ -49,6 +51,8 @@ export const useUi = create<UiStore>((set) => ({
     heightAids: true,
   },
   panelsHidden: false,
+  lesson: 'meet',
+  setLesson: (lesson) => set({ lesson }),
   setPaused: (paused) => {
     sim.paused = paused;
     set({ paused });

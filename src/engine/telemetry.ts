@@ -88,6 +88,33 @@ export class Telemetry {
     return { t, series };
   }
 
+  /** Value of a channel at time t (nearest earlier sample), NaN outside the recorded range. */
+  valueAt(name: string, t: number): number {
+    const ch = this.channels.get(name);
+    if (!ch || !this.count) return NaN;
+    const start = (this.head - this.count + this.capacity) % this.capacity;
+    let lo = 0;
+    let hi = this.count - 1;
+    if (t < this.time[start]! || t > this.time[(start + hi) % this.capacity]! + 0.01) return NaN;
+    while (lo < hi) {
+      const mid = (lo + hi + 1) >> 1;
+      if (this.time[(start + mid) % this.capacity]! <= t + 1e-9) lo = mid;
+      else hi = mid - 1;
+    }
+    return ch[(start + lo) % this.capacity]!;
+  }
+
+  /** Deep copy — used to freeze a run for comparison. */
+  clone(): Telemetry {
+    const c = new Telemetry(this.capacity);
+    c.time.set(this.time);
+    for (const [k, v] of this.channels) c.channels.set(k, v.slice());
+    c.head = this.head;
+    c.count = this.count;
+    c.version = this.version;
+    return c;
+  }
+
   /** CSV of all channels over the whole buffer. */
   toCsv(): string {
     const names = [...this.channels.keys()].sort();

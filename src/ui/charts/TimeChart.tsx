@@ -11,6 +11,8 @@ export interface SeriesSpec {
   width?: number;
   /** Listed in the legend with its live value, but not drawn (keeps the y scale readable). */
   legendOnly?: boolean;
+  /** Read from the frozen comparison run instead of the live one. */
+  ghost?: boolean;
 }
 
 export interface TimeChartProps {
@@ -56,7 +58,8 @@ export function TimeChart({
   const windowSec = useUi((s) => s.window);
   const windowRef = useRef(windowSec);
   windowRef.current = windowSec;
-  const specKey = series.map((s) => s.key).join('|') + (shadeKey ?? '');
+  const specKey =
+    series.map((s) => (s.ghost ? `ghost:${s.key}` : s.key)).join('|') + (shadeKey ?? '');
 
   useEffect(() => {
     const el = host.current!;
@@ -203,16 +206,24 @@ export function TimeChart({
     let seen = -1;
     let seenWindow = -1;
     const keys = series.map((s) => s.key);
+    let ghostSeen: unknown = null;
     const loop = () => {
       raf = requestAnimationFrame(loop);
       const tl = sim.telemetry;
-      if (tl.version === seen && windowRef.current === seenWindow) return;
+      if (tl.version === seen && windowRef.current === seenWindow && sim.ghost === ghostSeen)
+        return;
+      ghostSeen = sim.ghost;
       seen = tl.version;
       seenWindow = windowRef.current;
       const tNow = tl.lastTime;
       const from = tNow - windowRef.current;
       const names = shadeKey ? [...keys, shadeKey] : keys;
       const { t, series: data } = tl.window(names, from);
+      const ghost = sim.ghost?.telemetry;
+      series.forEach((s, i) => {
+        if (!s.ghost) return;
+        data[i] = ghost ? t.map((tk) => ghost.valueAt(s.key, tk)) : t.map(() => NaN);
+      });
       if (shadeKey) {
         shade.t = t;
         shade.v = data.pop()!;
@@ -240,7 +251,7 @@ export function TimeChart({
         {unit && <span className="text-muted">[{unit}]</span>}
         <span className="flex-1" />
         {series.map((s, i) => (
-          <span key={s.key} className="flex items-center gap-1 text-muted">
+          <span key={`${s.key}-${i}`} className="flex items-center gap-1 text-muted">
             <svg width="14" height="6" aria-hidden>
               <line
                 x1="0"

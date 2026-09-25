@@ -1,3 +1,4 @@
+import { LessonPanel } from '@/lessons/LessonPanel';
 import { Scene } from '@/scene/Scene';
 import { useUi } from '@/store/sim';
 import { ChartsPanel } from '@/ui/charts/ChartsPanel';
@@ -44,6 +45,7 @@ export function App() {
         {!hidden && (
           <>
             <aside className="row-span-2 min-h-0 overflow-y-auto border-l border-border bg-panel">
+              <LessonPanel />
               <ParamPanel />
             </aside>
             <section className="min-h-0 min-w-0 border-t border-border bg-panel">

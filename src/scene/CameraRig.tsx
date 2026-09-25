@@ -3,6 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
+import { useParams } from '@/store/params';
 import { sim, useUi } from '@/store/sim';
 
 const PRESETS = {
@@ -13,10 +14,23 @@ const PRESETS = {
 /** Orbit controls plus follow / side / top modes. */
 export function CameraRig() {
   const mode = useUi((s) => s.camera);
+  const level = useParams((s) => s.params.sim.level);
   const controls = useRef<OrbitControlsImpl>(null);
   const { camera } = useThree();
   const drone = useRef(new THREE.Vector3());
   const lastDrone = useRef(new THREE.Vector3(0, 2, 0));
+
+  // New level (or reset to the ground): frame the drone from the default angle again.
+  useEffect(() => {
+    const c = controls.current;
+    if (!c) return;
+    const t = new THREE.Vector3(0, 1.85, 0);
+    const offset =
+      level === 1 ? new THREE.Vector3(0.95, 0.45, 1.45) : new THREE.Vector3(1.6, 0.9, 2.5);
+    c.target.copy(t);
+    camera.position.copy(t).add(offset);
+    c.update();
+  }, [level, camera]);
 
   useEffect(() => {
     const c = controls.current;
@@ -37,7 +51,8 @@ export function CameraRig() {
     if (mode !== 'orbit') {
       // Follow: move camera and target together with the drone (smoothed).
       const target = drone.current.clone();
-      if (mode !== 'top') target.y = Math.max(target.y, 0.6);
+      // Keep the default framing height while the drone is on the ground / taking off.
+      if (mode !== 'top') target.y = Math.max(target.y, sim.takingOff ? sim.target.y * 0.9 : 0.6);
       const delta = target.clone().sub(c.target).multiplyScalar(0.08);
       c.target.add(delta);
       camera.position.add(delta);

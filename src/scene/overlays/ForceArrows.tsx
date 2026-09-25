@@ -2,6 +2,7 @@ import { Html } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
 import { useMemo, useRef } from 'react';
 import * as THREE from 'three';
+import { useParams } from '@/store/params';
 import { sim, useUi } from '@/store/sim';
 import { SIGNAL } from '@/ui/colors';
 import { Arrow } from './Arrow';
@@ -64,6 +65,7 @@ export function ForceArrows() {
  */
 export function TermArrows() {
   const show = useUi((s) => s.overlays.terms);
+  const level = useParams((s) => s.params.sim.level);
   const arrows = useArrows({ p: SIGNAL.p, i: SIGNAL.i, d: SIGNAL.d, ff: SIGNAL.ff }, 0.011);
   const order = ['ff', 'p', 'i', 'd'] as const;
 
@@ -87,7 +89,7 @@ export function TermArrows() {
     });
   });
 
-  if (!show || sim.level === 3) return null;
+  if (!show || level === 3) return null;
   return (
     <group>
       {order.map((k) => (

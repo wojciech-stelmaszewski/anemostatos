@@ -72,7 +72,18 @@ export interface ControlParams {
 
 export interface Params {
   sim: { level: Level; seed: number };
-  setpoint: { x: number; y: number; z: number; yawDeg: number; rateLimit: number };
+  setpoint: {
+    x: number;
+    y: number;
+    z: number;
+    yawDeg: number;
+    rateLimit: number;
+    /** Automatic setpoint motion added on top of the base value. */
+    profile: 'none' | 'square' | 'sine' | 'triangle';
+    profileAxis: 'y' | 'x';
+    profileAmplitude: number;
+    profilePeriod: number;
+  };
   drone: DroneParams;
   wind: WindParams;
   sensors: SensorParams;
@@ -81,7 +92,17 @@ export interface Params {
 
 export const defaultParams = (): Params => ({
   sim: { level: 1, seed: 1337 },
-  setpoint: { x: 0, y: 2, z: 0, yawDeg: 0, rateLimit: 0 },
+  setpoint: {
+    x: 0,
+    y: 2,
+    z: 0,
+    yawDeg: 0,
+    rateLimit: 0,
+    profile: 'none',
+    profileAxis: 'y',
+    profileAmplitude: 0.5,
+    profilePeriod: 8,
+  },
   drone: {
     mass: 1.0,
     maxMotorThrust: 6.1,

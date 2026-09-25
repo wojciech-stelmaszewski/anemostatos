@@ -22,3 +22,11 @@ export function downloadCsv(): void {
   a.click();
   URL.revokeObjectURL(a.href);
 }
+
+/** Freeze the current run for comparison, labelled with the altitude gains (L1) or the time. */
+export function snapshot(): void {
+  const g = sim.params.control.alt;
+  const label =
+    sim.level === 1 ? `Kp ${g.kp} Ki ${g.ki} Kd ${g.kd}` : `run @ ${sim.t.toFixed(0)} s`;
+  sim.snapshot(label);
+}

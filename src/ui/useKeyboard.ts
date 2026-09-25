@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import type { Level } from '@/sim/params';
 import { useParams } from '@/store/params';
 import { sim, useUi, type CameraMode } from '@/store/sim';
-import { gustNow } from './actions';
+import { gustNow, snapshot } from './actions';
 
 const CAMERAS: CameraMode[] = ['orbit', 'follow', 'side', 'top'];
 
@@ -50,6 +50,10 @@ export function useKeyboard(): void {
         case 'c':
         case 'C':
           ui.setCamera(CAMERAS[(CAMERAS.indexOf(ui.camera) + 1) % CAMERAS.length]!);
+          break;
+        case 's':
+        case 'S':
+          snapshot();
           break;
         case 'h':
         case 'H':

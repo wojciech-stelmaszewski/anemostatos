@@ -68,6 +68,12 @@ export class Simulation {
   forces: Forces = { thrust: v3(), gravity: v3(), drag: v3(), external: v3(), net: v3() };
   measurement: Measurement | null = null;
   telemetry = new Telemetry(HISTORY_SECONDS * TELEMETRY_HZ);
+  /** A frozen earlier run, overlaid on the charts for comparison. */
+  ghost: { telemetry: Telemetry; label: string } | null = null;
+  /** Scripted events (lessons): run once when simulation time passes `t`. */
+  private scheduled: { t: number; fn: (sim: Simulation) => void }[] = [];
+  /** Setpoint without the automatic profile. */
+  private base: Vec3 = v3();
   /** Times of setpoint steps (for step-response analysis). */
   stepEvents: { t: number; from: number; to: number }[] = [];
 
@@ -80,6 +86,7 @@ export class Simulation {
   constructor(params: Params) {
     this.params = params;
     this.target = v3(params.setpoint.x, params.setpoint.y, params.setpoint.z);
+    this.base = clone(this.target);
     this.setpoint = clone(this.target);
     this.wind = new Wind(params.sim.seed);
     this.sensors = new Sensors(params.sim.seed);
@@ -123,21 +130,63 @@ export class Simulation {
     this.actuation = idleActuation();
     this.target = v3(p.setpoint.x, p.setpoint.y, p.setpoint.z);
     if (p.sim.level === 1) this.target = v3(0, this.target.y, 0);
+    this.base = clone(this.target);
     this.setpoint = v3(this.target.x, this.state.pos.y, this.target.z);
     this.takingOff = true;
     this.yaw = (p.setpoint.yawDeg * Math.PI) / 180;
     this.state.q = p.sim.level === 3 ? qFromAxisAngle(v3(0, 1, 0), 0) : this.state.q;
     this.telemetry.clear();
     this.stepEvents = [];
+    this.scheduled = [];
     this.poke = null;
     this.armed = true;
     this.measurement = null;
     for (const fn of this.resetListeners) fn();
   }
 
+  /** Run `fn` once simulation time reaches `t` (cleared on reset). */
+  schedule(t: number, fn: (sim: Simulation) => void): void {
+    this.scheduled.push({ t, fn });
+    this.scheduled.sort((a, b) => a.t - b.t);
+  }
+
+  clearSchedule(): void {
+    this.scheduled = [];
+  }
+
+  /** Freeze the current run as the comparison ghost. */
+  snapshot(label: string): void {
+    this.ghost = { telemetry: this.telemetry.clone(), label };
+  }
+
   setTarget(pos: Vec3): void {
+    this.base = this.level === 1 ? v3(0, pos.y, 0) : clone(pos);
+    this.applyTarget(this.withProfile(this.base), true);
+  }
+
+  private withProfile(base: Vec3): Vec3 {
+    const sp = this.params.setpoint;
+    if (sp.profile === 'none' || this.takingOff) return base;
+    const phase = (this.t / Math.max(sp.profilePeriod, 0.1)) % 1;
+    const a = sp.profileAmplitude;
+    const off =
+      sp.profile === 'square'
+        ? phase < 0.5
+          ? a
+          : -a
+        : sp.profile === 'sine'
+          ? a * Math.sin(2 * Math.PI * phase)
+          : a * (phase < 0.5 ? 4 * phase - 1 : 3 - 4 * phase);
+    const axis = this.level === 1 ? 'y' : sp.profileAxis;
+    const out = clone(base);
+    out[axis] += off;
+    out.y = Math.max(out.y, 0.2);
+    return out;
+  }
+
+  private applyTarget(pos: Vec3, userStep: boolean): void {
     const next = this.level === 1 ? v3(0, pos.y, 0) : clone(pos);
-    if (length(sub(next, this.target)) > 1e-9) {
+    if (userStep && length(sub(next, this.target)) > 1e-9) {
       this.stepEvents.push({ t: this.t, from: this.target.y, to: next.y });
       if (this.stepEvents.length > 50) this.stepEvents.shift();
     }
@@ -192,6 +241,13 @@ export class Simulation {
     const dt = PHYS_DT;
     this.prevPos = clone(this.state.pos);
     this.prevQ = { ...this.state.q };
+
+    // Scripted events and the automatic setpoint profile.
+    while (this.scheduled.length && this.scheduled[0]!.t <= this.t)
+      this.scheduled.shift()!.fn(this);
+    if (p.setpoint.profile !== 'none') this.applyTarget(this.withProfile(this.base), false);
+    else if (!this.takingOff && length(sub(this.target, this.base)) > 1e-9)
+      this.applyTarget(this.base, false);
 
     // Rate-limited setpoint (always ramped during take-off).
     const rl = p.setpoint.rateLimit > 0 ? p.setpoint.rateLimit : this.takingOff ? TAKEOFF_RATE : 0;

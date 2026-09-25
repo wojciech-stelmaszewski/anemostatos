@@ -24,6 +24,7 @@ export function ChartsPanel() {
       { key: `${id}.meas`, label: 'measured', color: SIGNAL.measurement, width: 2 },
     ];
     if (meta.truth) s.push({ key: meta.truth, label: 'true', color: SIGNAL.truth, dash: [2, 3] });
+    s.push({ key: `${id}.meas`, label: 'ghost', color: SIGNAL.ghost, width: 1.5, ghost: true });
     return s;
   }, [id, meta.truth]);
 
@@ -94,7 +95,10 @@ export function ChartsPanel() {
         <TimeChart
           title="Error e = setpoint − measured"
           unit={meta.unit}
-          series={[{ key: `${id}.err`, label: 'e', color: SIGNAL.error, width: 2 }]}
+          series={[
+            { key: `${id}.err`, label: 'e', color: SIGNAL.error, width: 2 },
+            { key: `${id}.err`, label: 'ghost', color: SIGNAL.ghost, ghost: true },
+          ]}
           includeZero
         />
         <TimeChart

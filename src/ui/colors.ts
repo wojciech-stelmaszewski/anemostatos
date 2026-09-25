@@ -7,6 +7,8 @@ export const SIGNAL = {
   setpoint: '#9aa3b2',
   truth: '#6b7280',
   output: '#e6e9ef',
+  /** The frozen comparison run. */
+  ghost: 'rgba(230,233,239,0.35)',
   // Categorical — validated with the dataviz palette checker on the dark surface
   // (P/I/D/FF adjacent pairs: CVD ΔE ≥ 9.4, normal-vision ΔE ≥ 19.7).
   measurement: '#3987e5',

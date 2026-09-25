@@ -131,18 +131,18 @@ Generated from the parameter schema (see
 Every control has a unit, a range, a reset-to-default, and an ⓘ tooltip with a
 one-paragraph explanation.
 
-| Group          | Parameters                                                                                                                                                                                                                                                                                                            |
-| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Controller** | $K_p, K_i, K_d$ (log-scale sliders + numeric input); P/I/D enable toggles; feedforward on/off and assumed mass $\hat m$; derivative on error/measurement; D filter cutoff; anti-windup mode (+ $K_b$ / limit); output limits; controller rate; parallel/standard form display ($T_i$, $T_d$); Ziegler–Nichols helper. |
-| **Setpoint**   | value (or drag in 3D, or ↑/↓ keys); quick steps (±0.5 m, ±1 m); profile generator: step, square wave, ramp, sine (period, amplitude); setpoint rate limit.                                                                                                                                                            |
-| **Physics**    | true mass; max motor thrust; motor time constant; drag coefficients; payload drop/add buttons.                                                                                                                                                                                                                        |
-| **Wind**       | mean speed/heading/vertical; turbulence σ and τ; gust rate, amplitude range, duration range, vertical share; "Gust now" with direction picker; wind on/off master switch.                                                                                                                                             |
-| **Sensors**    | noise σ, bias, delay.                                                                                                                                                                                                                                                                                                 |
-| **Simulation** | level L1/L2/L3; seed (random / fixed); time scale; reset (keeps parameters) / full reset; share link; export CSV.                                                                                                                                                                                                     |
+| Group          | Parameters                                                                                                                                                                                                                                                                                    |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Controller** | $K_p, K_i, K_d$ (log-scale sliders + numeric input); P/I/D enable toggles; feedforward on/off and assumed mass $\hat m$; derivative on error/measurement; D filter cutoff; anti-windup mode (+ $K_b$ / limit); output limits; controller rate; parallel/standard form display ($T_i$, $T_d$). |
+| **Setpoint**   | value (or drag in 3D, or ↑/↓ keys); quick steps (±0.5 m, ±1 m); profile generator: step, square wave, ramp, sine (period, amplitude); setpoint rate limit.                                                                                                                                    |
+| **Physics**    | true mass; max motor thrust; motor time constant; drag coefficients; payload drop/add buttons.                                                                                                                                                                                                |
+| **Wind**       | mean speed/heading/vertical; turbulence σ and τ; gust rate, amplitude range, duration range, vertical share; "Gust now" with direction picker; wind on/off master switch.                                                                                                                     |
+| **Sensors**    | noise σ, bias, delay.                                                                                                                                                                                                                                                                         |
+| **Simulation** | level L1/L2/L3; seed (random / fixed); time scale; reset (keeps parameters) / full reset; share link; export CSV.                                                                                                                                                                             |
 
 ## 5. Lessons
 
-A lesson = **preset** (parameters + seed) + **short text** (MDX with
+A lesson = **preset** (parameters + seed) + **short text** (TSX with
 KaTeX) + optional **scripted events** (e.g. "at t = 3 s step setpoint to
 3 m", "at t = 8 s gust 6 m/s downward") + optional **goal check**
 ("get overshoot below 5 %").
@@ -160,8 +160,8 @@ Planned lessons (L1 unless stated):
 | 7   | Derivative kick           | Setpoint steps with D on error vs on measurement.                                                          |
 | 8   | Noisy sensor              | D amplifies noise; filter trade-off.                                                                       |
 | 9   | Too slow to react         | Lower controller rate / add sensor delay until unstable.                                                   |
-| 10  | Find the edge             | Ziegler–Nichols ultimate gain experiment, guided.                                                          |
-| 11  | Gust challenge            | Fixed seed, fixed gust sequence; score = RMS error + max deviation + energy used. Beat the reference tune. |
+| 10  | Find the edge             | Raise Kp until lag and sampling make the loop unstable; why Ziegler–Nichols does not fit a hovering drone. |
+| 11  | Gust challenge            | Fixed seed, fixed gust sequence; score = RMS altitude error over 60 s. Beat the default tune.              |
 | 12  | Why drones tilt (L2 → L3) | Same wind, point mass vs quadrotor.                                                                        |
 | 13  | Cascade                   | Tune rate → attitude → velocity → position, inside out.                                                    |
 | 14  | Cascade inversion (L3)    | Outer loop faster than inner → failure.                                                                    |
@@ -172,5 +172,6 @@ unlocked.
 ## 6. Keyboard shortcuts
 
 `Space` pause · `.` single step · `R` reset · `↑/↓` setpoint ±0.1 m
-(Shift: ±1 m) · `G` gust now · `S` snapshot · `1/2/3` simulation level ·
+(Shift: ±1 m) · `G` gust now · `S` snapshot · `M` controller on/off ·
+`1/2/3` simulation level ·
 `C` cycle camera · `H` hide panels.

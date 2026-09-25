@@ -11,8 +11,8 @@
 | App state                   | **Zustand**                                             | Tiny store used by both React UI and R3F; supports transient (non-rendering) subscriptions, which matters for 60 fps data.                                                                     |
 | UI components               | **shadcn/ui** (Radix primitives) + **Tailwind CSS**     | Accessible sliders, toggles, selects, tooltips, tabs, collapsibles; source lives in the repo and is fully restylable.                                                                          |
 | Live charts                 | **uPlot** (wrapped in a React component)                | Canvas-based, built for streaming time series, handles tens of thousands of points at 60 fps. Updated imperatively, never through React state.                                                 |
-| Math typesetting in lessons | **KaTeX** (`react-katex` / MDX)                         | Formulas in the in-app explanations.                                                                                                                                                           |
-| Lesson content              | **MDX**                                                 | Lessons written as Markdown with embedded components (e.g. a "load preset" button).                                                                                                            |
+| Math typesetting in lessons | **KaTeX** (small `<M>` component)                       | Formulas in the in-app explanations.                                                                                                                                                           |
+| Lesson content              | **TSX**                                                 | Lessons are data + JSX text: type-checked, no extra build plugins.                                                                                                                             |
 | Tests                       | **Vitest**                                              | Same config as Vite; physics/control are pure TS.                                                                                                                                              |
 | Lint / format               | ESLint + Prettier                                       |                                                                                                                                                                                                |
 | Running                     | **Local only**, via `Makefile`                          | A toy project: no deployment, no CI/CD. `make dev` to run, `make check` before committing.                                                                                                     |
@@ -73,7 +73,7 @@ src/
     charts/        uPlot wrappers bound to telemetry
     Inspector.tsx  loop inspector panel
     LiveFormula.tsx
-  lessons/       MDX lesson files + lesson runner
+  lessons/       lesson definitions (TSX + KaTeX) + lesson runner
   main.tsx       app entry
 tests/           unit tests mirroring src/sim, src/control, src/engine
 docs/
@@ -140,7 +140,8 @@ telemetry.notify(); // charts/readouts redraw imperatively
 - Parameters are **live**: changes apply at the next simulation step, no
   reset required (except simulation level and seed).
 - Current parameters serialise into the URL hash → any experiment is a
-  shareable link. Presets are the same JSON.
+  shareable link. Lessons act as presets: each modifies a fresh copy of the
+  defaults.
 
 ## 5. Telemetry
 

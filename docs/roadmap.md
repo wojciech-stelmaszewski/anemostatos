@@ -1,10 +1,13 @@
 # Roadmap
 
+> **Status (2026-09-25):** M0–M6 are implemented. What changed against the
+> original plan is noted under each milestone.
+
 Built in small milestones; each ends with something runnable and useful.
 The order is chosen so that the **educational core (L1 altitude loop with
 charts) is usable as early as possible**, and fidelity grows afterwards.
 
-## M0 — Project skeleton
+## M0 — Project skeleton ✅
 
 - Vite + React + TypeScript (strict) + ESLint/Prettier + Vitest.
 - Tailwind CSS + shadcn/ui set up; Zustand; R3F + drei installed.
@@ -16,7 +19,7 @@ charts) is usable as early as possible**, and fidelity grows afterwards.
 **Done when:** `make dev` shows the empty app layout (viewport + panels) and
 `make check` passes.
 
-## M1 — Scene and drone model
+## M1 — Scene and drone model ✅
 
 - R3F `<Canvas>`: camera with drei orbit controls, lights, shadows,
   environment lighting, sky gradient, fog.
@@ -28,7 +31,7 @@ charts) is usable as early as possible**, and fidelity grows afterwards.
 **Done when:** a good-looking drone can be positioned by hand above the grid
 and its height is easy to read from any camera angle.
 
-## M2 — L1 physics + PID + charts (the core)
+## M2 — L1 physics + PID + charts (the core) ✅
 
 - `sim`: L1 dynamics, motor lag, gravity, vertical drag, ground contact.
 - `engine` + `<SimDriver>`: fixed-step loop with accumulator in `useFrame`,
@@ -47,7 +50,7 @@ and its height is easy to read from any camera angle.
 **Done when:** you can take off, change the altitude setpoint and tune
 $K_p, K_i, K_d$ while watching each term on the chart.
 
-## M3 — Wind and disturbances
+## M3 — Wind and disturbances ✅
 
 - Wind model: mean, Ornstein–Uhlenbeck turbulence, 1−cos gusts, seeded.
 - Quadratic drag with relative air velocity (vertical in L1).
@@ -58,20 +61,21 @@ $K_p, K_i, K_d$ while watching each term on the chart.
 **Done when:** the drone visibly gets knocked by gusts and recovers, and
 the same seed reproduces the same wind exactly (tested).
 
-## M4 — Learning tools
+## M4 — Learning tools ✅
 
 - Step-response analyser with on-chart markers and metrics table.
 - Theory readouts ($\omega_n$, $\zeta$, predicted $e_{ss}$).
 - Snapshot/ghost trace comparison, CSV export.
 - Setpoint profiles (square, ramp, sine) and dragging the setpoint ghost.
-- Presets + URL-shareable state.
-- MDX lesson runner + lessons 1–11.
+- URL-shareable state. Lessons double as presets (no separate preset library).
+- Lesson runner + lessons 1–11 (written as TSX with KaTeX instead of MDX:
+  fewer build plugins, type-checked content).
 - Tooltips with explanations for every parameter.
 
 **Done when:** a newcomer can go through the lessons and understand PID
 without any other material.
 
-## M5 — L2: 3D point mass
+## M5 — L2: 3D point mass ✅
 
 - L2 dynamics, three PIDs, horizontal wind.
 - Loop inspector (select `pos.x`, `pos.y`, `pos.z`).
@@ -79,7 +83,7 @@ without any other material.
 
 **Done when:** the drone holds a 3D point in wind from any direction.
 
-## M6 — L3: quadrotor with cascaded control
+## M6 — L3: quadrotor with cascaded control ✅
 
 - 6-DoF rigid-body dynamics, quaternion integration, X-frame torques.
 - Mixer with desaturation; motor saturation glow.
@@ -92,6 +96,11 @@ without any other material.
 default tune, and each loop can be inspected and retuned live.
 
 ## Later / ideas
+
+- Ziegler–Nichols helper (dropped from M4 — the method does not fit a
+  double-integrator plant; see pid-primer.md §6.2). Could return for the
+  rate loop, or with a relay auto-tuner.
+- Physics in a Web Worker if fast-forward on slow machines needs it.
 
 - Frequency response: sine sweep → Bode plot of the closed loop.
 - Root-locus / pole view for the L1 linearised model.

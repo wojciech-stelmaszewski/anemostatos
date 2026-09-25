@@ -125,6 +125,21 @@ Two cures, both available as toggles:
 > $e_{ss} = mg/K_p$ on the chart, predicted value printed next to it. Then
 > enable I, then try feedforward instead.
 
+### 4.1 Why the integral always overshoots here
+
+A surprising but important fact, visible in lesson 5: with an I term, a step
+response of the altitude loop **must** overshoot. At steady state the
+integral has to hold the same value as before the step (the load has not
+changed), so over the whole response
+
+$$
+K_i \int_{t_0}^{\infty} e(t)\,dt = 0 .
+$$
+
+During the climb the error is positive; to cancel that area it has to spend
+some time negative — above the setpoint. Keeping $K_i$ small (and letting
+feedforward carry the known load) keeps this overshoot small.
+
 ## 5. From textbook to reality: the digital PID
 
 A computer runs the controller at discrete instants $t_k = k\,\Delta t$.
@@ -232,12 +247,14 @@ constant_.
    amplitude. That gain is $K_u$, the oscillation period $T_u$.
 2. Classic PID: $K_p = 0.6K_u$, $K_i = 1.2K_u/T_u$, $K_d = 0.075K_uT_u$.
 
-The simulator has a helper that measures $T_u$ from the chart (zero
-crossings) and proposes the gains. Z–N gives an aggressive, rather
-overshooting tune — a good starting point, and a good lesson about why
-heuristics are only heuristics.
+Z–N assumes a plant that is stable on its own (a heater, a tank). A
+hovering drone is a **double integrator**: under P alone it oscillates at
+_every_ gain (lesson 2), so there is no clean ultimate gain — the recipe does
+not apply directly. A good lesson about why heuristics come with
+assumptions.
 
-> **Lesson "Find the edge"** — Ziegler–Nichols step by step.
+> **Lesson "Find the edge"** — keep $K_d$, raise $K_p$ until motor lag and
+> sampling make the loop ring and finally oscillate.
 
 ### 6.3 Parallel vs. standard form
 

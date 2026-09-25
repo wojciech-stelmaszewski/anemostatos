@@ -74,9 +74,15 @@ $$
   adjustable from the true mass $m$. Mismatch ⇒ steady-state error that only
   the I term can fix. (Lesson "Heavier than you think".)
 - Output limits = physical thrust range, so saturation and windup are real.
-- Default tune (with feedforward): $K_p = 6$, $K_i = 2$, $K_d = 4$
-  ($\omega_n \approx 2.4$ rad/s, $\zeta \approx 0.8$ from the PD part alone).
-  To be refined in M2.
+- Default tune (with feedforward): $K_p = 10$, $K_i = 0.8$, $K_d = 7$
+  ($\omega_n \approx 3.2$ rad/s, $\zeta \approx 1.1$ from the PD part alone):
+  ≈ 5 % overshoot on a 1 m step (caused by the I term, see
+  [pid-primer.md §4.1](pid-primer.md#41-why-the-integral-always-overshoots-here)).
+- **Integrators are held at zero while landed and during take-off.** The
+  engine ramps the take-off setpoint at 1 m/s and releases the integrators
+  once the ramp is done and the drone has arrived (or stopped climbing).
+  Without this, the integral winds up on the ground and during the climb —
+  real flight controllers do the same.
 
 This single loop is where most lessons live.
 
@@ -201,9 +207,10 @@ and shows for it: setpoint vs measurement, error, P/I/D/FF contributions,
 output with saturation limits, and editable gains. See
 [ui-and-visualization.md](ui-and-visualization.md#live-charts).
 
-## 6. Presets
+## 6. Presets and sharing
 
-Named parameter sets, loadable from the UI and used by lessons:
-`default`, `p-only`, `pd`, `aggressive`, `sluggish`, `ziegler-nichols`,
-`no-feedforward`, `windup-demo`, … Stored as plain JSON so they can be
-diffed, shared (URL-encoded) and versioned.
+There is no separate preset library: **lessons are the presets.** Each lesson
+is a small function that modifies a fresh copy of the default parameters
+(plus optional scripted events), see `src/lessons/lessons.tsx`. Any
+experiment can also be shared as a link — the full parameter tree is
+serialised as JSON into the URL hash (toolbar → link button).

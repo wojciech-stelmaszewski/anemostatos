@@ -43,8 +43,8 @@ Roughly a 5-inch-class / small camera drone.
 | Max thrust per motor        | $f_{max}$                | 6.1 N                        | Thrust-to-weight ≈ 2.5.                     |
 | Motor time constant         | $\tau_m$                 | 0.03 s                       | First-order lag.                            |
 | Rotor torque coefficient    | $c_\tau$                 | 0.016 m                      | Yaw reaction torque $= c_\tau f_i$.         |
-| Linear drag, horizontal     | $c_{h}$                  | 0.05 N·s²/m²                 | Quadratic drag.                             |
-| Linear drag, vertical       | $c_{v}$                  | 0.10 N·s²/m²                 |                                             |
+| Linear drag, horizontal     | $c_{h}$                  | 0.12 N·s²/m²                 | Quadratic drag.                             |
+| Linear drag, vertical       | $c_{v}$                  | 0.25 N·s²/m²                 | Free-fall terminal speed ≈ 6.3 m/s.         |
 | Angular damping             | $c_\omega$               | 0.002 N·m·s                  | Keeps L3 numerically tame.                  |
 
 ## 4. Equations of motion
@@ -172,9 +172,9 @@ $$
 ### 5.3 Discrete gusts — "1 − cosine" profile
 
 The classic aviation gust shape. Gusts arrive as a Poisson process with rate
-$\lambda$ (default: one every 6 s on average). Each gust draws a random
+$\lambda$ (default: 8 per minute). Each gust draws a random
 direction (horizontal, with a configurable vertical share), peak amplitude
-$A$ (default range 2–8 m/s) and duration $T_g$ (0.5–3 s):
+$A$ (default range 3–9 m/s) and duration $T_g$ (0.6–2.5 s):
 
 $$
 w_{gust}(t) = \hat d\,\frac{A}{2}\left(1 - \cos\frac{2\pi (t - t_0)}{T_g}\right),

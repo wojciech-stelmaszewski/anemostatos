@@ -78,7 +78,19 @@ export function TimeChart({
       scales: {
         x: { time: false },
         y: {
-          range: (_u, min, max) => {
+          range: (u) => {
+            // Own min/max over the drawn series: uPlot's auto range breaks on all-NaN
+            // series (e.g. the ghost trace when there is no ghost).
+            let min = Infinity;
+            let max = -Infinity;
+            series.forEach((s, i) => {
+              if (s.legendOnly) return;
+              for (const v of (u.data[i + 1] ?? []) as (number | null)[]) {
+                if (v == null || Number.isNaN(v)) continue;
+                if (v < min) min = v;
+                if (v > max) max = v;
+              }
+            });
             if (!Number.isFinite(min) || !Number.isFinite(max)) return [-1, 1];
             if (includeZero) {
               min = Math.min(min, 0);

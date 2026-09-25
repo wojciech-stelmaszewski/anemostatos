@@ -6,9 +6,14 @@ const f = (v: number | null, digits = 2, unit = '') =>
   v === null ? '…' : `${v.toFixed(digits)}${unit}`;
 
 /** Rise time, overshoot, settling time and steady-state error of the last setpoint step. */
+/** Only position-like loops have setpoints the user steps; inner loops' setpoints move continuously. */
+const isStepLoop = (id: string) => id === 'alt' || id.startsWith('pos.');
+
 export function StepMetrics({ loopId, unit }: { loopId: string; unit: string }) {
   const [m, setM] = useState<M | null>(null);
+  const applies = isStepLoop(loopId);
   useEffect(() => {
+    if (!applies) return;
     const tick = () => {
       const { t, series } = sim.telemetry.window([`${loopId}.sp`, `${loopId}.meas`], -Infinity);
       setM(analyzeLastStep(t, series[0]!, series[1]!));
@@ -16,7 +21,15 @@ export function StepMetrics({ loopId, unit }: { loopId: string; unit: string }) 
     tick();
     const id = setInterval(tick, 250);
     return () => clearInterval(id);
-  }, [loopId]);
+  }, [loopId, applies]);
+
+  if (!applies)
+    return (
+      <div className="rounded border border-border/60 p-1.5 text-muted">
+        Step-response metrics apply to the position loops, where you set the setpoint. Here the
+        setpoint comes from the outer loop and moves all the time.
+      </div>
+    );
 
   return (
     <div className="space-y-0.5 rounded border border-border/60 p-1.5">

@@ -8,6 +8,9 @@ export function M({ children, display = false }: { children: string; display?: b
     [children, display],
   );
   return (
-    <span className={display ? 'my-1 block' : ''} dangerouslySetInnerHTML={{ __html: html }} />
+    <span
+      className={display ? 'my-1 block overflow-x-auto overflow-y-hidden pb-1' : ''}
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
   );
 }

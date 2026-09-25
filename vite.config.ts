@@ -8,6 +8,8 @@ export default defineConfig({
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },
+  // Three.js alone is ~700 kB; this is a local app, so one chunk is fine.
+  build: { chunkSizeWarningLimit: 2000 },
   test: {
     include: ['tests/**/*.test.ts'],
     environment: 'node',

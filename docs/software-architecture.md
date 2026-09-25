@@ -2,20 +2,20 @@
 
 ## 1. Tech stack
 
-| Concern | Choice | Why |
-| --- | --- | --- |
-| Language | **TypeScript** (strict) | Types for vectors/units/config catch a lot of physics bugs. |
-| Build / dev server | **Vite** | Zero-config, fast HMR, static output. |
-| UI framework | **React 19** | Largest ecosystem, and — decisively — home of React Three Fiber, the best way to build a Three.js app declaratively. |
-| 3D / WebGL | **Three.js** via **React Three Fiber** (R3F) + **drei** | The scene (drone, grid, arrows, overlays) becomes composable components; drei provides orbit/camera controls, environment lighting, contact shadows, text labels, `Line`, performance helpers. |
-| App state | **Zustand** | Tiny store used by both React UI and R3F; supports transient (non-rendering) subscriptions, which matters for 60 fps data. |
-| UI components | **shadcn/ui** (Radix primitives) + **Tailwind CSS** | Accessible sliders, toggles, selects, tooltips, tabs, collapsibles; source lives in the repo and is fully restylable. |
-| Live charts | **uPlot** (wrapped in a React component) | Canvas-based, built for streaming time series, handles tens of thousands of points at 60 fps. Updated imperatively, never through React state. |
-| Math typesetting in lessons | **KaTeX** (`react-katex` / MDX) | Formulas in the in-app explanations. |
-| Lesson content | **MDX** | Lessons written as Markdown with embedded components (e.g. a "load preset" button). |
-| Tests | **Vitest** | Same config as Vite; physics/control are pure TS. |
-| Lint / format | ESLint + Prettier | |
-| Running | **Local only**, via `Makefile` | A toy project: no deployment, no CI/CD. `make dev` to run, `make check` before committing. |
+| Concern                     | Choice                                                  | Why                                                                                                                                                                                            |
+| --------------------------- | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Language                    | **TypeScript** (strict)                                 | Types for vectors/units/config catch a lot of physics bugs.                                                                                                                                    |
+| Build / dev server          | **Vite**                                                | Zero-config, fast HMR, static output.                                                                                                                                                          |
+| UI framework                | **React 19**                                            | Largest ecosystem, and — decisively — home of React Three Fiber, the best way to build a Three.js app declaratively.                                                                           |
+| 3D / WebGL                  | **Three.js** via **React Three Fiber** (R3F) + **drei** | The scene (drone, grid, arrows, overlays) becomes composable components; drei provides orbit/camera controls, environment lighting, contact shadows, text labels, `Line`, performance helpers. |
+| App state                   | **Zustand**                                             | Tiny store used by both React UI and R3F; supports transient (non-rendering) subscriptions, which matters for 60 fps data.                                                                     |
+| UI components               | **shadcn/ui** (Radix primitives) + **Tailwind CSS**     | Accessible sliders, toggles, selects, tooltips, tabs, collapsibles; source lives in the repo and is fully restylable.                                                                          |
+| Live charts                 | **uPlot** (wrapped in a React component)                | Canvas-based, built for streaming time series, handles tens of thousands of points at 60 fps. Updated imperatively, never through React state.                                                 |
+| Math typesetting in lessons | **KaTeX** (`react-katex` / MDX)                         | Formulas in the in-app explanations.                                                                                                                                                           |
+| Lesson content              | **MDX**                                                 | Lessons written as Markdown with embedded components (e.g. a "load preset" button).                                                                                                            |
+| Tests                       | **Vitest**                                              | Same config as Vite; physics/control are pure TS.                                                                                                                                              |
+| Lint / format               | ESLint + Prettier                                       |                                                                                                                                                                                                |
+| Running                     | **Local only**, via `Makefile`                          | A toy project: no deployment, no CI/CD. `make dev` to run, `make check` before committing.                                                                                                     |
 
 Physics and control code **must not import React, Three.js or DOM APIs**.
 They use a tiny own vector/quaternion module (`src/math`) so the core can be
@@ -108,14 +108,14 @@ any scene component reads the new state in the same frame:
 
 ```ts
 // SimDriver: useFrame((_, delta) => { ... }, -1)
-const frameDt = Math.min(delta, 0.1);             // clamp: tab was hidden etc.
-accumulator += frameDt * timeScale;               // timeScale: 0 (pause) … 0.1 (slow-mo) … 4
+const frameDt = Math.min(delta, 0.1); // clamp: tab was hidden etc.
+accumulator += frameDt * timeScale; // timeScale: 0 (pause) … 0.1 (slow-mo) … 4
 while (accumulator >= PHYS_DT) {
-  sim.step(PHYS_DT);                              // controllers run inside, every n-th step
+  sim.step(PHYS_DT); // controllers run inside, every n-th step
   accumulator -= PHYS_DT;
 }
-sim.alpha = accumulator / PHYS_DT;               // scene components interpolate prev → current
-telemetry.notify();                               // charts/readouts redraw imperatively
+sim.alpha = accumulator / PHYS_DT; // scene components interpolate prev → current
+telemetry.notify(); // charts/readouts redraw imperatively
 ```
 
 - `PHYS_DT` = 1 ms. At 1× speed that is ~16 physics steps per 60 Hz frame.
@@ -157,13 +157,13 @@ telemetry.notify();                               // charts/readouts redraw impe
 
 ## 6. Testing strategy
 
-| Area | Tests |
-| --- | --- |
-| `math` | quaternion ops, rotations, normalisation, PRNG determinism. |
-| `pid` | each term in isolation, derivative on measurement (no kick), filter step response, each anti-windup mode, bumpless gain change, reset. |
-| `sim` | free fall matches $\frac12 g t^2$; hover equilibrium with $T = mg$; motor lag time constant; drag terminal velocity; torque sign conventions; OU process mean/variance statistics; gust profile shape. |
-| `control` | L1 closed loop reaches setpoint with $e_{ss} \approx 0$ with I; P-only $e_{ss} \approx mg/K_p$ (the theory check!); mixer round-trip $A^{-1}A = I$; L3 hover and step converge. |
-| `engine` | same seed ⇒ bit-identical trajectories; step metrics on synthetic signals. |
+| Area      | Tests                                                                                                                                                                                                  |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `math`    | quaternion ops, rotations, normalisation, PRNG determinism.                                                                                                                                            |
+| `pid`     | each term in isolation, derivative on measurement (no kick), filter step response, each anti-windup mode, bumpless gain change, reset.                                                                 |
+| `sim`     | free fall matches $\frac12 g t^2$; hover equilibrium with $T = mg$; motor lag time constant; drag terminal velocity; torque sign conventions; OU process mean/variance statistics; gust profile shape. |
+| `control` | L1 closed loop reaches setpoint with $e_{ss} \approx 0$ with I; P-only $e_{ss} \approx mg/K_p$ (the theory check!); mixer round-trip $A^{-1}A = I$; L3 hover and step converge.                        |
+| `engine`  | same seed ⇒ bit-identical trajectories; step metrics on synthetic signals.                                                                                                                             |
 
 The UI and rendering are verified manually / via screenshots; they contain no
 logic worth unit-testing if the split above is respected.

@@ -18,12 +18,12 @@ interface PidConfig {
   ki: number;
   kd: number;
   derivativeOn: 'error' | 'measurement';
-  dFilterHz: number | null;       // null = no filter
+  dFilterHz: number | null; // null = no filter
   outMin: number;
   outMax: number;
   antiWindup: AntiWindup;
-  iLimit?: number;                 // for 'integral-limit'
-  kb?: number;                     // for 'back-calculation'
+  iLimit?: number; // for 'integral-limit'
+  kb?: number; // for 'back-calculation'
   enabled: { p: boolean; i: boolean; d: boolean }; // per-term toggles for lessons
 }
 
@@ -34,17 +34,17 @@ interface PidTerms {
   p: number;
   i: number;
   d: number;
-  ff: number;          // feedforward passed in by the caller
+  ff: number; // feedforward passed in by the caller
   unsaturated: number; // p + i + d + ff
-  output: number;      // after clamping to [outMin, outMax]
+  output: number; // after clamping to [outMin, outMax]
   saturated: boolean;
 }
 
 interface Pid {
   update(setpoint: number, measurement: number, dt: number, ff?: number): PidTerms;
-  reset(integral?: number): void;   // bumpless re-init support
+  reset(integral?: number): void; // bumpless re-init support
   readonly last: PidTerms;
-  config: PidConfig;                // mutable at runtime
+  config: PidConfig; // mutable at runtime
 }
 ```
 
@@ -187,7 +187,7 @@ Saturation handling (visible in the motor bar chart):
 ### 4.7 Loop rates and the cascade rule
 
 Defaults: rate 1 kHz, attitude 250 Hz, velocity 100 Hz, position 50 Hz — all
-configurable. Each inner loop should be ~5–10× faster (in *bandwidth*, not
+configurable. Each inner loop should be ~5–10× faster (in _bandwidth_, not
 just sample rate) than the one around it.
 
 > **Lesson "Cascade inversion"** — make the attitude loop slower than the

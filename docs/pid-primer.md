@@ -19,16 +19,16 @@ flowchart LR
     SENS -- "measurement y" --> SUM
 ```
 
-| Symbol | Name | In Anemostatos (altitude loop) |
-| --- | --- | --- |
-| $r$ | setpoint / reference | desired altitude, e.g. 2.0 m |
-| $y$ | process variable / measurement | measured altitude |
-| $e = r - y$ | error | how far below the target we are |
-| $u$ | control output / command | collective thrust command |
-| $d$ | disturbance | wind gusts (gravity is a constant disturbance too) |
+| Symbol      | Name                           | In Anemostatos (altitude loop)                     |
+| ----------- | ------------------------------ | -------------------------------------------------- |
+| $r$         | setpoint / reference           | desired altitude, e.g. 2.0 m                       |
+| $y$         | process variable / measurement | measured altitude                                  |
+| $e = r - y$ | error                          | how far below the target we are                    |
+| $u$         | control output / command       | collective thrust command                          |
+| $d$         | disturbance                    | wind gusts (gravity is a constant disturbance too) |
 
 The controller never sees the wind. It only sees the error and reacts to it.
-That is the whole point of *feedback*: you do not need to model a disturbance
+That is the whole point of _feedback_: you do not need to model a disturbance
 to reject it.
 
 ## 2. The ideal (continuous) PID
@@ -88,12 +88,12 @@ $$
 
 When the setpoint jumps (e.g. 1 m → 3 m) we measure:
 
-| Metric | Definition |
-| --- | --- |
-| Rise time | time from 10 % to 90 % of the step |
-| Overshoot | peak above the setpoint, as % of step size |
-| Settling time | time after which the output stays within ±2 % of the step |
-| Steady-state error | remaining error once everything has settled |
+| Metric             | Definition                                                |
+| ------------------ | --------------------------------------------------------- |
+| Rise time          | time from 10 % to 90 % of the step                        |
+| Overshoot          | peak above the setpoint, as % of step size                |
+| Settling time      | time after which the output stays within ±2 % of the step |
+| Steady-state error | remaining error once everything has settled               |
 
 The simulator computes and displays these automatically after each setpoint
 step (see [ui-and-visualization.md](ui-and-visualization.md#step-response-metrics)).
@@ -108,7 +108,7 @@ T = K_p\, e \quad\Rightarrow\quad \text{at equilibrium } K_p\, e_{ss} = mg
 \quad\Rightarrow\quad e_{ss} = \frac{mg}{K_p}
 $$
 
-So the drone settles *below* the setpoint, by exactly as much as is needed
+So the drone settles _below_ the setpoint, by exactly as much as is needed
 for the error to "hold it up". Increasing $K_p$ shrinks the droop but never
 removes it (and eventually causes oscillation).
 
@@ -118,7 +118,7 @@ Two cures, both available as toggles:
    $e_{ss} \to 0$.
 2. **Feedforward** — add the known hover thrust directly:
    $T = mg + \text{PID}(e)$. Now the controller only has to fight the
-   *deviations*. This is what real flight controllers do; the I term then
+   _deviations_. This is what real flight controllers do; the I term then
    only mops up model errors (wrong mass, battery sag, constant wind).
 
 > **Lesson "The gravity droop"** — P-only, no feedforward: observe
@@ -139,7 +139,7 @@ u_k &= K_p\, e_k + I_k + D_k
 \end{aligned}
 $$
 
-Note that $K_i$ is applied *inside* the integral. That way changing $K_i$
+Note that $K_i$ is applied _inside_ the integral. That way changing $K_i$
 on the fly does not cause a jump in the output (the stored integral is
 already scaled).
 
@@ -160,7 +160,7 @@ $$
 D_k = -K_d\, \frac{y_k - y_{k-1}}{\Delta t}
 $$
 
-Same damping, no kick. Toggle: *D on error / D on measurement*.
+Same damping, no kick. Toggle: _D on error / D on measurement_.
 
 ### 5.2 Noise → filtered derivative
 
@@ -174,7 +174,7 @@ D_k = \alpha\, D_{k-1} + (1-\alpha)\,D_k^{\text{raw}},
 $$
 
 The filter adds lag, so too much filtering brings back oscillation.
-Parameter: *D filter cutoff (Hz)*.
+Parameter: _D filter cutoff (Hz)_.
 
 > **Lesson "Noisy sensor"** — enable altimeter noise, watch the D
 > contribution chart turn into a hairball and the motors jitter; then
@@ -190,12 +190,12 @@ recovery.
 
 Anti-windup strategies (selectable):
 
-| Strategy | Idea |
-| --- | --- |
-| None | For demonstration of the problem. |
-| Clamping (conditional integration) | Stop integrating while the output is saturated *and* the error would push further into saturation. |
-| Integral limit | Hard clamp on $|I|$. Simple, crude. |
-| Back-calculation | Feed the difference between saturated and unsaturated output back into the integrator with gain $K_b$. |
+| Strategy                           | Idea                                                                                                   |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| None                               | For demonstration of the problem.                                                                      |
+| Clamping (conditional integration) | Stop integrating while the output is saturated _and_ the error would push further into saturation.     |
+| Integral limit                     | Hard clamp on $                                                                                        | I   | $. Simple, crude. |
+| Back-calculation                   | Feed the difference between saturated and unsaturated output back into the integrator with gain $K_b$. |
 
 > **Lesson "Windup"** — hold the drone down with a strong downward gust
 > (or a large step up with low thrust limit), watch the I term grow on the
@@ -205,8 +205,8 @@ Anti-windup strategies (selectable):
 
 Motors cannot change speed instantly; they behave like a first-order lag with
 time constant $\tau_m$ (≈ 20–50 ms for small drones). Lag, like sampling
-delay, limits how aggressive the gains can be. Parameter: *motor time
-constant*.
+delay, limits how aggressive the gains can be. Parameter: _motor time
+constant_.
 
 ### 5.5 Other practical details (implemented, briefly explained in UI)
 
@@ -271,20 +271,20 @@ the loop around it.** Details in
 
 ## 8. Glossary
 
-| Term | Meaning |
-| --- | --- |
-| Plant | The system being controlled (the drone). |
-| Setpoint | Target value. |
-| Disturbance | Unmeasured external input (wind). |
-| Saturation | Actuator at its limit. |
-| Windup | Integral growing during saturation. |
-| Feedforward | Command computed from a model, added to feedback. |
-| Cascade | Nested loops, outer output = inner setpoint. |
-| Bandwidth | Roughly: how fast a loop can follow changes. |
+| Term          | Meaning                                                |
+| ------------- | ------------------------------------------------------ |
+| Plant         | The system being controlled (the drone).               |
+| Setpoint      | Target value.                                          |
+| Disturbance   | Unmeasured external input (wind).                      |
+| Saturation    | Actuator at its limit.                                 |
+| Windup        | Integral growing during saturation.                    |
+| Feedforward   | Command computed from a model, added to feedback.      |
+| Cascade       | Nested loops, outer output = inner setpoint.           |
+| Bandwidth     | Roughly: how fast a loop can follow changes.           |
 | Settling time | Time until the response stays within a tolerance band. |
 
 ## Further reading
 
-- K. J. Åström, R. M. Murray — *Feedback Systems* (free online), ch. 10–11.
-- B. Douglas — *Understanding PID Control* video series (MathWorks).
+- K. J. Åström, R. M. Murray — _Feedback Systems_ (free online), ch. 10–11.
+- B. Douglas — _Understanding PID Control_ video series (MathWorks).
 - PX4 and Betaflight documentation on multicopter controller structure.

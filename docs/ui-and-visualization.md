@@ -58,15 +58,15 @@ Procedural (a `<Drone>` R3F component built from Three.js primitives, no
 external assets),
 aimed at a clean "product render" look:
 
-| Part | Construction |
-| --- | --- |
-| Frame | X-shaped carbon arms: flattened rounded boxes, dark graphite with subtle carbon-weave normal/roughness texture (generated). |
-| Body | Rounded box core + smooth top canopy in an accent colour (e.g. orange), small vent details. |
-| Battery | Pack strapped under the body, with a strap. |
-| Motors | Metallic bells (cylinders with a chamfer), anodised accent rings. |
-| Propellers | Two-blade, slightly twisted blades; CW/CCW pairs mirrored. Spin speed ∝ √thrust. Above a threshold, blades fade into a translucent motion-blur disc whose opacity follows thrust. |
-| Orientation cues | Front: small camera pod + white/green LEDs. Rear: red LEDs. Needed in L3 to read yaw. |
-| Landing gear | Four short legs / skids. |
+| Part             | Construction                                                                                                                                                                      |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Frame            | X-shaped carbon arms: flattened rounded boxes, dark graphite with subtle carbon-weave normal/roughness texture (generated).                                                       |
+| Body             | Rounded box core + smooth top canopy in an accent colour (e.g. orange), small vent details.                                                                                       |
+| Battery          | Pack strapped under the body, with a strap.                                                                                                                                       |
+| Motors           | Metallic bells (cylinders with a chamfer), anodised accent rings.                                                                                                                 |
+| Propellers       | Two-blade, slightly twisted blades; CW/CCW pairs mirrored. Spin speed ∝ √thrust. Above a threshold, blades fade into a translucent motion-blur disc whose opacity follows thrust. |
+| Orientation cues | Front: small camera pod + white/green LEDs. Rear: red LEDs. Needed in L3 to read yaw.                                                                                             |
+| Landing gear     | Four short legs / skids.                                                                                                                                                          |
 
 - PBR materials (`MeshStandardMaterial`), image-based lighting from a
   generated `RoomEnvironment`, one directional key light casting soft shadows.
@@ -76,15 +76,15 @@ aimed at a clean "product render" look:
 
 ### 2.3 Overlays (all toggleable)
 
-| Overlay | Meaning |
-| --- | --- |
-| Setpoint ghost | Translucent wireframe drone (or crosshair) at the target. Draggable with the mouse to change the setpoint. |
-| Error line | Dashed line drone → setpoint, labelled with the error. |
-| Force arrows | Thrust, gravity, drag/wind force, net force — scaled in N, colour-coded as in the charts. |
-| Term arrows (L1/L2) | Separate arrows for the P, I, D and feedforward contributions — the PID made visible *on the drone*. |
-| Desired thrust vector (L3) | $\vec F_{des}$ from the cascade vs. actual thrust axis. |
-| Trail | Fading path of the last N seconds. |
-| Wind | Streaking particles moving with the air velocity; density/brightness ∝ speed; a flash/wave when a gust starts. Plus a HUD wind indicator (arrow + m/s). |
+| Overlay                    | Meaning                                                                                                                                                 |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Setpoint ghost             | Translucent wireframe drone (or crosshair) at the target. Draggable with the mouse to change the setpoint.                                              |
+| Error line                 | Dashed line drone → setpoint, labelled with the error.                                                                                                  |
+| Force arrows               | Thrust, gravity, drag/wind force, net force — scaled in N, colour-coded as in the charts.                                                               |
+| Term arrows (L1/L2)        | Separate arrows for the P, I, D and feedforward contributions — the PID made visible _on the drone_.                                                    |
+| Desired thrust vector (L3) | $\vec F_{des}$ from the cascade vs. actual thrust axis.                                                                                                 |
+| Trail                      | Fading path of the last N seconds.                                                                                                                      |
+| Wind                       | Streaking particles moving with the air velocity; density/brightness ∝ speed; a flash/wave when a gust starts. Plus a HUD wind indicator (arrow + m/s). |
 
 ### 2.4 Camera
 
@@ -97,14 +97,14 @@ aimed at a clean "product render" look:
 All charts share the time axis, cursor and pause state (hover on one →
 crosshair and values in all). Time window: 5 / 10 / 30 / 60 s.
 
-| Chart | Series |
-| --- | --- |
-| **Tracking** | setpoint (dashed), measurement, true value (if sensor noise/bias is on — shows the difference!), frozen "ghost" run for comparison. |
-| **Error** | $e(t)$, ±2 % settling band after a step, shaded integral area (what the I term "sees"). |
-| **PID terms** | P, I, D, FF contributions and total output $u$; output limits drawn as bands; saturated intervals shaded. The single most important chart. |
-| **Actuators** | Four motor thrusts (commanded vs. actual — shows motor lag), limits. |
-| **Disturbance** | Wind components / magnitude, gust events as markers. |
-| **Attitude (L3)** | roll/pitch/yaw setpoint vs actual; body rates. |
+| Chart             | Series                                                                                                                                     |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Tracking**      | setpoint (dashed), measurement, true value (if sensor noise/bias is on — shows the difference!), frozen "ghost" run for comparison.        |
+| **Error**         | $e(t)$, ±2 % settling band after a step, shaded integral area (what the I term "sees").                                                    |
+| **PID terms**     | P, I, D, FF contributions and total output $u$; output limits drawn as bands; saturated intervals shaded. The single most important chart. |
+| **Actuators**     | Four motor thrusts (commanded vs. actual — shows motor lag), limits.                                                                       |
+| **Disturbance**   | Wind components / magnitude, gust events as markers.                                                                                       |
+| **Attitude (L3)** | roll/pitch/yaw setpoint vs actual; body rates.                                                                                             |
 
 - **Loop selector**: in L2/L3 the Tracking/Error/PID charts follow the loop
   chosen in the inspector (`alt`, `vel.x`, `att.roll`, `rate.pitch`, …).
@@ -131,14 +131,14 @@ Generated from the parameter schema (see
 Every control has a unit, a range, a reset-to-default, and an ⓘ tooltip with a
 one-paragraph explanation.
 
-| Group | Parameters |
-| --- | --- |
+| Group          | Parameters                                                                                                                                                                                                                                                                                                            |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Controller** | $K_p, K_i, K_d$ (log-scale sliders + numeric input); P/I/D enable toggles; feedforward on/off and assumed mass $\hat m$; derivative on error/measurement; D filter cutoff; anti-windup mode (+ $K_b$ / limit); output limits; controller rate; parallel/standard form display ($T_i$, $T_d$); Ziegler–Nichols helper. |
-| **Setpoint** | value (or drag in 3D, or ↑/↓ keys); quick steps (±0.5 m, ±1 m); profile generator: step, square wave, ramp, sine (period, amplitude); setpoint rate limit. |
-| **Physics** | true mass; max motor thrust; motor time constant; drag coefficients; payload drop/add buttons. |
-| **Wind** | mean speed/heading/vertical; turbulence σ and τ; gust rate, amplitude range, duration range, vertical share; "Gust now" with direction picker; wind on/off master switch. |
-| **Sensors** | noise σ, bias, delay. |
-| **Simulation** | level L1/L2/L3; seed (random / fixed); time scale; reset (keeps parameters) / full reset; share link; export CSV. |
+| **Setpoint**   | value (or drag in 3D, or ↑/↓ keys); quick steps (±0.5 m, ±1 m); profile generator: step, square wave, ramp, sine (period, amplitude); setpoint rate limit.                                                                                                                                                            |
+| **Physics**    | true mass; max motor thrust; motor time constant; drag coefficients; payload drop/add buttons.                                                                                                                                                                                                                        |
+| **Wind**       | mean speed/heading/vertical; turbulence σ and τ; gust rate, amplitude range, duration range, vertical share; "Gust now" with direction picker; wind on/off master switch.                                                                                                                                             |
+| **Sensors**    | noise σ, bias, delay.                                                                                                                                                                                                                                                                                                 |
+| **Simulation** | level L1/L2/L3; seed (random / fixed); time scale; reset (keeps parameters) / full reset; share link; export CSV.                                                                                                                                                                                                     |
 
 ## 5. Lessons
 
@@ -149,22 +149,22 @@ KaTeX) + optional **scripted events** (e.g. "at t = 3 s step setpoint to
 
 Planned lessons (L1 unless stated):
 
-| # | Title | Idea |
-| --- | --- | --- |
-| 1 | Meet the loop | Tour of the screen: setpoint, error, output. Controller off → the drone falls. |
-| 2 | Just a spring | P-only with feedforward: it oscillates. Why? $\omega_n$, no damping. |
-| 3 | The gravity droop | P-only, no feedforward: $e_{ss} = mg/K_p$, predicted vs measured. |
-| 4 | Add a damper | Add D, reach critical damping; relate to $\zeta$. |
-| 5 | Integral to the rescue | Mass mismatch / constant wind → steady error → I removes it; I-induced overshoot. |
-| 6 | Windup | Saturation + integral = overshoot; compare anti-windup strategies. |
-| 7 | Derivative kick | Setpoint steps with D on error vs on measurement. |
-| 8 | Noisy sensor | D amplifies noise; filter trade-off. |
-| 9 | Too slow to react | Lower controller rate / add sensor delay until unstable. |
-| 10 | Find the edge | Ziegler–Nichols ultimate gain experiment, guided. |
-| 11 | Gust challenge | Fixed seed, fixed gust sequence; score = RMS error + max deviation + energy used. Beat the reference tune. |
-| 12 | Why drones tilt (L2 → L3) | Same wind, point mass vs quadrotor. |
-| 13 | Cascade | Tune rate → attitude → velocity → position, inside out. |
-| 14 | Cascade inversion (L3) | Outer loop faster than inner → failure. |
+| #   | Title                     | Idea                                                                                                       |
+| --- | ------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| 1   | Meet the loop             | Tour of the screen: setpoint, error, output. Controller off → the drone falls.                             |
+| 2   | Just a spring             | P-only with feedforward: it oscillates. Why? $\omega_n$, no damping.                                       |
+| 3   | The gravity droop         | P-only, no feedforward: $e_{ss} = mg/K_p$, predicted vs measured.                                          |
+| 4   | Add a damper              | Add D, reach critical damping; relate to $\zeta$.                                                          |
+| 5   | Integral to the rescue    | Mass mismatch / constant wind → steady error → I removes it; I-induced overshoot.                          |
+| 6   | Windup                    | Saturation + integral = overshoot; compare anti-windup strategies.                                         |
+| 7   | Derivative kick           | Setpoint steps with D on error vs on measurement.                                                          |
+| 8   | Noisy sensor              | D amplifies noise; filter trade-off.                                                                       |
+| 9   | Too slow to react         | Lower controller rate / add sensor delay until unstable.                                                   |
+| 10  | Find the edge             | Ziegler–Nichols ultimate gain experiment, guided.                                                          |
+| 11  | Gust challenge            | Fixed seed, fixed gust sequence; score = RMS error + max deviation + energy used. Beat the reference tune. |
+| 12  | Why drones tilt (L2 → L3) | Same wind, point mass vs quadrotor.                                                                        |
+| 13  | Cascade                   | Tune rate → attitude → velocity → position, inside out.                                                    |
+| 14  | Cascade inversion (L3)    | Outer loop faster than inner → failure.                                                                    |
 
 Lessons are optional: the sandbox is always available with every parameter
 unlocked.

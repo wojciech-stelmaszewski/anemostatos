@@ -22,30 +22,30 @@ make control interesting**. Every parameter listed here is exposed in the UI
 The project grows through three levels of fidelity. All share the wind
 model, integrator and telemetry; they differ in what the "plant" is.
 
-| Level | Plant | State | Control input | Purpose |
-| --- | --- | --- | --- | --- |
-| **L1 — Altitude** | 1D point mass on the vertical axis | $y, \dot y$ | collective thrust $T$ | Pure, clean PID lessons. Drone is locked horizontally and level. |
-| **L2 — Point mass 3D** | 3D point mass with a force vector | $\vec p, \vec v$ | force $\vec F$ (3 axes, limited) | Three independent PIDs; shows wind from any direction. Physically a "cheat" (drones can't push sideways), clearly labelled as such. |
-| **L3 — Quadrotor** | 6-DoF rigid body with 4 motors | $\vec p, \vec v, q, \vec\omega$, motor speeds | 4 motor commands | Realistic: tilt to move, cascaded PID, mixer, motor saturation. |
+| Level                  | Plant                              | State                                         | Control input                    | Purpose                                                                                                                             |
+| ---------------------- | ---------------------------------- | --------------------------------------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| **L1 — Altitude**      | 1D point mass on the vertical axis | $y, \dot y$                                   | collective thrust $T$            | Pure, clean PID lessons. Drone is locked horizontally and level.                                                                    |
+| **L2 — Point mass 3D** | 3D point mass with a force vector  | $\vec p, \vec v$                              | force $\vec F$ (3 axes, limited) | Three independent PIDs; shows wind from any direction. Physically a "cheat" (drones can't push sideways), clearly labelled as such. |
+| **L3 — Quadrotor**     | 6-DoF rigid body with 4 motors     | $\vec p, \vec v, q, \vec\omega$, motor speeds | 4 motor commands                 | Realistic: tilt to move, cascaded PID, mixer, motor saturation.                                                                     |
 
-In L1 and L2 the drone is still *rendered* as a full quadrotor (props
+In L1 and L2 the drone is still _rendered_ as a full quadrotor (props
 spinning according to thrust), just with constrained motion.
 
 ## 3. Drone parameters (defaults)
 
 Roughly a 5-inch-class / small camera drone.
 
-| Parameter | Symbol | Default | Notes |
-| --- | --- | --- | --- |
-| Mass | $m$ | 1.0 kg | Changeable at runtime (e.g. "add payload"). |
-| Arm length (centre → motor) | $L$ | 0.17 m | X configuration. |
-| Inertia | $I_{xx}, I_{yy}, I_{zz}$ | 0.0082, 0.0149, 0.0082 kg·m² | $I_{yy}$ = yaw axis. |
-| Max thrust per motor | $f_{max}$ | 6.1 N | Thrust-to-weight ≈ 2.5. |
-| Motor time constant | $\tau_m$ | 0.03 s | First-order lag. |
-| Rotor torque coefficient | $c_\tau$ | 0.016 m | Yaw reaction torque $= c_\tau f_i$. |
-| Linear drag, horizontal | $c_{h}$ | 0.05 N·s²/m² | Quadratic drag. |
-| Linear drag, vertical | $c_{v}$ | 0.10 N·s²/m² | |
-| Angular damping | $c_\omega$ | 0.002 N·m·s | Keeps L3 numerically tame. |
+| Parameter                   | Symbol                   | Default                      | Notes                                       |
+| --------------------------- | ------------------------ | ---------------------------- | ------------------------------------------- |
+| Mass                        | $m$                      | 1.0 kg                       | Changeable at runtime (e.g. "add payload"). |
+| Arm length (centre → motor) | $L$                      | 0.17 m                       | X configuration.                            |
+| Inertia                     | $I_{xx}, I_{yy}, I_{zz}$ | 0.0082, 0.0149, 0.0082 kg·m² | $I_{yy}$ = yaw axis.                        |
+| Max thrust per motor        | $f_{max}$                | 6.1 N                        | Thrust-to-weight ≈ 2.5.                     |
+| Motor time constant         | $\tau_m$                 | 0.03 s                       | First-order lag.                            |
+| Rotor torque coefficient    | $c_\tau$                 | 0.016 m                      | Yaw reaction torque $= c_\tau f_i$.         |
+| Linear drag, horizontal     | $c_{h}$                  | 0.05 N·s²/m²                 | Quadratic drag.                             |
+| Linear drag, vertical       | $c_{v}$                  | 0.10 N·s²/m²                 |                                             |
+| Angular damping             | $c_\omega$               | 0.002 N·m·s                  | Keeps L3 numerically tame.                  |
 
 ## 4. Equations of motion
 
@@ -80,8 +80,8 @@ $$
 F_{drag,j} = -c_j\,|v_{rel,j}|\,v_{rel,j}\quad (j \in \{x,y,z\},\ c_y = c_v,\ c_x = c_z = c_h)
 $$
 
-  This is how wind acts on the drone: a hovering drone ($\vec v = 0$) in wind
-  $\vec w$ feels a force *along* the wind, growing with its square.
+This is how wind acts on the drone: a hovering drone ($\vec v = 0$) in wind
+$\vec w$ feels a force _along_ the wind, growing with its square.
 
 ### 4.3 Rotation (L3 only)
 
@@ -130,7 +130,7 @@ $$
 
 - If $y \le 0$ and $\dot y < 0$: clamp $y = 0$, $\dot y = 0$, apply strong
   horizontal friction, and (L3) force the attitude level. The drone is then
-  *landed*.
+  _landed_.
 - Simulation starts landed with motors idle; "Take off" enables the
   controller with the initial setpoint.
 - A crash (hitting the ground with $|\dot y| > 3$ m/s or tilt > 80°) marks
@@ -201,12 +201,12 @@ controller tunings can be compared fairly on the exact same disturbance.
 The controller never reads the true state directly; it reads a **sensor
 model**:
 
-| Option | Default | Effect |
-| --- | --- | --- |
-| Gaussian noise σ (per signal) | off (altitude 0.02 m when on) | Shows the D-term noise problem. |
-| Bias | off | Constant offset; shows that feedback can't fix a wrong sensor. |
-| Delay | 0 ms | Transport delay; shows loss of stability margin. |
-| Sample rate | = controller rate | Sample-and-hold between samples. |
+| Option                        | Default                       | Effect                                                         |
+| ----------------------------- | ----------------------------- | -------------------------------------------------------------- |
+| Gaussian noise σ (per signal) | off (altitude 0.02 m when on) | Shows the D-term noise problem.                                |
+| Bias                          | off                           | Constant offset; shows that feedback can't fix a wrong sensor. |
+| Delay                         | 0 ms                          | Transport delay; shows loss of stability margin.               |
+| Sample rate                   | = controller rate             | Sample-and-hold between samples.                               |
 
 In L3 the sensors provide position, velocity, attitude and body rates (an
 idealised "perfect state estimator" + optional noise). State estimation is
@@ -217,7 +217,7 @@ explicitly out of scope.
 - **Fixed physics step** $\Delta t_{phys}$ = 1 ms (1 kHz). Fast enough to
   resolve motor lag (30 ms) and rotational dynamics with a simple method.
 - **Semi-implicit (symplectic) Euler**: update velocity from forces, then
-  position from the *new* velocity; same for $\vec\omega$ and $q$.
+  position from the _new_ velocity; same for $\vec\omega$ and $q$.
   Quaternion renormalised every step.
 - The controller runs every $n$ physics steps
   ($\Delta t_{ctrl} = n\,\Delta t_{phys}$), holding its output constant in

@@ -1,6 +1,6 @@
 # Anemostatos — Documentation
 
-> *ánemos* (wind) + *statós* (standing): "the one that stands in the wind".
+> _ánemos_ (wind) + _statós_ (standing): "the one that stands in the wind".
 
 Anemostatos is an **educational, interactive simulator of a PID controller**.
 A quadcopter drone hovers above an infinite reference grid in a 3D WebGL
@@ -16,7 +16,7 @@ anti-windup…) is visible, tweakable and plotted live.
 
 1. Build intuition for what the **P**, **I** and **D** terms each do — and
    what goes wrong when one of them is missing or mistuned.
-2. Show the practical problems of a *real* digital PID: discrete time,
+2. Show the practical problems of a _real_ digital PID: discrete time,
    actuator saturation, integrator windup, derivative kick, sensor noise,
    actuator lag.
 3. Show how PID controllers are **composed** (cascaded loops) to control a
@@ -33,14 +33,14 @@ anti-windup…) is visible, tweakable and plotted live.
 
 ## Document index
 
-| Document | Contents |
-| --- | --- |
-| [pid-primer.md](pid-primer.md) | PID theory from the ground up, discrete implementation, the practical pitfalls, tuning. The "textbook" of the project. |
-| [physics-model.md](physics-model.md) | Units, frames, drone dynamics, motors, gravity, drag, the wind/gust model, numerical integration. |
-| [control-architecture.md](control-architecture.md) | How the controllers are wired for each simulation level: altitude loop, 3-axis loop, full cascade (position → velocity → attitude → rate → mixer). |
-| [software-architecture.md](software-architecture.md) | Tech stack, module layout, simulation loop, data flow, telemetry, testing. |
-| [ui-and-visualization.md](ui-and-visualization.md) | 3D scene, drone model, overlays, live charts, parameter panel, lessons/scenarios. |
-| [roadmap.md](roadmap.md) | The implementation plan: milestones, deliverables, acceptance criteria. |
+| Document                                             | Contents                                                                                                                                           |
+| ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [pid-primer.md](pid-primer.md)                       | PID theory from the ground up, discrete implementation, the practical pitfalls, tuning. The "textbook" of the project.                             |
+| [physics-model.md](physics-model.md)                 | Units, frames, drone dynamics, motors, gravity, drag, the wind/gust model, numerical integration.                                                  |
+| [control-architecture.md](control-architecture.md)   | How the controllers are wired for each simulation level: altitude loop, 3-axis loop, full cascade (position → velocity → attitude → rate → mixer). |
+| [software-architecture.md](software-architecture.md) | Tech stack, module layout, simulation loop, data flow, telemetry, testing.                                                                         |
+| [ui-and-visualization.md](ui-and-visualization.md)   | 3D scene, drone model, overlays, live charts, parameter panel, lessons/scenarios.                                                                  |
+| [roadmap.md](roadmap.md)                             | The implementation plan: milestones, deliverables, acceptance criteria.                                                                            |
 
 ## At a glance
 

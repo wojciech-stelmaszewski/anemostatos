@@ -101,8 +101,8 @@ default tune, and each loop can be inspected and retuned live.
 
 ## Open decisions
 
-| Topic | Current choice | Alternative |
-| --- | --- | --- |
-| UI framework | React + R3F (decided) | — |
-| Physics in worker | Main thread | Web Worker if L3 + fast-forward gets heavy. |
-| Chart library | uPlot | Custom canvas if we need very specific annotations. |
+| Topic             | Current choice        | Alternative                                         |
+| ----------------- | --------------------- | --------------------------------------------------- |
+| UI framework      | React + R3F (decided) | —                                                   |
+| Physics in worker | Main thread           | Web Worker if L3 + fast-forward gets heavy.         |
+| Chart library     | uPlot                 | Custom canvas if we need very specific annotations. |

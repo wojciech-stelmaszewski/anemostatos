@@ -8,10 +8,17 @@ export interface GoalContext {
   metrics: StepMetrics | null;
 }
 
+/** Part I = PID (first semester), Part II = beyond PID (second semester). */
+export type Part = 1 | 2;
+
 export interface Lesson {
   id: string;
   title: string;
   level: Level;
+  /** Defaults to Part I. Numbering restarts in each part. */
+  part?: Part;
+  /** Chapter heading within the part (Part II). */
+  chapter?: string;
   /** Modify a fresh copy of the default parameters. */
   setup?: (p: Params) => void;
   /** Schedule scripted events after the reset. */

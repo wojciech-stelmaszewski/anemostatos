@@ -6,7 +6,7 @@ import { GRAVITY } from '@/sim/params';
 import type { Measurement } from '@/sim/sensors';
 import { mix } from './mixer';
 import { defaultGains, Pid, type PidTerms } from './pid';
-import { periodSteps, type ControlInput, type Controller } from './types';
+import { periodSteps, pidLoop, type ControlInput, type Controller, type LoopTerms } from './types';
 
 const DEG = 180 / Math.PI;
 const up = v3(0, 1, 0);
@@ -81,7 +81,7 @@ export class CascadeController implements Controller {
     const dtOf = (hz: number) => periodSteps(hz, physDt) * physDt;
     let m: Measurement | null = null;
     const sense = () => (m ??= input.sense());
-    const mHat = P.control.massEstimate;
+    const mHat = P.control.model.mass;
     const fmax = P.drone.maxMotorThrust;
 
     // 1. Position P → velocity setpoint.
@@ -162,20 +162,20 @@ export class CascadeController implements Controller {
     return this.held;
   }
 
-  loops(): Record<string, PidTerms> {
+  loops(): Record<string, LoopTerms> {
     return {
-      'pos.x': this.pos.x.last,
-      'pos.y': this.pos.y.last,
-      'pos.z': this.pos.z.last,
-      'vel.x': this.vel.x.last,
-      'vel.y': this.vel.y.last,
-      'vel.z': this.vel.z.last,
-      'att.roll': this.att.roll,
-      'att.pitch': this.att.pitch,
-      'att.yaw': this.att.yaw,
-      'rate.roll': this.rate.roll.last,
-      'rate.pitch': this.rate.pitch.last,
-      'rate.yaw': this.rate.yaw.last,
+      'pos.x': pidLoop(this.pos.x.last),
+      'pos.y': pidLoop(this.pos.y.last),
+      'pos.z': pidLoop(this.pos.z.last),
+      'vel.x': pidLoop(this.vel.x.last),
+      'vel.y': pidLoop(this.vel.y.last),
+      'vel.z': pidLoop(this.vel.z.last),
+      'att.roll': pidLoop(this.att.roll),
+      'att.pitch': pidLoop(this.att.pitch),
+      'att.yaw': pidLoop(this.att.yaw),
+      'rate.roll': pidLoop(this.rate.roll.last),
+      'rate.pitch': pidLoop(this.rate.pitch.last),
+      'rate.yaw': pidLoop(this.rate.yaw.last),
     };
   }
 

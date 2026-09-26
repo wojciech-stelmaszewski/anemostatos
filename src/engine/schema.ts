@@ -1,40 +1,54 @@
-import type { Level } from '@/sim/params';
+import type { Level, Params } from '@/sim/params';
+
+/** Visibility rules shared by fields and groups. */
+interface Visibility {
+  levels?: Level[];
+  /** Extra condition, e.g. "only while this controller is selected". */
+  when?: (p: Params) => boolean;
+}
 
 /**
  * Declarative description of every tunable parameter. The parameter panel is generated from this,
  * and the short `help` texts are the in-app explanations (docs/ui-and-visualization.md §4).
  */
-export type Field =
-  | {
-      kind: 'number';
-      path: string;
-      label: string;
-      unit?: string;
-      min: number;
-      max: number;
-      step: number;
-      log?: boolean;
-      help?: string;
-      levels?: Level[];
-    }
-  | { kind: 'bool'; path: string; label: string; help?: string; levels?: Level[] }
-  | {
-      kind: 'select';
-      path: string;
-      label: string;
-      options: { value: string; label: string }[];
-      help?: string;
-      levels?: Level[];
-    };
+export type Field = Visibility &
+  (
+    | {
+        kind: 'number';
+        path: string;
+        label: string;
+        unit?: string;
+        min: number;
+        max: number;
+        step: number;
+        log?: boolean;
+        help?: string;
+      }
+    | { kind: 'bool'; path: string; label: string; help?: string }
+    | {
+        kind: 'select';
+        path: string;
+        label: string;
+        options: { value: string; label: string }[];
+        help?: string;
+      }
+  );
 
-export interface Group {
+export interface Group extends Visibility {
   id: string;
   title: string;
-  levels?: Level[];
   fields: Field[];
   /** Colour hint for PID groups: shows which loop this is. */
   loop?: string;
 }
+
+/** Whether a field or group is shown for these parameters. */
+export const visible = (v: Visibility, p: Params): boolean =>
+  (!v.levels || v.levels.includes(p.sim.level)) && (!v.when || v.when(p));
+
+const l1Pid = (p: Params) => p.sim.level === 2 || p.control.l1.kind === 'pid';
+const l3Outer = (p: Params) => p.control.l3.outer === 'pid-cascade';
+const l3Inner = (p: Params) => p.control.l3.inner === 'pid';
 
 const pid = (
   prefix: string,
@@ -152,6 +166,50 @@ const L12: Level[] = [1, 2];
 
 export const SCHEMA: Group[] = [
   {
+    id: 'controller',
+    title: 'Controller',
+    fields: [
+      {
+        kind: 'select',
+        path: 'control.l1.kind',
+        label: 'Altitude controller',
+        options: [{ value: 'pid', label: 'PID' }],
+        levels: [1],
+        help: 'Which control law flies the drone. Part II adds model-based, observer-based and optimising controllers.',
+      },
+      {
+        kind: 'select',
+        path: 'control.l3.outer',
+        label: 'Outer stage',
+        options: [{ value: 'pid-cascade', label: 'PID cascade' }],
+        levels: [3],
+        help: 'Turns the position reference into a desired acceleration (thrust vector).',
+      },
+      {
+        kind: 'select',
+        path: 'control.l3.inner',
+        label: 'Inner stage',
+        options: [{ value: 'pid', label: 'attitude P + rate PID' }],
+        levels: [3],
+        help: 'Turns the desired attitude into motor torques.',
+      },
+      {
+        kind: 'select',
+        path: 'control.l3.compensation',
+        label: 'Disturbance compensation',
+        options: [{ value: 'none', label: 'none' }],
+        levels: [3],
+      },
+      {
+        kind: 'select',
+        path: 'control.l3.safety',
+        label: 'Safety filter',
+        options: [{ value: 'none', label: 'none' }],
+        levels: [3],
+      },
+    ],
+  },
+  {
     id: 'setpoint',
     title: 'Setpoint',
     fields: [
@@ -253,6 +311,7 @@ export const SCHEMA: Group[] = [
     title: 'Altitude PID',
     loop: 'alt',
     levels: L12,
+    when: l1Pid,
     fields: [
       {
         kind: 'bool',
@@ -262,7 +321,7 @@ export const SCHEMA: Group[] = [
       },
       {
         kind: 'number',
-        path: 'control.massEstimate',
+        path: 'control.model.mass',
         label: 'Assumed mass m̂',
         unit: 'kg',
         min: 0.2,
@@ -307,6 +366,7 @@ export const SCHEMA: Group[] = [
     title: 'Position P',
     loop: 'pos.x',
     levels: [3],
+    when: l3Outer,
     fields: [
       {
         kind: 'number',
@@ -364,6 +424,7 @@ export const SCHEMA: Group[] = [
     title: 'Velocity PID — horizontal',
     loop: 'vel.x',
     levels: [3],
+    when: l3Outer,
     fields: [
       {
         kind: 'number',
@@ -393,11 +454,12 @@ export const SCHEMA: Group[] = [
     title: 'Velocity PID — vertical',
     loop: 'vel.y',
     levels: [3],
+    when: l3Outer,
     fields: [
       { kind: 'bool', path: 'control.feedforward', label: 'Gravity feedforward' },
       {
         kind: 'number',
-        path: 'control.massEstimate',
+        path: 'control.model.mass',
         label: 'Assumed mass m̂',
         unit: 'kg',
         min: 0.2,
@@ -412,6 +474,7 @@ export const SCHEMA: Group[] = [
     title: 'Attitude P',
     loop: 'att.roll',
     levels: [3],
+    when: l3Inner,
     fields: [
       {
         kind: 'number',
@@ -461,6 +524,7 @@ export const SCHEMA: Group[] = [
     title: 'Rate PID — roll/pitch',
     loop: 'rate.roll',
     levels: [3],
+    when: l3Inner,
     fields: [
       {
         kind: 'number',
@@ -485,6 +549,7 @@ export const SCHEMA: Group[] = [
     title: 'Rate PID — yaw',
     loop: 'rate.yaw',
     levels: [3],
+    when: l3Inner,
     fields: [
       ...pid('control.l3.rateYaw', {
         kp: [0.5, 200],
@@ -665,6 +730,33 @@ export const SCHEMA: Group[] = [
     ],
   },
   {
+    id: 'faults',
+    title: 'Faults & aerodynamics',
+    fields: [
+      ...[1, 2, 3, 4].map((i): Field => ({
+        kind: 'number',
+        path: `drone.motorEfficiency.${i - 1}`,
+        label: `Motor ${i} efficiency`,
+        min: 0,
+        max: 1,
+        step: 0.01,
+        levels: [1, 3],
+        help: 'Fraction of the commanded thrust this motor really produces — a damaged prop or a weak motor. The controller is not told.',
+      })),
+      {
+        kind: 'number',
+        path: 'drone.rotorDrag',
+        label: 'Rotor drag',
+        unit: 's/m',
+        min: 0,
+        max: 0.05,
+        step: 0.001,
+        levels: [3],
+        help: 'Spinning rotors moving edgewise through the air feel a drag proportional to thrust × in-plane air speed. Real, significant at speed, and not modelled by simple controllers. 0 = off.',
+      },
+    ],
+  },
+  {
     id: 'sensors',
     title: 'Sensors',
     fields: [
@@ -718,6 +810,16 @@ export const SCHEMA: Group[] = [
         step: 1,
         help: 'Transport delay of the measurement. Delay eats stability margin.',
       },
+      {
+        kind: 'number',
+        path: 'sensors.posRateHz',
+        label: 'Position sensor rate',
+        unit: 'Hz',
+        min: 0,
+        max: 200,
+        step: 1,
+        help: 'How often the position sensor (GPS, barometer, motion capture) delivers a new fix; the last one is held in between. 0 = a fresh reading on every controller sample.',
+      },
     ],
   },
 ];
@@ -728,5 +830,11 @@ export const getIn = (obj: unknown, path: string): unknown =>
 export function setIn<T>(obj: T, path: string, value: unknown): T {
   const [head, ...rest] = path.split('.');
   const o = obj as Record<string, unknown>;
-  return { ...o, [head!]: rest.length ? setIn(o[head!], rest.join('.'), value) : value } as T;
+  const next = rest.length ? setIn(o[head!], rest.join('.'), value) : value;
+  if (Array.isArray(obj)) {
+    const copy = [...obj];
+    copy[Number(head)] = next;
+    return copy as T;
+  }
+  return { ...o, [head!]: next } as T;
 }

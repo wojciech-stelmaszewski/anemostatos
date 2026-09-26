@@ -2,8 +2,9 @@ import { useRef } from 'react';
 import { getIn } from '@/engine/schema';
 import { useParams } from '@/store/params';
 import { sim, useUi } from '@/store/sim';
-import { loopMeta } from '@/ui/charts/loops';
-import { SIGNAL } from '@/ui/colors';
+import { partValue } from '@/control/types';
+import { isPidParts, loopMeta, useLoopParts } from '@/ui/charts/loops';
+import { partColor, SIGNAL } from '@/ui/colors';
 import { useRaf } from './useRaf';
 
 const kpPath = (id: string, level: number) =>
@@ -40,6 +41,7 @@ export function LiveFormula() {
   const kp = useParams((s) => getIn(s.params, kpPath(meta.id, level)) as number);
   const refs = useRef<Record<string, HTMLSpanElement | null>>({});
   const r = (k: string) => (el: HTMLSpanElement | null) => void (refs.current[k] = el);
+  const parts = useLoopParts(meta.id);
 
   useRaf(() => {
     const t = sim.controller.loops()[meta.id];
@@ -49,13 +51,43 @@ export function LiveFormula() {
       if (el && el.textContent !== s) el.textContent = s;
     };
     set('e', t.error.toFixed(3));
-    set('p', n(t.p));
-    set('i', n(t.i));
-    set('d', n(t.d));
-    set('ff', n(t.ff));
+    for (const part of t.parts) set(`part.${part.key}`, n(part.value));
+    set('p', n(partValue(t, 'p')));
+    set('i', n(partValue(t, 'i')));
+    set('d', n(partValue(t, 'd')));
+    set('ff', n(partValue(t, 'ff')));
     set('u', t.output.toFixed(2));
     set('sat', t.saturated ? `saturated (wanted ${t.unsaturated.toFixed(2)})` : '');
   });
+
+  if (!isPidParts(parts)) {
+    // Any other controller: its output as the sum of its named contributions.
+    return (
+      <div className="pointer-events-none rounded-lg border border-border/80 bg-panel/85 px-3 py-2 font-mono text-xs shadow-lg backdrop-blur">
+        <div className="mb-1 font-sans text-[10px] uppercase tracking-wider text-muted">
+          {meta.name} controller, live
+        </div>
+        <div className="whitespace-nowrap">
+          <span className="text-muted">u = </span>
+          {parts.map((p, i) => (
+            <span key={p.key} style={{ color: partColor(p.key, i) }}>
+              <span ref={r(`part.${p.key}`)} />{' '}
+            </span>
+          ))}
+          → <span className="font-semibold text-fg" ref={r('u')} /> {meta.outUnit}
+        </div>
+        <div className="text-[10px] text-[#e66767]" ref={r('sat')} />
+        <div className="mt-1 font-sans text-[10px] text-muted">
+          {parts.map((p, i) => (
+            <span key={p.key} style={{ color: partColor(p.key, i) }}>
+              {i > 0 && <span className="text-muted"> + </span>}
+              {p.label}
+            </span>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="pointer-events-none rounded-lg border border-border/80 bg-panel/85 px-3 py-2 font-mono text-xs shadow-lg backdrop-blur">

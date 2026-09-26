@@ -1,4 +1,9 @@
+import { useMemo } from 'react';
+import { controllerKey } from '@/control/registry';
+import type { LoopPart } from '@/control/types';
 import type { Level } from '@/sim/params';
+import { useParams } from '@/store/params';
+import { sim } from '@/store/sim';
 
 export interface LoopMeta {
   id: string;
@@ -64,3 +69,15 @@ export const LOOPS: Record<Level, LoopMeta[]> = {
 
 export const loopMeta = (level: Level, id: string): LoopMeta =>
   LOOPS[level].find((l) => l.id === id) ?? LOOPS[level][0]!;
+
+/** The contributions the running controller reports for a loop (re-read when it is swapped). */
+export function useLoopParts(id: string): LoopPart[] {
+  const key = useParams((s) => controllerKey(s.params));
+  // `key` changes whenever the simulation builds a different controller.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  return useMemo(() => sim.controller.loops()[id]?.parts ?? [], [id, key]);
+}
+
+/** True when the loop's parts are the classic P, I, D (+ feedforward). */
+export const isPidParts = (parts: readonly LoopPart[]): boolean =>
+  parts.map((p) => p.key).join() === 'p,i,d,ff';

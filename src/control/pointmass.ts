@@ -2,7 +2,7 @@ import { clampLength, v3 } from '@/math/vec3';
 import { idleActuation, type Actuation } from '@/sim/dynamics';
 import { GRAVITY } from '@/sim/params';
 import { Pid } from './pid';
-import { periodSteps, type ControlInput, type Controller } from './types';
+import { periodSteps, pidLoop, type ControlInput, type Controller } from './types';
 
 /**
  * Level 2: three independent position PIDs producing a force vector directly
@@ -33,7 +33,7 @@ export class PointMassController implements Controller {
     const m = input.sense();
     const dt = n * physDt;
     const h = p.control.maxHForce;
-    const ff = p.control.feedforward ? p.control.massEstimate * GRAVITY : 0;
+    const ff = p.control.feedforward ? p.control.model.mass * GRAVITY : 0;
     const fx = this.x.update(p.control.posH, setpoint.pos.x, m.pos.x, dt, 0, -h, h).output;
     const fz = this.z.update(p.control.posH, setpoint.pos.z, m.pos.z, dt, 0, -h, h).output;
     const fy = this.y.update(
@@ -51,7 +51,11 @@ export class PointMassController implements Controller {
   }
 
   loops() {
-    return { 'pos.x': this.x.last, 'pos.y': this.y.last, 'pos.z': this.z.last };
+    return {
+      'pos.x': pidLoop(this.x.last),
+      'pos.y': pidLoop(this.y.last),
+      'pos.z': pidLoop(this.z.last),
+    };
   }
 
   extras() {

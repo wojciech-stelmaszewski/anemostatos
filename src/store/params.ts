@@ -13,13 +13,24 @@ const fromHash = (): Params | null => {
   try {
     const h = decodeURIComponent(window.location.hash.slice(1));
     if (!h.startsWith('p=')) return null;
-    return deepMerge(defaultParams(), JSON.parse(h.slice(2))) as Params;
+    return deepMerge(defaultParams(), migrate(JSON.parse(h.slice(2)))) as Params;
   } catch {
     return null;
   }
 };
 
-function deepMerge(base: unknown, over: unknown): unknown {
+/** Upgrade shared links made by older versions. */
+export function migrate(raw: unknown): unknown {
+  const c = (raw as { control?: Record<string, unknown> })?.control;
+  // Part I stored the assumed mass as control.massEstimate; it now lives in control.model.
+  if (c && typeof c.massEstimate === 'number') {
+    c.model = { ...(c.model as object), mass: c.massEstimate };
+    delete c.massEstimate;
+  }
+  return raw;
+}
+
+export function deepMerge(base: unknown, over: unknown): unknown {
   if (typeof base !== 'object' || base === null || typeof over !== 'object' || over === null) {
     return over === undefined ? base : over;
   }

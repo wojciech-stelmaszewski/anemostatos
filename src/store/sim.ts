@@ -6,6 +6,9 @@ import { useParams } from './params';
 export const sim = new Simulation(useParams.getState().params);
 useParams.subscribe((s) => sim.setParams(s.params));
 
+/** What the bottom-right chart slot shows. */
+export type ExtraChart = 'wind' | 'disturbance' | 'phase';
+
 export type CameraMode = 'orbit' | 'follow' | 'side' | 'top';
 
 export interface Overlays {
@@ -22,6 +25,7 @@ interface UiStore {
   timeScale: number;
   window: number;
   loop: string;
+  extraChart: ExtraChart;
   camera: CameraMode;
   overlays: Overlays;
   panelsHidden: boolean;
@@ -31,6 +35,7 @@ interface UiStore {
   setTimeScale: (s: number) => void;
   setWindow: (w: number) => void;
   setLoop: (l: string) => void;
+  setExtraChart: (c: ExtraChart) => void;
   setCamera: (c: CameraMode) => void;
   toggleOverlay: (k: keyof Overlays) => void;
   togglePanels: () => void;
@@ -41,6 +46,7 @@ export const useUi = create<UiStore>((set) => ({
   timeScale: 1,
   window: 10,
   loop: 'alt',
+  extraChart: 'wind',
   camera: 'follow',
   overlays: {
     forces: true,
@@ -63,6 +69,7 @@ export const useUi = create<UiStore>((set) => ({
   },
   setWindow: (window) => set({ window }),
   setLoop: (loop) => set({ loop }),
+  setExtraChart: (extraChart) => set({ extraChart }),
   setCamera: (camera) => set({ camera }),
   toggleOverlay: (k) => set((s) => ({ overlays: { ...s.overlays, [k]: !s.overlays[k] } })),
   togglePanels: () => set((s) => ({ panelsHidden: !s.panelsHidden })),

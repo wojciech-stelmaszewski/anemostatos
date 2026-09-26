@@ -7,7 +7,7 @@ import {
   qToEuler,
   type Quat,
 } from '@/math/quat';
-import { add, clone, cross, length, normalize, scale, sub, v3, type Vec3 } from '@/math/vec3';
+import { add, clone, cross, dot, length, normalize, scale, sub, v3, type Vec3 } from '@/math/vec3';
 import { FOOT_HEIGHT, MOTOR_POSITIONS } from './drone';
 import { GRAVITY, type DroneParams, type Level } from './params';
 
@@ -22,6 +22,8 @@ export interface DroneState {
   motors: [number, number, number, number];
   /** L2 only: actual applied force vector (after lag), N. */
   force: Vec3;
+  /** Linear acceleration over the last step, world frame, m/s² (includes ground reaction). */
+  accel: Vec3;
   landed: boolean;
   crashed: boolean;
 }
@@ -49,6 +51,7 @@ export const initialState = (): DroneState => ({
   omega: v3(),
   motors: [0, 0, 0, 0],
   force: v3(),
+  accel: v3(),
   landed: true,
   crashed: false,
 });
@@ -102,7 +105,7 @@ export function stepDynamics(
     for (let i = 0; i < 4; i++) s.motors[i] = share;
   } else {
     for (let i = 0; i < 4; i++) {
-      const cmd = Math.min(Math.max(act.motorCmd[i]!, 0), fmax);
+      const cmd = Math.min(Math.max(act.motorCmd[i]!, 0), fmax) * p.motorEfficiency[i]!;
       s.motors[i] = s.motors[i]! + (cmd - s.motors[i]!) * lag;
     }
   }
@@ -112,6 +115,7 @@ export function stepDynamics(
     level === 2 ? clone(s.force) : level === 1 ? v3(0, total, 0) : qRotate(s.q, v3(0, total, 0));
   const gravity = v3(0, -p.mass * GRAVITY, 0);
   let drag = dragForce(s.vel, wind, p);
+  if (level === 3 && p.rotorDrag > 0) drag = add(drag, rotorDragForce(s, wind, total, p.rotorDrag));
   let ext = external;
   if (level === 1) {
     drag = v3(0, drag.y, 0);
@@ -120,6 +124,7 @@ export function stepDynamics(
   const net = add(add(add(thrust, gravity), drag), ext);
 
   // Translation.
+  const vBefore = s.vel;
   s.vel = add(s.vel, scale(net, dt / p.mass));
   if (level === 1) s.vel = v3(0, s.vel.y, 0);
   s.pos = add(s.pos, scale(s.vel, dt));
@@ -158,5 +163,17 @@ export function stepDynamics(
     }
   }
 
+  s.accel = scale(sub(s.vel, vBefore), 1 / dt);
   return { thrust, gravity, drag, external: ext, net };
 }
+
+/**
+ * Rotor drag (blade flapping and induced drag): opposes the air-relative velocity in the rotor
+ * plane, proportional to thrust (docs/physics-model.md §5.3, Faessler et al. 2018).
+ */
+export const rotorDragForce = (s: DroneState, wind: Vec3, thrust: number, k: number): Vec3 => {
+  const r = sub(s.vel, wind);
+  const up = qRotate(s.q, upY);
+  const inPlane = sub(r, scale(up, dot(r, up)));
+  return scale(inPlane, -k * thrust);
+};

@@ -97,14 +97,14 @@ aimed at a clean "product render" look:
 All charts share the time axis, cursor and pause state (hover on one →
 crosshair and values in all). Time window: 5 / 10 / 30 / 60 s.
 
-| Chart             | Series                                                                                                                                     |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Tracking**      | setpoint (dashed), measurement, true value (if sensor noise/bias is on — shows the difference!), frozen "ghost" run for comparison.        |
-| **Error**         | $e(t)$, ±2 % settling band after a step, shaded integral area (what the I term "sees").                                                    |
-| **PID terms**     | P, I, D, FF contributions and total output $u$; output limits drawn as bands; saturated intervals shaded. The single most important chart. |
-| **Actuators**     | Four motor thrusts (commanded vs. actual — shows motor lag), limits.                                                                       |
-| **Disturbance**   | Wind components / magnitude, gust events as markers.                                                                                       |
-| **Attitude (L3)** | roll/pitch/yaw setpoint vs actual; body rates.                                                                                             |
+| Chart             | Series                                                                                                                                                                                                                                                                           |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Tracking**      | setpoint (dashed), measurement, true value (if sensor noise/bias is on — shows the difference!), frozen "ghost" run for comparison.                                                                                                                                              |
+| **Error**         | $e(t)$, ±2 % settling band after a step, shaded integral area (what the I term "sees").                                                                                                                                                                                          |
+| **PID terms**     | P, I, D, FF contributions and total output $u$; output limits drawn as bands; saturated intervals shaded. The single most important chart.                                                                                                                                       |
+| **Actuators**     | Four motor thrusts (commanded vs. actual — shows motor lag), limits.                                                                                                                                                                                                             |
+| **Extra slot**    | Switchable: **wind** (components, gust markers), **disturbance** (true force the model does not explain, plus a controller's estimate when it has one), **phase portrait** ($e$ vs $\dot e$ of the true state; a step is a horizontal hop, a good loop spirals into the origin). |
+| **Attitude (L3)** | roll/pitch/yaw setpoint vs actual; body rates.                                                                                                                                                                                                                                   |
 
 - **Loop selector**: in L2/L3 the Tracking/Error/PID charts follow the loop
   chosen in the inspector (`alt`, `vel.x`, `att.roll`, `rate.pitch`, …).
@@ -114,6 +114,9 @@ crosshair and values in all). Time window: 5 / 10 / 30 / 60 s.
 - **Freeze & compare**: "Snapshot" button stores the current run as a ghost
   trace; subsequent runs are overlaid.
 - **Export**: CSV of the visible buffers.
+- **Compute meter** (chart header): average wall-clock µs the controller
+  takes per physics step. Display only — the simulation never depends on
+  wall-clock time. Matters once Part II's optimisers arrive.
 
 ### Step-response metrics
 
@@ -168,6 +171,11 @@ Planned lessons (L1 unless stated):
 
 Lessons are optional: the sandbox is always available with every parameter
 unlocked.
+
+The panel has two tabs, **Part I · PID** (the lessons above) and **Part II ·
+Beyond PID** (a second semester, numbered II.1–II.21, planned in
+[beyond-pid.md §6](beyond-pid.md#6-lessons-part-ii)). A lesson declares its
+`part` and an optional `chapter`.
 
 ## 6. Keyboard shortcuts
 

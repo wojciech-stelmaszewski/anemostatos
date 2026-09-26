@@ -38,7 +38,7 @@ export function InfoCard({ meta }: { meta: LoopMeta }) {
       iOn: path ? (getIn(s.params, `${path}.iOn`) as boolean) : false,
       dOn: path ? (getIn(s.params, `${path}.dOn`) as boolean) : false,
       m: s.params.drone.mass,
-      mHat: s.params.control.massEstimate,
+      mHat: s.params.control.model.mass,
       ff: s.params.control.feedforward,
     })),
   );

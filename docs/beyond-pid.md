@@ -1,7 +1,7 @@
 # Part II — Beyond PID
 
-> **Status (2026-09-26):** plan, not implemented. Milestones M7–M12 in
-> [roadmap.md](roadmap.md) point here.
+> **Status (2026-09-26):** M7 (foundations) implemented; M8–M12 planned.
+> Milestones in [roadmap.md](roadmap.md) point here.
 
 Part I (lessons 1–14) teaches PID from first principles up to the full
 quadrotor cascade. Part II answers the question every student asks next:
@@ -257,7 +257,14 @@ library).
 
 Each ends with something runnable; `make check` passes at each commit.
 
-### M7 — Foundations for Part II
+### M7 — Foundations for Part II ✅
+
+Done as planned, with these differences: the controller selection selects
+are hidden while they offer a single option (Part I's UI is unchanged);
+`control.model.inertiaScale`/`motorTau` and the accelerometer/motor-feedback
+sensor settings exist in the parameters but get panel fields with the
+milestones that use them (M8, M9); Part I's behaviour is pinned by a
+telemetry regression test (`tests/regression.test.ts`).
 
 - `LoopTerms` + adapter, contributions chart, controller-dependent `LoopMeta`.
 - Controller selection in params, schema `controllers` filter, URL state

@@ -46,6 +46,8 @@ Roughly a 5-inch-class / small camera drone.
 | Linear drag, horizontal     | $c_{h}$                  | 0.12 N·s²/m²                 | Quadratic drag.                             |
 | Linear drag, vertical       | $c_{v}$                  | 0.25 N·s²/m²                 | Free-fall terminal speed ≈ 6.3 m/s.         |
 | Angular damping             | $c_\omega$               | 0.002 N·m·s                  | Keeps L3 numerically tame.                  |
+| Motor efficiency            | $\eta_i$                 | 1, 1, 1, 1                   | Fault injection (Part II).                  |
+| Rotor drag                  | $k_{rd}$                 | 0 (off)                      | L3; see §4.5.                               |
 
 ## 4. Equations of motion
 
@@ -57,6 +59,10 @@ actual thrust following a first-order lag:
 $$
 \dot f_i = \frac{f_i^{cmd} - f_i}{\tau_m}
 $$
+
+A motor with efficiency $\eta_i < 1$ (a chipped prop, a weak motor) lags
+towards $\eta_i f_i^{cmd}$ instead: the controller asks for one thrust and
+silently gets less.
 
 In L1 the four motors receive the same command ($f_i^{cmd} = T/4$). In L2
 the motors are purely decorative (the force vector is applied directly, with
@@ -136,6 +142,35 @@ $$
 - A crash (hitting the ground with $|\dot y| > 3$ m/s or tilt > 80°) marks
   the run as crashed and offers a reset — failures are part of learning.
 
+### 4.5 Rotor drag (L3, optional)
+
+Rotors moving edgewise through the air produce a drag force in the rotor
+plane, roughly proportional to thrust (blade flapping and induced drag,
+[Faessler et al. 2018](beyond-pid.md#8-references)):
+
+$$
+\vec F_{rd} = -k_{rd}\,T\,\big(\vec v_r - (\vec v_r\cdot\hat y_b)\,\hat y_b\big),
+\qquad \vec v_r = \vec v - \vec w
+$$
+
+Off by default (so the Part I tunes stay valid); Part II uses it to give
+adaptive and learned controllers an effect that simple models miss.
+
+### 4.6 What the controller's model does not explain
+
+The engine records the **true disturbance** as a controller's nominal model
+would see it (world frame, N):
+
+$$
+\vec d = \hat m\,\dot{\vec v} - \vec T - \hat m\,\vec g
+$$
+
+where $\vec T$ is the actual thrust vector and $\hat m$ the assumed mass
+(`control.model.mass`). It contains drag, wind, pokes, the mass error and
+ground reaction — everything a disturbance observer (Part II) has to
+estimate. The "disturbance" chart plots it, next to any estimate a
+controller publishes.
+
 ## 5. Wind model
 
 Wind is a 3D air-velocity field $\vec w(t)$, uniform in space (the drone is
@@ -206,11 +241,15 @@ model**:
 | Gaussian noise σ (per signal) | off (altitude 0.02 m when on) | Shows the D-term noise problem.                                |
 | Bias                          | off                           | Constant offset; shows that feedback can't fix a wrong sensor. |
 | Delay                         | 0 ms                          | Transport delay; shows loss of stability margin.               |
-| Sample rate                   | = controller rate             | Sample-and-hold between samples.                               |
+| Position sample rate          | 0 = fresh on every read       | Sample-and-hold between fixes (GPS/baro-like, e.g. 50 Hz).     |
+| Accelerometer noise / bias    | off                           | Specific force in the body frame; used by Part II (KF, INDI).  |
+| Motor feedback                | on                            | Actual per-motor thrust (RPM telemetry); used by INDI.         |
 
-In L3 the sensors provide position, velocity, attitude and body rates (an
-idealised "perfect state estimator" + optional noise). State estimation is
-explicitly out of scope.
+The sensors provide position, velocity, attitude, body rates, the
+**accelerometer** (specific force $R^\top(\dot{\vec v} - \vec g)$ in the body
+frame, so it reads $+g$ upwards while hovering and $0$ in free fall) and the
+**motor thrusts**. Part I treats this as an idealised "perfect state
+estimator" + optional noise; Part II adds real estimation (Kalman filter).
 
 ## 7. Numerical integration
 

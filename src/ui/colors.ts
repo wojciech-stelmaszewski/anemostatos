@@ -27,6 +27,13 @@ export const SIGNAL = {
   motors: ['#3987e5', '#d95926', '#199e70', '#c98500'],
 } as const;
 
+/** Colour of a loop contribution: P/I/D/FF keep their hues, other controllers' parts cycle. */
+const PART_CYCLE = [SIGNAL.p, SIGNAL.d, SIGNAL.i, SIGNAL.ff, SIGNAL.measurement] as const;
+export const partColor = (key: string, index: number): string =>
+  key === 'p' || key === 'i' || key === 'd' || key === 'ff'
+    ? SIGNAL[key]
+    : PART_CYCLE[index % PART_CYCLE.length]!;
+
 export const SCENE = {
   background: '#0b0e13',
   skyTop: '#05070b',

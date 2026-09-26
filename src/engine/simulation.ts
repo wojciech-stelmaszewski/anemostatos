@@ -1,8 +1,5 @@
-import { AltitudeController } from '@/control/altitude';
-import { CascadeController } from '@/control/cascade';
-import { PointMassController } from '@/control/pointmass';
-import type { PidTerms } from '@/control/pid';
-import type { Controller, Setpoint } from '@/control/types';
+import { controllerKey, makeController } from '@/control/registry';
+import type { Controller, LoopTerms, Setpoint } from '@/control/types';
 import { qFromAxisAngle, qToEuler, type Quat } from '@/math/quat';
 import { clone, length, scale, sub, add, v3, type Vec3 } from '@/math/vec3';
 import { FOOT_HEIGHT } from '@/sim/drone';
@@ -14,7 +11,7 @@ import {
   type DroneState,
   type Forces,
 } from '@/sim/dynamics';
-import type { Level, Params } from '@/sim/params';
+import { GRAVITY, type Level, type Params } from '@/sim/params';
 import { Sensors, type Measurement } from '@/sim/sensors';
 import { Wind } from '@/sim/wind';
 import { Telemetry } from './telemetry';
@@ -27,13 +24,6 @@ const MAX_STEPS_PER_FRAME = 200;
 const POKE_DURATION = 0.05;
 /** Vertical speed of the automatic take-off setpoint ramp, m/s. */
 const TAKEOFF_RATE = 1;
-
-const makeController = (level: Level): Controller =>
-  level === 1
-    ? new AltitudeController()
-    : level === 2
-      ? new PointMassController()
-      : new CascadeController();
 
 /**
  * Owns the whole simulated world: drone, wind, sensors, controller and telemetry.
@@ -55,6 +45,10 @@ export class Simulation {
   timeScale = 1;
   /** True if the last frame had to drop simulation time to keep up. */
   lagging = false;
+  /** Wall-clock cost of the controller, µs per physics step (averaged over the last frame). */
+  controlMicros = 0;
+  private cpuSum = 0;
+  private cpuSteps = 0;
 
   /** Where the user wants the drone (target) and the rate-limited setpoint actually tracked. */
   target: Vec3;
@@ -90,7 +84,7 @@ export class Simulation {
     this.setpoint = clone(this.target);
     this.wind = new Wind(params.sim.seed);
     this.sensors = new Sensors(params.sim.seed);
-    this.controller = makeController(params.sim.level);
+    this.controller = makeController(params);
     this.reset();
   }
 
@@ -103,7 +97,7 @@ export class Simulation {
     return () => this.resetListeners.delete(fn);
   }
 
-  /** Accept a new parameter tree. Level or seed changes restart the run. */
+  /** Accept a new parameter tree. Level, seed or controller changes restart the run. */
   setParams(next: Params): void {
     const prev = this.params;
     this.params = next;
@@ -112,7 +106,8 @@ export class Simulation {
       this.setTarget(v3(sp.x, sp.y, sp.z));
     }
     this.yaw = (sp.yawDeg * Math.PI) / 180;
-    if (next.sim.level !== prev.sim.level || next.sim.seed !== prev.sim.seed) this.reset();
+    if (next.sim.seed !== prev.sim.seed || controllerKey(next) !== controllerKey(prev))
+      this.reset();
   }
 
   /** Restart from the ground with the current parameters. */
@@ -126,7 +121,7 @@ export class Simulation {
     this.accumulator = 0;
     this.wind = new Wind(p.sim.seed);
     this.sensors = new Sensors(p.sim.seed);
-    this.controller = makeController(p.sim.level);
+    this.controller = makeController(p);
     this.actuation = idleActuation();
     this.target = v3(p.setpoint.x, p.setpoint.y, p.setpoint.z);
     if (p.sim.level === 1) this.target = v3(0, this.target.y, 0);
@@ -223,6 +218,11 @@ export class Simulation {
       this.accumulator -= PHYS_DT;
       steps++;
     }
+    if (this.cpuSteps > 0) {
+      const us = (this.cpuSum / this.cpuSteps) * 1000;
+      this.controlMicros += (us - this.controlMicros) * 0.1; // smoothed for display
+      this.cpuSum = this.cpuSteps = 0;
+    }
     this.lagging = this.accumulator >= PHYS_DT;
     if (this.lagging) this.accumulator = 0;
     this.alpha = this.accumulator / PHYS_DT;
@@ -272,13 +272,17 @@ export class Simulation {
     if (this.armed && !this.state.crashed) {
       if (this.state.landed || this.takingOff) this.controller.resetIntegrators();
       const sp: Setpoint = { pos: this.setpoint, yaw: this.yaw };
+      const t0 = performance.now();
       this.actuation = this.controller.tick({
         params: p,
         setpoint: sp,
         physDt: dt,
         stepIndex: this.stepIndex,
-        sense: () => (this.measurement = this.sensors.read(p.sensors, dt)),
+        sense: () => (this.measurement = this.sensors.read(p.sensors, dt, this.t)),
       });
+      // Measured only for display; wall-clock time never feeds back into the simulation.
+      this.cpuSum += performance.now() - t0;
+      this.cpuSteps++;
     } else {
       this.actuation = idleActuation();
     }
@@ -323,15 +327,34 @@ export class Simulation {
     tl.set('gust', length(this.wind.gustVelocity));
     tl.set('drag.y', this.forces.drag.y);
     if (this.measurement) {
-      tl.set('meas.x', this.measurement.pos.x);
-      tl.set('meas.y', this.measurement.pos.y);
-      tl.set('meas.z', this.measurement.pos.z);
+      const m = this.measurement;
+      tl.set('meas.x', m.pos.x);
+      tl.set('meas.y', m.pos.y);
+      tl.set('meas.z', m.pos.z);
+      tl.set('imu.acc.x', m.acc.x);
+      tl.set('imu.acc.y', m.acc.y);
+      tl.set('imu.acc.z', m.acc.z);
     }
+    // The true disturbance as the controller's model sees it (docs/physics-model.md §7).
+    const d = this.disturbance();
+    tl.set('dist.x', d.x);
+    tl.set('dist.y', d.y);
+    tl.set('dist.z', d.z);
     const loops = this.controller.loops();
     for (const id in loops) recordLoop(tl, id, loops[id]!);
     const extras = this.controller.extras();
     for (const k in extras) tl.set(k, extras[k]!);
     tl.commit(this.t);
+  }
+
+  /**
+   * Everything the nominal model m̂·a = thrust + m̂·g does not explain, N (world frame):
+   * drag, wind, pokes, mass error and ground reaction. Part II observers try to estimate this.
+   */
+  disturbance(): Vec3 {
+    const mHat = this.params.control.model.mass;
+    const nominal = add(this.forces.thrust, v3(0, -mHat * GRAVITY, 0));
+    return sub(scale(this.state.accel, mHat), nominal);
   }
 
   /** Interpolated pose for rendering. */
@@ -346,15 +369,16 @@ export class Simulation {
   }
 }
 
-function recordLoop(tl: Telemetry, id: string, t: PidTerms): void {
+function recordLoop(tl: Telemetry, id: string, t: LoopTerms): void {
   tl.set(`${id}.sp`, t.setpoint);
   tl.set(`${id}.meas`, t.measurement);
   tl.set(`${id}.err`, t.error);
-  tl.set(`${id}.p`, t.p);
-  tl.set(`${id}.i`, t.i);
-  tl.set(`${id}.d`, t.d);
-  tl.set(`${id}.ff`, t.ff);
-  tl.set(`${id}.pid`, t.p + t.i + t.d);
+  let fb = 0;
+  for (const part of t.parts) {
+    tl.set(`${id}.part.${part.key}`, part.value);
+    if (!part.ff) fb += part.value;
+  }
+  tl.set(`${id}.fb`, fb);
   tl.set(`${id}.u`, t.output);
   tl.set(`${id}.uraw`, t.unsaturated);
   tl.set(`${id}.sat`, t.saturated ? 1 : 0);

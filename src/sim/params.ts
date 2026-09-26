@@ -2,6 +2,13 @@ import { defaultGains, type PidGains } from '@/control/pid';
 
 export type Level = 1 | 2 | 3;
 
+/** Controller families selectable per level (docs/beyond-pid.md §3.2). Part II adds more. */
+export type L1Kind = 'pid';
+export type L3Outer = 'pid-cascade';
+export type L3Inner = 'pid';
+export type L3Compensation = 'none';
+export type L3Safety = 'none';
+
 export interface DroneParams {
   mass: number;
   maxMotorThrust: number;
@@ -12,6 +19,10 @@ export interface DroneParams {
   torqueCoeff: number;
   angularDamping: number;
   crashSpeed: number;
+  /** Fraction of the commanded thrust each motor actually delivers (faults, worn props). */
+  motorEfficiency: [number, number, number, number];
+  /** Rotor drag: horizontal body-plane force −k·T·v_rel, s/m (L3). 0 = off. */
+  rotorDrag: number;
 }
 
 export interface WindParams {
@@ -37,13 +48,32 @@ export interface SensorParams {
   gyroNoise: number; // deg/s
   altBias: number;
   delayMs: number;
+  /** Accelerometer (specific force, body frame) noise σ, m/s². */
+  accNoise: number;
+  /** Accelerometer bias along the body up-axis, m/s². */
+  accBias: number;
+  /** Position sensor sample rate, Hz; readings are held in between. 0 = fresh on every read. */
+  posRateHz: number;
+  /** Motor-speed telemetry (per-motor thrust) available to the controller. */
+  motorFeedback: boolean;
+}
+
+/** What the controller believes about the vehicle. The truth lives in `DroneParams`. */
+export interface ModelParams {
+  /** Assumed mass m̂, kg. */
+  mass: number;
+  /** Assumed inertia as a multiple of the true one. */
+  inertiaScale: number;
+  /** Assumed motor time constant, s. */
+  motorTau: number;
 }
 
 export interface ControlParams {
   /** Rate of the L1/L2 controller. */
   rateHz: number;
   feedforward: boolean;
-  massEstimate: number;
+  model: ModelParams;
+  l1: { kind: L1Kind };
   /** Vertical position loop, L1 and L2. */
   alt: PidGains;
   /** Horizontal position loops, L2. */
@@ -67,6 +97,10 @@ export interface ControlParams {
     hzAtt: number;
     hzVel: number;
     hzPos: number;
+    outer: L3Outer;
+    inner: L3Inner;
+    compensation: L3Compensation;
+    safety: L3Safety;
   };
 }
 
@@ -113,6 +147,8 @@ export const defaultParams = (): Params => ({
     torqueCoeff: 0.016,
     angularDamping: 0.002,
     crashSpeed: 3,
+    motorEfficiency: [1, 1, 1, 1],
+    rotorDrag: 0,
   },
   wind: {
     enabled: true,
@@ -129,11 +165,22 @@ export const defaultParams = (): Params => ({
     gustDurMax: 2.5,
     gustVertical: 0.7,
   },
-  sensors: { posNoise: 0, velNoise: 0, gyroNoise: 0, altBias: 0, delayMs: 0 },
+  sensors: {
+    posNoise: 0,
+    velNoise: 0,
+    gyroNoise: 0,
+    altBias: 0,
+    delayMs: 0,
+    accNoise: 0,
+    accBias: 0,
+    posRateHz: 0,
+    motorFeedback: true,
+  },
   control: {
     rateHz: 250,
     feedforward: true,
-    massEstimate: 1.0,
+    model: { mass: 1.0, inertiaScale: 1, motorTau: 0.03 },
+    l1: { kind: 'pid' },
     alt: defaultGains({ kp: 10, ki: 0.8, kd: 7, iLimit: 10 }),
     posH: defaultGains({ kp: 4, ki: 0.8, kd: 3, iLimit: 3 }),
     maxHForce: 5,
@@ -154,6 +201,10 @@ export const defaultParams = (): Params => ({
       hzAtt: 250,
       hzVel: 100,
       hzPos: 50,
+      outer: 'pid-cascade',
+      inner: 'pid',
+      compensation: 'none',
+      safety: 'none',
     },
   },
 });

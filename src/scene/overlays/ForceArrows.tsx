@@ -2,6 +2,7 @@ import { Html } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
 import { useMemo, useRef } from 'react';
 import * as THREE from 'three';
+import { partValue } from '@/control/types';
 import { useParams } from '@/store/params';
 import { sim, useUi } from '@/store/sim';
 import { SIGNAL } from '@/ui/colors';
@@ -73,12 +74,12 @@ export function TermArrows() {
     const { pos } = sim.renderPose();
     const loops = sim.controller.loops();
     const vec = (k: 'p' | 'i' | 'd' | 'ff') => {
-      if (sim.level === 1) return tmpV.set(0, loops.alt?.[k] ?? 0, 0);
+      if (sim.level === 1) return tmpV.set(0, partValue(loops.alt, k), 0);
       if (sim.level === 2)
         return tmpV.set(
-          loops['pos.x']?.[k] ?? 0,
-          loops['pos.y']?.[k] ?? 0,
-          loops['pos.z']?.[k] ?? 0,
+          partValue(loops['pos.x'], k),
+          partValue(loops['pos.y'], k),
+          partValue(loops['pos.z'], k),
         );
       return tmpV.set(0, 0, 0);
     };

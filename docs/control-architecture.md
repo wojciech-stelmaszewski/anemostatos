@@ -56,6 +56,22 @@ Implementation notes (all from [pid-primer.md §5](pid-primer.md#5-from-textbook
 - `dt` is passed explicitly — the controller has no notion of wall time.
 - Pure and deterministic: no globals, no randomness, trivially unit-testable.
 
+### 1.1 Controller-agnostic reporting
+
+Controllers report each loop as `LoopTerms`: setpoint, measurement, error,
+a list of **named additive parts**, and the (un)saturated output. A PID's
+parts are P, I, D and FF (`pidLoop()` adapts `PidTerms`); an LQR reports
+$-k_i x_i$ per state, a disturbance observer $-\hat f/b_0$, and so on. The
+charts, the live formula and the term arrows are driven by the parts, so a
+new controller needs no UI code to be inspectable.
+
+`src/control/registry.ts` builds the controller selected by the parameters
+(`control.l1.kind`; L3 stages `outer`, `inner`, `compensation`, `safety` —
+see [beyond-pid.md §3.2](beyond-pid.md#32-controller-selection)). Changing
+the selection restarts the run. What the controller _believes_ about the
+vehicle lives in `control.model` ($\hat m$, inertia scale, motor time
+constant), separate from the true `drone` parameters.
+
 ## 2. Level 1 — altitude hold
 
 ```mermaid

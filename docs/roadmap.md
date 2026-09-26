@@ -1,6 +1,6 @@
 # Roadmap
 
-> **Status (2026-09-25):** M0–M6 are implemented. What changed against the
+> **Status (2026-09-26):** M0–M7 are implemented (M7 = Part II foundations). What changed against the
 > original plan is noted under each milestone.
 
 Built in small milestones; each ends with something runnable and useful.
@@ -104,7 +104,7 @@ semester of lessons (II.1–II.21). Full research, design and lesson plan:
 
 | Milestone | Content                                                                                    |
 | --------- | ------------------------------------------------------------------------------------------ |
-| M7        | Foundations: generic loop terms, controller selection, new sensors, linear algebra, charts |
+| M7 ✅     | Foundations: generic loop terms, controller selection, new sensors, linear algebra, charts |
 | M8        | L1: LQR/LQI, Kalman filter, ADRC — lessons II.1–II.6                                       |
 | M9        | L3 stage pipeline, INDI — lessons II.7–II.9                                                |
 | M10       | Geometric control, flatness feedforward, trajectories — lessons II.10–II.12                |

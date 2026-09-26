@@ -1,7 +1,7 @@
 import { GRAVITY } from '@/sim/params';
 import { idleActuation, type Actuation } from '@/sim/dynamics';
 import { Pid } from './pid';
-import { periodSteps, type ControlInput, type Controller } from './types';
+import { periodSteps, pidLoop, type ControlInput, type Controller } from './types';
 
 /**
  * Level 1: a single PID on altitude driving collective thrust (docs/control-architecture.md §2).
@@ -26,7 +26,7 @@ export class AltitudeController implements Controller {
     if (stepIndex % n !== 0) return this.held; // zero-order hold between samples
 
     const m = input.sense();
-    const ff = p.control.feedforward ? p.control.massEstimate * GRAVITY : 0;
+    const ff = p.control.feedforward ? p.control.model.mass * GRAVITY : 0;
     const tMax = 4 * p.drone.maxMotorThrust;
     const t = this.alt.update(
       p.control.alt,
@@ -43,7 +43,7 @@ export class AltitudeController implements Controller {
   }
 
   loops() {
-    return { alt: this.alt.last };
+    return { alt: pidLoop(this.alt.last) };
   }
 
   extras() {

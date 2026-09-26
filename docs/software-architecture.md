@@ -40,7 +40,8 @@ every signal. Therefore:
 
 ```
 src/
-  math/          vec3, quat, mat3, PRNG (seeded), filters
+  math/          vec3, quat, PRNG (seeded); mat.ts (small dense matrices, expm, c2d),
+                 riccati.ts (discrete LQR)
   sim/           pure simulation — no DOM, no Three.js
     drone.ts       state, parameters, motor model
     dynamics.ts    equations of motion per level (L1/L2/L3)
@@ -54,7 +55,9 @@ src/
     pointmass.ts   L2 controller
     cascade.ts     L3 cascade: position → velocity → attitude → rate
     mixer.ts       control allocation + desaturation
-    registry.ts    named loops for the inspector
+    types.ts       Controller interface, LoopTerms (named contributions for the inspector)
+    registry.ts    builds the controller selected in the parameters
+  estimation/    pure estimation — filters.ts (shared low-pass filters), later KF, ESO
   engine/
     simulation.ts  owns sim + controller, fixed-step stepping, loop rates
     telemetry.ts   ring buffers of all signals
@@ -93,6 +96,8 @@ flowchart TD
     engine --> control
     sim --> math
     control --> math
+    control --> estimation
+    estimation --> math
 ```
 
 `sim`, `control`, `math` and `engine` are framework-free TypeScript.
@@ -146,7 +151,9 @@ telemetry.notify(); // charts/readouts redraw imperatively
 ## 5. Telemetry
 
 - Every simulation step can publish named scalar signals
-  (`alt.error`, `alt.p`, `alt.i`, `wind.x`, `motor.1`, …).
+  (`alt.err`, `alt.part.p`, `alt.fb`, `wind.x`, `motor.1`, `dist.y`, …).
+  Every loop publishes `sp`, `meas`, `err`, one `part.<key>` channel per
+  contribution, their feedback sum `fb`, and `u`, `uraw`, `sat`.
 - Stored in fixed-size **ring buffers** (typed arrays), recorded at a
   telemetry rate (default 200 Hz) with a history of 60 s.
 - Charts read from the buffers at display rate (≤ 60 Hz); they never touch

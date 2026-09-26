@@ -1,7 +1,7 @@
 import { Info, RotateCcw } from 'lucide-react';
 import { useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { getIn, SCHEMA, type Field } from '@/engine/schema';
+import { getIn, SCHEMA, visible, type Field } from '@/engine/schema';
 import { defaultParams } from '@/sim/params';
 import { useParams } from '@/store/params';
 import { useUi } from '@/store/sim';
@@ -152,10 +152,28 @@ const ADVANCED = /\.(derivativeOn|dFilterHz|antiWindup|iLimit|kb)$/;
 export function ParamPanel() {
   const level = useParams((s) => s.params.sim.level);
   const setLoop = useUi((s) => s.setLoop);
+  // Visible field paths per group — re-render only when visibility changes, not on every edit.
+  const shown = useParams(
+    useShallow((s) =>
+      SCHEMA.map((g) =>
+        visible(g, s.params)
+          ? g.fields
+              .filter((f) => visible(f, s.params))
+              .map((f) => f.path)
+              .join(',')
+          : '',
+      ),
+    ),
+  );
   return (
     <div>
-      {SCHEMA.filter((g) => !g.levels || g.levels.includes(level)).map((g) => {
-        const fields = g.fields.filter((f) => !f.levels || f.levels.includes(level));
+      {SCHEMA.map((g, gi) => {
+        const paths = new Set(shown[gi]!.split(','));
+        // A choice with a single option is not a choice: hide it until Part II adds alternatives.
+        const fields = g.fields.filter(
+          (f) => paths.has(f.path) && !(f.kind === 'select' && f.options.length < 2),
+        );
+        if (!fields.length) return null;
         const termPrefix = fields.find((f) => f.path.endsWith('.pOn'))?.path.replace(/\.pOn$/, '');
         const basic = fields.filter(
           (f) => !/\.(pOn|iOn|dOn)$/.test(f.path) && !ADVANCED.test(f.path),

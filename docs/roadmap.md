@@ -98,18 +98,18 @@ default tune, and each loop can be inspected and retuned live.
 ## Part II — Beyond PID (planned)
 
 Contemporary controllers (LQR, Kalman, ADRC, INDI, geometric + flatness,
-MPC, MPPI, CBF, L1 adaptive, learned residuals and policies) and lessons
-15–35. Full research, design and lesson plan:
+MPC, MPPI, CBF, L1 adaptive, learned residuals and policies) and a second
+semester of lessons (II.1–II.21). Full research, design and lesson plan:
 [beyond-pid.md](beyond-pid.md).
 
 | Milestone | Content                                                                                    |
 | --------- | ------------------------------------------------------------------------------------------ |
 | M7        | Foundations: generic loop terms, controller selection, new sensors, linear algebra, charts |
-| M8        | L1: LQR/LQI, Kalman filter, ADRC — lessons 15–20                                           |
-| M9        | L3 stage pipeline, INDI — lessons 21–23                                                    |
-| M10       | Geometric control, flatness feedforward, trajectories — lessons 24–26                      |
-| M11       | QP, MPC (L1 + L3 outer), MPPI, CBF safety filter, keep-out zones — lessons 27–31           |
-| M12       | L1 adaptive, learned residual, learned policy, arena + `make bench` — lessons 32–35        |
+| M8        | L1: LQR/LQI, Kalman filter, ADRC — lessons II.1–II.6                                       |
+| M9        | L3 stage pipeline, INDI — lessons II.7–II.9                                                |
+| M10       | Geometric control, flatness feedforward, trajectories — lessons II.10–II.12                |
+| M11       | QP, MPC (L1 + L3 outer), MPPI, CBF safety filter, keep-out zones — lessons II.13–II.17     |
+| M12       | L1 adaptive, learned residual, learned policy, arena + `make bench` — lessons II.18–II.21  |
 
 ## Later / ideas
 

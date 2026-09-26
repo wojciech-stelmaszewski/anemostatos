@@ -267,8 +267,8 @@ Each ends with something runnable; `make check` passes at each commit.
   motor efficiency, rotor-drag toggle.
 - `math/mat.ts`, `math/riccati.ts`, `estimation/filters.ts` with tests.
 - Phase-portrait chart, estimate-vs-truth overlay, compute meter.
-- Lesson panel grouped into **Part I / Part II** chapters (`chapter` field on
-  `Lesson`).
+- Lesson panel split into **Part I / Part II** (a `part` and `chapter` field on
+  `Lesson`); Part II numbering restarts at II.1.
 
 **Done when:** Part I looks and behaves identically (lesson tests pass
 unchanged), and a dummy "PID via LoopTerms" controller is selectable.
@@ -280,7 +280,7 @@ unchanged), and a dummy "PID via LoopTerms" controller is selectable.
 - Tests: LQR gain vs analytic double-integrator solution; KF converges to
   the steady-state gain; ESO tracks a constant disturbance with zero
   steady-state error; closed-loop step for each controller.
-- Lessons 15–20.
+- Lessons II.1–II.6.
 
 **Done when:** on L1, the student can switch PID ↔ LQR ↔ ADRC on the same
 seed and compare with the ghost trace.
@@ -291,7 +291,7 @@ seed and compare with the ghost trace.
   behaviour change (regression test against recorded telemetry).
 - `indi.ts`: rate INDI and cascaded (acceleration) INDI; filter-sync option.
 - Motor degradation event.
-- Lessons 21–23.
+- Lessons II.7–II.9.
 
 **Done when:** INDI holds position in the gust challenge with a 2× inertia
 error where the PID rate loop oscillates.
@@ -303,7 +303,7 @@ error where the PID rate loop oscillates.
 - `geometric.ts` (Lee + tilt-prioritised), naive Euler controller,
   `flatness.ts` feedforward.
 - Reference trail + feedforward ghost in 3D.
-- Lessons 24–26.
+- Lessons II.10–II.12.
 
 **Done when:** a 2 m/s figure-8 is tracked with < 5 cm RMS error with
 feedforward on and visibly worse without.
@@ -314,7 +314,7 @@ feedforward on and visibly worse without.
   `mppi.ts`, `cbf.ts`, keep-out zones.
 - Predicted-horizon and rollout-cloud rendering (instanced lines, capped
   count).
-- Lessons 27–31.
+- Lessons II.13–II.17.
 
 **Done when:** L1 MPC respects a ceiling the PID violates, and MPPI flies
 around a keep-out zone at interactive frame rate (≥ 50 fps on a laptop).
@@ -325,82 +325,83 @@ around a keep-out zone at interactive frame rate (≥ 50 fps on a laptop).
   (`make train`), committed weights.
 - `engine/arena.ts`, `scripts/bench.ts` (`make bench`), arena UI.
 - `docs/modern-control-primer.md` finished.
-- Lessons 32–35.
+- Lessons II.18–II.21.
 
 **Done when:** `make bench` prints the arena table, and the lesson "The grand
 comparison" shows that each controller wins at least one column.
 
 ## 6. Lessons (Part II)
 
-Numbering continues after Part I. Priority: **must** (core story), **should**,
+Part II is the **second semester**: numbering restarts (II.1–II.21) and the
+lesson panel shows the two parts as separate courses. Priority: **must** (core story), **should**,
 **could** (drop if time runs out).
 
 ### Chapter A — From knobs to models (L1)
 
 | #   | id       | Title                     | Setup and events                                                                    | What the student sees / goal                                                                                                                                            | Prio   |
 | --- | -------- | ------------------------- | ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
-| 15  | `state`  | State, not error          | Calm, PD. Phase-portrait chart.                                                     | The PD controller is $u = -K x$ with $x = (e, \dot e)$; trajectories spiral into the origin. Goal: make the spiral critically damped (no crossing of the $e = 0$ axis). | must   |
-| 16  | `lqr`    | Pay for what you want     | LQR with $q_y, q_v, r$ sliders; PID default as ghost.                               | Gains appear from costs. Goal: beat the default PID's settling time with ≤ its peak thrust.                                                                             | must   |
-| 17  | `lqi`    | Integral, the optimal way | LQI, $\hat m = 0.8\,m$.                                                             | The mass error is removed by the augmented integral; equivalent $K_i$ readout matches Part I intuition.                                                                 | should |
-| 18  | `kalman` | Trust issues              | 5 cm altimeter noise at 50 Hz, noisy biased accelerometer; PID on raw vs PID on KF. | Estimate, truth and ±2σ band. Goal: RMS error below the "D-filter" lesson's best result.                                                                                | must   |
+| 1   | `state`  | State, not error          | Calm, PD. Phase-portrait chart.                                                     | The PD controller is $u = -K x$ with $x = (e, \dot e)$; trajectories spiral into the origin. Goal: make the spiral critically damped (no crossing of the $e = 0$ axis). | must   |
+| 2   | `lqr`    | Pay for what you want     | LQR with $q_y, q_v, r$ sliders; PID default as ghost.                               | Gains appear from costs. Goal: beat the default PID's settling time with ≤ its peak thrust.                                                                             | must   |
+| 3   | `lqi`    | Integral, the optimal way | LQI, $\hat m = 0.8\,m$.                                                             | The mass error is removed by the augmented integral; equivalent $K_i$ readout matches Part I intuition.                                                                 | should |
+| 4   | `kalman` | Trust issues              | 5 cm altimeter noise at 50 Hz, noisy biased accelerometer; PID on raw vs PID on KF. | Estimate, truth and ±2σ band. Goal: RMS error below the "D-filter" lesson's best result.                                                                                | must   |
 
 ### Chapter B — Estimate the disturbance, cancel it
 
 | #   | id          | Title                        | Setup and events                                                           | What the student sees / goal                                                                                                   | Prio   |
 | --- | ----------- | ---------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ------ |
-| 19  | `adrc`      | Everything is a disturbance  | L1 ADRC, gusts, payload +300 g at t = 10 s.                                | $\hat f$ tracks the true disturbance (plotted together). Compared with the I term: no waiting for an error to accumulate.      | must   |
-| 20  | `adrc-bw`   | How fast should you believe? | ADRC with sensor noise; observer bandwidth slider.                         | High $\omega_o$: fast rejection but noisy thrust; low: sluggish. Goal: find the sweet spot (score = RMS error + thrust noise). | should |
-| 21  | `indi`      | Don't model it, measure it   | L3, inertia ×2 (controller unaware); PID rate vs INDI.                     | PID rate loop rings; INDI barely notices, because it measures the acceleration its torque produces.                            | must   |
-| 22  | `indi-wind` | Feel the push                | L3 cascaded INDI vs PID cascade on the gust-challenge seed.                | The accelerometer sees the gust before any position error builds up. Goal: beat the PID cascade's RMS by 40 %.                 | must   |
-| 23  | `indi-sync` | Keep your filters in sync    | INDI with different filters on the gyro derivative and the motor feedback. | Mismatched delay ⇒ oscillation. Flip "synchronised filters" and it disappears. A real-world gotcha from INDI papers.           | should |
+| 5   | `adrc`      | Everything is a disturbance  | L1 ADRC, gusts, payload +300 g at t = 10 s.                                | $\hat f$ tracks the true disturbance (plotted together). Compared with the I term: no waiting for an error to accumulate.      | must   |
+| 6   | `adrc-bw`   | How fast should you believe? | ADRC with sensor noise; observer bandwidth slider.                         | High $\omega_o$: fast rejection but noisy thrust; low: sluggish. Goal: find the sweet spot (score = RMS error + thrust noise). | should |
+| 7   | `indi`      | Don't model it, measure it   | L3, inertia ×2 (controller unaware); PID rate vs INDI.                     | PID rate loop rings; INDI barely notices, because it measures the acceleration its torque produces.                            | must   |
+| 8   | `indi-wind` | Feel the push                | L3 cascaded INDI vs PID cascade on the gust-challenge seed.                | The accelerometer sees the gust before any position error builds up. Goal: beat the PID cascade's RMS by 40 %.                 | must   |
+| 9   | `indi-sync` | Keep your filters in sync    | INDI with different filters on the gyro derivative and the motor feedback. | Mismatched delay ⇒ oscillation. Flip "synchronised filters" and it disappears. A real-world gotcha from INDI papers.           | should |
 
 ### Chapter C — Geometry and trajectories (L3)
 
 | #   | id          | Title                       | Setup and events                                                    | What the student sees / goal                                                                                                   | Prio   |
 | --- | ----------- | --------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ------ |
-| 24  | `geometric` | Flying on a sphere          | Scripted 160° flip at altitude; Euler vs quaternion P vs geometric. | Euler controller takes the long way or tumbles; geometric recovers along the shortest rotation, tilt first.                    | must   |
-| 25  | `flatness`  | Feedforward from the future | 2 m/s figure-8; feedforward toggle.                                 | Without feedforward the drone lags and cuts corners; with it, tracking error drops by an order of magnitude. Goal: < 5 cm RMS. | must   |
-| 26  | `minsnap`   | Smooth is fast              | Waypoints: step setpoints vs min-snap trajectory, same total time.  | Steps saturate the motors and overshoot; min-snap arrives earlier with no saturation.                                          | should |
+| 10  | `geometric` | Flying on a sphere          | Scripted 160° flip at altitude; Euler vs quaternion P vs geometric. | Euler controller takes the long way or tumbles; geometric recovers along the shortest rotation, tilt first.                    | must   |
+| 11  | `flatness`  | Feedforward from the future | 2 m/s figure-8; feedforward toggle.                                 | Without feedforward the drone lags and cuts corners; with it, tracking error drops by an order of magnitude. Goal: < 5 cm RMS. | must   |
+| 12  | `minsnap`   | Smooth is fast              | Waypoints: step setpoints vs min-snap trajectory, same total time.  | Steps saturate the motors and overshoot; min-snap arrives earlier with no saturation.                                          | should |
 
 ### Chapter D — Optimisation in the loop
 
 | #   | id        | Title                  | Setup and events                                                                | What the student sees / goal                                                                                                        | Prio   |
 | --- | --------- | ---------------------- | ------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ------ |
-| 27  | `mpc`     | Look before you leap   | L1, ceiling at 4 m, setpoint step 2 → 3.9 m, tight thrust limit.                | PID (even with anti-windup) overshoots through the ceiling; MPC's predicted path (drawn in 3D) bends before the limit.              | must   |
-| 28  | `horizon` | How far ahead?         | Horizon and iteration-cap sliders; compute meter visible.                       | Too short ⇒ myopic; long ⇒ better but µs per tick climbs. The cost of optimality made visible.                                      | should |
-| 29  | `mpc-l3`  | MPC on top, INDI below | Fast figure-8 beyond the tilt limit; geometric vs MPC outer, PID vs INDI inner. | MPC plans within the tilt limit instead of saturating; INDI makes both robust to gusts — the conclusion of [Sun 2022] in 2 minutes. | should |
-| 30  | `mppi`    | A thousand futures     | Keep-out pillar between drone and target.                                       | The rollout cloud "flows" around the pillar. Temperature slider: greedy vs averaging.                                               | must   |
-| 31  | `cbf`     | The safety filter      | Deliberately aggressive PID, user drags the setpoint through a zone.            | The CBF changes the command only near the boundary; the drone slides along the zone surface. Arrow shows the correction.            | must   |
+| 13  | `mpc`     | Look before you leap   | L1, ceiling at 4 m, setpoint step 2 → 3.9 m, tight thrust limit.                | PID (even with anti-windup) overshoots through the ceiling; MPC's predicted path (drawn in 3D) bends before the limit.              | must   |
+| 14  | `horizon` | How far ahead?         | Horizon and iteration-cap sliders; compute meter visible.                       | Too short ⇒ myopic; long ⇒ better but µs per tick climbs. The cost of optimality made visible.                                      | should |
+| 15  | `mpc-l3`  | MPC on top, INDI below | Fast figure-8 beyond the tilt limit; geometric vs MPC outer, PID vs INDI inner. | MPC plans within the tilt limit instead of saturating; INDI makes both robust to gusts — the conclusion of [Sun 2022] in 2 minutes. | should |
+| 16  | `mppi`    | A thousand futures     | Keep-out pillar between drone and target.                                       | The rollout cloud "flows" around the pillar. Temperature slider: greedy vs averaging.                                               | must   |
+| 17  | `cbf`     | The safety filter      | Deliberately aggressive PID, user drags the setpoint through a zone.            | The CBF changes the command only near the boundary; the drone slides along the zone surface. Arrow shows the correction.            | must   |
 
 ### Chapter E — Adapting and learning
 
 | #   | id         | Title                        | Setup and events                                                         | What the student sees / goal                                                                                                | Prio   |
 | --- | ---------- | ---------------------------- | ------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- | ------ |
-| 32  | `l1ac`     | Adapt fast, act smooth       | L1: payload drop; L3: motor 2 at 60 % efficiency at t = 15 s.            | Adaptation bandwidth vs filter bandwidth as separate knobs; compare with I term and ESO.                                    | should |
-| 33  | `residual` | Learn the shape of the wind  | L3, rotor drag on, strong steady wind + turbulence, figure-8.            | Adapted coefficients converge; estimated vs true aerodynamic force. Beats the I term on a moving trajectory, where I lags.  | could  |
-| 34  | `policy`   | A controller nobody designed | Learned policy; then mass +50 % (outside training range).                | Crisp transients; small steady-state error; fails outside its training distribution. Matches [Kunapuli 2025].               | could  |
-| 35  | `arena`    | The grand comparison         | Arena: step, gust challenge, payload drop, figure-8, motor fault, noise. | Table of RMS / max error / energy / saturation / µs per tick. No controller wins every column — the real lesson of Part II. | must   |
+| 18  | `l1ac`     | Adapt fast, act smooth       | L1: payload drop; L3: motor 2 at 60 % efficiency at t = 15 s.            | Adaptation bandwidth vs filter bandwidth as separate knobs; compare with I term and ESO.                                    | should |
+| 19  | `residual` | Learn the shape of the wind  | L3, rotor drag on, strong steady wind + turbulence, figure-8.            | Adapted coefficients converge; estimated vs true aerodynamic force. Beats the I term on a moving trajectory, where I lags.  | could  |
+| 20  | `policy`   | A controller nobody designed | Learned policy; then mass +50 % (outside training range).                | Crisp transients; small steady-state error; fails outside its training distribution. Matches [Kunapuli 2025].               | could  |
+| 21  | `arena`    | The grand comparison         | Arena: step, gust challenge, payload drop, figure-8, motor fault, noise. | Table of RMS / max error / energy / saturation / µs per tick. No controller wins every column — the real lesson of Part II. | must   |
 
 Goals use the existing `goal.check` mechanism; reference scores (like the
 gust challenge today) are computed headlessly on the same seed.
 
 ## 7. Risks and open questions
 
-| Risk                                                          | Mitigation                                                                                                                                                                                             |
-| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| MPC/MPPI too slow on the main thread with fast-forward.       | Iteration and sample caps; MPPI at 50 Hz on the point-mass model. If still heavy, move `Simulation` to a Web Worker (already on the "later" list).                                                     |
-| The `LoopTerms` refactor breaks Part I.                       | M7 "done when" requires unchanged Part I lesson tests; add telemetry regression test for the default L3 run.                                                                                           |
-| Policy training in Node is slow or fails to converge.         | Small network, thrust + rates interface (easy task), ES with antithetic sampling; lesson 34 is **could**. Fallback: behaviour-clone the geometric controller and show the same generalisation failure. |
-| Scope: 21 lessons + 12 controllers.                           | Priorities above; the **must** set (13 lessons) is a coherent Part II on its own.                                                                                                                      |
-| Our quadratic drag model is "too easy" for learned residuals. | Rotor-drag toggle adds a thrust-dependent term the hand-crafted features don't capture exactly.                                                                                                        |
+| Risk                                                          | Mitigation                                                                                                                                                                                                |
+| ------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| MPC/MPPI too slow on the main thread with fast-forward.       | Iteration and sample caps; MPPI at 50 Hz on the point-mass model. If still heavy, move `Simulation` to a Web Worker (already on the "later" list).                                                        |
+| The `LoopTerms` refactor breaks Part I.                       | M7 "done when" requires unchanged Part I lesson tests; add telemetry regression test for the default L3 run.                                                                                              |
+| Policy training in Node is slow or fails to converge.         | Small network, thrust + rates interface (easy task), ES with antithetic sampling; lesson II.20 is **could**. Fallback: behaviour-clone the geometric controller and show the same generalisation failure. |
+| Scope: 21 lessons + 12 controllers.                           | Priorities above; the **must** set (13 lessons) is a coherent Part II on its own.                                                                                                                         |
+| Our quadratic drag model is "too easy" for learned residuals. | Rotor-drag toggle adds a thrust-dependent term the hand-crafted features don't capture exactly.                                                                                                           |
 
-Open decisions:
+Decisions (2026-09-26):
 
-1. **Lesson numbering** — continue 15–35 (proposed) or restart numbering per part.
-2. **Policy training** — offline ES in Node (proposed, no dependencies) vs.
-   a Python/PyTorch script (faster, but adds a second toolchain).
-3. **Keep-out zones** — virtual volumes (proposed) are the only additions to
-   the "grid-only" world.
+1. **Lesson numbering** — Part II is a second semester; numbering restarts at II.1.
+2. **Policy training** — offline evolution strategies in Node, no new
+   dependencies.
+3. **Keep-out zones** — yes, as virtual translucent volumes; the only
+   addition to the "grid-only" world.
 
 ## 8. References
 

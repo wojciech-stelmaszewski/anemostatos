@@ -95,6 +95,22 @@ without any other material.
 **Done when:** the full quadrotor holds position in gusty wind with a
 default tune, and each loop can be inspected and retuned live.
 
+## Part II — Beyond PID (planned)
+
+Contemporary controllers (LQR, Kalman, ADRC, INDI, geometric + flatness,
+MPC, MPPI, CBF, L1 adaptive, learned residuals and policies) and lessons
+15–35. Full research, design and lesson plan:
+[beyond-pid.md](beyond-pid.md).
+
+| Milestone | Content                                                                                    |
+| --------- | ------------------------------------------------------------------------------------------ |
+| M7        | Foundations: generic loop terms, controller selection, new sensors, linear algebra, charts |
+| M8        | L1: LQR/LQI, Kalman filter, ADRC — lessons 15–20                                           |
+| M9        | L3 stage pipeline, INDI — lessons 21–23                                                    |
+| M10       | Geometric control, flatness feedforward, trajectories — lessons 24–26                      |
+| M11       | QP, MPC (L1 + L3 outer), MPPI, CBF safety filter, keep-out zones — lessons 27–31           |
+| M12       | L1 adaptive, learned residual, learned policy, arena + `make bench` — lessons 32–35        |
+
 ## Later / ideas
 
 - Ziegler–Nichols helper (dropped from M4 — the method does not fit a
@@ -106,7 +122,6 @@ default tune, and each loop can be inspected and retuned live.
 - Root-locus / pole view for the L1 linearised model.
 - Auto-tuner (relay method) as a lesson.
 - Side-by-side twin drones with different tunings on the same wind.
-- Other controllers for comparison (LQR), once PID is well understood.
 
 ## Open decisions
 

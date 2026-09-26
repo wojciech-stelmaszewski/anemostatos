@@ -28,8 +28,8 @@ anti-windup…) is visible, tweakable and plotted live.
 - Photorealistic scenery, terrain, buildings. The world is a grid floor.
 - A flight simulator you pilot manually (we may add setpoint dragging, but
   the controller always flies).
-- Advanced control (LQR, MPC, Kalman filters). Possible future lessons,
-  out of scope for v1.
+- Advanced control in Part I. Part II adds contemporary controllers on top
+  of the PID foundation — see [beyond-pid.md](beyond-pid.md).
 
 ## Document index
 
@@ -40,6 +40,7 @@ anti-windup…) is visible, tweakable and plotted live.
 | [control-architecture.md](control-architecture.md)   | How the controllers are wired for each simulation level: altitude loop, 3-axis loop, full cascade (position → velocity → attitude → rate → mixer). |
 | [software-architecture.md](software-architecture.md) | Tech stack, module layout, simulation loop, data flow, telemetry, testing.                                                                         |
 | [ui-and-visualization.md](ui-and-visualization.md)   | 3D scene, drone model, overlays, live charts, parameter panel, lessons/scenarios.                                                                  |
+| [beyond-pid.md](beyond-pid.md)                       | Part II plan: research on contemporary controllers, architecture changes, milestones M7–M12, lessons 15–35.                                        |
 | [roadmap.md](roadmap.md)                             | The implementation plan: milestones, deliverables, acceptance criteria.                                                                            |
 
 ## At a glance

@@ -1,10 +1,12 @@
+import { useEffect, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { getIn } from '@/engine/schema';
 import { GRAVITY } from '@/sim/params';
 import { useParams } from '@/store/params';
+import { sim } from '@/store/sim';
 import { SIGNAL } from '@/ui/colors';
 import { StepMetrics } from './StepMetrics';
-import type { LoopMeta } from './loops';
+import { isPidParts, useLoopParts, type LoopMeta } from './loops';
 
 const gainPath = (id: string, level: number): string | null => {
   if (id === 'alt' || (level === 2 && id === 'pos.y')) return 'control.alt';
@@ -25,10 +27,30 @@ function Row({ label, value, hint }: { label: string; value: string; hint?: stri
   );
 }
 
+/** What a non-PID controller says about itself (gains, poles, estimates), refreshed live. */
+function Described({ loopId }: { loopId: string }) {
+  const params = useParams((s) => s.params);
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), 500);
+    return () => clearInterval(id);
+  }, []);
+  const rows = sim.controller.describe?.(params, loopId) ?? [];
+  if (!rows.length) return null;
+  return (
+    <div className="space-y-0.5 rounded border border-border/60 p-1.5">
+      {rows.map((r) => (
+        <Row key={r.label} label={r.label} value={r.value} hint={r.hint} />
+      ))}
+    </div>
+  );
+}
+
 /** Theory next to practice: what the gains predict, for the position-like loops. */
 export function InfoCard({ meta }: { meta: LoopMeta }) {
   const level = useParams((s) => s.params.sim.level);
-  const path = gainPath(meta.id, level);
+  const pid = isPidParts(useLoopParts(meta.id));
+  const path = pid ? gainPath(meta.id, level) : null;
   const v = useParams(
     useShallow((s) => ({
       kp: path ? (getIn(s.params, `${path}.kp`) as number) : 0,
@@ -104,7 +126,8 @@ export function InfoCard({ meta }: { meta: LoopMeta }) {
           )}
         </div>
       )}
-      {level === 3 && !path && (
+      {!pid && <Described loopId={meta.id} />}
+      {level === 3 && pid && !path && (
         <div className="text-muted">
           A proportional loop in the cascade: its output is the setpoint of the next, faster loop.
         </div>

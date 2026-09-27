@@ -102,6 +102,27 @@ $$
 
 This single loop is where most lessons live.
 
+### 2.1 Level 1 alternatives (Part II)
+
+`control.l1.kind` swaps the altitude PID for another control law with the
+same inputs and outputs; `control.l1.estimator` optionally puts a Kalman
+filter in front of whichever is selected. Theory in
+[modern-control-primer.md](modern-control-primer.md).
+
+| Kind   | File                  | Control law                                                                                                                               | Parts reported (role)                                   |
+| ------ | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| `pid`  | `control/altitude.ts` | as above                                                                                                                                  | P, I, D, FF                                             |
+| `lqr`  | `control/lqr.ts`      | $u = \hat m g - Kx$, $x = (y - r, \dot y\,[, T]\,[, \textstyle\int e])$, $K$ from the discrete Riccati equation, recomputed on any change | $-k_1 e$ (P), $-k_2 v$ (D), $-k_3 T$, $-k_i\xi$ (I), FF |
+| `adrc` | `control/adrc.ts`     | $u = \hat m g + (\omega_c^2(r - \hat y) - 2\omega_c\hat v - \hat f)/b_0$, $z$ from a 3rd-order ESO                                        | position (P), velocity (D), $-\hat f/b_0$ (I), FF       |
+
+With `estimator = 'kalman'`, `control/estimated.ts` wraps the controller:
+each time it samples the sensors, a 3-state Kalman filter (altitude, speed,
+accelerometer bias) predicts with the accelerometer and corrects with fresh
+position fixes, and the controller receives the estimate instead of the raw
+readings. LQR reads the sensors' velocity (or the filter's); PID and ADRC use
+only the position. Every controller describes itself for the info card
+(`describe()`: gains, poles, bandwidths, filter uncertainty).
+
 ## 3. Level 2 — 3D point mass
 
 Three independent copies of the L1 loop, one per world axis:

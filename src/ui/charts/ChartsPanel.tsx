@@ -15,6 +15,15 @@ const EXTRA: { value: ExtraChart; label: string }[] = [
   { value: 'wind', label: 'wind' },
   { value: 'disturbance', label: 'disturbance' },
   { value: 'phase', label: 'phase portrait' },
+  { value: 'estimate', label: 'estimate vs truth' },
+];
+
+const ESTIMATE: SeriesSpec[] = [
+  { key: 'pos.y', label: 'true', color: SIGNAL.truth, width: 2 },
+  { key: 'meas.y', label: 'sensor', color: SIGNAL.measurement, width: 1 },
+  { key: 'est.y', label: 'estimate', color: SIGNAL.output, width: 2 },
+  { key: 'est.y.hi', label: '+2σ', color: SIGNAL.output, dash: [3, 3], width: 1 },
+  { key: 'est.y.lo', label: '−2σ', color: SIGNAL.output, dash: [3, 3], width: 1 },
 ];
 
 /** Wall-clock cost of the controller — what Part II's optimisers pay for being clever. */
@@ -64,7 +73,7 @@ export function ChartsPanel() {
         .map((p, i) => ({
           key: `${id}.part.${p.key}`,
           label: p.label,
-          color: partColor(p.key, i),
+          color: partColor(p, i),
         })),
       {
         key: `${id}.fb`,
@@ -77,7 +86,7 @@ export function ChartsPanel() {
         .map((p, i) => ({
           key: `${id}.part.${p.key}`,
           label: p.label,
-          color: partColor(p.key, i + 3),
+          color: partColor(p, i + 3),
           legendOnly: true,
         })),
       { key: `${id}.u`, label: 'u', color: SIGNAL.output, legendOnly: true },
@@ -171,6 +180,8 @@ export function ChartsPanel() {
         />
         {extra === 'phase' ? (
           <PhasePortrait meta={meta} />
+        ) : extra === 'estimate' ? (
+          <TimeChart title="Altitude: estimate vs truth" unit="m" series={ESTIMATE} />
         ) : extra === 'disturbance' ? (
           <TimeChart
             title="Disturbance force (what the model does not explain)"

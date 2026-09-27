@@ -53,6 +53,12 @@ export function LessonPanel() {
   const setLesson = useUi((s) => s.setLesson);
   const current = LESSONS.find((l) => l.id === id) ?? LESSONS[0]!;
   const [part, setPart] = useState<Part>(partOf(current));
+  // Follow the current lesson when it changes from elsewhere (runner, links): adjust during render.
+  const [seen, setSeen] = useState(current.id);
+  if (seen !== current.id) {
+    setSeen(current.id);
+    setPart(partOf(current));
+  }
   const list = LESSONS.filter((l) => partOf(l) === part);
   const idx = list.findIndex((l) => l.id === current.id);
   const lesson = idx >= 0 ? current : list[0];
@@ -118,7 +124,7 @@ export function LessonPanel() {
                   onValueChange={setLesson}
                   options={list.map((l, k) => ({
                     value: l.id,
-                    label: `${prefix}${k + 1}. ${l.chapter ? `${l.chapter} — ` : ''}${l.title} (L${l.level})`,
+                    label: `${prefix}${k + 1}. ${l.title} (L${l.level})`,
                   }))}
                 />
                 <Button variant="accent" onClick={() => startLesson(lesson)}>
@@ -126,6 +132,11 @@ export function LessonPanel() {
                 </Button>
               </div>
               <div className="max-h-[42vh] space-y-1.5 overflow-y-auto pr-1 [&_kbd]:rounded [&_kbd]:border [&_kbd]:border-border [&_kbd]:bg-panel-2 [&_kbd]:px-1 [&_kbd]:font-mono [&_kbd]:text-[10px]">
+                {lesson.chapter && (
+                  <div className="text-[10px] font-semibold uppercase tracking-wider text-accent">
+                    {lesson.chapter}
+                  </div>
+                )}
                 <h3 className="text-sm font-semibold text-fg">{lesson.title}</h3>
                 {lesson.body}
                 <Goal key={lesson.id} lesson={lesson} />

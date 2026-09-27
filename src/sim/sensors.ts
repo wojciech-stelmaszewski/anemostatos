@@ -14,6 +14,8 @@ export interface Measurement {
   acc: Vec3;
   /** Actual thrust per motor from motor-speed telemetry, N; null if unavailable. */
   motors: [number, number, number, number] | null;
+  /** True when `pos` is a new fix (false while a slow position sensor holds its last value). */
+  posFresh: boolean;
 }
 
 const HISTORY = 1001; // 1 s of delay at 1 kHz
@@ -25,6 +27,7 @@ export const measurementOf = (s: DroneState): Measurement => ({
   omega: clone(s.omega),
   acc: qRotate(qConj(s.q), add(s.accel, v3(0, GRAVITY, 0))),
   motors: [...s.motors],
+  posFresh: true,
 });
 
 export class Sensors {
@@ -56,8 +59,10 @@ export class Sensors {
       s > 0 ? v3(v.x + s * r.normal(), v.y + s * r.normal(), v.z + s * r.normal()) : clone(v);
     const gyro = (p.gyroNoise * Math.PI) / 180;
     let pos: Vec3;
+    let posFresh = true;
     if (p.posRateHz > 0 && this.heldPos && t < this.nextPosT - 1e-9) {
       pos = clone(this.heldPos); // sample-and-hold between position fixes
+      posFresh = false;
     } else {
       pos = noisy(truth.pos, p.posNoise);
       pos.y += p.altBias;
@@ -78,7 +83,7 @@ export class Sensors {
     acc.y += p.accBias;
     const motors: Measurement['motors'] =
       p.motorFeedback && truth.motors ? [...truth.motors] : null;
-    return { pos, vel, q, omega, acc, motors };
+    return { pos, vel, q, omega, acc, motors, posFresh };
   }
 
   reset(): void {

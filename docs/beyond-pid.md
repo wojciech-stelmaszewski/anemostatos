@@ -1,6 +1,6 @@
 # Part II — Beyond PID
 
-> **Status (2026-09-26):** M7 (foundations) implemented; M8–M12 planned.
+> **Status (2026-09-27):** M7–M8 implemented; M9–M12 planned.
 > Milestones in [roadmap.md](roadmap.md) point here.
 
 Part I (lessons 1–14) teaches PID from first principles up to the full
@@ -280,7 +280,12 @@ telemetry regression test (`tests/regression.test.ts`).
 **Done when:** Part I looks and behaves identically (lesson tests pass
 unchanged), and a dummy "PID via LoopTerms" controller is selectable.
 
-### M8 — Chapter A + B on L1: LQR, Kalman, ADRC
+### M8 — Chapter A + B on L1: LQR, Kalman, ADRC ✅
+
+Done as planned. Notes: the Kalman filter is a wrapper that can sit in front
+of any L1 controller (`control.l1.estimator`); the theory lives in the new
+[modern-control-primer.md](modern-control-primer.md) (chapters A and B);
+lesson goals are proven reachable by tests.
 
 - `lqr.ts` (LQR/LQI, equivalent-gain readout, poles), `kalman.ts`, `eso.ts`,
   `adrc.ts`.

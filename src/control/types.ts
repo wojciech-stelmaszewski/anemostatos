@@ -26,6 +26,15 @@ export interface LoopPart {
   value: number;
   /** Feedforward rather than feedback (plotted legend-only, excluded from the feedback sum). */
   ff?: boolean;
+  /** Which PID term this part plays the role of — shares its colour and arrow (e.g. −k₂·v ≈ D). */
+  like?: 'p' | 'i' | 'd' | 'ff';
+}
+
+/** One line of a controller's self-description (gains, poles, …) for the info card. */
+export interface InfoRow {
+  label: string;
+  value: string;
+  hint?: string;
 }
 
 /** What any loop reports for the inspector — the controller-agnostic form of `PidTerms`. */
@@ -60,6 +69,10 @@ export const pidLoop = (t: PidTerms): LoopTerms => ({
 export const partValue = (t: LoopTerms | undefined, key: string): number =>
   t?.parts.find((p) => p.key === key)?.value ?? 0;
 
+/** Sum of the parts playing a PID term's role (the part itself for a PID). */
+export const roleValue = (t: LoopTerms | undefined, role: 'p' | 'i' | 'd' | 'ff'): number =>
+  t?.parts.reduce((s, p) => ((p.like ?? p.key) === role ? s + p.value : s), 0) ?? 0;
+
 export interface Controller {
   reset(): void;
   /** Zero all integrators — flight controllers do this while the drone sits on the ground. */
@@ -69,6 +82,8 @@ export interface Controller {
   loops(): Record<string, LoopTerms>;
   /** Extra signals worth plotting (e.g. desired thrust vector), by name. */
   extras(): Record<string, number>;
+  /** What the controller computed from the parameters (gains, poles…), for the info card. */
+  describe?(p: Params, loopId: string): InfoRow[];
 }
 
 /** How many physics steps between runs of a loop at `hz`. */

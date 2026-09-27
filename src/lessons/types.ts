@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import type { Simulation } from '@/engine/simulation';
 import type { StepMetrics } from '@/engine/metrics';
 import type { Level, Params } from '@/sim/params';
+import type { ExtraChart } from '@/store/sim';
 
 export interface GoalContext {
   sim: Simulation;
@@ -25,6 +26,10 @@ export interface Lesson {
   events?: (sim: Simulation) => void;
   /** Loop to show in the charts. */
   loop?: string;
+  /** What the bottom-right chart shows (default: wind). */
+  chart?: ExtraChart;
   goal?: { text: string; check: (ctx: GoalContext) => boolean | string };
+  /** A parameter change that reaches the goal — used by the tests to prove it is reachable. */
+  solution?: (p: Params) => void;
   body: ReactNode;
 }

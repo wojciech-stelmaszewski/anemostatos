@@ -57,7 +57,9 @@ src/
     mixer.ts       control allocation + desaturation
     types.ts       Controller interface, LoopTerms (named contributions for the inspector)
     registry.ts    builds the controller selected in the parameters
-  estimation/    pure estimation — filters.ts (shared low-pass filters), later KF, ESO
+    lqr.ts         L1 LQR / LQI;  adrc.ts  L1 ADRC;  estimated.ts  Kalman filter in front of L1
+  estimation/    pure estimation — filters.ts (low-pass pairs), kalman.ts (KF + altitude filter),
+                 eso.ts (extended state observer)
   engine/
     simulation.ts  owns sim + controller, fixed-step stepping, loop rates
     telemetry.ts   ring buffers of all signals

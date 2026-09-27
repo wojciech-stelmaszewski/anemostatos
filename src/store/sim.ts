@@ -7,7 +7,7 @@ export const sim = new Simulation(useParams.getState().params);
 useParams.subscribe((s) => sim.setParams(s.params));
 
 /** What the bottom-right chart slot shows. */
-export type ExtraChart = 'wind' | 'disturbance' | 'phase';
+export type ExtraChart = 'wind' | 'disturbance' | 'phase' | 'estimate';
 
 export type CameraMode = 'orbit' | 'follow' | 'side' | 'top';
 

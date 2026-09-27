@@ -187,7 +187,10 @@ export function ParamPanel() {
                 {g.title}
               </span>
             }
-            defaultOpen={g.id === 'alt' || g.id === 'setpoint' || (level > 1 && g.id === 'posH')}
+            defaultOpen={
+              ['alt', 'setpoint', 'controller', 'lqr', 'adrc', 'kalman'].includes(g.id) ||
+              (level > 1 && g.id === 'posH')
+            }
             accent={g.loop ? SIGNAL.output : undefined}
           >
             {termPrefix && <TermToggles prefix={termPrefix} />}

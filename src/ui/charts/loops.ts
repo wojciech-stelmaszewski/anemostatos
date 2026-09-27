@@ -1,8 +1,6 @@
-import { useMemo } from 'react';
-import { controllerKey } from '@/control/registry';
+import { useEffect, useState } from 'react';
 import type { LoopPart } from '@/control/types';
 import type { Level } from '@/sim/params';
-import { useParams } from '@/store/params';
 import { sim } from '@/store/sim';
 
 export interface LoopMeta {
@@ -70,12 +68,32 @@ export const LOOPS: Record<Level, LoopMeta[]> = {
 export const loopMeta = (level: Level, id: string): LoopMeta =>
   LOOPS[level].find((l) => l.id === id) ?? LOOPS[level][0]!;
 
-/** The contributions the running controller reports for a loop (re-read when it is swapped). */
+const partsSignature = (parts: readonly LoopPart[]) =>
+  parts.map((p) => `${p.key}:${p.label}:${p.like ?? ''}:${p.ff ? 1 : 0}`).join('|');
+
+/**
+ * The contributions the running controller reports for a loop. Polled, because the list changes
+ * when the controller is swapped or reconfigured (e.g. LQI adds an integral part) — React only
+ * re-renders when the list's shape changes, never for the values.
+ */
 export function useLoopParts(id: string): LoopPart[] {
-  const key = useParams((s) => controllerKey(s.params));
-  // `key` changes whenever the simulation builds a different controller.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  return useMemo(() => sim.controller.loops()[id]?.parts ?? [], [id, key]);
+  const read = () => sim.controller.loops()[id]?.parts ?? [];
+  const [parts, setParts] = useState(read);
+  useEffect(() => {
+    let sig = '';
+    const poll = () => {
+      const next = sim.controller.loops()[id]?.parts ?? [];
+      const s = partsSignature(next);
+      if (s !== sig) {
+        sig = s;
+        setParts(next);
+      }
+    };
+    poll();
+    const t = setInterval(poll, 250);
+    return () => clearInterval(t);
+  }, [id]);
+  return parts;
 }
 
 /** True when the loop's parts are the classic P, I, D (+ feedforward). */

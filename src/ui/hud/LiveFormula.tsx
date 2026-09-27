@@ -70,7 +70,7 @@ export function LiveFormula() {
         <div className="whitespace-nowrap">
           <span className="text-muted">u = </span>
           {parts.map((p, i) => (
-            <span key={p.key} style={{ color: partColor(p.key, i) }}>
+            <span key={p.key} style={{ color: partColor(p, i) }}>
               <span ref={r(`part.${p.key}`)} />{' '}
             </span>
           ))}
@@ -79,7 +79,7 @@ export function LiveFormula() {
         <div className="text-[10px] text-[#e66767]" ref={r('sat')} />
         <div className="mt-1 font-sans text-[10px] text-muted">
           {parts.map((p, i) => (
-            <span key={p.key} style={{ color: partColor(p.key, i) }}>
+            <span key={p.key} style={{ color: partColor(p, i) }}>
               {i > 0 && <span className="text-muted"> + </span>}
               {p.label}
             </span>

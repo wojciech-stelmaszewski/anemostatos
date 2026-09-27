@@ -4,6 +4,7 @@ import { useParams } from '@/store/params';
 import { SIGNAL } from '@/ui/colors';
 import { K, Notice, Try } from './Bits';
 import { M } from './Math';
+import { PART_TWO } from './part2';
 import type { Lesson } from './types';
 
 /** Change a parameter through the store, so the panel follows scripted events. */
@@ -48,7 +49,7 @@ const referenceScore = () => {
   return reference;
 };
 
-export const LESSONS: Lesson[] = [
+const PART_ONE: Lesson[] = [
   {
     id: 'meet',
     title: 'Meet the loop',
@@ -543,3 +544,5 @@ export const LESSONS: Lesson[] = [
     ),
   },
 ];
+
+export const LESSONS: Lesson[] = [...PART_ONE, ...PART_TWO];

@@ -111,16 +111,33 @@ semester of lessons (II.1–II.21). Full research, design and lesson plan:
 | M11 ✅    | QP, MPC (L1 + L3 outer), MPPI, CBF safety filter, keep-out zones — lessons II.13–II.17     |
 | M12 ✅    | L1 adaptive, learned residual, learned policy, arena + `make bench` — lessons II.18–II.21  |
 
+## Part III — Why it works (planned)
+
+Analysis rather than design: frequency response, poles and root locus,
+margins, delay and the waterbed effect, Lyapunov and regions of attraction,
+observability, LQG, sliding mode and backstepping, sampling, aliasing and
+notch filters, attitude estimation and an EKF, system identification, and
+flight after losing a rotor. Every analytic prediction is drawn next to the
+same quantity measured on the simulator. Third semester of lessons
+(III.1–III.20). Gap audit, design and lesson plan: [analysis.md](analysis.md).
+
+| Milestone | Content                                                                                                |
+| --------- | ------------------------------------------------------------------------------------------------------ |
+| M13       | Foundations: LTI toolbox, linear models, probe points and sweeps, Bode / Nyquist / pole–zero charts    |
+| M14       | Chapter F: poles, margins, delay, sensitivity, loop shaping — lessons III.1–III.6                      |
+| M15       | Chapter G: Lyapunov, observability, LQG — lessons III.7–III.9                                          |
+| M16       | Chapter H: sliding mode, backstepping, (H∞) — lessons III.10–III.12                                    |
+| M17       | Chapter I: sampling, vibration, notch filters, attitude estimation, EKF, sysid — lessons III.13–III.18 |
+| M18       | Chapter J: rotor loss, robustness report card in the arena — lessons III.19–III.20                     |
+
 ## Later / ideas
 
 - Ziegler–Nichols helper (dropped from M4 — the method does not fit a
   double-integrator plant; see pid-primer.md §6.2). Could return for the
-  rate loop, or with a relay auto-tuner.
+  rate loop, or with a relay auto-tuner (now planned: lesson III.18).
 - Physics in a Web Worker if fast-forward on slow machines needs it.
 
-- Frequency response: sine sweep → Bode plot of the closed loop.
-- Root-locus / pole view for the L1 linearised model.
-- Auto-tuner (relay method) as a lesson.
+- Iterative learning control on repeated figure-8 laps (see analysis.md §1).
 - Side-by-side twin drones with different tunings on the same wind.
 
 ## Open decisions

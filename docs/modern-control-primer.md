@@ -323,11 +323,118 @@ noise through to the motors.
 
 ---
 
+## C. Geometry and trajectories
+
+### C.1 Attitude lives on a sphere
+
+An attitude is a rotation, an element of the rotation group SO(3) — a curved
+space, not three independent number lines. Euler angles (roll, pitch, yaw)
+are a _chart_ of it: convenient, but singular. With this project's order
+(yaw, then pitch, then roll) the chart folds over at pitch = ±90°: roll and
+yaw stop being distinguishable (gimbal lock) and jump by 180° as the drone
+passes through.
+
+The naive attitude controller subtracts angles,
+$\omega_{cmd} = K\,(\eta_{sp} - \eta)$, and sends them as body rates. For small
+errors that is fine — all laws agree to first order. After a large upset it
+is wrong twice: angle differences are not body rates, and near the
+singularity they point the wrong way.
+
+Rotation-based laws compute the error on the group itself. With the error
+quaternion $q_e = q^{-1}\otimes q_{sp}$ (shortest way round:
+$q_{e,w}\ge 0$), Part I already used $\omega_{cmd} = K\cdot 2\,\vec q_{e}$, the
+error along the shortest rotation. The **tilt-prioritised** law
+(Brescianini & D'Andrea 2020) splits $q_e$ into a tilt part — rotate the
+thrust axis to where it must point — and a yaw part about that axis, with
+separate gains: yaw is the least important degree of freedom of a
+multicopter and must never steal authority from the thrust direction.
+Lee et al.'s geometric controller (2010) states the same idea with rotation
+matrices, $e_R = \tfrac12(R_d^\top R - R^\top R_d)^\vee$, and proves
+almost-global stability.
+
+> **Lesson II.10 "Flying on a sphere"** — a 170° flip at 6 m: the Euler law
+> loses 2.6 m and needs 1.4 s to level, the rotation-based laws 1.4 m and
+> 0.4 s. (Tilt-prioritised and quaternion behave alike here; the split pays
+> off with large yaw errors.)
+
+### C.2 Feedback is always late
+
+A feedback controller acts on an error, so for a moving reference it needs an
+error to act at all. For a 2 m/s figure-8 even a well-tuned loop lags and cuts
+the corners: ≈ 80 cm RMS with the geometric law and no feedforward, 122 cm
+for the Part I cascade.
+
+The geometric tracking law closes position and velocity in one expression
+and adds the reference's own acceleration:
+
+$$
+\vec a = \vec a_{ref} - K_p\,\vec e_p - K_v\,\vec e_v\quad(-\,K_i\!\int\vec e_p),
+\qquad \vec e_p = \vec p - \vec p_{ref},\ \vec e_v = \vec v - \vec v_{ref}
+$$
+
+With the plant $\ddot{\vec p} = \vec a$ the error obeys
+$\ddot{\vec e} + K_v\dot{\vec e} + K_p\vec e = 0$ whatever the trajectory — a
+mass–spring–damper again, with $\omega_n = \sqrt{K_p}$ and
+$\zeta = K_v/(2\sqrt{K_p})$ (shown in the info card).
+
+### C.3 Differential flatness
+
+A quadrotor is **differentially flat** (Mellinger & Kumar 2011): position
+and yaw, with their derivatives, determine the whole state and the inputs.
+
+- acceleration ⇒ thrust vector $\vec F = \hat m(\vec a + \vec g)$ ⇒ attitude
+  (thrust axis $b = \vec F/|\vec F|$, plus yaw) and collective thrust;
+- jerk ⇒ how fast the thrust axis turns: differentiating $b$,
+  $$\dot b = \frac{\hat m}{T}\big(j - (j\cdot b)\,b\big),\qquad \omega_\perp = b\times\dot b$$
+  — body-rate feedforward;
+- snap ⇒ angular acceleration ⇒ torque feedforward (not used here: the rate
+  loop, especially with INDI, absorbs it).
+
+So a smooth reference gives the inner loops their commands _before_ any error
+appears; feedback only corrects what the plan could not foresee.
+
+> **Lesson II.11 "Feedforward from the future"** — switch the feedforward on:
+> 78 cm → 2 cm RMS on the 2 m/s figure-8.
+
+### C.4 Minimum-snap trajectories
+
+If the reference must be smooth, which smooth path? Snap (4th derivative) is
+what the motors feel — it maps to the rate of change of thrust and torque —
+so Mellinger & Kumar minimise
+
+$$
+J = \int_0^T \big\|\,\ddddot{p}(t)\,\big\|^2\,dt
+$$
+
+subject to passing the waypoints at given times. The minimiser is a
+piecewise 7th-order polynomial, $C^6$ at the waypoints; with position, rest
+conditions and continuity the coefficients follow from **one linear solve**
+(`src/math/poly.ts`). Anemostatos flies a square with one rest-to-rest
+segment per side (straight edges; passing the corners without stopping
+bulges far outside the square).
+
+Honest comparison with simply stepping the setpoint to each corner, 2 s per
+side and a good controller: the steps arrive about as soon (1.84 s vs
+1.80 s). What planning buys is
+
+- **smoothness** — half the peak body rate (130 vs 249 °/s), less thrust
+  chatter;
+- **a schedule** — the drone is where the plan says, at every moment
+  (5 cm RMS), which is what coordinated flights and cameras need;
+- **feasibility in advance** — the plan's peak acceleration $a$ requires a
+  tilt of $\arctan(a/g)$. A 7 s lap needs 45° against a 35° limit: the info
+  card flags it before take-off.
+
+> **Lesson II.12 "Plan the motion"**.
+
+---
+
 ## Further reading
 
 The references are collected in [beyond-pid.md §8](beyond-pid.md#8-references).
 For this part in particular: Han 2009 and Gao 2003 (ADRC); Smeur et al. 2016
-and 2018, Tal & Karaman 2021 (INDI); any control
+and 2018, Tal & Karaman 2021 (INDI); Lee, Leok & McClamroch 2010, Brescianini
+& D'Andrea 2020, Mellinger & Kumar 2011 (geometry, flatness, min-snap); any control
 textbook's chapter on LQR and Kalman filtering (e.g. Åström & Murray,
 _Feedback Systems_, chapters on state feedback and output feedback, freely
 available online).

@@ -114,6 +114,10 @@ crosshair and values in all). Time window: 5 / 10 / 30 / 60 s.
 - **Freeze & compare**: "Snapshot" button stores the current run as a ghost
   trace; subsequent runs are overlaid.
 - **Export**: CSV of the visible buffers.
+- **Trajectories**: planar profiles (circle, figure-8, square by steps or
+  min-snap) draw their planned path as a dashed line in the 3D view; the info
+  card shows what the plan demands (peak speed, acceleration, the tilt it
+  needs vs the tilt limit — "not feasible" before you fly it).
 - **Compute meter** (chart header): average wall-clock µs the controller
   takes per physics step. Display only — the simulation never depends on
   wall-clock time. Matters once Part II's optimisers arrive.

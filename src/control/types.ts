@@ -7,6 +7,11 @@ import type { PidTerms } from './pid';
 export interface Setpoint {
   pos: Vec3;
   yaw: number; // rad
+  /** Derivatives of a smooth reference (trajectories); absent for plain setpoints. */
+  vel?: Vec3;
+  acc?: Vec3;
+  jerk?: Vec3;
+  snap?: Vec3;
 }
 
 export interface ControlInput {

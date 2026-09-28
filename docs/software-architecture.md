@@ -40,7 +40,8 @@ every signal. Therefore:
 
 ```
 src/
-  math/          vec3, quat, PRNG (seeded); mat.ts (small dense matrices, expm, c2d),
+  math/          vec3, quat, PRNG (seeded); poly.ts (minimum-snap splines);
+                 mat.ts (small dense matrices, expm, c2d, eigenvalues),
                  riccati.ts (discrete LQR)
   sim/           pure simulation — no DOM, no Three.js
     drone.ts       state, parameters, motor model
@@ -59,11 +60,13 @@ src/
     registry.ts    builds the controller selected in the parameters
     lqr.ts         L1 LQR / LQI;  adrc.ts  L1 ADRC;  estimated.ts  Kalman filter in front of L1
     stages.ts      L3 swappable stages: rate PID / rate INDI, no compensation / acceleration INDI
+    geometric.ts   L3 geometric tracking, attitude laws, flatness feedforward
   estimation/    pure estimation — filters.ts (low-pass pairs), kalman.ts (KF + altitude filter),
                  eso.ts (extended state observer)
   engine/
     simulation.ts  owns sim + controller, fixed-step stepping, loop rates
     telemetry.ts   ring buffers of all signals
+    reference.ts   setpoint profiles with derivatives (circle, figure-8, min-snap…)
     metrics.ts     step-response analysis (rise, overshoot, settling, e_ss)
     params.ts      parameter schema, presets, URL (de)serialisation
   store/         Zustand stores (params, UI state, lesson progress)

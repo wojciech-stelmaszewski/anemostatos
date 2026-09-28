@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { getIn } from '@/engine/schema';
+import { isPlanar, profileDemand } from '@/engine/reference';
 import { GRAVITY } from '@/sim/params';
 import { useParams } from '@/store/params';
 import { sim } from '@/store/sim';
@@ -42,6 +43,31 @@ function Described({ loopId }: { loopId: string }) {
       {rows.map((r) => (
         <Row key={r.label} label={r.label} value={r.value} hint={r.hint} />
       ))}
+    </div>
+  );
+}
+
+/** For planar trajectories: what the plan demands, compared with the drone's tilt limit. */
+function TrajectoryDemand() {
+  const params = useParams((s) => s.params);
+  if (!isPlanar(params.setpoint.profile)) return null;
+  const d = profileDemand(params);
+  const limit = params.control.l3.maxTiltDeg;
+  const over = d.tiltDeg > limit;
+  return (
+    <div className="space-y-0.5 rounded border border-border/60 p-1.5">
+      <div className="text-muted">The planned trajectory needs</div>
+      <Row label="peak speed" value={`${d.speed.toFixed(2)} m/s`} />
+      <Row
+        label="peak acceleration"
+        value={`${d.acc.toFixed(2)} m/s²`}
+        hint="Horizontal acceleration of the reference, known before flying it."
+      />
+      <Row
+        label="tilt for it (limit)"
+        value={`${d.tiltDeg.toFixed(0)}° (${limit}°)${over ? ' — not feasible' : ''}`}
+        hint="atan(a/g): a quadrotor accelerates sideways only by tilting. Above the limit the drone cannot follow the plan."
+      />
     </div>
   );
 }
@@ -127,6 +153,7 @@ export function InfoCard({ meta }: { meta: LoopMeta }) {
         </div>
       )}
       {!pid && <Described loopId={meta.id} />}
+      {level === 3 && <TrajectoryDemand />}
       {level === 3 && pid && !path && (
         <div className="text-muted">
           A proportional loop in the cascade: its output is the setpoint of the next, faster loop.

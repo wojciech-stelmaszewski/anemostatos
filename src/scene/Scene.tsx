@@ -9,6 +9,7 @@ import { DroneRig } from './DroneRig';
 import { Grid } from './Grid';
 import { ForceArrows, TermArrows } from './overlays/ForceArrows';
 import { HeightAids } from './overlays/HeightAids';
+import { ReferencePath } from './overlays/ReferencePath';
 import { SetpointGhost } from './overlays/SetpointGhost';
 import { Trail } from './overlays/Trail';
 import { WindParticles } from './overlays/WindParticles';
@@ -130,6 +131,7 @@ export function Scene() {
       <DroneRig />
       <HeightAids />
       <SetpointGhost />
+      <ReferencePath />
       <ForceArrows />
       <TermArrows />
       <Trail />

@@ -1,9 +1,10 @@
-import { qConj, qFromAxisAngle, qFromTo, qMul, qToEuler, qRotate, type Quat } from '@/math/quat';
+import { qFromAxisAngle, qFromTo, qMul, qToEuler, qRotate, type Quat } from '@/math/quat';
 import { clamp } from '@/math/util';
 import { clampLength, dot, length, normalize, v3, type Vec3 } from '@/math/vec3';
 import { idleActuation, type Actuation } from '@/sim/dynamics';
 import { GRAVITY, type Params } from '@/sim/params';
 import type { Measurement } from '@/sim/sensors';
+import { attitudeRates, flatnessRates, GeometricOuter } from './geometric';
 import { mix } from './mixer';
 import { defaultGains, Pid, type PidTerms } from './pid';
 import {
@@ -57,6 +58,8 @@ export class CascadeController implements Controller {
   readonly vel = { x: new Pid(), y: new Pid(), z: new Pid() };
   readonly rate: RateStage;
   readonly comp: Compensation;
+  /** Set when the outer stage is the geometric tracking controller instead of pos P + vel PID. */
+  readonly geo: GeometricOuter | null;
   att: Record<'roll' | 'pitch' | 'yaw', PidTerms> = {
     roll: pTerms(0, 0, 0, 0, 0),
     pitch: pTerms(0, 0, 0, 0, 0),
@@ -70,18 +73,25 @@ export class CascadeController implements Controller {
   private thrust = 0;
   /** Body-rate setpoint, deg/s: x roll, y yaw, z pitch. */
   private wSp = v3();
+  /** Body-rate feedforward from the reference's jerk, deg/s. */
+  private wFf = v3();
+  private jerk: Vec3 | undefined;
   private held: Actuation = idleActuation();
   private mixerSaturated = false;
 
   constructor(p?: Params) {
     this.rate = p?.control.l3.inner === 'indi' ? new RateIndi() : new PidRateStage();
     this.comp = p?.control.l3.compensation === 'indi' ? new AccelIndi() : new NoCompensation();
+    this.geo = p?.control.l3.outer === 'geometric' ? new GeometricOuter() : null;
   }
 
   reset(): void {
     for (const p of [...Object.values(this.pos), ...Object.values(this.vel)]) p.reset();
     this.rate.reset();
     this.comp.reset();
+    this.geo?.reset();
+    this.wFf = v3();
+    this.jerk = undefined;
     this.vSp = v3();
     this.aSp = v3();
     this.fDes = v3(0, GRAVITY, 0);
@@ -95,6 +105,7 @@ export class CascadeController implements Controller {
   resetIntegrators(): void {
     for (const p of Object.values(this.vel)) p.integral = 0;
     this.rate.resetIntegrators();
+    this.geo?.resetIntegrators();
   }
 
   tick(input: ControlInput): Actuation {
@@ -110,8 +121,8 @@ export class CascadeController implements Controller {
     // 0. Fast estimators of the compensation stage (filters) run with the rate loop.
     if (due(c.hzRate)) this.comp.sample(sense(), P, dtOf(c.hzRate));
 
-    // 1. Position P → velocity setpoint.
-    if (due(c.hzPos)) {
+    // 1. Position P → velocity setpoint (PID cascade only).
+    if (!this.geo && due(c.hzPos)) {
       const s = sense();
       const dt = dtOf(c.hzPos);
       const gH = defaultGains({ kp: c.posKpH, ki: 0, kd: 0 });
@@ -132,12 +143,17 @@ export class CascadeController implements Controller {
       // With an incremental (INDI) compensation the velocity loop's I term is redundant:
       // the increment already integrates.
       const noI = this.comp.replacesIntegral;
-      const velH = noI ? { ...c.velH, iOn: false } : c.velH;
-      const velV = noI ? { ...c.velV, iOn: false } : c.velV;
-      const ax = this.vel.x.update(velH, this.vSp.x, s.vel.x, dt, 0, -aH, aH).output;
-      const az = this.vel.z.update(velH, this.vSp.z, s.vel.z, dt, 0, -aH, aH).output;
-      const ay = this.vel.y.update(velV, this.vSp.y, s.vel.y, dt, 0, -0.8 * GRAVITY, aUp).output;
-      this.aSp = v3(ax, ay, az);
+      if (this.geo) {
+        this.aSp = this.geo.update(setpoint, s, dt, P, noI);
+        this.jerk = P.control.geometric.feedforward ? setpoint.jerk : undefined;
+      } else {
+        const velH = noI ? { ...c.velH, iOn: false } : c.velH;
+        const velV = noI ? { ...c.velV, iOn: false } : c.velV;
+        const ax = this.vel.x.update(velH, this.vSp.x, s.vel.x, dt, 0, -aH, aH).output;
+        const az = this.vel.z.update(velH, this.vSp.z, s.vel.z, dt, 0, -aH, aH).output;
+        const ay = this.vel.y.update(velV, this.vSp.y, s.vel.y, dt, 0, -0.8 * GRAVITY, aUp).output;
+        this.aSp = v3(ax, ay, az);
+      }
       let f = this.comp.force(this.aSp, P);
       f = v3(f.x, Math.max(f.y, 0.05 * mHat * GRAVITY), f.z);
       // Tilt limit: keep the vertical component, shrink the horizontal one.
@@ -152,11 +168,11 @@ export class CascadeController implements Controller {
     // 3. Attitude P → body-rate setpoint (deg/s).
     if (due(c.hzAtt)) {
       const s = sense();
-      let e = qMul(qConj(s.q), this.qSp);
-      if (e.w < 0) e = { w: -e.w, x: -e.x, y: -e.y, z: -e.z };
-      const err = v3(2 * e.x * DEG, 2 * e.y * DEG, 2 * e.z * DEG); // small-angle error, body axes
+      const att = attitudeRates(c.attitude, s.q, this.qSp, c.attKpRP, c.attKpYaw);
+      const err = att.err;
+      this.wFf = flatnessRates(this.fDes, this.jerk, mHat, s.q);
+      const raw = v3(att.raw.x + this.wFf.x, att.raw.y + this.wFf.y, att.raw.z + this.wFf.z);
       const lim = c.maxRateDeg;
-      const raw = v3(c.attKpRP * err.x, c.attKpYaw * err.y, c.attKpRP * err.z);
       this.wSp = v3(clamp(raw.x, -lim, lim), clamp(raw.y, -lim, lim), clamp(raw.z, -lim, lim));
       const eSp = qToEuler(this.qSp);
       const eNow = qToEuler(s.q);
@@ -184,13 +200,18 @@ export class CascadeController implements Controller {
   }
 
   loops(): Record<string, LoopTerms> {
+    const outer: Record<string, LoopTerms> = this.geo
+      ? this.geo.loops()
+      : {
+          'pos.x': pidLoop(this.pos.x.last),
+          'pos.y': pidLoop(this.pos.y.last),
+          'pos.z': pidLoop(this.pos.z.last),
+          'vel.x': pidLoop(this.vel.x.last),
+          'vel.y': pidLoop(this.vel.y.last),
+          'vel.z': pidLoop(this.vel.z.last),
+        };
     return {
-      'pos.x': pidLoop(this.pos.x.last),
-      'pos.y': pidLoop(this.pos.y.last),
-      'pos.z': pidLoop(this.pos.z.last),
-      'vel.x': pidLoop(this.vel.x.last),
-      'vel.y': pidLoop(this.vel.y.last),
-      'vel.z': pidLoop(this.vel.z.last),
+      ...outer,
       'att.roll': pidLoop(this.att.roll),
       'att.pitch': pidLoop(this.att.pitch),
       'att.yaw': pidLoop(this.att.yaw),
@@ -208,13 +229,40 @@ export class CascadeController implements Controller {
       'fdes.tilt': tilt,
       thrust: this.thrust,
       mixerSat: this.mixerSaturated ? 1 : 0,
+      'ff.rate.roll': this.wFf.x,
+      'ff.rate.pitch': this.wFf.z,
+      'q.sp.w': this.qSp.w,
+      'q.sp.x': this.qSp.x,
+      'q.sp.y': this.qSp.y,
+      'q.sp.z': this.qSp.z,
       ...this.rate.extras(),
       ...this.comp.extras(),
     };
   }
 
   describe(p: Params, loopId: string): InfoRow[] {
-    return [...this.rate.describe(p, loopId), ...this.comp.describe(p, loopId)];
+    const rows: InfoRow[] = [];
+    if (this.geo && loopId.startsWith('pos.')) {
+      const g = p.control.geometric;
+      const wn = Math.sqrt(g.kp);
+      rows.push(
+        {
+          label: 'law',
+          value: 'a = a_ref − Kp·e_p − Kv·e_v − Ki·∫e',
+          hint: 'Position and velocity closed in one law; the reference acceleration is fed forward.',
+        },
+        {
+          label: 'error dynamics ωₙ · ζ',
+          value: `${wn.toFixed(2)} rad/s · ${(g.kv / (2 * wn)).toFixed(2)}`,
+          hint: 'ë + Kv·ė + Kp·e = 0: the error behaves like a mass–spring–damper, whatever the trajectory.',
+        },
+        {
+          label: 'feedforward',
+          value: g.feedforward ? 'a_ref + body rates from jerk' : 'off (feedback only)',
+        },
+      );
+    }
+    return [...rows, ...this.rate.describe(p, loopId), ...this.comp.describe(p, loopId)];
   }
 
   /** Desired thrust vector, world frame — drawn as an arrow. */

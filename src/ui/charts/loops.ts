@@ -75,15 +75,23 @@ const accel = (axis: 'x' | 'y' | 'z'): LoopMeta => ({
 const ACCEL = [accel('x'), accel('y'), accel('z')];
 
 /** Loops to offer in the inspector for these parameters. */
-export const loopsFor = (p: Params): LoopMeta[] =>
-  p.sim.level === 3 && p.control.l3.compensation === 'indi'
-    ? [...LOOPS[3].slice(0, 6), ...ACCEL, ...LOOPS[3].slice(6)]
-    : LOOPS[p.sim.level];
+export const loopsFor = (p: Params): LoopMeta[] => {
+  if (p.sim.level !== 3) return LOOPS[p.sim.level];
+  const geometric = p.control.l3.outer === 'geometric';
+  // The geometric controller closes position and velocity in one law: no separate velocity loop,
+  // and its position loops output an acceleration.
+  const outer = geometric
+    ? LOOPS[3].slice(0, 3).map((l) => ({ ...l, outName: 'accel sp', outUnit: 'm/s²' }))
+    : LOOPS[3].slice(0, 6);
+  const acc = p.control.l3.compensation === 'indi' ? ACCEL : [];
+  return [...outer, ...acc, ...LOOPS[3].slice(6)];
+};
 
-export const loopMeta = (level: Level, id: string): LoopMeta =>
-  LOOPS[level].find((l) => l.id === id) ??
-  (level === 3 ? ACCEL.find((l) => l.id === id) : undefined) ??
-  LOOPS[level][0]!;
+/** Metadata of a loop as the selected controller defines it (falls back to the first loop). */
+export const loopMeta = (p: Params, id: string): LoopMeta => {
+  const list = loopsFor(p);
+  return list.find((l) => l.id === id) ?? list[0]!;
+};
 
 const partsSignature = (parts: readonly LoopPart[]) =>
   parts.map((p) => `${p.key}:${p.label}:${p.like ?? ''}:${p.ff ? 1 : 0}`).join('|');

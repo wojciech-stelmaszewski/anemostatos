@@ -6,7 +6,9 @@ export type Level = 1 | 2 | 3;
 export type L1Kind = 'pid' | 'lqr' | 'adrc';
 /** State estimator in front of the L1 controller. */
 export type L1Estimator = 'none' | 'kalman';
-export type L3Outer = 'pid-cascade';
+export type L3Outer = 'pid-cascade' | 'geometric';
+/** How an attitude error becomes a body-rate setpoint. */
+export type AttitudeLaw = 'quaternion' | 'tilt' | 'euler';
 export type L3Inner = 'pid' | 'indi';
 export type L3Compensation = 'none' | 'indi';
 export type L3Safety = 'none';
@@ -99,6 +101,17 @@ export interface ControlParams {
     /** Pass the actuator signal through the same filter as the measurement (as INDI requires). */
     syncFilters: boolean;
   };
+  /** L3 geometric tracking controller (Lee et al. 2010), in acceleration units. */
+  geometric: {
+    /** a = a_ref − Kp·e_p − Kv·e_v − Ki·∫e_p; 1/s². */
+    kp: number;
+    /** 1/s. */
+    kv: number;
+    /** 1/s³; 0 = no integral. */
+    ki: number;
+    /** Use the reference's acceleration, and body rates from its jerk (differential flatness). */
+    feedforward: boolean;
+  };
   /** L1 ADRC: controller and observer bandwidths, rad/s. */
   adrc: { wc: number; wo: number };
   /** L1 Kalman filter: what it assumes about the noise. */
@@ -134,6 +147,7 @@ export interface ControlParams {
     hzVel: number;
     hzPos: number;
     outer: L3Outer;
+    attitude: AttitudeLaw;
     inner: L3Inner;
     compensation: L3Compensation;
     safety: L3Safety;
@@ -149,7 +163,7 @@ export interface Params {
     yawDeg: number;
     rateLimit: number;
     /** Automatic setpoint motion added on top of the base value. */
-    profile: 'none' | 'square' | 'sine' | 'triangle';
+    profile: 'none' | 'square' | 'sine' | 'triangle' | 'circle' | 'figure8' | 'corners' | 'minsnap';
     profileAxis: 'y' | 'x';
     profileAmplitude: number;
     profilePeriod: number;
@@ -219,6 +233,7 @@ export const defaultParams = (): Params => ({
     l1: { kind: 'pid', estimator: 'none' },
     lqr: { qPos: 100, qVel: 10, qInt: 5, r: 1, integral: false, lagState: false },
     adrc: { wc: 3, wo: 15 },
+    geometric: { kp: 9, kv: 5, ki: 0.5, feedforward: true },
     indi: { rateKpRP: 20, rateKpYaw: 8, filterHz: 20, accFilterHz: 10, syncFilters: true },
     kalman: { accSigma: 0.5, posSigma: 0.05, biasSigma: 0.05 },
     alt: defaultGains({ kp: 10, ki: 0.8, kd: 7, iLimit: 10 }),
@@ -242,6 +257,7 @@ export const defaultParams = (): Params => ({
       hzVel: 100,
       hzPos: 50,
       outer: 'pid-cascade',
+      attitude: 'quaternion',
       inner: 'pid',
       compensation: 'none',
       safety: 'none',

@@ -56,7 +56,12 @@ export function ChartsPanel() {
     [ctrlKey],
   );
   const setWindow = useUi((s) => s.setWindow);
-  const meta = loopMeta(level, loopId);
+  const metaKey = useParams((s) => controllerKey(s.params));
+  const meta = useMemo(
+    () => loopMeta(useParams.getState().params, loopId),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- depends on the controller, via metaKey
+    [metaKey, loopId, level],
+  );
   const id = meta.id;
 
   const tracking = useMemo<SeriesSpec[]>(() => {

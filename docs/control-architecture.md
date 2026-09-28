@@ -269,6 +269,25 @@ flowchart LR
   (damaged prop) is rejected by the rate INDI, a force disturbance (gust) by
   the acceleration INDI; each does nothing for the other.
 
+### 4.9 Geometric tracking, attitude laws and flatness feedforward (Part II)
+
+- **Outer stage `geometric`** (`src/control/geometric.ts`, at the velocity
+  rate): $\vec a = \vec a_{ref} - K_p\vec e_p - K_v\vec e_v - K_i\int\vec e_p$
+  — Lee, Leok & McClamroch's translational law in cascaded form (it outputs a
+  desired acceleration, so compensation and the rate stages below still
+  apply). With feedforward off it ignores the reference's derivatives. Its
+  integral is bypassed under acceleration INDI.
+- **Attitude law** (`control.l3.attitude`): `quaternion` (Part I, default),
+  `tilt` (tilt-prioritised: thrust-axis error and yaw error with separate
+  gains, exact angles), `euler` (naive angle subtraction, for the lesson).
+- **Flatness feedforward**: from the reference's jerk,
+  $\dot b = \tfrac{\hat m}{T}(j - (j\cdot b)b)$, $\omega = b\times\dot b$, added
+  to the attitude loop's body-rate command.
+- **References**: `src/engine/reference.ts` gives the setpoint profile with
+  velocity, acceleration, jerk and snap; they reach the controller as
+  optional `Setpoint` fields only while the setpoint follows the profile
+  exactly (no rate limit, not taking off).
+
 ## 5. Loop inspector
 
 Every PID instance registers under a stable id

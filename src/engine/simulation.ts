@@ -14,6 +14,7 @@ import {
 import { GRAVITY, type Level, type Params } from '@/sim/params';
 import { Sensors, type Measurement } from '@/sim/sensors';
 import { Wind } from '@/sim/wind';
+import { profileOffset, zeroReference, type Reference } from './reference';
 import { Telemetry } from './telemetry';
 
 export const PHYS_DT = 0.001;
@@ -72,11 +73,20 @@ export class Simulation {
   private scheduled: { t: number; fn: (sim: Simulation) => void }[] = [];
   /** Setpoint without the automatic profile. */
   private base: Vec3 = v3();
+
+  /** The base point the automatic profile moves around (for drawing the path). */
+  get profileBase(): Vec3 {
+    return this.base;
+  }
   /** Times of setpoint steps (for step-response analysis). */
   stepEvents: { t: number; from: number; to: number }[] = [];
 
   /** While true the setpoint ramps up from the ground instead of jumping. */
   takingOff = true;
+  /** The automatic setpoint motion with its derivatives (zero without a profile). */
+  reference: Reference = zeroReference(v3());
+  /** When the planar profiles started their first lap. */
+  profileStart = 0;
   private accumulator = 0;
   private poke: { force: Vec3; until: number } | null = null;
   private resetListeners = new Set<() => void>();
@@ -110,6 +120,9 @@ export class Simulation {
       this.setTarget(v3(sp.x, sp.y, sp.z));
     }
     this.yaw = (sp.yawDeg * Math.PI) / 180;
+    const pp = prev.setpoint;
+    if (sp.profile !== pp.profile || sp.profilePeriod !== pp.profilePeriod)
+      this.profileStart = this.t;
     if (next.sim.seed !== prev.sim.seed || controllerKey(next) !== controllerKey(prev))
       this.reset();
   }
@@ -132,6 +145,8 @@ export class Simulation {
     this.base = clone(this.target);
     this.setpoint = v3(this.target.x, this.state.pos.y, this.target.z);
     this.takingOff = true;
+    this.profileStart = 0;
+    this.reference = zeroReference(v3());
     this.yaw = (p.setpoint.yawDeg * Math.PI) / 180;
     this.state.q = p.sim.level === 3 ? qFromAxisAngle(v3(0, 1, 0), 0) : this.state.q;
     this.telemetry.clear();
@@ -166,21 +181,14 @@ export class Simulation {
 
   private withProfile(base: Vec3): Vec3 {
     const sp = this.params.setpoint;
-    if (sp.profile === 'none' || this.takingOff) return base;
-    const phase = (this.t / Math.max(sp.profilePeriod, 0.1)) % 1;
-    const a = sp.profileAmplitude;
-    const off =
-      sp.profile === 'square'
-        ? phase < 0.5
-          ? a
-          : -a
-        : sp.profile === 'sine'
-          ? a * Math.sin(2 * Math.PI * phase)
-          : a * (phase < 0.5 ? 4 * phase - 1 : 3 - 4 * phase);
-    const axis = this.level === 1 ? 'y' : sp.profileAxis;
-    const out = clone(base);
-    out[axis] += off;
+    if (sp.profile === 'none' || this.takingOff) {
+      this.reference = zeroReference(base);
+      return base;
+    }
+    const r = profileOffset(this.params, this.level, this.t, this.profileStart);
+    const out = v3(base.x + r.pos.x, base.y + r.pos.y, base.z + r.pos.z);
     out.y = Math.max(out.y, 0.2);
+    this.reference = { ...r, pos: out };
     return out;
   }
 
@@ -268,7 +276,10 @@ export class Simulation {
     if (this.takingOff && length(sub(this.target, this.setpoint)) < 1e-9) {
       const arrived = length(sub(this.target, this.state.pos)) < 0.05;
       const stalled = Math.abs(this.state.vel.y) < 0.02 && !this.state.landed;
-      if (arrived || stalled) this.takingOff = false;
+      if (arrived || stalled) {
+        this.takingOff = false;
+        this.profileStart = this.t;
+      }
     }
 
     const wind = this.wind.step(this.t, dt, p.wind);
@@ -276,7 +287,12 @@ export class Simulation {
 
     if (this.armed && !this.state.crashed) {
       if (this.state.landed || this.takingOff) this.controller.resetIntegrators();
-      const sp: Setpoint = { pos: this.setpoint, yaw: this.yaw };
+      // Reference derivatives only while the setpoint follows the profile exactly.
+      const exact = p.setpoint.profile !== 'none' && rl === 0 && !this.takingOff;
+      const r = this.reference;
+      const sp: Setpoint = exact
+        ? { pos: this.setpoint, yaw: this.yaw, vel: r.vel, acc: r.acc, jerk: r.jerk, snap: r.snap }
+        : { pos: this.setpoint, yaw: this.yaw };
       const t0 = performance.now();
       this.actuation = this.controller.tick({
         params: p,

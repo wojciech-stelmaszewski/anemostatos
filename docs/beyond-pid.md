@@ -1,6 +1,6 @@
 # Part II — Beyond PID
 
-> **Status (2026-09-27):** M7–M9 implemented; M10–M12 planned.
+> **Status (2026-09-28):** M7–M10 implemented; M11–M12 planned.
 > Milestones in [roadmap.md](roadmap.md) point here.
 
 Part I (lessons 1–14) teaches PID from first principles up to the full
@@ -337,6 +337,26 @@ the same latent bug).
 **Done when:** a 2 m/s figure-8 is tracked with < 5 cm RMS error with
 feedforward on and visibly worse without.
 
+**✅ Done** — 2.1 cm RMS with feedforward, 78 cm without, 122 cm for the PID
+cascade. What changed: the geometric controller lives in `geometric.ts`
+together with the attitude laws and the flatness feedforward (no separate
+`flatness.ts`); references with derivatives come from `engine/reference.ts`
+(profiles `circle`, `figure8`, `corners`, `minsnap`). The 3D view draws the
+planned path; the "feedforward ghost" drone was replaced by a feasibility
+readout (peak speed, acceleration and the tilt it needs vs the limit), which
+teaches more. Measurements that reshaped the lessons:
+
+- A 170° flip: naive Euler angles lose 2.6 m of altitude, quaternion and
+  tilt-prioritised laws 1.4 m. Tilt-prioritised and quaternion are
+  indistinguishable here (the split matters with large yaw errors), and the
+  lesson says so.
+- Min-snap through the corners _without stopping_ bulges 1.4 m outside the
+  square, so the square profile is rest-to-rest per edge. Against steps to
+  each corner it is **not faster** (both arrive in ≈ 1.8 s of a 2 s side) —
+  it is half as violent (130 vs 249 °/s peak body rate), exactly on schedule,
+  and it flags an infeasible plan (7 s lap → 45° tilt needed) before flight.
+  II.12 is renamed "Plan the motion" accordingly.
+
 ### M11 — Optimisation in the loop
 
 - `qp.ts` (tested against hand-solved problems), `mpc.ts` (L1 and L3 outer),
@@ -388,9 +408,9 @@ lesson panel shows the two parts as separate courses. Priority: **must** (core s
 
 | #   | id          | Title                       | Setup and events                                                    | What the student sees / goal                                                                                                   | Prio   |
 | --- | ----------- | --------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ------ |
-| 10  | `geometric` | Flying on a sphere          | Scripted 160° flip at altitude; Euler vs quaternion P vs geometric. | Euler controller takes the long way or tumbles; geometric recovers along the shortest rotation, tilt first.                    | must   |
+| 10  | `geometric` | Flying on a sphere          | Scripted 170° flip at 6 m; Euler vs quaternion vs tilt-prioritised. | Euler loses 2.6 m and levels in 1.4 s; rotation-based laws 1.4 m and 0.4 s. Goal: lose < 1.8 m.                                | must   |
 | 11  | `flatness`  | Feedforward from the future | 2 m/s figure-8; feedforward toggle.                                 | Without feedforward the drone lags and cuts corners; with it, tracking error drops by an order of magnitude. Goal: < 5 cm RMS. | must   |
-| 12  | `minsnap`   | Smooth is fast              | Waypoints: step setpoints vs min-snap trajectory, same total time.  | Steps saturate the motors and overshoot; min-snap arrives earlier with no saturation.                                          | should |
+| 12  | `minsnap`   | Plan the motion             | 3 m square, 2 s per side: steps to each corner vs min-snap.         | Same arrival time, half the peak body rate, on schedule; a 7 s lap is flagged infeasible before flight.                        | should |
 
 ### Chapter D — Optimisation in the loop
 

@@ -102,11 +102,13 @@ function BoolField({ field }: { field: Extract<Field, { kind: 'bool' }> }) {
 
 function SelectField({ field }: { field: Extract<Field, { kind: 'select' }> }) {
   const value = useParams((s) => getIn(s.params, field.path)) as string;
+  const level = useParams((s) => s.params.sim.level);
   const set = useParams((s) => s.set);
+  const options = field.options.filter((o) => !o.levels || o.levels.includes(level));
   return (
     <div className="flex items-center justify-between gap-2">
       <Label field={field} />
-      <Select value={value} onValueChange={(v) => set(field.path, v)} options={field.options} />
+      <Select value={value} onValueChange={(v) => set(field.path, v)} options={options} />
     </div>
   );
 }

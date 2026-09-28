@@ -29,7 +29,8 @@ export type Field = Visibility &
         kind: 'select';
         path: string;
         label: string;
-        options: { value: string; label: string }[];
+        /** Options may be limited to some levels. */
+        options: { value: string; label: string; levels?: Level[] }[];
         help?: string;
       }
   );
@@ -227,9 +228,24 @@ export const SCHEMA: Group[] = [
         kind: 'select',
         path: 'control.l3.outer',
         label: 'Outer stage',
-        options: [{ value: 'pid-cascade', label: 'PID cascade' }],
+        options: [
+          { value: 'pid-cascade', label: 'PID cascade' },
+          { value: 'geometric', label: 'geometric tracking (Lee)' },
+        ],
         levels: [3],
-        help: 'Turns the position reference into a desired acceleration (thrust vector).',
+        help: 'Turns the position reference into a desired acceleration (thrust vector). The geometric controller also uses the reference’s velocity and acceleration (and its jerk for body-rate feedforward) when flying a trajectory.',
+      },
+      {
+        kind: 'select',
+        path: 'control.l3.attitude',
+        label: 'Attitude law',
+        options: [
+          { value: 'quaternion', label: 'quaternion error' },
+          { value: 'tilt', label: 'tilt-prioritised' },
+          { value: 'euler', label: 'Euler angles (naive)' },
+        ],
+        levels: [3],
+        help: 'How an attitude error becomes a body-rate command. Quaternion: the shortest rotation. Tilt-prioritised: fix the thrust direction first, yaw separately. Euler angles: subtract roll/pitch/yaw — fine when small, wrong near ±90° pitch.',
       },
       {
         kind: 'select',
@@ -325,13 +341,18 @@ export const SCHEMA: Group[] = [
           { value: 'square', label: 'square wave (steps)' },
           { value: 'sine', label: 'sine' },
           { value: 'triangle', label: 'triangle (ramps)' },
+          { value: 'circle', label: 'circle', levels: [2, 3] },
+          { value: 'figure8', label: 'figure-8', levels: [2, 3] },
+          { value: 'corners', label: 'square: steps to each corner', levels: [2, 3] },
+          { value: 'minsnap', label: 'square: min-snap trajectory', levels: [2, 3] },
         ],
-        help: 'Move the setpoint automatically around its base value. Square = repeated step responses; sine = how well the loop follows a smooth motion (try shortening the period).',
+        help: 'Move the setpoint automatically around its base value. Square = repeated step responses; sine = how well the loop follows a smooth motion (try shortening the period). Circle, figure-8 and the square paths fly in the horizontal plane; amplitude = radius or half the side, period = one lap.',
       },
       {
         kind: 'select',
         path: 'setpoint.profileAxis',
         label: 'Motion axis',
+        when: (p) => ['square', 'sine', 'triangle'].includes(p.setpoint.profile),
         options: [
           { value: 'y', label: 'altitude (Y)' },
           { value: 'x', label: 'horizontal (X)' },
@@ -557,6 +578,53 @@ export const SCHEMA: Group[] = [
         step: 0.1,
       },
       ...pid('control.posH', { kp: [0.1, 100], ki: [0.01, 50], kd: [0.01, 50], unit: 'N' }),
+    ],
+  },
+  {
+    id: 'geometric',
+    title: 'Geometric tracking',
+    loop: 'pos.x',
+    levels: [3],
+    when: (p) => p.control.l3.outer === 'geometric',
+    fields: [
+      {
+        kind: 'number',
+        path: 'control.geometric.kp',
+        label: 'Kp (position)',
+        unit: '1/s²',
+        min: 0.1,
+        max: 100,
+        step: 0.1,
+        log: true,
+        help: 'a = a_ref − Kp·e_p − Kv·e_v − Ki·∫e_p: acceleration per metre of position error.',
+      },
+      {
+        kind: 'number',
+        path: 'control.geometric.kv',
+        label: 'Kv (velocity)',
+        unit: '1/s',
+        min: 0.1,
+        max: 50,
+        step: 0.1,
+        log: true,
+        help: 'Acceleration per m/s of velocity error: the damping.',
+      },
+      {
+        kind: 'number',
+        path: 'control.geometric.ki',
+        label: 'Ki (integral)',
+        unit: '1/s³',
+        min: 0,
+        max: 10,
+        step: 0.05,
+        help: 'Removes steady offsets (wind). Bypassed when acceleration INDI is on.',
+      },
+      {
+        kind: 'bool',
+        path: 'control.geometric.feedforward',
+        label: 'Trajectory feedforward',
+        help: 'Use the reference’s velocity and acceleration, and turn its jerk into body-rate feedforward (differential flatness). Off: pure feedback, which can only react once an error exists.',
+      },
     ],
   },
   {

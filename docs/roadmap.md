@@ -1,6 +1,6 @@
 # Roadmap
 
-> **Status (2026-09-27):** M0–M9 are implemented (M7–M9 = the start of Part II). What changed against the
+> **Status (2026-09-28):** M0–M10 are implemented (M7–M10 = Part II so far). What changed against the
 > original plan is noted under each milestone.
 
 Built in small milestones; each ends with something runnable and useful.
@@ -107,7 +107,7 @@ semester of lessons (II.1–II.21). Full research, design and lesson plan:
 | M7 ✅     | Foundations: generic loop terms, controller selection, new sensors, linear algebra, charts |
 | M8 ✅     | L1: LQR/LQI, Kalman filter, ADRC — lessons II.1–II.6                                       |
 | M9 ✅     | L3 stage pipeline, INDI — lessons II.7–II.9                                                |
-| M10       | Geometric control, flatness feedforward, trajectories — lessons II.10–II.12                |
+| M10 ✅    | Geometric control, flatness feedforward, trajectories — lessons II.10–II.12                |
 | M11       | QP, MPC (L1 + L3 outer), MPPI, CBF safety filter, keep-out zones — lessons II.13–II.17     |
 | M12       | L1 adaptive, learned residual, learned policy, arena + `make bench` — lessons II.18–II.21  |
 

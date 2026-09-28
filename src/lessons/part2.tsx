@@ -1,6 +1,8 @@
 import { Simulation } from '@/engine/simulation';
 import { defaultParams, type Params } from '@/sim/params';
 import { K, Notice, Try } from './Bits';
+import { qFromAxisAngle, qMul } from '@/math/quat';
+import { v3 } from '@/math/vec3';
 import { M } from './Math';
 import { setAt } from './script';
 import type { Lesson } from './types';
@@ -37,10 +39,11 @@ const ghostOf = (
   return g;
 };
 
-const maxOf = (sim: Simulation, key: string, from: number, to = Infinity) => {
+/** Largest value of `sign·channel` in [from, to] (sign −1 turns it into a minimum). */
+const maxOf = (sim: Simulation, key: string, from: number, to = Infinity, sign = 1) => {
   const { t, series } = sim.telemetry.window([key], from);
   let m = -Infinity;
-  for (let k = 0; k < t.length && t[k]! <= to; k++) m = Math.max(m, series[0]![k]!);
+  for (let k = 0; k < t.length && t[k]! <= to; k++) m = Math.max(m, sign * series[0]![k]!);
   return m;
 };
 
@@ -131,6 +134,21 @@ const gustReferenceScore = () => {
   }
   return gustReference;
 };
+
+// Chapter C
+const C = 'C · Geometry and trajectories';
+const FLIP_AT = 10;
+const FIG8_PERIOD = 8.9; // 2 m/s peak with a 2 m amplitude
+const figureEight = (p: Params) => {
+  p.wind.enabled = false;
+  p.setpoint.y = 3;
+  p.setpoint.profile = 'figure8';
+  p.setpoint.profileAmplitude = 2;
+  p.setpoint.profilePeriod = FIG8_PERIOD;
+};
+const minOf = (sim: Simulation, key: string, from: number) => -maxOf(sim, key, from, Infinity, -1);
+/** Lowest altitude since `from`. */
+const lowest = (sim: Simulation, from: number) => -maxOf(sim, 'pos.y', from, Infinity, -1);
 
 const A = 'A · From knobs to models';
 const B = 'B · Estimate the disturbance';
@@ -632,6 +650,179 @@ export const PART_TWO: Lesson[] = [
         <Notice>
           This is the most common INDI implementation bug in practice. The published fix is exactly
           this: filter the actuator feedback with the same filter as the sensor.
+        </Notice>
+      </>
+    ),
+  },
+  {
+    id: 'geometric',
+    part: 2,
+    chapter: C,
+    title: 'Flying on a sphere',
+    level: 3,
+    loop: 'att.roll',
+    setup: (p) => {
+      p.wind.enabled = false;
+      p.setpoint.y = 6;
+      p.control.l3.attitude = 'euler';
+    },
+    events: (sim) =>
+      sim.schedule(FLIP_AT, (s) => {
+        s.state.q = qMul(qFromAxisAngle(v3(1, 0, 1), (170 * Math.PI) / 180), s.state.q);
+        s.state.omega = v3();
+      }),
+    goal: {
+      text: 'Recover from the 170° flip losing less than 1.8 m of altitude.',
+      check: ({ sim }) => {
+        if (sim.t < FLIP_AT + 4) return false;
+        const loss = 6 - lowest(sim, FLIP_AT);
+        return loss < 1.8 || `altitude lost ${loss.toFixed(2)} m`;
+      },
+    },
+    solution: (p) => {
+      p.control.l3.attitude = 'quaternion';
+    },
+    body: (
+      <>
+        <p>
+          Attitudes live on a sphere-like space (the rotation group), not on three independent
+          number lines. At <i>t</i> = {FLIP_AT} s something flips the drone 170° about a diagonal
+          axis, 6 m up. It has to turn its thrust back upwards before gravity wins.
+        </p>
+        <p>
+          The attitude law is set to the <b>naive</b> one: subtract the roll, pitch and yaw angles
+          and command them as body rates. Euler angles are fine for small errors, but near ±90°
+          pitch they fold over (<i>gimbal lock</i>): roll and yaw jump by 180°, and the commanded
+          rotation points the wrong way for a while.
+        </p>
+        <Try>
+          Press <kbd>R</kbd> and watch the recovery a few times. Then set{' '}
+          <i>Controller → Attitude law</i> to <b>quaternion error</b> (the shortest rotation,
+          computed on the sphere itself) or <b>tilt-prioritised</b>, and press <kbd>R</kbd>.
+        </Try>
+        <Notice>
+          Measured here: Euler loses 2.6 m and needs 1.4 s to level; the rotation-based laws lose
+          1.4 m and level in 0.4 s. Tilt-prioritised and quaternion behave alike in this test — the
+          tilt-first split pays off when a large <i>yaw</i> error would otherwise steal authority
+          from the thrust direction.
+        </Notice>
+      </>
+    ),
+  },
+  {
+    id: 'flatness',
+    part: 2,
+    chapter: C,
+    title: 'Feedforward from the future',
+    level: 3,
+    loop: 'pos.x',
+    setup: (p) => {
+      figureEight(p);
+      p.control.l3.outer = 'geometric';
+      p.control.geometric.feedforward = false;
+    },
+    onStart: (sim) => {
+      ghostOf(sim, (p) => (p.control.l3.outer = 'pid-cascade'), 'PID cascade', 40);
+    },
+    goal: {
+      text: 'RMS position error below 5 cm over the last lap of the 2 m/s figure-8.',
+      check: ({ sim }) => {
+        if (sim.t < 25) return false;
+        const { rms } = positionError(sim, sim.t - FIG8_PERIOD);
+        return rms < 0.05 || `RMS error ${(rms * 100).toFixed(1)} cm over the last lap`;
+      },
+    },
+    solution: (p) => {
+      p.control.geometric.feedforward = true;
+    },
+    body: (
+      <>
+        <p>
+          The setpoint now flies a figure-8 at up to 2 m/s. The <b>geometric tracking controller</b>{' '}
+          (Lee et al.) closes position and velocity in one law,
+        </p>
+        <M display>{'a = a_{ref} - K_p\\,e_p - K_v\\,e_v'}</M>
+        <p>
+          but its feedforward is off: it only reacts to errors, so it is always a step behind — it
+          cuts the corners of the 8, like the PID cascade (the ghost).
+        </p>
+        <p>
+          A quadrotor is <b>differentially flat</b>: from the position trajectory and its
+          derivatives you can compute everything else. The acceleration tells you the thrust vector,
+          hence the attitude; the <b>jerk</b> tells you how fast that attitude must turn, hence the
+          body rates:
+        </p>
+        <M display>
+          {
+            '\\dot b = \\tfrac{\\hat m}{T}\\big(j - (j\\cdot b)\\,b\\big),\\qquad \\omega = b \\times \\dot b'
+          }
+        </M>
+        <Try>
+          Switch on <i>Geometric tracking → Trajectory feedforward</i>. The tracking error drops
+          from about 80 cm to 2 cm. Feedback now only corrects what the plan could not foresee.
+        </Try>
+      </>
+    ),
+  },
+  {
+    id: 'minsnap',
+    part: 2,
+    chapter: C,
+    title: 'Plan the motion',
+    level: 3,
+    loop: 'pos.x',
+    setup: (p) => {
+      p.wind.enabled = false;
+      p.setpoint.y = 3;
+      p.setpoint.profile = 'corners';
+      p.setpoint.profileAmplitude = 1.5;
+      p.setpoint.profilePeriod = 8;
+      p.control.l3.outer = 'geometric';
+    },
+    goal: {
+      text: 'Over the last lap: follow the plan within 10 cm RMS, with body rates below 150 °/s.',
+      check: ({ sim }) => {
+        if (sim.t < 30) return false;
+        const from = sim.t - 8;
+        const { rms } = positionError(sim, from);
+        const rate = Math.max(
+          maxOf(sim, 'rate.roll.meas', from),
+          maxOf(sim, 'rate.pitch.meas', from),
+          -minOf(sim, 'rate.roll.meas', from),
+          -minOf(sim, 'rate.pitch.meas', from),
+        );
+        return (
+          (rms < 0.1 && rate < 150) ||
+          `plan error ${(rms * 100).toFixed(0)} cm RMS · peak body rate ${rate.toFixed(0)} °/s`
+        );
+      },
+    },
+    solution: (p) => {
+      p.setpoint.profile = 'minsnap';
+    },
+    body: (
+      <>
+        <p>
+          The drone flies a 3 × 3 m square, 2 s per side. Here the setpoint simply <b>jumps</b> to
+          the next corner every 2 s — a step, and the controller does the rest as hard as it can: it
+          lunges, tilts to the limit, whips round at almost 250 °/s and stops.
+        </p>
+        <p>
+          A <b>minimum-snap trajectory</b> (Mellinger &amp; Kumar) plans the same motion instead:
+          for each side, the polynomial path from rest to rest in 2 s that minimises{' '}
+          <M>{'\\int \\|\\ddddot p\\|^2 dt'}</M>. Snap is what the motors feel (it maps to changes
+          of thrust and torque), so the smoothest path for them.
+        </p>
+        <Try>
+          Set <i>Setpoint → Automatic motion → square: min-snap trajectory</i>. Same corners, same
+          schedule, half the peak body rate — and the drone is exactly where the plan says, at every
+          moment. Then shorten the period to 7 s and look at the info card: the plan now needs 45°
+          of tilt, over the 35° limit. The trajectory tells you it is infeasible <i>before</i> you
+          fly it.
+        </Try>
+        <Notice>
+          Not faster: with a good controller the steps arrive about as soon. What planning buys is
+          smoothness, a schedule you can rely on, and an early warning when the plan is impossible.
         </Notice>
       </>
     ),

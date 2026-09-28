@@ -1,4 +1,5 @@
-import { useRef } from 'react';
+import { controllerKey } from '@/control/registry';
+import { useMemo, useRef } from 'react';
 import { getIn } from '@/engine/schema';
 import { useParams } from '@/store/params';
 import { sim, useUi } from '@/store/sim';
@@ -37,7 +38,12 @@ const n = (v: number, d = 2) =>
 export function LiveFormula() {
   const level = useParams((s) => s.params.sim.level);
   const loopId = useUi((s) => s.loop);
-  const meta = loopMeta(level, loopId);
+  const metaKey = useParams((s) => controllerKey(s.params));
+  const meta = useMemo(
+    () => loopMeta(useParams.getState().params, loopId),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- depends on the controller, via metaKey
+    [metaKey, loopId, level],
+  );
   const kp = useParams((s) => getIn(s.params, kpPath(meta.id, level)) as number);
   const refs = useRef<Record<string, HTMLSpanElement | null>>({});
   const r = (k: string) => (el: HTMLSpanElement | null) => void (refs.current[k] = el);

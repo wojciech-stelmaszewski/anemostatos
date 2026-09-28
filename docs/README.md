@@ -40,7 +40,7 @@ anti-windup…) is visible, tweakable and plotted live.
 | [control-architecture.md](control-architecture.md)   | How the controllers are wired for each simulation level: altitude loop, 3-axis loop, full cascade (position → velocity → attitude → rate → mixer). |
 | [software-architecture.md](software-architecture.md) | Tech stack, module layout, simulation loop, data flow, telemetry, testing.                                                                         |
 | [ui-and-visualization.md](ui-and-visualization.md)   | 3D scene, drone model, overlays, live charts, parameter panel, lessons/scenarios.                                                                  |
-| [modern-control-primer.md](modern-control-primer.md) | Part II textbook: state, LQR/LQI, Kalman filter, ADRC (more chapters as Part II grows).                                                            |
+| [modern-control-primer.md](modern-control-primer.md) | Part II textbook: state, LQR/LQI, Kalman filter, ADRC, INDI (more chapters as Part II grows).                                                      |
 | [beyond-pid.md](beyond-pid.md)                       | Part II plan: research on contemporary controllers, architecture changes, milestones M7–M12, lessons II.1–II.21.                                   |
 | [roadmap.md](roadmap.md)                             | The implementation plan: milestones, deliverables, acceptance criteria.                                                                            |
 

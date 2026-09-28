@@ -30,7 +30,9 @@ const reachesGoal = (lesson: Lesson, withSolution: boolean, seconds = 45): boole
   lesson.setup?.(p);
   if (withSolution) lesson.solution?.(p);
   const sim = new Simulation(p);
-  lesson.events?.(sim);
+  sim.script = lesson.events ?? null;
+  sim.reset();
+  lesson.onStart?.(sim);
   const loop = lesson.loop ?? 'alt';
   for (let k = 1; k <= seconds * 1000; k++) {
     sim.step();
@@ -51,4 +53,23 @@ describe('Part II lesson goals', () => {
       expect(reachesGoal(lesson, true)).toBe(true);
     });
   }
+});
+
+describe('lesson scripts', () => {
+  it('replay after a reset, starting from the lesson’s original parameters', () => {
+    const lesson = LESSONS.find((l) => l.id === 'indi')!;
+    const p = defaultParams();
+    p.sim.level = lesson.level;
+    lesson.setup?.(p);
+    const sim = new Simulation(p);
+    sim.lessonStart = structuredClone(p);
+    sim.script = lesson.events!;
+    sim.reset();
+    for (let k = 0; k < 14000; k++) sim.step();
+    expect(sim.params.drone.motorEfficiency[1]).toBe(0.6); // the prop broke at 12 s
+    sim.reset(); // the user presses R
+    expect(sim.params.drone.motorEfficiency[1]).toBe(1); // healthy again…
+    for (let k = 0; k < 14000; k++) sim.step();
+    expect(sim.params.drone.motorEfficiency[1]).toBe(0.6); // …and it breaks again
+  });
 });

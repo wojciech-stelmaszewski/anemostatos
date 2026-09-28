@@ -1,12 +1,27 @@
-import { qConj, qFromAxisAngle, qFromTo, qMul, qRotate, qToEuler, type Quat } from '@/math/quat';
+import { qConj, qFromAxisAngle, qFromTo, qMul, qToEuler, qRotate, type Quat } from '@/math/quat';
 import { clamp } from '@/math/util';
 import { clampLength, dot, length, normalize, v3, type Vec3 } from '@/math/vec3';
 import { idleActuation, type Actuation } from '@/sim/dynamics';
-import { GRAVITY } from '@/sim/params';
+import { GRAVITY, type Params } from '@/sim/params';
 import type { Measurement } from '@/sim/sensors';
 import { mix } from './mixer';
 import { defaultGains, Pid, type PidTerms } from './pid';
-import { periodSteps, pidLoop, type ControlInput, type Controller, type LoopTerms } from './types';
+import {
+  AccelIndi,
+  NoCompensation,
+  PidRateStage,
+  RateIndi,
+  type Compensation,
+  type RateStage,
+} from './stages';
+import {
+  periodSteps,
+  pidLoop,
+  type ControlInput,
+  type Controller,
+  type InfoRow,
+  type LoopTerms,
+} from './types';
 
 const DEG = 180 / Math.PI;
 const up = v3(0, 1, 0);
@@ -32,13 +47,16 @@ const pTerms = (
 });
 
 /**
- * Level 3: position P → velocity PID → thrust vector → attitude P → rate PID → mixer
- * (docs/control-architecture.md §4). Each loop runs at its own rate; angles in degrees.
+ * Level 3 as a pipeline of stages (docs/beyond-pid.md §3.2):
+ *   position P → velocity PID → [compensation] → thrust vector → attitude P → [rate stage] → mixer.
+ * The outer stage is the PID cascade; compensation (none / acceleration INDI) and the rate stage
+ * (PID / INDI) are swappable. Each loop runs at its own rate; angles in degrees.
  */
 export class CascadeController implements Controller {
   readonly pos = { x: new Pid(), y: new Pid(), z: new Pid() };
   readonly vel = { x: new Pid(), y: new Pid(), z: new Pid() };
-  readonly rate = { roll: new Pid(), yaw: new Pid(), pitch: new Pid() };
+  readonly rate: RateStage;
+  readonly comp: Compensation;
   att: Record<'roll' | 'pitch' | 'yaw', PidTerms> = {
     roll: pTerms(0, 0, 0, 0, 0),
     pitch: pTerms(0, 0, 0, 0, 0),
@@ -46,6 +64,7 @@ export class CascadeController implements Controller {
   };
 
   private vSp = v3();
+  private aSp = v3();
   private fDes = v3(0, GRAVITY, 0);
   private qSp: Quat = { w: 1, x: 0, y: 0, z: 0 };
   private thrust = 0;
@@ -54,14 +73,17 @@ export class CascadeController implements Controller {
   private held: Actuation = idleActuation();
   private mixerSaturated = false;
 
+  constructor(p?: Params) {
+    this.rate = p?.control.l3.inner === 'indi' ? new RateIndi() : new PidRateStage();
+    this.comp = p?.control.l3.compensation === 'indi' ? new AccelIndi() : new NoCompensation();
+  }
+
   reset(): void {
-    for (const p of [
-      ...Object.values(this.pos),
-      ...Object.values(this.vel),
-      ...Object.values(this.rate),
-    ])
-      p.reset();
+    for (const p of [...Object.values(this.pos), ...Object.values(this.vel)]) p.reset();
+    this.rate.reset();
+    this.comp.reset();
     this.vSp = v3();
+    this.aSp = v3();
     this.fDes = v3(0, GRAVITY, 0);
     this.qSp = { w: 1, x: 0, y: 0, z: 0 };
     this.thrust = 0;
@@ -71,7 +93,8 @@ export class CascadeController implements Controller {
   }
 
   resetIntegrators(): void {
-    for (const p of [...Object.values(this.vel), ...Object.values(this.rate)]) p.integral = 0;
+    for (const p of Object.values(this.vel)) p.integral = 0;
+    this.rate.resetIntegrators();
   }
 
   tick(input: ControlInput): Actuation {
@@ -83,6 +106,9 @@ export class CascadeController implements Controller {
     const sense = () => (m ??= input.sense());
     const mHat = P.control.model.mass;
     const fmax = P.drone.maxMotorThrust;
+
+    // 0. Fast estimators of the compensation stage (filters) run with the rate loop.
+    if (due(c.hzRate)) this.comp.sample(sense(), P, dtOf(c.hzRate));
 
     // 1. Position P → velocity setpoint.
     if (due(c.hzPos)) {
@@ -97,17 +123,23 @@ export class CascadeController implements Controller {
       this.vSp = v3(h.x, vy, h.z);
     }
 
-    // 2. Velocity PID → acceleration → desired thrust vector → attitude setpoint.
+    // 2. Velocity PID → acceleration → [compensation] → thrust vector → attitude setpoint.
     if (due(c.hzVel)) {
       const s = sense();
       const dt = dtOf(c.hzVel);
       const aH = GRAVITY * Math.tan((c.maxTiltDeg * Math.PI) / 180);
       const aUp = (4 * fmax) / Math.max(mHat, 0.1) - GRAVITY;
-      const ax = this.vel.x.update(c.velH, this.vSp.x, s.vel.x, dt, 0, -aH, aH).output;
-      const az = this.vel.z.update(c.velH, this.vSp.z, s.vel.z, dt, 0, -aH, aH).output;
-      const ay = this.vel.y.update(c.velV, this.vSp.y, s.vel.y, dt, 0, -0.8 * GRAVITY, aUp).output;
-      const g = P.control.feedforward ? GRAVITY : 0;
-      let f = v3(mHat * ax, Math.max(mHat * (ay + g), 0.05 * mHat * GRAVITY), mHat * az);
+      // With an incremental (INDI) compensation the velocity loop's I term is redundant:
+      // the increment already integrates.
+      const noI = this.comp.replacesIntegral;
+      const velH = noI ? { ...c.velH, iOn: false } : c.velH;
+      const velV = noI ? { ...c.velV, iOn: false } : c.velV;
+      const ax = this.vel.x.update(velH, this.vSp.x, s.vel.x, dt, 0, -aH, aH).output;
+      const az = this.vel.z.update(velH, this.vSp.z, s.vel.z, dt, 0, -aH, aH).output;
+      const ay = this.vel.y.update(velV, this.vSp.y, s.vel.y, dt, 0, -0.8 * GRAVITY, aUp).output;
+      this.aSp = v3(ax, ay, az);
+      let f = this.comp.force(this.aSp, P);
+      f = v3(f.x, Math.max(f.y, 0.05 * mHat * GRAVITY), f.z);
       // Tilt limit: keep the vertical component, shrink the horizontal one.
       const hMax = f.y * Math.tan((c.maxTiltDeg * Math.PI) / 180);
       const h = clampLength(v3(f.x, 0, f.z), hMax);
@@ -137,25 +169,14 @@ export class CascadeController implements Controller {
       this.thrust = clamp(dot(this.fDes, qRotate(s.q, up)), 0, 4 * fmax);
     }
 
-    // 4. Rate PID → angular acceleration → torque → mixer.
+    // 4. Rate stage → torque → mixer.
     if (due(c.hzRate)) {
       const s = sense();
-      const dt = dtOf(c.hzRate);
-      const w = v3(s.omega.x * DEG, s.omega.y * DEG, s.omega.z * DEG);
-      const aLim = 20000; // deg/s², far beyond what the motors can deliver; the mixer is the real limit
-      const ar = this.rate.roll.update(c.rateRP, this.wSp.x, w.x, dt, 0, -aLim, aLim).output;
-      const ap = this.rate.pitch.update(c.rateRP, this.wSp.z, w.z, dt, 0, -aLim, aLim).output;
-      const ay = this.rate.yaw.update(c.rateYaw, this.wSp.y, w.y, dt, 0, -aLim, aLim).output;
-      const I = P.drone.inertia;
-      const r = mix(
-        this.thrust,
-        (I.x * ar) / DEG,
-        (I.y * ay) / DEG,
-        (I.z * ap) / DEG,
-        P.drone.torqueCoeff,
-        fmax,
-      );
+      const tau = this.rate.torque(this.wSp, s, dtOf(c.hzRate), P);
+      const r = mix(this.thrust, tau.x, tau.y, tau.z, P.drone.torqueCoeff, fmax);
       this.mixerSaturated = r.saturated;
+      this.rate.applied(r.motors);
+      this.comp.applied(r.motors);
       this.held = { motorCmd: r.motors, forceCmd: this.held.forceCmd };
     }
 
@@ -173,9 +194,8 @@ export class CascadeController implements Controller {
       'att.roll': pidLoop(this.att.roll),
       'att.pitch': pidLoop(this.att.pitch),
       'att.yaw': pidLoop(this.att.yaw),
-      'rate.roll': pidLoop(this.rate.roll.last),
-      'rate.pitch': pidLoop(this.rate.pitch.last),
-      'rate.yaw': pidLoop(this.rate.yaw.last),
+      ...this.rate.loops(),
+      ...this.comp.loops(this.aSp),
     };
   }
 
@@ -188,7 +208,13 @@ export class CascadeController implements Controller {
       'fdes.tilt': tilt,
       thrust: this.thrust,
       mixerSat: this.mixerSaturated ? 1 : 0,
+      ...this.rate.extras(),
+      ...this.comp.extras(),
     };
+  }
+
+  describe(p: Params, loopId: string): InfoRow[] {
+    return [...this.rate.describe(p, loopId), ...this.comp.describe(p, loopId)];
   }
 
   /** Desired thrust vector, world frame — drawn as an arrow. */

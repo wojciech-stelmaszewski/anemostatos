@@ -10,8 +10,11 @@ export function startLesson(lesson: Lesson): void {
   lesson.setup?.(p);
   useParams.getState().replace(p);
   sim.ghost = null;
+  sim.lessonStart = structuredClone(p);
+  const events = lesson.events;
+  sim.script = events ? (s) => s.level === lesson.level && events(s) : null;
   sim.reset();
-  lesson.events?.(sim);
+  lesson.onStart?.(sim);
   const ui = useUi.getState();
   ui.setLoop(lesson.loop ?? DEFAULT_LOOP[lesson.level]);
   ui.setExtraChart(lesson.chart ?? 'wind');

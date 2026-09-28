@@ -7,8 +7,8 @@ export type L1Kind = 'pid' | 'lqr' | 'adrc';
 /** State estimator in front of the L1 controller. */
 export type L1Estimator = 'none' | 'kalman';
 export type L3Outer = 'pid-cascade';
-export type L3Inner = 'pid';
-export type L3Compensation = 'none';
+export type L3Inner = 'pid' | 'indi';
+export type L3Compensation = 'none' | 'indi';
 export type L3Safety = 'none';
 
 export interface DroneParams {
@@ -86,6 +86,18 @@ export interface ControlParams {
     integral: boolean;
     /** Model the motor lag as a third state. */
     lagState: boolean;
+  };
+  /** L3 INDI (rate stage and acceleration compensation). */
+  indi: {
+    /** α_des = K·(ω_sp − ω), 1/s. */
+    rateKpRP: number;
+    rateKpYaw: number;
+    /** Cutoff of the gyro-derivative / motor-torque filter pair, Hz. */
+    filterHz: number;
+    /** Cutoff of the accelerometer / thrust-vector filter pair, Hz. */
+    accFilterHz: number;
+    /** Pass the actuator signal through the same filter as the measurement (as INDI requires). */
+    syncFilters: boolean;
   };
   /** L1 ADRC: controller and observer bandwidths, rad/s. */
   adrc: { wc: number; wo: number };
@@ -207,6 +219,7 @@ export const defaultParams = (): Params => ({
     l1: { kind: 'pid', estimator: 'none' },
     lqr: { qPos: 100, qVel: 10, qInt: 5, r: 1, integral: false, lagState: false },
     adrc: { wc: 3, wo: 15 },
+    indi: { rateKpRP: 20, rateKpYaw: 8, filterHz: 20, accFilterHz: 10, syncFilters: true },
     kalman: { accSigma: 0.5, posSigma: 0.05, biasSigma: 0.05 },
     alt: defaultGains({ kp: 10, ki: 0.8, kd: 7, iLimit: 10 }),
     posH: defaultGains({ kp: 4, ki: 0.8, kd: 3, iLimit: 3 }),

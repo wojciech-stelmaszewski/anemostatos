@@ -112,14 +112,17 @@ motor lag.
 
 **Part II — Beyond PID** (the second semester, in progress; plan in [docs/beyond-pid.md](docs/beyond-pid.md)):
 
-| #    | Lesson                       | Level | What you learn                                                      |
-| ---- | ---------------------------- | ----- | ------------------------------------------------------------------- |
-| II.1 | State, not error             | L1    | PD is state feedback; reading the phase portrait                    |
-| II.2 | Pay for what you want        | L1    | LQR: gains from costs via the Riccati equation                      |
-| II.3 | Integral, the optimal way    | L1    | LQI: integral action as an extra state                              |
-| II.4 | Trust issues                 | L1    | Kalman filter: fusing a noisy barometer with a biased accelerometer |
-| II.5 | Everything is a disturbance  | L1    | ADRC: an observer estimates the total disturbance, and cancels it   |
-| II.6 | How fast should you believe? | L1    | observer bandwidth vs noise and unmodelled lag                      |
+| #    | Lesson                       | Level | What you learn                                                       |
+| ---- | ---------------------------- | ----- | -------------------------------------------------------------------- |
+| II.1 | State, not error             | L1    | PD is state feedback; reading the phase portrait                     |
+| II.2 | Pay for what you want        | L1    | LQR: gains from costs via the Riccati equation                       |
+| II.3 | Integral, the optimal way    | L1    | LQI: integral action as an extra state                               |
+| II.4 | Trust issues                 | L1    | Kalman filter: fusing a noisy barometer with a biased accelerometer  |
+| II.5 | Everything is a disturbance  | L1    | ADRC: an observer estimates the total disturbance, and cancels it    |
+| II.6 | How fast should you believe? | L1    | observer bandwidth vs noise and unmodelled lag                       |
+| II.7 | Don't model it, measure it   | L3    | rate INDI: a broken prop rejected by measuring angular acceleration  |
+| II.8 | Feel the push                | L3    | acceleration INDI: gusts felt by the accelerometer, not the position |
+| II.9 | Keep your filters in sync    | L3    | the classic INDI bug: filter delay mismatch                          |
 
 ## Run it
 
@@ -190,7 +193,7 @@ the last 60 s of telemetry as CSV.
 The [`docs/`](docs/README.md) folder is the project's textbook and design record:
 
 - [**PID primer**](docs/pid-primer.md): theory from the ground up, the digital PID, windup, derivative kick, noise, tuning, cascades.
-- [**Modern control primer**](docs/modern-control-primer.md): Part II theory — state feedback, LQR/LQI, the Kalman filter, ADRC.
+- [**Modern control primer**](docs/modern-control-primer.md): Part II theory — state feedback, LQR/LQI, the Kalman filter, ADRC, INDI.
 - [**Beyond PID**](docs/beyond-pid.md): Part II research survey, plan and lesson list.
 - [**Physics model**](docs/physics-model.md): frames, equations of motion, motors, drag, the wind and gust model, integration.
 - [**Control architecture**](docs/control-architecture.md): how the loops are wired at each level, including the cascade and the mixer.

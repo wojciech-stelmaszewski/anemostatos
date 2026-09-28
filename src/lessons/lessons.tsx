@@ -1,14 +1,11 @@
 import { Simulation } from '@/engine/simulation';
 import { defaultParams, type Params } from '@/sim/params';
-import { useParams } from '@/store/params';
 import { SIGNAL } from '@/ui/colors';
 import { K, Notice, Try } from './Bits';
 import { M } from './Math';
 import { PART_TWO } from './part2';
+import { setAt } from './script';
 import type { Lesson } from './types';
-
-/** Change a parameter through the store, so the panel follows scripted events. */
-const setParam = (path: string, value: unknown) => useParams.getState().set(path, value);
 
 const calm = (p: Params) => {
   p.wind.enabled = false;
@@ -95,7 +92,7 @@ const PART_ONE: Lesson[] = [
       calm(p);
       p.control.alt = { ...p.control.alt, iOn: false, dOn: false };
     },
-    events: (sim) => sim.schedule(6, () => setParam('setpoint.y', 3)),
+    events: (sim) => setAt(sim, 6, 'setpoint.y', 3),
     body: (
       <>
         <p>
@@ -255,7 +252,7 @@ const PART_ONE: Lesson[] = [
       p.drone.maxMotorThrust = 3;
       p.control.alt = { ...p.control.alt, ki: 3, antiWindup: 'none' };
     },
-    events: (sim) => sim.schedule(8, () => setParam('setpoint.y', 6)),
+    events: (sim) => setAt(sim, 8, 'setpoint.y', 6),
     body: (
       <>
         <p>

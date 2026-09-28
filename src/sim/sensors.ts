@@ -12,7 +12,10 @@ export interface Measurement {
   omega: Vec3;
   /** Accelerometer: specific force (acceleration minus gravity), body frame, m/s². */
   acc: Vec3;
-  /** Actual thrust per motor from motor-speed telemetry, N; null if unavailable. */
+  /**
+   * Motor-speed telemetry per motor, as the thrust a healthy motor makes at that speed, N; null if
+   * unavailable. It does not see a damaged prop — only the rotor speed.
+   */
   motors: [number, number, number, number] | null;
   /** True when `pos` is a new fix (false while a slow position sensor holds its last value). */
   posFresh: boolean;
@@ -26,7 +29,7 @@ export const measurementOf = (s: DroneState): Measurement => ({
   q: { ...s.q },
   omega: clone(s.omega),
   acc: qRotate(qConj(s.q), add(s.accel, v3(0, GRAVITY, 0))),
-  motors: [...s.motors],
+  motors: [...s.rotors],
   posFresh: true,
 });
 

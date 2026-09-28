@@ -60,9 +60,14 @@ $$
 \dot f_i = \frac{f_i^{cmd} - f_i}{\tau_m}
 $$
 
-A motor with efficiency $\eta_i < 1$ (a chipped prop, a weak motor) lags
-towards $\eta_i f_i^{cmd}$ instead: the controller asks for one thrust and
-silently gets less.
+The motor state is its **rotor speed**, expressed as the thrust a healthy
+motor makes at that speed ($r_i$, lagging the command as above). The thrust
+actually produced is $f_i = \eta_i\, r_i$: a motor with efficiency
+$\eta_i < 1$ (a chipped prop) spins exactly as commanded but pushes less.
+Motor-speed telemetry reports $r_i$, not $f_i$ — it cannot see a damaged prop.
+The distinction matters for INDI: its actuator feedback must be the actuator
+_state_; the thrust deficit then appears in the measured acceleration, where
+INDI corrects it.
 
 In L1 the four motors receive the same command ($f_i^{cmd} = T/4$). In L2
 the motors are purely decorative (the force vector is applied directly, with
@@ -243,12 +248,12 @@ model**:
 | Delay                         | 0 ms                          | Transport delay; shows loss of stability margin.               |
 | Position sample rate          | 0 = fresh on every read       | Sample-and-hold between fixes (GPS/baro-like, e.g. 50 Hz).     |
 | Accelerometer noise / bias    | off                           | Specific force in the body frame; used by Part II (KF, INDI).  |
-| Motor feedback                | on                            | Actual per-motor thrust (RPM telemetry); used by INDI.         |
+| Motor feedback                | on                            | Rotor speed per motor (RPM telemetry); used by LQR, INDI.      |
 
 The sensors provide position, velocity, attitude, body rates, the
 **accelerometer** (specific force $R^\top(\dot{\vec v} - \vec g)$ in the body
 frame, so it reads $+g$ upwards while hovering and $0$ in free fall) and the
-**motor thrusts**. Part I treats this as an idealised "perfect state
+**rotor speeds**. Part I treats this as an idealised "perfect state
 estimator" + optional noise; Part II adds real estimation (Kalman filter).
 
 ## 7. Numerical integration

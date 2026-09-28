@@ -24,6 +24,7 @@ describe('dynamics', () => {
     s.pos = v3(0, 2, 0);
     const f = (p.mass * GRAVITY) / 4;
     s.motors = [f, f, f, f];
+    s.rotors = [f, f, f, f];
     const act = idleActuation();
     act.motorCmd = [f, f, f, f];
     for (let k = 0; k < 2000; k++) stepDynamics(3, s, act, v3(), v3(), p, dt);
@@ -55,6 +56,7 @@ describe('dynamics', () => {
     s.pos = v3(0, 2, 0);
     const f = (p.mass * GRAVITY) / 4;
     s.motors = [f, f, f, f];
+    s.rotors = [f, f, f, f];
     const act = idleActuation();
     act.motorCmd = [f, f, f, f];
     stepDynamics(1, s, act, v3(0, 4, 0), v3(), p, dt);

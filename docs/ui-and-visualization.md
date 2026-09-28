@@ -175,7 +175,11 @@ unlocked.
 The panel has two tabs, **Part I · PID** (the lessons above) and **Part II ·
 Beyond PID** (a second semester, numbered II.1–II.21, planned in
 [beyond-pid.md §6](beyond-pid.md#6-lessons-part-ii)). A lesson declares its
-`part` and an optional `chapter`. Part II lessons with a goal also carry a
+`part` and an optional `chapter`. A lesson's scripted **events** replay after
+every reset while it is active (press R and the prop breaks again at 12 s);
+scripted parameter changes (`setAt` in `src/lessons/script.ts`) are undone
+on reset first. One-time work — ghost runs, reference scores — goes in
+`onStart`. Part II lessons with a goal also carry a
 `solution` (a parameter change); the tests check that each goal is _not_ met
 at the start and _is_ met with the solution.
 

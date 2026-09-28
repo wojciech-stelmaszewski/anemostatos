@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { LoopPart } from '@/control/types';
-import type { Level } from '@/sim/params';
+import type { Level, Params } from '@/sim/params';
 import { sim } from '@/store/sim';
 
 export interface LoopMeta {
@@ -65,8 +65,25 @@ export const LOOPS: Record<Level, LoopMeta[]> = {
   ],
 };
 
+const accel = (axis: 'x' | 'y' | 'z'): LoopMeta => ({
+  id: `acc.${axis}`,
+  name: `Accel ${axis.toUpperCase()} (INDI)`,
+  unit: 'm/s²',
+  outUnit: 'm/s²',
+  outName: 'force / m̂',
+});
+const ACCEL = [accel('x'), accel('y'), accel('z')];
+
+/** Loops to offer in the inspector for these parameters. */
+export const loopsFor = (p: Params): LoopMeta[] =>
+  p.sim.level === 3 && p.control.l3.compensation === 'indi'
+    ? [...LOOPS[3].slice(0, 6), ...ACCEL, ...LOOPS[3].slice(6)]
+    : LOOPS[p.sim.level];
+
 export const loopMeta = (level: Level, id: string): LoopMeta =>
-  LOOPS[level].find((l) => l.id === id) ?? LOOPS[level][0]!;
+  LOOPS[level].find((l) => l.id === id) ??
+  (level === 3 ? ACCEL.find((l) => l.id === id) : undefined) ??
+  LOOPS[level][0]!;
 
 const partsSignature = (parts: readonly LoopPart[]) =>
   parts.map((p) => `${p.key}:${p.label}:${p.like ?? ''}:${p.ff ? 1 : 0}`).join('|');

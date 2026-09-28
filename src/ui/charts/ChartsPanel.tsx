@@ -7,7 +7,7 @@ import { partColor, SIGNAL } from '@/ui/colors';
 import { Select } from '@/ui/components/select';
 import { InfoCard } from './InfoCard';
 import { PhasePortrait } from './PhasePortrait';
-import { isPidParts, LOOPS, loopMeta, useLoopParts } from './loops';
+import { isPidParts, loopMeta, loopsFor, useLoopParts } from './loops';
 import { TimeChart, type SeriesSpec } from './TimeChart';
 
 const WINDOWS = [5, 10, 30, 60];
@@ -50,6 +50,11 @@ export function ChartsPanel() {
   const extra = useUi((s) => s.extraChart);
   const setExtra = useUi((s) => s.setExtraChart);
   const ctrlKey = useParams((s) => controllerKey(s.params));
+  const loopOptions = useMemo(
+    () => loopsFor(useParams.getState().params).map((l) => ({ value: l.id, label: l.name })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the list depends on the controller
+    [ctrlKey],
+  );
   const setWindow = useUi((s) => s.setWindow);
   const meta = loopMeta(level, loopId);
   const id = meta.id;
@@ -134,11 +139,7 @@ export function ChartsPanel() {
       <div className="flex items-center gap-2 text-xs">
         <span className="font-semibold uppercase tracking-wider text-muted">Charts</span>
         <span className="text-muted">loop</span>
-        <Select
-          value={id}
-          onValueChange={setLoop}
-          options={LOOPS[level].map((l) => ({ value: l.id, label: l.name }))}
-        />
+        <Select value={id} onValueChange={setLoop} options={loopOptions} />
         <span className="text-muted">window</span>
         <Select
           value={String(windowSec)}

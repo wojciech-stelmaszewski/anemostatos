@@ -1,6 +1,6 @@
 # Part II — Beyond PID
 
-> **Status (2026-09-27):** M7–M8 implemented; M9–M12 planned.
+> **Status (2026-09-27):** M7–M9 implemented; M10–M12 planned.
 > Milestones in [roadmap.md](roadmap.md) point here.
 
 Part I (lessons 1–14) teaches PID from first principles up to the full
@@ -297,7 +297,7 @@ lesson goals are proven reachable by tests.
 **Done when:** on L1, the student can switch PID ↔ LQR ↔ ADRC on the same
 seed and compare with the ghost trace.
 
-### M9 — L3 stage pipeline and INDI
+### M9 — L3 stage pipeline and INDI ✅
 
 - `stages.ts`: current cascade refactored into outer/inner stages with no
   behaviour change (regression test against recorded telemetry).
@@ -307,6 +307,23 @@ seed and compare with the ghost trace.
 
 **Done when:** INDI holds position in the gust challenge with a 2× inertia
 error where the PID rate loop oscillates.
+
+**What was built, and what changed.** INDI lives in `stages.ts` (no separate
+`indi.ts`). The "done when" above turned out to be the wrong experiment: a 2×
+inertia error barely troubles either rate loop (both tolerate it; INDI breaks
+first, at ≈ 3× over-estimate), so it demonstrates nothing. What does separate
+them, measured:
+
+| Scenario                                 | PID cascade | Rate INDI | Acceleration INDI | Both   |
+| ---------------------------------------- | ----------- | --------- | ----------------- | ------ |
+| Prop of motor 2 at 60 % (max pos. error) | 77 cm       | 21 cm     | 86 cm             | 3.8 cm |
+| Gust-challenge wind (RMS pos. error)     | 22 cm       | 22 cm     | 5.9 cm            | 5.7 cm |
+
+Lesson II.7 therefore uses the broken prop. Modelling fix found on the way:
+motor telemetry reports rotor _speed_, not thrust (physics-model.md §4.1),
+otherwise INDI "sees" the damage in its actuator term and cannot close the
+gap. Lesson scripts now replay after every reset (Part I's Windup lesson had
+the same latent bug).
 
 ### M10 — Geometry and trajectories
 
@@ -363,7 +380,7 @@ lesson panel shows the two parts as separate courses. Priority: **must** (core s
 | --- | ----------- | ---------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ------ |
 | 5   | `adrc`      | Everything is a disturbance  | L1 ADRC, gusts, payload +300 g at t = 10 s.                                | $\hat f$ tracks the true disturbance (plotted together). Compared with the I term: no waiting for an error to accumulate.      | must   |
 | 6   | `adrc-bw`   | How fast should you believe? | ADRC with sensor noise; observer bandwidth slider.                         | High $\omega_o$: fast rejection but noisy thrust; low: sluggish. Goal: find the sweet spot (score = RMS error + thrust noise). | should |
-| 7   | `indi`      | Don't model it, measure it   | L3, inertia ×2 (controller unaware); PID rate vs INDI.                     | PID rate loop rings; INDI barely notices, because it measures the acceleration its torque produces.                            | must   |
+| 7   | `indi`      | Don't model it, measure it   | L3, prop of motor 2 breaks (60 %) at 12 s; PID rate vs INDI.               | PID drifts 77 cm; rate INDI 21 cm, because it measures the acceleration its torque produces. Goal: < 30 cm.                    | must   |
 | 8   | `indi-wind` | Feel the push                | L3 cascaded INDI vs PID cascade on the gust-challenge seed.                | The accelerometer sees the gust before any position error builds up. Goal: beat the PID cascade's RMS by 40 %.                 | must   |
 | 9   | `indi-sync` | Keep your filters in sync    | INDI with different filters on the gyro derivative and the motor feedback. | Mismatched delay ⇒ oscillation. Flip "synchronised filters" and it disappears. A real-world gotcha from INDI papers.           | should |
 

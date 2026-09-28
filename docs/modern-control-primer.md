@@ -231,12 +231,103 @@ $\omega_c$ well below the actuator bandwidth $1/\tau_m$.
 > - 10 × thrust jitter in N) is U-shaped in $\omega_o$, with its minimum
 >   around 10 rad/s.
 
+### B.3 Incremental nonlinear dynamic inversion (INDI)
+
+**Dynamic inversion** computes the input that produces a desired
+acceleration from a model: $\tau = I\,\alpha_{des} + \omega\times I\omega -
+\tau_{aero} - \dots$ Every term you forget becomes an error. **INDI** avoids
+the model by writing the same equation _incrementally_ around the present
+moment. Over one short sample the state barely changes, but the torque can
+change a lot, so
+
+$$
+I\,\dot\omega \approx I\,\dot\omega_0 + (\tau - \tau_0)
+\quad\Rightarrow\quad
+\tau = \tau_0 + \hat I\,(\alpha_{des} - \dot\omega_0)
+$$
+
+with $\tau_0$ the torque the motors produce _now_ and $\dot\omega_0$ the
+angular acceleration the drone has _now_. Everything else — gyroscopic
+coupling, aerodynamic moments, a centre of mass that moved, a damaged prop —
+is contained in the measured $\dot\omega_0$ and needs no model (Smeur, Chu &
+de Croon 2016). What remains of the model is the **control effectiveness**:
+here, the inertia $\hat I$ and the mixer geometry. A factor-2 error in
+$\hat I$ only rescales the loop gain; around 3× over-estimate the loop gets
+too aggressive.
+
+The rate controller becomes
+$\alpha_{des} = K\,(\omega_{sp} - \omega)$ — one gain per axis. In steady
+state $\dot\omega_0 = \alpha_{des} = 0$ and the command equals $\tau_0$: the
+incremental form behaves like an integrator with no windup (it always starts
+from what the actuators actually do).
+
+**Where $\tau_0$ comes from.** From the motors' _speeds_ (RPM telemetry,
+mapped to the thrust a healthy motor would make), or, without telemetry,
+from a first-order model of the motors driven by the commands. It must be the
+actuator _state_, not the thrust: a chipped prop spins at the commanded speed
+and pushes less, and that deficit must show up in $\dot\omega_0$ — not be
+hidden in $\tau_0$, where the increment could never close the gap.
+
+> **Lesson II.7 "Don't model it, measure it"** — the prop of motor 2 drops to
+> 60 % in mid-air. PID cascade: 77 cm drift; rate INDI: 21 cm.
+
+### B.4 Cascaded INDI on acceleration
+
+The same trick one level up (Smeur, de Croon & Chu 2018; Tal & Karaman
+2021): with the thrust vector $\vec F_0$ the motors produce now and the
+acceleration $\vec a_0$ the accelerometer measures now,
+
+$$
+\vec F = \vec F_0 + \hat m\,(\vec a_{sp} - \vec a_0),
+\qquad \vec a_0 = R\,\vec a_{meas} + \vec g .
+$$
+
+A gust is a force: the accelerometer feels it the instant it acts, long
+before it has moved the drone far enough for a position or velocity error.
+The velocity loop's integral becomes redundant (the increment already
+integrates) and is bypassed. As a by-product,
+$\hat m\vec a_0 - \vec F_0 - \hat m\vec g$ _is_ an estimate of the disturbance
+force — INDI knows the disturbance without ever computing it.
+
+Each INDI loop rejects disturbances at its own level. Measured in the
+simulator:
+
+| Disturbance             | PID   | rate INDI | acceleration INDI | both   |
+| ----------------------- | ----- | --------- | ----------------- | ------ |
+| broken prop (max error) | 77 cm | 21 cm     | 86 cm             | 3.8 cm |
+| gusty wind (RMS error)  | 22 cm | 22 cm     | 5.9 cm            | 5.7 cm |
+
+This is why research stacks put INDI beneath everything else, and why Sun et
+al. (2022) found it decisive for both NMPC and flatness-based control.
+
+> **Lesson II.8 "Feel the push"** — beat the PID cascade's RMS error on the
+> gust-challenge wind by 40 % (acceleration INDI achieves ≈ 73 %).
+
+### B.5 Keep the filters in sync
+
+$\dot\omega_0$ comes from differentiating a noisy gyro, so it is low-pass
+filtered, and a filter delays. $\tau_0$, if taken raw, is not delayed. INDI
+subtracts one from the other: it then compares the torque of _now_ with the
+acceleration of _a few tens of milliseconds ago_, keeps correcting for a
+mismatch that no longer exists, and the loop wobbles. The fix, standard in
+the INDI literature, is to pass $\tau_0$ through the **same** filter, so
+both describe the same moment (the same applies to $\vec F_0$ and $\vec a_0$).
+
+With a fast filter the mismatch is small and harmless; the bug bites exactly
+when noise forces a slow one. In the simulator, with 10 °/s gyro noise and a
+5 Hz filter: unsynchronised 21° RMS attitude error and 0.54 N motor jitter,
+synchronised 7.4° and 0.08 N. Raising the cutoff to escape instead lets the
+noise through to the motors.
+
+> **Lesson II.9 "Keep your filters in sync"**.
+
 ---
 
 ## Further reading
 
 The references are collected in [beyond-pid.md §8](beyond-pid.md#8-references).
-For this part in particular: Han 2009 and Gao 2003 (ADRC); any control
+For this part in particular: Han 2009 and Gao 2003 (ADRC); Smeur et al. 2016
+and 2018, Tal & Karaman 2021 (INDI); any control
 textbook's chapter on LQR and Kalman filtering (e.g. Åström & Murray,
 _Feedback Systems_, chapters on state feedback and output feedback, freely
 available online).

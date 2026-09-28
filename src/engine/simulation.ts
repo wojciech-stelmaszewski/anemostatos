@@ -64,6 +64,10 @@ export class Simulation {
   telemetry = new Telemetry(HISTORY_SECONDS * TELEMETRY_HZ);
   /** A frozen earlier run, overlaid on the charts for comparison. */
   ghost: { telemetry: Telemetry; label: string } | null = null;
+  /** A lesson's script: run after every reset to (re)schedule its events. */
+  script: ((sim: Simulation) => void) | null = null;
+  /** The parameters the running lesson started with (scripted changes are undone on reset). */
+  lessonStart: Params | null = null;
   /** Scripted events (lessons): run once when simulation time passes `t`. */
   private scheduled: { t: number; fn: (sim: Simulation) => void }[] = [];
   /** Setpoint without the automatic profile. */
@@ -136,10 +140,11 @@ export class Simulation {
     this.poke = null;
     this.armed = true;
     this.measurement = null;
+    this.script?.(this);
     for (const fn of this.resetListeners) fn();
   }
 
-  /** Run `fn` once simulation time reaches `t` (cleared on reset). */
+  /** Run `fn` once simulation time reaches `t` (cleared on reset; lesson scripts re-add theirs). */
   schedule(t: number, fn: (sim: Simulation) => void): void {
     this.scheduled.push({ t, fn });
     this.scheduled.sort((a, b) => a.t - b.t);

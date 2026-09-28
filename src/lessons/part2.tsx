@@ -1,16 +1,14 @@
 import { Simulation } from '@/engine/simulation';
-import type { Params } from '@/sim/params';
-import { useParams } from '@/store/params';
+import { defaultParams, type Params } from '@/sim/params';
 import { K, Notice, Try } from './Bits';
 import { M } from './Math';
+import { setAt } from './script';
 import type { Lesson } from './types';
 
 /**
  * Part II — the second semester: contemporary controllers beyond PID (docs/beyond-pid.md §6).
  * Numbering restarts at II.1 in the lesson panel.
  */
-
-const setParam = (path: string, value: unknown) => useParams.getState().set(path, value);
 
 const calm = (p: Params) => {
   p.wind.enabled = false;
@@ -71,6 +69,67 @@ const noisySensors = (p: Params) => {
   p.sensors.posRateHz = 50;
   p.sensors.accNoise = 0.3;
   p.sensors.accBias = 0.2;
+};
+
+/** 3D position error statistics over [from, to]. */
+const positionError = (sim: Simulation, from: number, to = Infinity) => {
+  const keys = ['sp.x', 'pos.x', 'sp.y', 'pos.y', 'sp.z', 'pos.z'];
+  const { t, series: s } = sim.telemetry.window(keys, from);
+  let se = 0;
+  let max = 0;
+  let n = 0;
+  for (let k = 0; k < t.length && t[k]! <= to; k++) {
+    const e = Math.hypot(s[0]![k]! - s[1]![k]!, s[2]![k]! - s[3]![k]!, s[4]![k]! - s[5]![k]!);
+    se += e * e;
+    max = Math.max(max, e);
+    n++;
+  }
+  return { rms: Math.sqrt(se / Math.max(n, 1)), max };
+};
+
+/** Roll/pitch tracking error (RMS, degrees) and motor jitter (RMS sample-to-sample change, N). */
+const attitudeQuality = (sim: Simulation, from: number) => {
+  const keys = ['att.roll.err', 'att.pitch.err', 'motor.1', 'motor.2', 'motor.3', 'motor.4'];
+  const { series: s } = sim.telemetry.window(keys, from);
+  const n = s[0]!.length;
+  let att = 0;
+  let du = 0;
+  for (let k = 0; k < n; k++) {
+    att += s[0]![k]! ** 2 + s[1]![k]! ** 2;
+    if (k) for (let m = 2; m < 6; m++) du += (s[m]![k]! - s[m]![k - 1]!) ** 2;
+  }
+  return { attRms: Math.sqrt(att / Math.max(n, 1)), jitter: Math.sqrt(du / Math.max(n - 1, 1)) };
+};
+
+const FAULT_AT = 12;
+const brokenProp = (s: Simulation) => setAt(s, FAULT_AT, 'drone.motorEfficiency.1', 0.6);
+const payload = (s: Simulation) => setAt(s, 12, 'drone.mass', 1.3);
+const damagedProp = (p: Params) => {
+  p.wind.enabled = false;
+  p.setpoint.x = 2;
+};
+
+// II.8: gusty wind, scored like Part I's gust challenge (reference = PID cascade, same wind).
+const gusty = (p: Params) => {
+  p.sim.seed = 4242;
+  p.wind.gustsPerMinute = 14;
+  p.wind.gustAmpMin = 4;
+  p.wind.gustAmpMax = 10;
+  p.wind.turbSigma = 1.2;
+};
+const GUST_FROM = 8;
+const GUST_TO = 40;
+let gustReference: number | null = null;
+const gustReferenceScore = () => {
+  if (gustReference === null) {
+    const p = defaultParams();
+    p.sim.level = 3;
+    gusty(p);
+    const s = new Simulation(p);
+    for (let k = 0; k < GUST_TO * 1000; k++) s.step();
+    gustReference = positionError(s, GUST_FROM, GUST_TO).rms;
+  }
+  return gustReference;
 };
 
 const A = 'A · From knobs to models';
@@ -145,7 +204,7 @@ export const PART_TWO: Lesson[] = [
       p.control.l1.kind = 'lqr';
       p.control.lqr.r = 10;
     },
-    events: (sim) => {
+    onStart: (sim) => {
       const g = ghostOf(
         sim,
         (p) => {
@@ -208,7 +267,7 @@ export const PART_TWO: Lesson[] = [
       p.control.l1.kind = 'lqr';
       p.control.model.mass = 0.8;
     },
-    events: (sim) => sim.schedule(15, () => setParam('setpoint.y', 3)),
+    events: (sim) => setAt(sim, 15, 'setpoint.y', 3),
     goal: {
       text: 'Steady-state error below 1 cm, with the model still believing m̂ = 0.8 kg.',
       check: ({ sim }) => {
@@ -319,14 +378,9 @@ export const PART_TWO: Lesson[] = [
     setup: (p) => {
       p.control.l1.kind = 'adrc';
     },
-    events: (sim) => {
-      const payload = (s: Simulation) =>
-        s.schedule(12, (x) =>
-          x.setParams({ ...x.params, drone: { ...x.params.drone, mass: 1.3 } }),
-        );
-      ghostOf(sim, (p) => (p.control.l1.kind = 'pid'), 'PID (default)', 40, payload);
-      sim.schedule(12, () => setParam('drone.mass', 1.3));
-    },
+    events: (sim) => payload(sim),
+    onStart: (sim) =>
+      ghostOf(sim, (p) => (p.control.l1.kind = 'pid'), 'PID (default)', 40, payload),
     body: (
       <>
         <p>
@@ -402,6 +456,182 @@ export const PART_TWO: Lesson[] = [
           at high bandwidth that ignorance destabilises the loop. A model can be simple — but not
           simpler than the bandwidth you ask for. Rule of thumb: <M>{'\\omega_o'}</M> ≈ 3–10 ×{' '}
           <M>{'\\omega_c'}</M>.
+        </Notice>
+      </>
+    ),
+  },
+
+  {
+    id: 'indi',
+    part: 2,
+    chapter: B,
+    title: "Don't model it, measure it",
+    level: 3,
+    loop: 'rate.roll',
+    setup: damagedProp,
+    events: (sim) => brokenProp(sim),
+    onStart: (sim) => ghostOf(sim, () => {}, 'PID rate loop', 30, brokenProp),
+    goal: {
+      text: 'After the prop breaks, keep the position error below 30 cm (the PID ghost drifts 77 cm).',
+      check: ({ sim }) => {
+        if (sim.t < FAULT_AT + 8) return false;
+        const { max } = positionError(sim, FAULT_AT);
+        return max < 0.3 || `max error after the fault ${(max * 100).toFixed(0)} cm`;
+      },
+    },
+    solution: (p) => {
+      p.control.l3.inner = 'indi';
+    },
+    body: (
+      <>
+        <p>
+          At <i>t</i> = {FAULT_AT} s the propeller of motor 2 chips: it keeps spinning at the
+          commanded speed but gives only 60 % of the thrust. Nothing in the controller's model
+          knows. The PID rate loop sees a rate error, lets its <K k="i">I</K> term build up, and
+          meanwhile the drone tips and drifts.
+        </p>
+        <p>
+          <b>Incremental nonlinear dynamic inversion</b> asks a different question:{' '}
+          <i>what angular acceleration do I have right now, and what do I want?</i> It keeps the
+          torque the motors produce at this moment and changes it by exactly the missing part:
+        </p>
+        <M display>
+          {
+            '\\tau = \\tau_0 + \\hat I\\,(\\alpha_{des} - \\dot\\omega),\\qquad \\alpha_{des} = K\\,(\\omega_{sp} - \\omega)'
+          }
+        </M>
+        <p>
+          <M>{'\\tau_0'}</M> comes from the motor speeds, <M>{'\\dot\\omega'}</M> from
+          differentiating the gyro. The broken prop, a shifted payload, any unmodelled torque — it
+          is all already <i>inside</i> the measured <M>{'\\dot\\omega'}</M>. The only model left is
+          the inertia <M>{'\\hat I'}</M>, and even that may be off by a factor of two.
+        </p>
+        <Try>
+          <i>Controller → Inner stage → attitude P + rate INDI</i>, press <kbd>R</kbd>. The chart
+          shows the three parts of the INDI command: <K k="i">what the motors do now</K>,{' '}
+          <K k="p">what we want</K>, <K k="d">what we measure</K>.
+        </Try>
+        <Notice>
+          Try the <i>Assumed inertia</i> slider: ×0.5 and ×2 fly fine, ×3 makes the loop too
+          aggressive. INDI is robust to <i>unmodelled</i> effects, not to a wildly wrong idea of its
+          own actuators.
+        </Notice>
+      </>
+    ),
+  },
+  {
+    id: 'indi-wind',
+    part: 2,
+    chapter: B,
+    title: 'Feel the push',
+    level: 3,
+    loop: 'vel.x',
+    chart: 'disturbance',
+    setup: gusty,
+    onStart: (sim) => {
+      ghostOf(sim, () => {}, 'PID cascade', GUST_TO);
+    },
+    goal: {
+      text: `RMS position error between ${GUST_FROM} s and ${GUST_TO} s at least 40 % below the PID cascade on the same wind.`,
+      check: ({ sim }) => {
+        if (sim.t < GUST_TO) return false;
+        const ref = gustReferenceScore();
+        const { rms } = positionError(sim, GUST_FROM, GUST_TO);
+        return (
+          rms < 0.6 * ref ||
+          `${(rms * 100).toFixed(1)} cm (PID cascade ${(ref * 100).toFixed(1)} cm, target ${(60 * ref).toFixed(1)} cm)`
+        );
+      },
+    },
+    solution: (p) => {
+      p.control.l3.compensation = 'indi';
+    },
+    body: (
+      <>
+        <p>
+          A gust is a <b>force</b>. The PID cascade only notices it once it has pushed the drone far
+          enough to cause a velocity error, and its <K k="i">I</K> term needs more time still. An
+          accelerometer feels the push the moment it happens.
+        </p>
+        <p>
+          <b>Cascaded INDI</b> applies the same idea one level up: keep the thrust vector the motors
+          produce now, <M>{'F_0'}</M>, and correct it by the acceleration that is missing:
+        </p>
+        <M display>{'F = F_0 + \\hat m\\,(a_{sp} - a_{meas})'}</M>
+        <p>
+          The bottom-right chart shows the true disturbance force. With acceleration INDI on, a
+          dashed line appears: what INDI implicitly <i>knows</i> about the disturbance, without ever
+          computing it.
+        </p>
+        <Try>
+          <ol className="list-decimal space-y-0.5 pl-4">
+            <li>
+              First switch only the <i>Inner stage</i> to INDI and reset. No better — the rate loop
+              was never the problem.
+            </li>
+            <li>
+              Now set <i>Disturbance compensation → acceleration INDI</i>. Pick the new{' '}
+              <i>Accel X (INDI)</i> loop in the chart selector to see its parts.
+            </li>
+          </ol>
+        </Try>
+        <Notice>
+          Each INDI loop rejects disturbances at its own level: torques in the rate loop (last
+          lesson), forces in the acceleration loop. That is why research stacks (and the comparisons
+          in docs/beyond-pid.md) put INDI under everything else.
+        </Notice>
+      </>
+    ),
+  },
+  {
+    id: 'indi-sync',
+    part: 2,
+    chapter: B,
+    title: 'Keep your filters in sync',
+    level: 3,
+    loop: 'rate.pitch',
+    setup: (p) => {
+      p.wind.enabled = false;
+      p.setpoint.profile = 'square';
+      p.setpoint.profileAxis = 'x';
+      p.setpoint.profileAmplitude = 1.5;
+      p.setpoint.profilePeriod = 6;
+      p.sensors.gyroNoise = 10;
+      p.control.l3.inner = 'indi';
+      p.control.indi.filterHz = 5;
+      p.control.indi.syncFilters = false;
+    },
+    goal: {
+      text: 'Over the last 10 s: roll/pitch error below 8.5° RMS and motor jitter below 0.12 N.',
+      check: ({ sim }) => {
+        if (sim.t < 15) return false;
+        const { attRms, jitter } = attitudeQuality(sim, sim.t - 10);
+        return (
+          (attRms < 8.5 && jitter < 0.12) ||
+          `attitude ${attRms.toFixed(1)}° RMS · motor jitter ${jitter.toFixed(3)} N`
+        );
+      },
+    },
+    solution: (p) => {
+      p.control.indi.syncFilters = true;
+    },
+    body: (
+      <>
+        <p>
+          A noisy gyro (10 °/s) forces a slow 5 Hz filter before differentiating it — and a slow
+          filter means the measured <M>{'\\dot\\omega'}</M> describes the drone as it was some 30 ms
+          ago. The motor torque <M>{'\\tau_0'}</M>, however, is taken fresh. INDI subtracts one from
+          the other, so it now compares <i>today's</i> torque with <i>yesterday's</i> acceleration
+          and keeps correcting for a mismatch that no longer exists.
+        </p>
+        <Try>
+          Watch the wobble, then switch on <i>INDI → Synchronised filters</i>: the motor signal
+          passes through the same filter, both halves describe the same moment, the wobble is gone.
+          Tempted to just raise the filter cutoff instead? Try it — and look at the motors.
+        </Try>
+        <Notice>
+          This is the most common INDI implementation bug in practice. The published fix is exactly
+          this: filter the actuator feedback with the same filter as the sensor.
         </Notice>
       </>
     ),

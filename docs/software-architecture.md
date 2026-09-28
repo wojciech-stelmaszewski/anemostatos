@@ -58,6 +58,7 @@ src/
     types.ts       Controller interface, LoopTerms (named contributions for the inspector)
     registry.ts    builds the controller selected in the parameters
     lqr.ts         L1 LQR / LQI;  adrc.ts  L1 ADRC;  estimated.ts  Kalman filter in front of L1
+    stages.ts      L3 swappable stages: rate PID / rate INDI, no compensation / acceleration INDI
   estimation/    pure estimation — filters.ts (low-pass pairs), kalman.ts (KF + altitude filter),
                  eso.ts (extended state observer)
   engine/

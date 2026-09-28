@@ -18,8 +18,13 @@ export interface DroneState {
   q: Quat;
   /** Body angular velocity, rad/s. */
   omega: Vec3;
-  /** Actual thrust of each motor (after lag), N. */
+  /** Actual thrust of each motor (after lag and efficiency), N. */
   motors: [number, number, number, number];
+  /**
+   * Rotor speed of each motor, expressed as the thrust a healthy motor makes at that speed, N.
+   * This is what motor-speed telemetry reports; a damaged prop turns it into less real thrust.
+   */
+  rotors: [number, number, number, number];
   /** L2 only: actual applied force vector (after lag), N. */
   force: Vec3;
   /** Linear acceleration over the last step, world frame, m/s² (includes ground reaction). */
@@ -50,6 +55,7 @@ export const initialState = (): DroneState => ({
   q: qIdentity(),
   omega: v3(),
   motors: [0, 0, 0, 0],
+  rotors: [0, 0, 0, 0],
   force: v3(),
   accel: v3(),
   landed: true,
@@ -102,11 +108,12 @@ export function stepDynamics(
     // Point mass pushed by a force vector; motors only mirror its magnitude for the visuals.
     s.force = add(s.force, scale(sub(act.forceCmd, s.force), lag));
     const share = Math.min(length(s.force) / 4, fmax);
-    for (let i = 0; i < 4; i++) s.motors[i] = share;
+    for (let i = 0; i < 4; i++) s.motors[i] = s.rotors[i] = share;
   } else {
     for (let i = 0; i < 4; i++) {
-      const cmd = Math.min(Math.max(act.motorCmd[i]!, 0), fmax) * p.motorEfficiency[i]!;
-      s.motors[i] = s.motors[i]! + (cmd - s.motors[i]!) * lag;
+      const cmd = Math.min(Math.max(act.motorCmd[i]!, 0), fmax);
+      s.rotors[i] = s.rotors[i]! + (cmd - s.rotors[i]!) * lag;
+      s.motors[i] = s.rotors[i]! * p.motorEfficiency[i]!;
     }
   }
 

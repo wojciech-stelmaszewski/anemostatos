@@ -37,6 +37,6 @@ export function makeController(p: Params): Controller {
     case 2:
       return new PointMassController();
     case 3:
-      return new CascadeController();
+      return new CascadeController(p);
   }
 }

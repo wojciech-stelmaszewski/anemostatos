@@ -236,6 +236,39 @@ just sample rate) than the one around it.
 > **Lesson "Cascade inversion"** — make the attitude loop slower than the
 > velocity loop and watch the drone wobble and diverge.
 
+### 4.8 Swappable stages and INDI (Part II)
+
+The L3 controller is a pipeline with two swappable stages
+(`src/control/stages.ts`, selected by `control.l3.inner` and
+`control.l3.compensation`):
+
+```mermaid
+flowchart LR
+    POS[Position P] --> VEL[Velocity PID]
+    VEL -- a_sp --> COMP["Compensation<br/>none · acceleration INDI"]
+    COMP -- F --> TV[Thrust vector] --> ATT[Attitude P]
+    ATT -- ω_sp --> RATE["Rate stage<br/>PID · INDI"] -- τ --> MIX[Mixer]
+```
+
+- **Rate INDI** (1 kHz): $\tau = \tau_{0,f} + \hat I(\alpha_{des} - \dot\omega_f)$,
+  $\alpha_{des} = K(\omega_{sp} - \omega)$. $\dot\omega_f$ is the derivative of
+  the gyro after a 2nd-order low-pass; $\tau_0$ is the torque of the current
+  rotor speeds (telemetry, or a first-order model of the motors driven by the
+  commands) through the **same** filter. Parts reported: $\tau_0/\hat I$ (role
+  I — it holds the steady torque), $\alpha_{des}$ (P), $-\dot\omega$ (D).
+- **Acceleration INDI** (filters at 1 kHz, law at the velocity-loop rate):
+  $\vec F = \vec F_{0,f} + \hat m(\vec a_{sp} - \vec a_f)$ with
+  $\vec a = R\,\vec a_{meas} + \vec g$ from the accelerometer and
+  $\vec F_0 = R\,(0, \sum r_i, 0)^\top$. The velocity loop's I term is
+  bypassed (the increment already integrates). Its implicit disturbance
+  estimate $\hat m\vec a_f - \vec F_{0,f} - \hat m\vec g$ is published for the
+  disturbance chart, and extra inspector loops `acc.x/y/z` appear.
+- With `inner = 'pid'` and `compensation = 'none'` the pipeline is
+  numerically identical to Part I's cascade (pinned by the regression test).
+- **Division of labour** (measured, see the lessons): a torque disturbance
+  (damaged prop) is rejected by the rate INDI, a force disturbance (gust) by
+  the acceleration INDI; each does nothing for the other.
+
 ## 5. Loop inspector
 
 Every PID instance registers under a stable id

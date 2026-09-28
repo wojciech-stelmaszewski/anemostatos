@@ -17,6 +17,7 @@ const hovering = (level: 1 | 3 = 1) => {
   s.landed = false;
   const f = (p.mass * GRAVITY) / 4;
   s.motors = [f, f, f, f];
+  s.rotors = [f, f, f, f];
   const act = idleActuation();
   act.motorCmd = [f, f, f, f];
   stepDynamics(level, s, act, v3(), v3(), p, dt);
@@ -77,7 +78,7 @@ describe('position sample rate', () => {
 });
 
 describe('motor feedback', () => {
-  it('reports actual motor thrust, or null when disabled', () => {
+  it('reports rotor speed (as healthy-motor thrust), or null when disabled', () => {
     const sensors = new Sensors(1);
     const { s } = hovering();
     sensors.record(s);
@@ -89,7 +90,7 @@ describe('motor feedback', () => {
 });
 
 describe('faults and aerodynamics', () => {
-  it('a motor at 50 % efficiency settles at half the commanded thrust', () => {
+  it('a motor at 50 % efficiency spins as commanded but makes half the thrust', () => {
     const p = {
       ...defaultParams().drone,
       motorEfficiency: [0.5, 1, 1, 1] as [number, number, number, number],
@@ -100,6 +101,7 @@ describe('faults and aerodynamics', () => {
     for (let k = 0; k < 500; k++) stepDynamics(1, s, act, v3(), v3(), p, dt);
     expect(s.motors[0]).toBeCloseTo(2, 3);
     expect(s.motors[1]).toBeCloseTo(4, 3);
+    expect(s.rotors[0]).toBeCloseTo(4, 3); // the telemetry cannot see the damage
   });
 
   it('rotor drag opposes in-plane air velocity and ignores motion along the thrust axis', () => {

@@ -22,8 +22,13 @@ export interface Lesson {
   chapter?: string;
   /** Modify a fresh copy of the default parameters. */
   setup?: (p: Params) => void;
-  /** Schedule scripted events after the reset. */
+  /**
+   * Scripted events. Run after every reset while the lesson is active (so pressing R replays
+   * them); use `setAt` from ./script for parameter changes.
+   */
   events?: (sim: Simulation) => void;
+  /** Run once when the lesson starts (ghost runs, reference scores). */
+  onStart?: (sim: Simulation) => void;
   /** Loop to show in the charts. */
   loop?: string;
   /** What the bottom-right chart shows (default: wind). */

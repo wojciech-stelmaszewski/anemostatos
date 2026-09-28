@@ -1,10 +1,10 @@
-import { Html } from '@react-three/drei';
 import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
 import { useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { useParams } from '@/store/params';
 import { sim, useUi } from '@/store/sim';
 import { SIGNAL } from '@/ui/colors';
+import { DomLabel } from './DomLabel';
 
 const snap = (v: number) => Math.round(v * 20) / 20;
 
@@ -124,12 +124,11 @@ export function SetpointGhost() {
             <meshBasicMaterial color={SIGNAL.setpoint} transparent opacity={0.5} />
           </mesh>
         ))}
-        <Html position={[0.3, 0.06, 0]} style={{ pointerEvents: 'none' }}>
-          <div
-            ref={label}
-            className="select-none whitespace-nowrap font-mono text-[10px] text-muted"
-          />
-        </Html>
+        <DomLabel
+          position={[0.3, 0.06, 0]}
+          elRef={label}
+          className="select-none whitespace-nowrap font-mono text-[10px] text-muted"
+        />
       </group>
     </>
   );

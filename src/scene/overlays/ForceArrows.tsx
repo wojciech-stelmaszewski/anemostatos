@@ -1,4 +1,3 @@
-import { Html } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
 import { useMemo, useRef } from 'react';
 import * as THREE from 'three';
@@ -7,6 +6,7 @@ import { useParams } from '@/store/params';
 import { sim, useUi } from '@/store/sim';
 import { SIGNAL } from '@/ui/colors';
 import { Arrow } from './Arrow';
+import { DomLabel } from './DomLabel';
 
 /** Metres of arrow per newton. */
 export const N_TO_M = 0.04;
@@ -109,6 +109,13 @@ export function TermArrows() {
   );
 }
 
+const LEGEND_STYLE = {
+  ff: { color: SIGNAL.ff },
+  p: { color: SIGNAL.p },
+  i: { color: SIGNAL.i },
+  d: { color: SIGNAL.d },
+} as const;
+
 function TermLegend() {
   const ref = useRef<THREE.Group>(null);
   useFrame(() => {
@@ -118,16 +125,14 @@ function TermLegend() {
   return (
     <group ref={ref}>
       {(['ff', 'p', 'i', 'd'] as const).map((k, idx) => (
-        <group key={k} position={[-0.3 - idx * 0.06, -0.035, 0]}>
-          <Html center style={{ pointerEvents: 'none' }}>
-            <span
-              className="select-none font-mono text-[9px] font-bold"
-              style={{ color: SIGNAL[k] }}
-            >
-              {k.toUpperCase()}
-            </span>
-          </Html>
-        </group>
+        <DomLabel
+          key={k}
+          position={[-0.3 - idx * 0.06, -0.035, 0]}
+          center
+          text={k.toUpperCase()}
+          className="select-none font-mono text-[9px] font-bold"
+          style={LEGEND_STYLE[k]}
+        />
       ))}
     </group>
   );

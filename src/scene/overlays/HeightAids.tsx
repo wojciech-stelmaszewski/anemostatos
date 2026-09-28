@@ -1,8 +1,8 @@
-import { Html } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
 import { useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { sim, useUi } from '@/store/sim';
+import { DomLabel } from './DomLabel';
 
 /** Drop line to the floor, floor marker and a height label: altitude readable from any angle. */
 export function HeightAids() {
@@ -62,12 +62,11 @@ export function HeightAids() {
         </mesh>
       </group>
       <group ref={labelAnchor}>
-        <Html position={[0.06, 0, 0]} style={{ pointerEvents: 'none' }}>
-          <div
-            ref={label}
-            className="select-none whitespace-nowrap rounded bg-black/40 px-1 font-mono text-[10px] text-fg"
-          />
-        </Html>
+        <DomLabel
+          position={[0.06, 0, 0]}
+          elRef={label}
+          className="select-none whitespace-nowrap rounded bg-black/40 px-1 font-mono text-[10px] text-fg"
+        />
       </group>
     </>
   );

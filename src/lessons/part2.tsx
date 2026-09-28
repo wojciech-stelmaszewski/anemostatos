@@ -150,6 +150,29 @@ const minOf = (sim: Simulation, key: string, from: number) => -maxOf(sim, key, f
 /** Lowest altitude since `from`. */
 const lowest = (sim: Simulation, from: number) => -maxOf(sim, 'pos.y', from, Infinity, -1);
 
+// Chapter D
+const D = 'D · Optimisation in the loop';
+const STEP_AT = 8;
+const JUMP_AT = 10;
+const ceilingScene = (p: Params) => {
+  p.wind.enabled = false;
+  p.world.ceiling = 4;
+  // Crisper weights than the L3 defaults: the altitude loop has no attitude lag to respect.
+  p.control.mpc = { ...p.control.mpc, qPos: 50, qVel: 5, r: 0.05 };
+};
+const pillarScene = (p: Params) => {
+  p.world.pillar = true;
+  p.world.pillarX = 3;
+  p.world.pillarZ = 0.15;
+  p.world.pillarR = 0.6;
+};
+/** First time ≥ from when |channel − target| < tol (Infinity if never). */
+const firstWithin = (sim: Simulation, key: string, target: number, tol: number, from: number) => {
+  const { t, series } = sim.telemetry.window([key], from);
+  for (let k = 0; k < t.length; k++) if (Math.abs(series[0]![k]! - target) < tol) return t[k]!;
+  return Infinity;
+};
+
 const A = 'A · From knobs to models';
 const B = 'B · Estimate the disturbance';
 
@@ -823,6 +846,272 @@ export const PART_TWO: Lesson[] = [
         <Notice>
           Not faster: with a good controller the steps arrive about as soon. What planning buys is
           smoothness, a schedule you can rely on, and an early warning when the plan is impossible.
+        </Notice>
+      </>
+    ),
+  },
+  {
+    id: 'mpc',
+    part: 2,
+    chapter: D,
+    title: 'Look before you leap',
+    level: 1,
+    setup: (p) => {
+      ceilingScene(p);
+    },
+    events: (sim) => setAt(sim, STEP_AT, 'setpoint.y', 3.95),
+    goal: {
+      text: 'Reach 3.95 m (± 5 cm) without ever touching the ceiling at 4 m.',
+      check: ({ sim }) => {
+        if (sim.t < STEP_AT + 4) return false;
+        const settled = Math.abs(sim.state.pos.y - 3.95) < 0.05;
+        return (
+          (settled && sim.zoneTime === 0) ||
+          `time above the ceiling ${sim.zoneTime.toFixed(2)} s · altitude ${sim.state.pos.y.toFixed(3)} m`
+        );
+      },
+    },
+    solution: (p) => {
+      p.control.l1.kind = 'mpc';
+    },
+    body: (
+      <>
+        <p>
+          A ceiling at 4 m (the red plane). At <i>t</i> = {STEP_AT} s the setpoint jumps to 3.95 m —
+          5 cm below it. The PID only learns about the ceiling by hitting it: its I term makes it
+          overshoot, and it spends seconds above the line. Part I's anti-windup only cleaned up{' '}
+          <i>after</i> saturation; nothing ever planned for a limit.
+        </p>
+        <p>
+          <b>Model predictive control</b> does: at every step it computes the best thrust sequence
+          for the next second — subject to the thrust range <i>and</i> the ceiling — applies only
+          the first move, and plans again 20 ms later (receding horizon):
+        </p>
+        <M display>
+          {
+            '\\min_{u_0..u_{N-1}} \\sum_k q\\,(y_k - r)^2 + r_u\\,u_k^2 \\quad\\text{s.t.}\\quad 0 \\le T_k \\le T_{max},\\ y_k \\le y_{ceil}'
+          }
+        </M>
+        <Try>
+          <i>Controller → Altitude controller → MPC</i>. The amber line beside the drone is its
+          plan: watch it bend under the ceiling before the drone gets there.
+        </Try>
+      </>
+    ),
+  },
+  {
+    id: 'horizon',
+    part: 2,
+    chapter: D,
+    title: 'How far ahead?',
+    level: 1,
+    setup: (p) => {
+      ceilingScene(p);
+      p.control.l1.kind = 'mpc';
+      p.control.mpc.horizon = 2;
+    },
+    events: (sim) => setAt(sim, STEP_AT, 'setpoint.y', 3.95),
+    goal: {
+      text: 'Reach 3.95 m within 1.6 s of the step, with a horizon of 0.6 s or less.',
+      check: ({ sim }) => {
+        if (sim.t < STEP_AT + 4) return false;
+        const reach = firstWithin(sim, 'pos.y', 3.95, 0.05, STEP_AT) - STEP_AT;
+        const h = sim.params.control.mpc.horizon;
+        return (
+          (reach < 1.6 && h <= 0.6 && sim.zoneTime === 0) ||
+          `horizon ${h.toFixed(2)} s · reached after ${Number.isFinite(reach) ? reach.toFixed(2) : '—'} s`
+        );
+      },
+    },
+    solution: (p) => {
+      p.control.mpc.horizon = 0.5;
+    },
+    body: (
+      <>
+        <p>
+          Planning costs computing time — look at <i>controller … µs/step</i> in the chart header. A
+          2 s horizon means a 100-variable optimisation 50 times a second. Real flight computers
+          have a budget.
+        </p>
+        <Try>
+          Shorten the horizon (then <kbd>R</kbd>): 1 s, 0.5 s, 0.3 s, 0.1 s. The cost drops — and
+          the controller becomes <b>myopic</b>: it still never crosses the ceiling (the constraint
+          is in every plan), but it no longer sees far enough to hurry, and the climb gets slow.
+          Also try capping the <i>QP iterations</i> at 5.
+        </Try>
+        <Notice>
+          The horizon must cover the time the system needs to react — here, to brake from climbing
+          speed. Beyond that, extra horizon buys little and costs a lot.
+        </Notice>
+      </>
+    ),
+  },
+  {
+    id: 'mpc-l3',
+    part: 2,
+    chapter: D,
+    title: 'MPC on top, INDI below',
+    level: 3,
+    loop: 'pos.x',
+    setup: (p) => {
+      p.setpoint.y = 3;
+      p.setpoint.profile = 'figure8';
+      p.setpoint.profileAmplitude = 2;
+      p.setpoint.profilePeriod = 6;
+      gusty(p);
+      p.control.l3.outer = 'mpc';
+    },
+    goal: {
+      text: 'RMS position error below 2.5 cm over the last lap, in the gusts.',
+      check: ({ sim }) => {
+        if (sim.t < 25) return false;
+        const { rms } = positionError(sim, sim.t - 6);
+        return rms < 0.025 || `RMS error ${(rms * 100).toFixed(1)} cm over the last lap`;
+      },
+    },
+    solution: (p) => {
+      p.control.l3.inner = 'indi';
+      p.control.l3.compensation = 'indi';
+    },
+    body: (
+      <>
+        <p>
+          The MPC now flies the outer loop of the quadrotor: three small QPs (x, y, z) on a
+          point-mass model, looking 1 s ahead along the planned figure-8, with the tilt and speed
+          limits as constraints. The amber line is its plan. In the gusty wind it tracks to about 4
+          cm.
+        </p>
+        <Try>
+          Add <i>Inner stage → rate INDI</i> and <i>Disturbance compensation → acceleration INDI</i>
+          . Then switch the outer stage to <i>geometric tracking</i> for comparison — with INDI
+          underneath, both land around 1.5 cm.
+        </Try>
+        <Notice>
+          This is the conclusion of Sun et al. (2022), comparing nonlinear MPC and flatness-based
+          control on real racing quadrotors: an INDI inner loop made both robust, and mattered more
+          than the choice on top. (Our MPC is linear, on a point-mass model; it wins on feasible
+          trajectories but, unlike a full nonlinear MPC, not beyond the drone's limits — the
+          geometric controller holds on longer there.)
+        </Notice>
+      </>
+    ),
+  },
+  {
+    id: 'mppi',
+    part: 2,
+    chapter: D,
+    title: 'A thousand futures',
+    level: 3,
+    loop: 'pos.x',
+    setup: (p) => {
+      p.wind.enabled = false;
+      pillarScene(p);
+      p.control.l3.outer = 'geometric';
+    },
+    events: (sim) => setAt(sim, JUMP_AT, 'setpoint.x', 6),
+    goal: {
+      text: 'Reach the new setpoint (x = 6 m) without entering the pillar.',
+      check: ({ sim }) => {
+        if (sim.t < JUMP_AT + 3) return false;
+        const e = Math.hypot(sim.state.pos.x - 6, sim.state.pos.y - 2, sim.state.pos.z);
+        return (
+          (e < 0.2 && sim.zoneTime === 0) ||
+          `distance to target ${e.toFixed(2)} m · time inside the pillar ${sim.zoneTime.toFixed(2)} s`
+        );
+      },
+    },
+    solution: (p) => {
+      p.control.l3.outer = 'mppi';
+    },
+    body: (
+      <>
+        <p>
+          The target jumps to the far side of a pillar. Every controller so far goes straight
+          through it: a pillar is not convex, and no quadratic program can say "left <i>or</i>{' '}
+          right".
+        </p>
+        <p>
+          <b>MPPI</b> (model predictive path integral) does not optimise, it <i>samples</i>: 256
+          random variations of its current plan, each flown forward 1.5 s on a simple model and
+          scored — tracking, effort, and a heavy penalty for every moment inside the pillar. The new
+          plan is the average of all of them, weighted by <M>{'e^{-\\text{cost}/\\lambda}'}</M>. The
+          coloured cloud is those futures (green cheap, red expensive).
+        </p>
+        <Try>
+          <i>Outer stage → MPPI</i>, press <kbd>R</kbd>. Then play with the temperature λ: 0.2
+          follows the best sample (decisive), 50 averages many — and the average of "left" and
+          "right" is "straight into the pillar": it hesitates in front. At 500 it wanders.
+        </Try>
+        <Notice>
+          Sampling is expensive (see the µs/step meter), but it is embarrassingly parallel — which
+          is why MPPI is popular on GPUs for off-road driving and drone racing.
+        </Notice>
+      </>
+    ),
+  },
+  {
+    id: 'cbf',
+    part: 2,
+    chapter: D,
+    title: 'The safety filter',
+    level: 3,
+    loop: 'pos.x',
+    setup: (p) => {
+      p.wind.enabled = false;
+      pillarScene(p);
+      p.setpoint.profile = 'sine';
+      p.setpoint.profileAxis = 'x';
+      p.setpoint.profileAmplitude = 4;
+      p.setpoint.profilePeriod = 10;
+      p.control.l3.outer = 'geometric';
+    },
+    goal: {
+      text: 'For 20 s: never inside the pillar, while still following the setpoint on the free side (x below −3.5 m).',
+      check: ({ sim }) => {
+        if (sim.t < 30) return false;
+        const from = sim.t - 20;
+        const inside = maxOf(sim, 'zone.inside', from);
+        const far = maxOf(sim, 'pos.x', from);
+        const near = -maxOf(sim, 'pos.x', from, Infinity, -1);
+        return (
+          (inside === 0 && near < -3.5) ||
+          `${inside ? 'entered the pillar' : 'stayed out'} · reached x from ${near.toFixed(1)} to ${far.toFixed(1)} m`
+        );
+      },
+    },
+    solution: (p) => {
+      p.control.l3.safety = 'cbf';
+    },
+    body: (
+      <>
+        <p>
+          The setpoint swings back and forth straight through a pillar — imagine a pilot, or a buggy
+          planner, asking for it. The geometric controller obeys perfectly, and flies through.
+        </p>
+        <p>
+          A <b>control barrier function</b> filter sits between <i>any</i> controller and the
+          motors. With <M>{'h(p) = |p - c|^2 - R^2'}</M> (positive outside), it only allows
+          accelerations that keep <M>h</M> from reaching zero too fast:
+        </p>
+        <M display>{'\\ddot h + 2\\gamma\\,\\dot h + \\gamma^2 h \\ge 0'}</M>
+        <p>
+          — a linear constraint on the acceleration. The filter returns the closest allowed
+          acceleration to what was asked: far from the pillar it changes nothing; near it, the red
+          arrow shows the correction.
+        </p>
+        <Try>
+          <i>Safety filter → control barrier function</i>. The drone now brakes before the pillar
+          and never enters it. Vary γ: small brakes early and gently, large lets it come close. Then
+          try <i>Outer stage → MPPI</i> with the filter still on.
+        </Try>
+        <Notice>
+          Watch what happens when the setpoint is behind the pillar: the drone stops in front of it
+          and waits. A safety filter guarantees <b>safety, not progress</b> — it removes the part of
+          the command that approaches the boundary, but it does not plan a way around (a{' '}
+          <i>deadlock</i>). Going around is a planning problem: put MPPI on top (previous lesson)
+          and keep the filter as the last line of defence. The filter does not care what is above it
+          — PID, MPC, a learned policy or a human — which is why it is the usual way to add
+          "provably safe" to controllers that are not.
         </Notice>
       </>
     ),

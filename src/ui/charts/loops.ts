@@ -77,7 +77,7 @@ const ACCEL = [accel('x'), accel('y'), accel('z')];
 /** Loops to offer in the inspector for these parameters. */
 export const loopsFor = (p: Params): LoopMeta[] => {
   if (p.sim.level !== 3) return LOOPS[p.sim.level];
-  const geometric = p.control.l3.outer === 'geometric';
+  const geometric = p.control.l3.outer !== 'pid-cascade'; // geometric, MPC, MPPI
   // The geometric controller closes position and velocity in one law: no separate velocity loop,
   // and its position loops output an acceleration.
   const outer = geometric

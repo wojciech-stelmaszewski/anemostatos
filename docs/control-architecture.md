@@ -288,6 +288,29 @@ flowchart LR
   optional `Setpoint` fields only while the setpoint follows the profile
   exactly (no rate limit, not taking off).
 
+### 4.10 Optimisation in the loop (Part II)
+
+- **L1 `mpc`** (`control/mpc.ts`): condensed linear MPC on
+  $\hat m\ddot y = u$, re-planned at `mpc.hz` (prediction step $1/hz$) over
+  `mpc.horizon` seconds; input bounds (thrust range) as boxes, the ceiling as
+  linear constraints on the predicted altitudes; solved with the ADMM QP
+  (`math/qp.ts`, factorisation cached, warm-started, iteration cap). Applies
+  the first move and holds it until the next plan.
+- **L3 outer `mpc`**: three independent axis MPCs on $\ddot p = a$ with the
+  horizontal box from the tilt limit (norm re-clamped), the vertical range
+  from the thrust range, speed limits and the ceiling. It previews the
+  planned trajectory through `ControlInput.preview(τ)`.
+- **L3 outer `mppi`** (`control/mppi.ts`): 256 seeded rollouts of a
+  point-mass model per re-plan; cost = tracking + effort + zone and floor
+  penalties; nominal sequence updated by $e^{-S/\lambda}$ weighting and shifted
+  (receding horizon).
+- **Safety `cbf`** (`control/cbf.ts`): on the desired acceleration, before
+  the compensation stage: $\ddot h + 2\gamma\dot h + \gamma^2 h \ge 0$ per zone
+  (pillar, ceiling), minimal change by a small QP. Its correction is
+  published (`cbf.dx/dy/dz`) and drawn as a red arrow.
+- Predictive controllers expose `plan()` (planned path, MPPI samples with
+  normalised costs) for the 3D overlay.
+
 ## 5. Loop inspector
 
 Every PID instance registers under a stable id

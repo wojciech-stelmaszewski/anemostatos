@@ -126,6 +126,11 @@ motor lag.
 | II.10 | Flying on a sphere           | L3    | attitude on the rotation group: why naive Euler angles fail a flip           |
 | II.11 | Feedforward from the future  | L3    | geometric tracking + differential flatness: 80 cm → 2 cm on a figure-8       |
 | II.12 | Plan the motion              | L3    | minimum-snap trajectories: smooth, on schedule, feasibility known in advance |
+| II.13 | Look before you leap         | L1    | MPC: plan within the limits (a ceiling) instead of reacting to them          |
+| II.14 | How far ahead?               | L1    | the horizon: foresight vs computing cost                                     |
+| II.15 | MPC on top, INDI below       | L3    | the inner loop matters most (Sun et al. 2022)                                |
+| II.16 | A thousand futures           | L3    | MPPI: sampling-based planning around a pillar; temperature                   |
+| II.17 | The safety filter            | L3    | control barrier functions: safety for any controller — and its deadlock      |
 
 ## Run it
 
@@ -196,7 +201,7 @@ the last 60 s of telemetry as CSV.
 The [`docs/`](docs/README.md) folder is the project's textbook and design record:
 
 - [**PID primer**](docs/pid-primer.md): theory from the ground up, the digital PID, windup, derivative kick, noise, tuning, cascades.
-- [**Modern control primer**](docs/modern-control-primer.md): Part II theory — state feedback, LQR/LQI, the Kalman filter, ADRC, INDI, geometric control and trajectories.
+- [**Modern control primer**](docs/modern-control-primer.md): Part II theory — state feedback, LQR/LQI, the Kalman filter, ADRC, INDI, geometric control and trajectories, MPC, MPPI, safety filters.
 - [**Beyond PID**](docs/beyond-pid.md): Part II research survey, plan and lesson list.
 - [**Physics model**](docs/physics-model.md): frames, equations of motion, motors, drag, the wind and gust model, integration.
 - [**Control architecture**](docs/control-architecture.md): how the loops are wired at each level, including the cascade and the mixer.

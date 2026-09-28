@@ -13,6 +13,7 @@ import {
 } from '@/sim/dynamics';
 import { GRAVITY, type Level, type Params } from '@/sim/params';
 import { Sensors, type Measurement } from '@/sim/sensors';
+import { zoneDistance } from '@/sim/world';
 import { Wind } from '@/sim/wind';
 import { profileOffset, zeroReference, type Reference } from './reference';
 import { Telemetry } from './telemetry';
@@ -87,6 +88,8 @@ export class Simulation {
   reference: Reference = zeroReference(v3());
   /** When the planar profiles started their first lap. */
   profileStart = 0;
+  /** Seconds spent inside a keep-out zone since the last reset. */
+  zoneTime = 0;
   private accumulator = 0;
   private poke: { force: Vec3; until: number } | null = null;
   private resetListeners = new Set<() => void>();
@@ -146,6 +149,7 @@ export class Simulation {
     this.setpoint = v3(this.target.x, this.state.pos.y, this.target.z);
     this.takingOff = true;
     this.profileStart = 0;
+    this.zoneTime = 0;
     this.reference = zeroReference(v3());
     this.yaw = (p.setpoint.yawDeg * Math.PI) / 180;
     this.state.q = p.sim.level === 3 ? qFromAxisAngle(v3(0, 1, 0), 0) : this.state.q;
@@ -300,6 +304,7 @@ export class Simulation {
         physDt: dt,
         stepIndex: this.stepIndex,
         sense: () => (this.measurement = this.sensors.read(p.sensors, dt, this.t)),
+        preview: (tau) => this.previewAt(tau, exact),
       });
       // Measured only for display; wall-clock time never feeds back into the simulation.
       this.cpuSum += performance.now() - t0;
@@ -312,6 +317,8 @@ export class Simulation {
     if (this.poke && this.t >= this.poke.until) this.poke = null;
     this.forces = stepDynamics(this.level, this.state, this.actuation, wind, ext, p.drone, dt);
     if (this.state.crashed) this.armed = false;
+
+    if (zoneDistance(this.state.pos, p.world, this.level) < 0) this.zoneTime += dt;
 
     this.t += dt;
     this.stepIndex++;
@@ -361,11 +368,22 @@ export class Simulation {
     tl.set('dist.x', d.x);
     tl.set('dist.y', d.y);
     tl.set('dist.z', d.z);
+    const zd = zoneDistance(s.pos, this.params.world, this.level);
+    tl.set('zone.dist', Number.isFinite(zd) ? zd : NaN);
+    tl.set('zone.inside', zd < 0 ? 1 : 0);
     const loops = this.controller.loops();
     for (const id in loops) recordLoop(tl, id, loops[id]!);
     const extras = this.controller.extras();
     for (const k in extras) tl.set(k, extras[k]!);
     tl.commit(this.t);
+  }
+
+  /** The reference `tau` seconds ahead: the planned profile if it is followed exactly. */
+  private previewAt(tau: number, exact: boolean): Vec3 {
+    if (!exact) return clone(this.setpoint);
+    const r = profileOffset(this.params, this.level, this.t + tau, this.profileStart);
+    const b = this.base;
+    return v3(b.x + r.pos.x, Math.max(b.y + r.pos.y, 0.2), b.z + r.pos.z);
   }
 
   /**

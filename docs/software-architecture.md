@@ -40,7 +40,7 @@ every signal. Therefore:
 
 ```
 src/
-  math/          vec3, quat, PRNG (seeded); poly.ts (minimum-snap splines);
+  math/          vec3, quat, PRNG (seeded); poly.ts (minimum-snap splines); qp.ts (ADMM QP);
                  mat.ts (small dense matrices, expm, c2d, eigenvalues),
                  riccati.ts (discrete LQR)
   sim/           pure simulation — no DOM, no Three.js
@@ -48,6 +48,7 @@ src/
     dynamics.ts    equations of motion per level (L1/L2/L3)
     wind.ts        mean + Ornstein–Uhlenbeck + 1−cos gusts
     sensors.ts     noise, bias, delay, sample & hold
+    world.ts       keep-out zones: signed distance
     integrator.ts  semi-implicit Euler (interface allows RK4)
     world.ts       ground contact, crash detection, external pokes
   control/       pure control — no DOM, no Three.js
@@ -61,6 +62,8 @@ src/
     lqr.ts         L1 LQR / LQI;  adrc.ts  L1 ADRC;  estimated.ts  Kalman filter in front of L1
     stages.ts      L3 swappable stages: rate PID / rate INDI, no compensation / acceleration INDI
     geometric.ts   L3 geometric tracking, attitude laws, flatness feedforward
+    mpc.ts         axis MPC (QP), L1 MPC, L3 MPC outer stage
+    mppi.ts        MPPI sampling outer stage;  cbf.ts  control-barrier safety filter
   estimation/    pure estimation — filters.ts (low-pass pairs), kalman.ts (KF + altitude filter),
                  eso.ts (extended state observer)
   engine/

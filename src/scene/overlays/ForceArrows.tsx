@@ -31,6 +31,7 @@ export function ForceArrows() {
     gravity: SIGNAL.gravity,
     drag: SIGNAL.drag,
     desired: SIGNAL.ff,
+    safety: SIGNAL.error,
   });
 
   useFrame(() => {
@@ -48,6 +49,13 @@ export function ForceArrows() {
     if (sim.level === 3 && 'fdes.x' in ex) {
       set('desired', { x: ex['fdes.x']!, y: ex['fdes.y']!, z: ex['fdes.z']! });
     } else arrows.desired.visible = false;
+    // The safety filter's correction, as the force it adds (m̂·Δa).
+    const m = sim.params.control.model.mass;
+    const dx = (ex['cbf.dx'] ?? 0) * m;
+    const dy = (ex['cbf.dy'] ?? 0) * m;
+    const dz = (ex['cbf.dz'] ?? 0) * m;
+    if (Math.hypot(dx, dy, dz) > 0.05) set('safety', { x: dx, y: dy, z: dz }, -0.02);
+    else arrows.safety.visible = false;
   });
 
   if (!show) return null;

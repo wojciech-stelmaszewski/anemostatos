@@ -429,12 +429,119 @@ side and a good controller: the steps arrive about as soon (1.84 s vs
 
 ---
 
+## D. Optimisation in the loop
+
+### D.1 Model predictive control
+
+Part I handled limits after the fact: saturate, then stop the integrator from
+winding up. **MPC** plans with them. At every step it solves
+
+$$
+\min_{u_0,\dots,u_{N-1}} \sum_{k=1}^{N} q_p\,(p_k - r_k)^2 + q_v\,(v_k - v_{r,k})^2 + r\,u_{k-1}^2
+\quad\text{s.t.}\quad u_{min} \le u_k \le u_{max},\ \ p_k \le p_{max},\ \dots
+$$
+
+over a model, applies only $u_0$, and solves again at the next step with the
+new measurement (**receding horizon**) — feedback through re-planning.
+
+For a linear model the predictions are affine in the inputs:
+$p = \bar p + G_p U$, $v = \bar v + G_v U$ with $\bar p_k = p_0 + k\,\Delta t\,v_0$
+and $G_{p,kj} = b\,\Delta t^2 (k - j - \tfrac12)$ for $j < k$. The cost becomes
+$\tfrac12 U^\top H U + f^\top U$ and the limits become linear inequalities in
+$U$: a **quadratic program** ("condensed" MPC).
+
+Anemostatos solves it with ADMM as in OSQP (Stellato et al. 2020): a
+factorisation computed once and reused, cheap iterations, warm start from the
+previous plan, and an **iteration cap** — so the computing time is bounded and
+the run deterministic (the µs/step meter shows the cost).
+
+> **Lesson II.13 "Look before you leap"** — ceiling at 4 m, setpoint 3.95 m:
+> the PID spends 8.5 s above the ceiling, the MPC never touches it and
+> arrives sooner.
+
+### D.2 The horizon
+
+The horizon must cover what the system needs to react — here, to brake from
+climbing speed. Shorter plans are cheaper but **myopic**: with hard
+constraints in every plan the drone stays safe, but with little to gain
+within a short window the climb becomes slow (0.1 s horizon: 6.2 s to
+arrive; 1 s: 1.3 s). Longer horizons cost more (the QP grows with $N$) and
+soon buy nothing.
+
+> **Lesson II.14 "How far ahead?"**
+
+### D.3 MPC on top, INDI below
+
+On the quadrotor, the MPC runs as the outer stage: three axis QPs on
+$\ddot p = a$ with the tilt limit as a bound on horizontal acceleration,
+previewing the planned trajectory. It is a _linear_ MPC on a _point-mass_
+model: good on feasible trajectories (it beats geometric + flatness on a
+6.5 s figure-8, 1.8 vs 3.8 cm), not beyond the drone's limits, where the
+attitude dynamics it ignores dominate. Full nonlinear MPC (acados, Sun et al. 2022) models those too.
+
+What carries over from Sun et al. is the other finding: **the inner loop
+matters most.** In gusts, MPC alone tracks to 4.3 cm, MPC + INDI to 1.6 cm,
+geometric + INDI to 1.3 cm.
+
+> **Lesson II.15 "MPC on top, INDI below"**
+
+### D.4 MPPI — planning by sampling
+
+Some costs are not convex: "stay out of that pillar" allows passing left
+_or_ right, and no QP can express the "or". **Model predictive path
+integral** control (Williams et al. 2017) does not optimise, it samples:
+
+1. perturb the current plan $U$ with Gaussian noise $K$ times;
+2. roll each perturbed sequence out on a model; score it with any cost
+   (here: tracking, effort, a heavy penalty inside a zone);
+3. new plan $U \leftarrow U + \sum_i w_i\,\varepsilon_i$ with
+   $w_i \propto e^{-S_i/\lambda}$;
+4. apply the first input, shift the plan, repeat.
+
+The **temperature** $\lambda$ sets how many samples count: small follows the
+best sample (decisive), large averages many — and the average of "left of
+the pillar" and "right of the pillar" is "into the pillar": the drone
+hesitates in front. It costs many rollouts (256 × 30 steps per plan here,
+≈ 10 % of a CPU core in real time), but they are independent, which is why
+MPPI runs on GPUs in racing and off-road driving.
+
+> **Lesson II.16 "A thousand futures"**
+
+### D.5 Control barrier functions
+
+A **safety filter** sits between any controller and the actuators and
+changes the command as little as possible to stay in a safe set
+$\{h(p) \ge 0\}$ (Ames et al. 2019). For a pillar,
+$h = |p_{xz} - c|^2 - R^2$. The acceleration affects $h$ only through
+$\ddot h$ (relative degree 2), so the condition is
+
+$$
+\ddot h + 2\gamma\,\dot h + \gamma^2 h \ge 0
+\quad\Longleftrightarrow\quad
+2\,(p - c)\cdot a \;\ge\; -2|v|^2 - 2\gamma\dot h - \gamma^2 h,
+$$
+
+linear in $a$ — and the filter is the tiny QP
+$\min |a - a_{des}|^2$ subject to all such constraints. Far from the boundary
+it does nothing; near it, it removes exactly the part of the command that
+would approach too fast ($\gamma$ sets how fast is too fast).
+
+Its limit is equally instructive: a CBF guarantees **safety, not progress**.
+With the target behind the pillar, the filtered drone stops in front of it
+and waits (a deadlock) — going around is a planning problem (MPPI), and the
+filter stays as the last line of defence, whatever flies above it.
+
+> **Lesson II.17 "The safety filter"**
+
+---
+
 ## Further reading
 
 The references are collected in [beyond-pid.md §8](beyond-pid.md#8-references).
 For this part in particular: Han 2009 and Gao 2003 (ADRC); Smeur et al. 2016
 and 2018, Tal & Karaman 2021 (INDI); Lee, Leok & McClamroch 2010, Brescianini
-& D'Andrea 2020, Mellinger & Kumar 2011 (geometry, flatness, min-snap); any control
+& D'Andrea 2020, Mellinger & Kumar 2011 (geometry, flatness, min-snap);
+Stellato et al. 2020, Williams et al. 2017, Ames et al. 2019 (QP, MPPI, CBF); any control
 textbook's chapter on LQR and Kalman filtering (e.g. Åström & Murray,
 _Feedback Systems_, chapters on state feedback and output feedback, freely
 available online).

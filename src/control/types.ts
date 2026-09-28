@@ -22,6 +22,11 @@ export interface ControlInput {
   stepIndex: number;
   /** Lazily sampled sensor reading — only read when a loop actually runs. */
   sense: () => Measurement;
+  /**
+   * Where the reference will be `tau` seconds from now (the planned trajectory, or the current
+   * setpoint if there is no plan). Lets predictive controllers look ahead.
+   */
+  preview?: (tau: number) => Vec3;
 }
 
 /** One named additive contribution to a loop's output (P, I, D, −K·x, −f̂/b₀, …). */
@@ -78,6 +83,16 @@ export const partValue = (t: LoopTerms | undefined, key: string): number =>
 export const roleValue = (t: LoopTerms | undefined, role: 'p' | 'i' | 'd' | 'ff'): number =>
   t?.parts.reduce((s, p) => ((p.like ?? p.key) === role ? s + p.value : s), 0) ?? 0;
 
+/** What a predictive controller intends to do, for drawing in 3D. */
+export interface Plan {
+  /** The chosen predicted path (world positions, from now into the future). */
+  best: Vec3[];
+  /** Sampled alternatives (MPPI), with their costs normalised to 0 (best) … 1 (worst). */
+  samples?: { path: Vec3[]; cost: number }[];
+  /** Simulation time the plan was made. */
+  t0: number;
+}
+
 export interface Controller {
   reset(): void;
   /** Zero all integrators — flight controllers do this while the drone sits on the ground. */
@@ -89,6 +104,8 @@ export interface Controller {
   extras(): Record<string, number>;
   /** What the controller computed from the parameters (gains, poles…), for the info card. */
   describe?(p: Params, loopId: string): InfoRow[];
+  /** The current plan of a predictive controller (MPC, MPPI), if any. */
+  plan?(): Plan | null;
 }
 
 /** How many physics steps between runs of a loop at `hz`. */

@@ -176,6 +176,16 @@ ground reaction — everything a disturbance observer (Part II) has to
 estimate. The "disturbance" chart plots it, next to any estimate a
 controller publishes.
 
+### 4.7 Keep-out zones
+
+`world.ceiling` (m, 0 = none) and `world.pillar` (a vertical cylinder at
+`pillarX`, `pillarZ` with radius `pillarR`, L2/L3). They are **virtual**:
+nothing collides. The engine computes the signed distance of the drone's
+centre to the nearest zone (`src/sim/world.ts`), records `zone.dist` and
+`zone.inside`, and accumulates the time spent inside (`sim.zoneTime`); the
+3D view makes the zone glow while the drone is in it. Controllers that care
+(MPC, MPPI, the CBF filter) read the same parameters.
+
 ## 5. Wind model
 
 Wind is a 3D air-velocity field $\vec w(t)$, uniform in space (the drone is

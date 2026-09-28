@@ -4,6 +4,7 @@ import { AltitudeController } from './altitude';
 import { CascadeController } from './cascade';
 import { WithAltitudeKalman } from './estimated';
 import { LqrController } from './lqr';
+import { MpcAltitudeController } from './mpc';
 import { PointMassController } from './pointmass';
 import type { Controller } from './types';
 
@@ -31,7 +32,9 @@ export function makeController(p: Params): Controller {
           ? new LqrController()
           : kind === 'adrc'
             ? new AdrcController()
-            : new AltitudeController();
+            : kind === 'mpc'
+              ? new MpcAltitudeController()
+              : new AltitudeController();
       return p.control.l1.estimator === 'kalman' ? new WithAltitudeKalman(c) : c;
     }
     case 2:

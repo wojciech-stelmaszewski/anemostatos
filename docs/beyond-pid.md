@@ -1,6 +1,6 @@
 # Part II — Beyond PID
 
-> **Status (2026-09-28):** M7–M10 implemented; M11–M12 planned.
+> **Status (2026-09-28):** M7–M11 implemented; M12 planned.
 > Milestones in [roadmap.md](roadmap.md) point here.
 
 Part I (lessons 1–14) teaches PID from first principles up to the full
@@ -368,6 +368,32 @@ teaches more. Measurements that reshaped the lessons:
 **Done when:** L1 MPC respects a ceiling the PID violates, and MPPI flies
 around a keep-out zone at interactive frame rate (≥ 50 fps on a laptop).
 
+**✅ Done.** L1 MPC: 0 s above the ceiling (PID: 8.5 s) and 1.4 s to arrive
+(PID 1.75 s). MPPI goes around the pillar; it costs ≈ 0.1 s of CPU per
+simulated second (10 % at real time; tested < 30 %). Keep-out zones are a
+ceiling and one pillar (`world.*`), virtual, with the time spent inside
+counted (`sim.zoneTime`, telemetry `zone.inside`). What the measurements
+changed:
+
+- **L3 MPC is linear, on a point-mass model.** With moderate weights it beats
+  geometric + flatness on feasible figure-8s (1.8 vs 3.8 cm at a 6.5 s lap)
+  but, unlike the nonlinear MPC of [Sun 2022], not at or beyond the drone's
+  limits (it ignores attitude dynamics) — the geometric controller holds on
+  longer there, and MPC + INDI destabilises at the edge. II.15 therefore
+  teaches what held up: the INDI loop underneath matters more than the outer
+  stage (both reach ≈ 1.5 cm in gusts with INDI). Aggressive MPC weights
+  (q = 50, r = 0.05) destabilised L3 through the unmodelled attitude lag; L3
+  defaults are q = 20, r = 0.1, the L1 lessons use the crisper set.
+- **The CBF deadlocks.** When the setpoint lies behind the pillar, the
+  filtered drone stops in front of it: a safety filter guarantees safety, not
+  progress. II.17's goal and text say so and point to MPPI for going around.
+- **MPC horizon:** with hard constraints a short horizon never violates the
+  ceiling; its myopia shows as slowness (0.1 s horizon: 6.2 s to arrive vs
+  1.3 s at 1 s), so II.14 asks for the shortest horizon that still arrives
+  in 1.6 s.
+- The safety filter acts on the desired acceleration _before_ the
+  compensation stage, so acceleration INDI delivers the safe acceleration.
+
 ### M12 — Adapting, learning, and the arena
 
 - `l1ac.ts`, `residual.ts`, `policy.ts`, `scripts/train-policy.ts`
@@ -414,13 +440,13 @@ lesson panel shows the two parts as separate courses. Priority: **must** (core s
 
 ### Chapter D — Optimisation in the loop
 
-| #   | id        | Title                  | Setup and events                                                                | What the student sees / goal                                                                                                        | Prio   |
-| --- | --------- | ---------------------- | ------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ------ |
-| 13  | `mpc`     | Look before you leap   | L1, ceiling at 4 m, setpoint step 2 → 3.9 m, tight thrust limit.                | PID (even with anti-windup) overshoots through the ceiling; MPC's predicted path (drawn in 3D) bends before the limit.              | must   |
-| 14  | `horizon` | How far ahead?         | Horizon and iteration-cap sliders; compute meter visible.                       | Too short ⇒ myopic; long ⇒ better but µs per tick climbs. The cost of optimality made visible.                                      | should |
-| 15  | `mpc-l3`  | MPC on top, INDI below | Fast figure-8 beyond the tilt limit; geometric vs MPC outer, PID vs INDI inner. | MPC plans within the tilt limit instead of saturating; INDI makes both robust to gusts — the conclusion of [Sun 2022] in 2 minutes. | should |
-| 16  | `mppi`    | A thousand futures     | Keep-out pillar between drone and target.                                       | The rollout cloud "flows" around the pillar. Temperature slider: greedy vs averaging.                                               | must   |
-| 17  | `cbf`     | The safety filter      | Deliberately aggressive PID, user drags the setpoint through a zone.            | The CBF changes the command only near the boundary; the drone slides along the zone surface. Arrow shows the correction.            | must   |
+| #   | id        | Title                  | Setup and events                                                                | What the student sees / goal                                                                                                   | Prio   |
+| --- | --------- | ---------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ------ |
+| 13  | `mpc`     | Look before you leap   | L1, ceiling at 4 m, setpoint step 2 → 3.95 m.                                   | PID overshoots through the ceiling (8.5 s above it); MPC plans below it and arrives sooner.                                    | must   |
+| 14  | `horizon` | How far ahead?         | Start with a 2 s horizon; compute meter visible.                                | Short ⇒ still safe but myopic and slow; long ⇒ costly. Goal: ≤ 0.6 s horizon, arrival within 1.6 s.                            | should |
+| 15  | `mpc-l3`  | MPC on top, INDI below | 6 s figure-8 in gusts; MPC outer; add INDI below; compare geometric.            | MPC 4.3 cm → MPC + INDI 1.6 cm; geometric + INDI 1.3 cm: the inner loop matters most (Sun 2022). Goal: < 2.5 cm.               | should |
+| 16  | `mppi`    | A thousand futures     | Keep-out pillar between drone and target.                                       | The rollout cloud "flows" around the pillar. Temperature slider: greedy vs averaging.                                          | must   |
+| 17  | `cbf`     | The safety filter      | Setpoint sweeps through a pillar; geometric controller obeys and flies through. | CBF: never inside, correction arrow near the boundary — and a deadlock in front when the target is behind (safety ≠ progress). | must   |
 
 ### Chapter E — Adapting and learning
 

@@ -1,3 +1,4 @@
+import { QpSolver } from '@/math/qp';
 import { qFromAxisAngle, qFromTo, qMul, qToEuler, qRotate, type Quat } from '@/math/quat';
 import { clamp } from '@/math/util';
 import { clampLength, dot, length, normalize, v3, type Vec3 } from '@/math/vec3';
@@ -5,7 +6,10 @@ import { idleActuation, type Actuation } from '@/sim/dynamics';
 import { GRAVITY, type Params } from '@/sim/params';
 import type { Measurement } from '@/sim/sensors';
 import { attitudeRates, flatnessRates, GeometricOuter } from './geometric';
+import { safetyFilter } from './cbf';
 import { mix } from './mixer';
+import { mpcTiming, MpcOuter } from './mpc';
+import { MppiOuter } from './mppi';
 import { defaultGains, Pid, type PidTerms } from './pid';
 import {
   AccelIndi,
@@ -22,6 +26,7 @@ import {
   type Controller,
   type InfoRow,
   type LoopTerms,
+  type Plan,
 } from './types';
 
 const DEG = 180 / Math.PI;
@@ -60,6 +65,15 @@ export class CascadeController implements Controller {
   readonly comp: Compensation;
   /** Set when the outer stage is the geometric tracking controller instead of pos P + vel PID. */
   readonly geo: GeometricOuter | null;
+  readonly mpc: MpcOuter | null;
+  readonly mppi: MppiOuter | null;
+  private readonly cbfSolver = new QpSolver();
+  /** Desired acceleration before the safety filter, and how many barriers were active. */
+  private aNominal = v3();
+  private cbfActive = 0;
+  private aSafe = v3();
+  private refNow = v3();
+  private lastPos = v3();
   att: Record<'roll' | 'pitch' | 'yaw', PidTerms> = {
     roll: pTerms(0, 0, 0, 0, 0),
     pitch: pTerms(0, 0, 0, 0, 0),
@@ -83,6 +97,8 @@ export class CascadeController implements Controller {
     this.rate = p?.control.l3.inner === 'indi' ? new RateIndi() : new PidRateStage();
     this.comp = p?.control.l3.compensation === 'indi' ? new AccelIndi() : new NoCompensation();
     this.geo = p?.control.l3.outer === 'geometric' ? new GeometricOuter() : null;
+    this.mpc = p?.control.l3.outer === 'mpc' ? new MpcOuter() : null;
+    this.mppi = p?.control.l3.outer === 'mppi' ? new MppiOuter(p.sim.seed) : null;
   }
 
   reset(): void {
@@ -90,6 +106,12 @@ export class CascadeController implements Controller {
     this.rate.reset();
     this.comp.reset();
     this.geo?.reset();
+    this.mpc?.reset();
+    this.mppi?.reset();
+    this.cbfSolver.reset();
+    this.aNominal = v3();
+    this.aSafe = v3();
+    this.cbfActive = 0;
     this.wFf = v3();
     this.jerk = undefined;
     this.vSp = v3();
@@ -121,8 +143,9 @@ export class CascadeController implements Controller {
     // 0. Fast estimators of the compensation stage (filters) run with the rate loop.
     if (due(c.hzRate)) this.comp.sample(sense(), P, dtOf(c.hzRate));
 
+    const predictive = this.mpc || this.mppi;
     // 1. Position P → velocity setpoint (PID cascade only).
-    if (!this.geo && due(c.hzPos)) {
+    if (!this.geo && !predictive && due(c.hzPos)) {
       const s = sense();
       const dt = dtOf(c.hzPos);
       const gH = defaultGains({ kp: c.posKpH, ki: 0, kd: 0 });
@@ -146,6 +169,17 @@ export class CascadeController implements Controller {
       if (this.geo) {
         this.aSp = this.geo.update(setpoint, s, dt, P, noI);
         this.jerk = P.control.geometric.feedforward ? setpoint.jerk : undefined;
+      } else if (predictive) {
+        // Re-plan at the planner's own rate; hold the first move in between.
+        this.refNow = setpoint.pos;
+        const t = stepIndex * physDt;
+        if (this.mpc && due(mpcTiming(P).hz)) {
+          this.lastPos = s.pos;
+          this.aSp = this.mpc.update(s, input.preview, setpoint.pos, P, t);
+        }
+        if (this.mppi && due(P.control.mppi.hz)) {
+          this.aSp = this.mppi.update(s, input.preview ?? (() => setpoint.pos), P, t);
+        }
       } else {
         const velH = noI ? { ...c.velH, iOn: false } : c.velH;
         const velV = noI ? { ...c.velV, iOn: false } : c.velV;
@@ -154,7 +188,18 @@ export class CascadeController implements Controller {
         const ay = this.vel.y.update(velV, this.vSp.y, s.vel.y, dt, 0, -0.8 * GRAVITY, aUp).output;
         this.aSp = v3(ax, ay, az);
       }
-      let f = this.comp.force(this.aSp, P);
+      // Safety filter: the closest acceleration that keeps out of the zones.
+      this.aNominal = this.aSp;
+      this.cbfActive = 0;
+      let aCmd = this.aSp;
+      if (c.safety === 'cbf') {
+        const r = safetyFilter(this.aSp, s, P, 3, this.cbfSolver);
+        aCmd = r.a;
+        this.cbfActive = r.active;
+      }
+      this.aSafe = aCmd;
+      this.lastPos = s.pos;
+      let f = this.comp.force(aCmd, P);
       f = v3(f.x, Math.max(f.y, 0.05 * mHat * GRAVITY), f.z);
       // Tilt limit: keep the vertical component, shrink the horizontal one.
       const hMax = f.y * Math.tan((c.maxTiltDeg * Math.PI) / 180);
@@ -202,14 +247,16 @@ export class CascadeController implements Controller {
   loops(): Record<string, LoopTerms> {
     const outer: Record<string, LoopTerms> = this.geo
       ? this.geo.loops()
-      : {
-          'pos.x': pidLoop(this.pos.x.last),
-          'pos.y': pidLoop(this.pos.y.last),
-          'pos.z': pidLoop(this.pos.z.last),
-          'vel.x': pidLoop(this.vel.x.last),
-          'vel.y': pidLoop(this.vel.y.last),
-          'vel.z': pidLoop(this.vel.z.last),
-        };
+      : this.mpc || this.mppi
+        ? this.plannerLoops()
+        : {
+            'pos.x': pidLoop(this.pos.x.last),
+            'pos.y': pidLoop(this.pos.y.last),
+            'pos.z': pidLoop(this.pos.z.last),
+            'vel.x': pidLoop(this.vel.x.last),
+            'vel.y': pidLoop(this.vel.y.last),
+            'vel.z': pidLoop(this.vel.z.last),
+          };
     return {
       ...outer,
       'att.roll': pidLoop(this.att.roll),
@@ -229,6 +276,10 @@ export class CascadeController implements Controller {
       'fdes.tilt': tilt,
       thrust: this.thrust,
       mixerSat: this.mixerSaturated ? 1 : 0,
+      'cbf.active': this.cbfActive,
+      'cbf.dx': this.aSafe.x - this.aNominal.x,
+      'cbf.dy': this.aSafe.y - this.aNominal.y,
+      'cbf.dz': this.aSafe.z - this.aNominal.z,
       'ff.rate.roll': this.wFf.x,
       'ff.rate.pitch': this.wFf.z,
       'q.sp.w': this.qSp.w,
@@ -263,6 +314,39 @@ export class CascadeController implements Controller {
       );
     }
     return [...rows, ...this.rate.describe(p, loopId), ...this.comp.describe(p, loopId)];
+  }
+
+  /** Position loops of a planner: reference vs measurement, output = first planned acceleration. */
+  private plannerLoops(): Record<string, LoopTerms> {
+    const out: Record<string, LoopTerms> = {};
+    for (const k of ['x', 'y', 'z'] as const) {
+      const pos = this.lastPos[k];
+      out[`pos.${k}`] = {
+        setpoint: this.refNow[k],
+        measurement: pos,
+        error: this.refNow[k] - pos,
+        parts: [
+          { key: 'plan', label: 'a₀ (first move of the plan)', value: this.aNominal[k], like: 'p' },
+        ],
+        unsaturated: this.aNominal[k],
+        output: this.aNominal[k],
+        saturated: false,
+      };
+    }
+    return out;
+  }
+
+  plan(): Plan | null {
+    return this.mpc?.plan() ?? this.mppi?.plan() ?? null;
+  }
+
+  /** Correction the safety filter applied to the desired acceleration (zero when inactive). */
+  get safetyCorrection(): Vec3 {
+    return v3(
+      this.aSafe.x - this.aNominal.x,
+      this.aSafe.y - this.aNominal.y,
+      this.aSafe.z - this.aNominal.z,
+    );
   }
 
   /** Desired thrust vector, world frame — drawn as an arrow. */

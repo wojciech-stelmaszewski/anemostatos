@@ -9,10 +9,12 @@ import { DroneRig } from './DroneRig';
 import { Grid } from './Grid';
 import { ForceArrows, TermArrows } from './overlays/ForceArrows';
 import { HeightAids } from './overlays/HeightAids';
+import { Plans } from './overlays/Plans';
 import { ReferencePath } from './overlays/ReferencePath';
 import { SetpointGhost } from './overlays/SetpointGhost';
 import { Trail } from './overlays/Trail';
 import { WindParticles } from './overlays/WindParticles';
+import { Zones } from './overlays/Zones';
 
 /** Advances the simulation before anything else reads it this frame. */
 function SimDriver() {
@@ -132,6 +134,8 @@ export function Scene() {
       <HeightAids />
       <SetpointGhost />
       <ReferencePath />
+      <Plans />
+      <Zones />
       <ForceArrows />
       <TermArrows />
       <Trail />

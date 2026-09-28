@@ -3,15 +3,15 @@ import { defaultGains, type PidGains } from '@/control/pid';
 export type Level = 1 | 2 | 3;
 
 /** Controller families selectable per level (docs/beyond-pid.md §3.2). Part II adds more. */
-export type L1Kind = 'pid' | 'lqr' | 'adrc';
+export type L1Kind = 'pid' | 'lqr' | 'adrc' | 'mpc';
 /** State estimator in front of the L1 controller. */
 export type L1Estimator = 'none' | 'kalman';
-export type L3Outer = 'pid-cascade' | 'geometric';
+export type L3Outer = 'pid-cascade' | 'geometric' | 'mpc' | 'mppi';
 /** How an attitude error becomes a body-rate setpoint. */
 export type AttitudeLaw = 'quaternion' | 'tilt' | 'euler';
 export type L3Inner = 'pid' | 'indi';
 export type L3Compensation = 'none' | 'indi';
-export type L3Safety = 'none';
+export type L3Safety = 'none' | 'cbf';
 
 export interface DroneParams {
   mass: number;
@@ -112,6 +112,42 @@ export interface ControlParams {
     /** Use the reference's acceleration, and body rates from its jerk (differential flatness). */
     feedforward: boolean;
   };
+  /** Linear MPC (L1 altitude, L3 outer stage). */
+  mpc: {
+    /** Re-planning rate, Hz; also the prediction step (1/hz). */
+    hz: number;
+    /** Prediction horizon, s. */
+    horizon: number;
+    qPos: number;
+    qVel: number;
+    r: number;
+    /** ADMM iteration cap per solve. */
+    iterations: number;
+    /** Distance kept from the ceiling, m. */
+    margin: number;
+  };
+  /** MPPI sampling controller (L3 outer stage). */
+  mppi: {
+    hz: number;
+    samples: number;
+    /** Horizon, s, split into `steps`. */
+    horizon: number;
+    steps: number;
+    /** Exploration noise σ, m/s². */
+    sigma: number;
+    /** Temperature λ: low = follow the best sample, high = average many. */
+    lambda: number;
+    qPos: number;
+    zoneWeight: number;
+    /** Distance kept from keep-out zones, m. */
+    margin: number;
+  };
+  /** Control-barrier-function safety filter (L3). */
+  cbf: {
+    /** How early it starts braking (1/s); h-dynamics poles at −γ. */
+    gamma: number;
+    margin: number;
+  };
   /** L1 ADRC: controller and observer bandwidths, rad/s. */
   adrc: { wc: number; wo: number };
   /** L1 Kalman filter: what it assumes about the noise. */
@@ -154,8 +190,20 @@ export interface ControlParams {
   };
 }
 
+/** Virtual keep-out zones (no collisions: violations are counted and shown). */
+export interface WorldParams {
+  /** Ceiling height, m; 0 = none. */
+  ceiling: number;
+  /** A vertical pillar (infinitely tall cylinder), L2/L3. */
+  pillar: boolean;
+  pillarX: number;
+  pillarZ: number;
+  pillarR: number;
+}
+
 export interface Params {
   sim: { level: Level; seed: number };
+  world: WorldParams;
   setpoint: {
     x: number;
     y: number;
@@ -176,6 +224,7 @@ export interface Params {
 
 export const defaultParams = (): Params => ({
   sim: { level: 1, seed: 1337 },
+  world: { ceiling: 0, pillar: false, pillarX: 3, pillarZ: 0, pillarR: 0.6 },
   setpoint: {
     x: 0,
     y: 2,
@@ -233,6 +282,19 @@ export const defaultParams = (): Params => ({
     l1: { kind: 'pid', estimator: 'none' },
     lqr: { qPos: 100, qVel: 10, qInt: 5, r: 1, integral: false, lagState: false },
     adrc: { wc: 3, wo: 15 },
+    mpc: { hz: 50, horizon: 1, qPos: 20, qVel: 4, r: 0.1, iterations: 60, margin: 0.03 },
+    mppi: {
+      hz: 50,
+      samples: 256,
+      horizon: 1.5,
+      steps: 30,
+      sigma: 4,
+      lambda: 1,
+      qPos: 20,
+      zoneWeight: 3000,
+      margin: 0.35,
+    },
+    cbf: { gamma: 2.5, margin: 0.3 },
     geometric: { kp: 9, kv: 5, ki: 0.5, feedforward: true },
     indi: { rateKpRP: 20, rateKpYaw: 8, filterHz: 20, accFilterHz: 10, syncFilters: true },
     kalman: { accSigma: 0.5, posSigma: 0.05, biasSigma: 0.05 },

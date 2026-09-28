@@ -118,6 +118,11 @@ crosshair and values in all). Time window: 5 / 10 / 30 / 60 s.
   min-snap) draw their planned path as a dashed line in the 3D view; the info
   card shows what the plan demands (peak speed, acceleration, the tilt it
   needs vs the tilt limit — "not feasible" before you fly it).
+- **Plans and zones**: predictive controllers draw their plan (white line);
+  MPPI also draws up to 64 of its sampled futures, green (cheap) to red
+  (expensive). Keep-out zones are translucent red (a ceiling plane, a
+  pillar) and glow while the drone is inside. The CBF filter's correction
+  is a red arrow at the drone.
 - **Compute meter** (chart header): average wall-clock µs the controller
   takes per physics step. Display only — the simulation never depends on
   wall-clock time. Matters once Part II's optimisers arrive.

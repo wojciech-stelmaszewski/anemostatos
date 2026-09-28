@@ -214,3 +214,51 @@ export const toContinuous = (z: Complex, dt: number): Complex => ({
   re: Math.log(Math.hypot(z.re, z.im)) / dt,
   im: Math.atan2(z.im, z.re) / dt,
 });
+
+/** LU factorisation with partial pivoting, reusable for many right-hand sides. */
+export interface Lu {
+  lu: Mat;
+  perm: number[];
+}
+
+export function luFactor(a: Mat): Lu {
+  const n = rows(a);
+  const lu = clone(a);
+  const perm = Array.from({ length: n }, (_, i) => i);
+  for (let k = 0; k < n; k++) {
+    let piv = k;
+    for (let i = k + 1; i < n; i++) if (Math.abs(lu[i]![k]!) > Math.abs(lu[piv]![k]!)) piv = i;
+    if (Math.abs(lu[piv]![k]!) < 1e-14) throw new Error('luFactor: singular matrix');
+    if (piv !== k) {
+      [lu[k], lu[piv]] = [lu[piv]!, lu[k]!];
+      [perm[k], perm[piv]] = [perm[piv]!, perm[k]!];
+    }
+    const rk = lu[k]!;
+    for (let i = k + 1; i < n; i++) {
+      const ri = lu[i]!;
+      const f = (ri[k]! /= rk[k]!);
+      if (f === 0) continue;
+      for (let j = k + 1; j < n; j++) ri[j]! -= f * rk[j]!;
+    }
+  }
+  return { lu, perm };
+}
+
+/** Solve A·x = b for a vector b with a factorisation from `luFactor`. */
+export function luSolve(f: Lu, b: readonly number[]): number[] {
+  const n = f.lu.length;
+  const x = f.perm.map((p) => b[p]!);
+  for (let i = 0; i < n; i++) {
+    const r = f.lu[i]!;
+    let s = x[i]!;
+    for (let j = 0; j < i; j++) s -= r[j]! * x[j]!;
+    x[i] = s;
+  }
+  for (let i = n - 1; i >= 0; i--) {
+    const r = f.lu[i]!;
+    let s = x[i]!;
+    for (let j = i + 1; j < n; j++) s -= r[j]! * x[j]!;
+    x[i] = s / r[i]!;
+  }
+  return x;
+}

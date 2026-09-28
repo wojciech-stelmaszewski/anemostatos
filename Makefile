@@ -7,7 +7,7 @@ node_modules: package.json
 	$(NPM) install
 	@touch node_modules
 
-.PHONY: help install dev test test-watch lint typecheck format check build preview clean
+.PHONY: help install dev test test-watch lint typecheck format check build preview clean train bench
 
 help: ## Show this help
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  \033[36m%-11s\033[0m %s\n", $$1, $$2}'
@@ -39,6 +39,14 @@ build: node_modules ## Production build into dist/
 
 preview: build ## Serve the production build locally
 	$(NPM) run preview -- --open
+
+NODE_TS := node --experimental-transform-types --no-warnings --import ./scripts/register.mjs
+
+train: node_modules ## Train the neural-network policy (lesson II.20), a few minutes
+	$(NODE_TS) scripts/train-policy.ts
+
+bench: node_modules ## Run the controller arena and print the results table
+	$(NODE_TS) scripts/bench.ts
 
 clean: ## Remove build output and dependencies
 	rm -rf dist node_modules

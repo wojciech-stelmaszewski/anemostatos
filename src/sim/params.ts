@@ -3,14 +3,14 @@ import { defaultGains, type PidGains } from '@/control/pid';
 export type Level = 1 | 2 | 3;
 
 /** Controller families selectable per level (docs/beyond-pid.md §3.2). Part II adds more. */
-export type L1Kind = 'pid' | 'lqr' | 'adrc' | 'mpc';
+export type L1Kind = 'pid' | 'lqr' | 'adrc' | 'mpc' | 'l1ac';
 /** State estimator in front of the L1 controller. */
 export type L1Estimator = 'none' | 'kalman';
-export type L3Outer = 'pid-cascade' | 'geometric' | 'mpc' | 'mppi';
+export type L3Outer = 'pid-cascade' | 'geometric' | 'mpc' | 'mppi' | 'policy';
 /** How an attitude error becomes a body-rate setpoint. */
 export type AttitudeLaw = 'quaternion' | 'tilt' | 'euler';
 export type L3Inner = 'pid' | 'indi';
-export type L3Compensation = 'none' | 'indi';
+export type L3Compensation = 'none' | 'indi' | 'l1ac' | 'learned';
 export type L3Safety = 'none' | 'cbf';
 
 export interface DroneParams {
@@ -148,6 +148,22 @@ export interface ControlParams {
     gamma: number;
     margin: number;
   };
+  /** L1 adaptive control. */
+  l1ac: {
+    /** State-predictor pole magnitude, 1/s. */
+    as: number;
+    /** Bandwidth of the low-pass C(s) on the estimate, Hz. */
+    filterHz: number;
+    /** Baseline controller bandwidth (L1 altitude), rad/s. */
+    wc: number;
+  };
+  /** Learned-basis residual compensation (L3). */
+  residual: {
+    /** RLS forgetting factor per update (100 Hz): closer to 1 = longer memory. */
+    forgetting: number;
+    /** Accelerometer / thrust filter, Hz. */
+    filterHz: number;
+  };
   /** L1 ADRC: controller and observer bandwidths, rad/s. */
   adrc: { wc: number; wo: number };
   /** L1 Kalman filter: what it assumes about the noise. */
@@ -282,6 +298,8 @@ export const defaultParams = (): Params => ({
     l1: { kind: 'pid', estimator: 'none' },
     lqr: { qPos: 100, qVel: 10, qInt: 5, r: 1, integral: false, lagState: false },
     adrc: { wc: 3, wo: 15 },
+    l1ac: { as: 20, filterHz: 5, wc: 3 },
+    residual: { forgetting: 0.995, filterHz: 10 },
     mpc: { hz: 50, horizon: 1, qPos: 20, qVel: 4, r: 0.1, iterations: 60, margin: 0.03 },
     mppi: {
       hz: 50,

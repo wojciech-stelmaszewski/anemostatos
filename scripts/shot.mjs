@@ -72,7 +72,11 @@ await send('Page.navigate', { url });
 for (let k = 0; k < waits.length; k++) {
   await sleep(waits[k]);
   for (const a of actions.filter((a) => a.at === k)) {
-    const r = await send('Runtime.evaluate', { expression: `(async () => { ${a.js} })()`, awaitPromise: true, returnByValue: true });
+    const r = await send('Runtime.evaluate', {
+      expression: `(async () => { ${a.js} })()`,
+      awaitPromise: true,
+      returnByValue: true,
+    });
     if (r?.exceptionDetails) console.log('[eval error]', r.exceptionDetails.exception?.description);
     if (r?.result?.value !== undefined) console.log('[eval]', JSON.stringify(r.result.value));
   }

@@ -110,7 +110,7 @@ motor lag.
 | 13  | The cascade            | L3    | nested loops, each one's output is the next one's setpoint             |
 | 14  | Cascade inversion      | L3    | inner loops must be faster than outer ones                             |
 
-**Part II — Beyond PID** (the second semester, in progress; plan in [docs/beyond-pid.md](docs/beyond-pid.md)):
+**Part II — Beyond PID** (the second semester; research and plan in [docs/beyond-pid.md](docs/beyond-pid.md), measured comparison in [docs/arena.md](docs/arena.md)):
 
 | #     | Lesson                       | Level | What you learn                                                               |
 | ----- | ---------------------------- | ----- | ---------------------------------------------------------------------------- |
@@ -131,11 +131,16 @@ motor lag.
 | II.15 | MPC on top, INDI below       | L3    | the inner loop matters most (Sun et al. 2022)                                |
 | II.16 | A thousand futures           | L3    | MPPI: sampling-based planning around a pillar; temperature                   |
 | II.17 | The safety filter            | L3    | control barrier functions: safety for any controller — and its deadlock      |
+| II.18 | Adapt fast, act smooth       | L1    | L1 adaptive control: adaptation speed vs filter bandwidth                    |
+| II.19 | Learn the shape of the wind  | L3    | a learned residual model (Neural-Fly-style) vs an integrator                 |
+| II.20 | A controller nobody designed | L3    | a neural policy trained by imitation + evolution strategies, and its limits  |
+| II.21 | The grand comparison         | L3    | the arena: every controller, every scenario — no winner takes all            |
 
 ## Run it
 
 The simulator runs locally in the browser. It needs Node.js ≥ 20 and a
-WebGL-capable browser.
+WebGL-capable browser (`make bench` and `make train` run the simulator in
+Node directly and need Node.js ≥ 22.7).
 
 ```sh
 git clone https://github.com/wojciech-stelmaszewski/anemostatos.git
@@ -149,6 +154,8 @@ make dev        # installs dependencies on first run, opens http://localhost:517
 | `make check`                  | lint + typecheck + unit tests                         |
 | `make test`                   | unit tests only (physics, PID, closed loops, lessons) |
 | `make build` / `make preview` | production build and a local preview of it            |
+| `make bench`                  | run the controller arena and print the table (≈ 30 s) |
+| `make train`                  | retrain the neural policy of lesson II.20 (≈ 2 min)   |
 | `make`                        | list all targets                                      |
 
 ## Controls
@@ -201,7 +208,7 @@ the last 60 s of telemetry as CSV.
 The [`docs/`](docs/README.md) folder is the project's textbook and design record:
 
 - [**PID primer**](docs/pid-primer.md): theory from the ground up, the digital PID, windup, derivative kick, noise, tuning, cascades.
-- [**Modern control primer**](docs/modern-control-primer.md): Part II theory — state feedback, LQR/LQI, the Kalman filter, ADRC, INDI, geometric control and trajectories, MPC, MPPI, safety filters.
+- [**Modern control primer**](docs/modern-control-primer.md): Part II theory — state feedback, LQR/LQI, the Kalman filter, ADRC, INDI, geometric control and trajectories, MPC, MPPI, safety filters, adaptive and learned control.
 - [**Beyond PID**](docs/beyond-pid.md): Part II research survey, plan and lesson list.
 - [**Physics model**](docs/physics-model.md): frames, equations of motion, motors, drag, the wind and gust model, integration.
 - [**Control architecture**](docs/control-architecture.md): how the loops are wired at each level, including the cascade and the mixer.

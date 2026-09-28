@@ -3,6 +3,7 @@ import { defaultParams, type Params } from '@/sim/params';
 import { K, Notice, Try } from './Bits';
 import { qFromAxisAngle, qMul } from '@/math/quat';
 import { v3 } from '@/math/vec3';
+import { ArenaPanel } from '@/ui/arena/ArenaPanel';
 import { M } from './Math';
 import { setAt } from './script';
 import type { Lesson } from './types';
@@ -171,6 +172,17 @@ const firstWithin = (sim: Simulation, key: string, target: number, tol: number, 
   const { t, series } = sim.telemetry.window([key], from);
   for (let k = 0; k < t.length; k++) if (Math.abs(series[0]![k]! - target) < tol) return t[k]!;
   return Infinity;
+};
+
+// Chapter E
+const E = 'E · Adapting and learning';
+/** RMS sample-to-sample change of a telemetry channel since `from`. */
+const channelJitter = (sim: Simulation, key: string, from: number) => {
+  const { series } = sim.telemetry.window([key], from);
+  const x = series[0]!;
+  let d = 0;
+  for (let k = 1; k < x.length; k++) d += (x[k]! - x[k - 1]!) ** 2;
+  return Math.sqrt(d / Math.max(x.length - 1, 1));
 };
 
 const A = 'A · From knobs to models';
@@ -1112,6 +1124,200 @@ export const PART_TWO: Lesson[] = [
           and keep the filter as the last line of defence. The filter does not care what is above it
           — PID, MPC, a learned policy or a human — which is why it is the usual way to add
           "provably safe" to controllers that are not.
+        </Notice>
+      </>
+    ),
+  },
+  {
+    id: 'l1ac',
+    part: 2,
+    chapter: E,
+    title: 'Adapt fast, act smooth',
+    level: 1,
+    chart: 'disturbance',
+    setup: (p) => {
+      p.control.l1.kind = 'l1ac';
+      p.control.l1ac.filterHz = 50;
+      p.sensors.velNoise = 0.1;
+    },
+    events: (sim) => payload(sim),
+    goal: {
+      text: 'After the payload lands: max error below 6 cm and thrust jitter below 0.3 N.',
+      check: ({ sim }) => {
+        if (sim.t < 20) return false;
+        const { max } = positionError(sim, 12);
+        const jitter = channelJitter(sim, 'thrust', 12);
+        return (
+          (max < 0.06 && jitter < 0.3) ||
+          `max error ${(max * 100).toFixed(1)} cm · thrust jitter ${jitter.toFixed(2)} N`
+        );
+      },
+    },
+    solution: (p) => {
+      p.control.l1ac.filterHz = 3;
+    },
+    body: (
+      <>
+        <p>
+          <b>L1 adaptive control</b> estimates the missing force very fast: a state predictor runs
+          next to the drone, and every sample the estimate <M>{'\\hat\\sigma'}</M> is set to
+          whatever would make the predictor agree with the measurement. Fast — and as noisy as the
+          sensor.
+        </p>
+        <p>
+          Its trick is to separate <i>how fast it learns</i> from <i>how much of it acts</i>: only a
+          low-pass filtered estimate <M>{'C(s)\\,\\hat\\sigma'}</M> reaches the motors.
+        </p>
+        <M display>{'u = u_{baseline} - C(s)\\,\\hat\\sigma'}</M>
+        <p>
+          The velocity sensor is noisy (0.1 m/s) and at <i>t</i> = 12 s a 300 g payload lands. The
+          filter is wide open at 50 Hz: the estimate (dashed, bottom right) follows the truth — and
+          the noise goes straight into the motors.
+        </p>
+        <Try>
+          Lower <i>L1 adaptive → Filter C(s)</i> (then <kbd>R</kbd>): 20, 10, 5, 3, 1 Hz. Watch the
+          thrust calm down and the payload response get slower. The estimate itself stays just as
+          fast — only what reaches the motors changes.
+        </Try>
+        <Notice>For comparison the same payload costs the PID 28 cm and ADRC 12 cm.</Notice>
+      </>
+    ),
+  },
+  {
+    id: 'residual',
+    part: 2,
+    chapter: E,
+    title: 'Learn the shape of the wind',
+    level: 3,
+    loop: 'pos.x',
+    chart: 'disturbance',
+    setup: (p) => {
+      p.drone.rotorDrag = 0.02;
+      p.wind.meanSpeed = 3;
+      p.wind.gustsOn = false;
+      p.wind.turbSigma = 0.5;
+      p.setpoint.y = 3;
+      p.setpoint.profile = 'figure8';
+      p.setpoint.profileAmplitude = 2;
+      p.setpoint.profilePeriod = 6.5;
+      p.control.l3.outer = 'geometric';
+    },
+    goal: {
+      text: 'RMS error below 5 cm over the last lap of the fast figure-8 in the wind.',
+      check: ({ sim }) => {
+        if (sim.t < 30) return false;
+        const { rms } = positionError(sim, sim.t - 6.5);
+        return rms < 0.05 || `RMS error ${(rms * 100).toFixed(1)} cm over the last lap`;
+      },
+    },
+    solution: (p) => {
+      p.control.l3.compensation = 'learned';
+    },
+    body: (
+      <>
+        <p>
+          A fast figure-8 through a 3 m/s wind, with rotor drag on. The aerodynamic force now{' '}
+          <i>changes with the drone's own velocity</i> — upwind, downwind, sideways, every second.
+          An integrator can only hold a constant: it is always chasing (≈ 14 cm here).
+        </p>
+        <p>
+          <b>Neural-Fly</b> (O'Connell et al. 2022) learns the <i>shape</i> of the residual force as
+          a function of the state, <M>{'f \\approx \\Phi(x)\\,\\theta'}</M>, and adapts only the
+          coefficients <M>{'\\theta'}</M> online. Here <M>{'\\Phi'}</M> is hand-made from the
+          physics — a constant, <M>v</M>, <M>{'|v|v'}</M>, thrust × in-plane velocity — and{' '}
+          <M>{'\\theta'}</M> is fitted by recursive least squares to the accelerometer's residual.
+        </p>
+        <Try>
+          <i>Disturbance compensation → learned residual model</i>. The dashed estimate now
+          anticipates the force along the path. The info card shows the fitted model.
+        </Try>
+        <Notice>
+          Honest comparison: with this simulator's clean accelerometer, L1 adaptive and INDI do even
+          better (≈ 2 cm) because they simply measure the force fast. The learned model's advantage
+          shows with poor sensors: with 3 m/s² accelerometer noise and 30 ms delay all three track
+          to ≈ 6–7 cm, but the learned model's thrust is 7× smoother than L1's. Neural-Fly's claim
+          is exactly that: a good model lets you adapt slowly, and slow is smooth.
+        </Notice>
+      </>
+    ),
+  },
+  {
+    id: 'policy',
+    part: 2,
+    chapter: E,
+    title: 'A controller nobody designed',
+    level: 3,
+    loop: 'pos.x',
+    setup: (p) => {
+      p.wind.enabled = false;
+      p.control.l3.outer = 'policy';
+    },
+    events: (sim) => {
+      setAt(sim, 10, 'setpoint.x', 3);
+      setAt(sim, 20, 'drone.mass', 1.5);
+    },
+    onStart: (sim) => {
+      const hop = (s: Simulation) => {
+        setAt(s, 10, 'setpoint.x', 3);
+        setAt(s, 20, 'drone.mass', 1.5);
+      };
+      ghostOf(sim, (p) => (p.control.l3.outer = 'geometric'), 'geometric controller', 35, hop);
+    },
+    body: (
+      <>
+        <p>
+          The quadrotor is now flown by a small neural network (15 inputs, two layers of 32, 4
+          outputs: collective thrust and body rates). Nobody wrote its control law. It was trained
+          by <code>make train</code> in two steps, in about two minutes:
+        </p>
+        <ol className="list-decimal space-y-0.5 pl-4">
+          <li>
+            <b>Imitation</b>: fly the geometric controller in randomised conditions (mass 0.85–1.15
+            kg, wind up to 3 m/s), record what it commands, fit the network to it.
+          </li>
+          <li>
+            <b>Evolution strategies</b>: perturb the weights, let each variant fly, move towards the
+            variants that stayed closer to their targets — reinforcement learning without gradients.
+          </li>
+        </ol>
+        <p>
+          The info card shows the numbers from training. At <i>t</i> = 10 s the target moves 3 m; at{' '}
+          <i>t</i> = 20 s the mass jumps to 1.5 kg — well outside anything it has seen.
+        </p>
+        <Notice>
+          What to look for, compared with the geometric ghost: it flies and reacts quickly, but it
+          never quite settles — it keeps hunting around the target in a small limit cycle (about ±15
+          cm), because nothing in its training rewarded perfect stillness and it has no integrator
+          (no memory of past errors). After the mass jump, far outside its training range, it gets
+          much worse. Careful comparisons of learned and classical controllers (Kunapuli et al.
+          2025) find the same division: learning helps in fast transients and in problems too hard
+          to model; classical control keeps its guarantees and its steady state. State-of-the-art
+          policies are far larger, see a history of observations, and train on millions of flights.
+        </Notice>
+      </>
+    ),
+  },
+  {
+    id: 'arena',
+    part: 2,
+    chapter: E,
+    title: 'The grand comparison',
+    level: 3,
+    body: (
+      <>
+        <p>
+          The end of the semester. Every controller of Part II flies the same six scenarios on
+          identical, seeded conditions: a step, Part I's gust challenge, a payload, a broken prop, a
+          2 m/s figure-8, and noisy, delayed sensors. Two more columns: how hard the motors work and
+          what it costs to compute.
+        </p>
+        <ArenaPanel />
+        <Notice>
+          No controller wins every column. INDI underneath (with MPC or geometric control on top)
+          dominates the disturbances; the PID's calm motors come from being sluggish; the neural
+          policy is the cheapest to run; MPPI pays for its generality. Measured once with{' '}
+          <code>make bench</code> on the author's machine: docs/arena.md. The real lesson of Part II
+          is not which controller is best, but which one is best <i>for what</i> — and knowing why.
         </Notice>
       </>
     ),

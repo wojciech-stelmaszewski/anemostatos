@@ -3,8 +3,7 @@
 The textbook of Part II ("Beyond PID"), the sequel to [pid-primer.md](pid-primer.md).
 Each chapter matches a chapter of lessons (see
 [beyond-pid.md §6](beyond-pid.md#6-lessons-part-ii)); the **Lesson** notes
-point to the experiment that shows it. Chapters C–E are written as their
-milestones land.
+point to the experiment that shows it.
 
 ---
 
@@ -535,13 +534,105 @@ filter stays as the last line of defence, whatever flies above it.
 
 ---
 
+## E. Adapting and learning
+
+### E.1 L1 adaptive control
+
+Adaptive control estimates what the model gets wrong while flying. Classical
+model-reference adaptive control has a catch: faster adaptation means higher
+gain, and high adaptation gain means poor robustness and oscillation. **L1
+adaptive control** (Hovakimyan & Cao 2010) separates the two:
+
+- a **state predictor** runs beside the drone,
+  $\hat m\,\dot{\hat v} = F_{known} + \hat\sigma + \hat m\,a_s(\hat v - v)$;
+- a **piecewise-constant adaptation law** sets $\hat\sigma$ every sample to
+  the value that makes the predictor agree with the measurement,
+  $\hat\sigma = -\hat m\,\Phi^{-1} e^{a_sT}(\hat v - v)$,
+  $\Phi = (e^{a_sT} - 1)/a_s$ — as fast as the sample rate allows;
+- a **low-pass filter** $C(s)$ decides how much of $\hat\sigma$ reaches the
+  actuators: $u = u_{baseline} - C(s)\,\hat\sigma$.
+
+Adaptation speed is now free; robustness (and noise) is set by $C(s)$ alone.
+Anemostatos uses the velocity-predictor form of L1Quad (Wu et al. 2025), on
+the altitude loop and per world axis on the quadrotor.
+
+> **Lesson II.18 "Adapt fast, act smooth"** — a payload with a noisy velocity
+> sensor: max error 3.9 cm (ADRC 12.2, PID 27.7); open the filter and the
+> noise goes into the motors.
+
+### E.2 Learning the shape of a disturbance
+
+Integrators, observers and L1 all estimate the disturbance _as it is now_.
+When it depends on the state — aerodynamic drag on a drone flying a
+trajectory through wind — a **model** of how it varies can predict it
+instead: $f \approx \Phi(x)\,\theta$. Neural-Fly (O'Connell et al. 2022)
+meta-learns the basis $\Phi$ offline with a neural network across wind
+conditions, so that online only the linear coefficients $\theta$ adapt.
+
+Anemostatos hand-crafts $\Phi$ from the physics — per axis
+$[1,\ v,\ |v|v,\ T\,v_\perp]$ (steady part, linear and quadratic drag, rotor
+drag) — and fits $\theta$ by **recursive least squares** with forgetting to
+the residual force measured by the accelerometer. RLS needs one practical
+fix: without excitation (hovering) its covariance grows without bound
+(covariance windup) and the fit becomes jumpy, so the covariance is capped.
+
+Measured honestly: on a fast figure-8 through wind it beats the integrator
+≈ 4× (14 → 3 cm); with this simulator's clean accelerometer the fast
+observers (L1, INDI) do better still (≈ 2 cm). With poor sensors all three
+track alike, and the learned model gives by far the smoothest thrust — a good
+model lets you adapt slowly, and slow is smooth.
+
+> **Lesson II.19 "Learn the shape of the wind"**
+
+### E.3 Learned policies
+
+A policy maps observations directly to commands; nobody writes its control
+law. Anemostatos trains a small MLP (15 → 32 → 32 → 4, observations: errors,
+attitude axes, body rates; actions: collective thrust + body rates, the
+interface of Kaufmann et al. 2023) in two stages, with `make train`:
+
+1. **Imitation learning** — fly the geometric controller in randomised
+   conditions and fit the network to its commands (supervised, backprop +
+   Adam).
+2. **Evolution strategies** — a gradient-free form of reinforcement learning:
+   perturb the weights, fly each variant, move towards the better ones (rank
+   shaping, antithetic samples, common random seeds).
+
+The result flies, reacts quickly, and shows the classic weaknesses: it hunts
+around its targets in a small limit cycle (nothing rewarded perfect
+stillness, and it has no memory), and it degrades outside its training
+distribution. Careful comparisons (Kunapuli et al. 2025) find the same
+split: learned controllers can win transients and hard-to-model problems;
+classical ones keep their guarantees and steady state. Champion-level racing
+policies (Kaufmann et al. 2023) are far larger and trained on vastly more
+experience; differentiable simulation (Heeg et al. 2025) makes such training
+much more sample-efficient.
+
+> **Lesson II.20 "A controller nobody designed"**
+
+### E.4 The arena
+
+Every controller of Part II flies the same seeded scenarios; accuracy, motor
+smoothness and computing cost are measured for all
+([arena.md](arena.md), lesson II.21). No controller wins every column. An
+INDI inner loop (under MPC or geometric control) dominates the disturbance
+scenarios; the PID has the calmest motors because it is sluggish; the policy
+is the cheapest to evaluate; MPPI pays for its generality. Choosing a
+controller is choosing which column matters.
+
+> **Lesson II.21 "The grand comparison"**
+
+---
+
 ## Further reading
 
 The references are collected in [beyond-pid.md §8](beyond-pid.md#8-references).
 For this part in particular: Han 2009 and Gao 2003 (ADRC); Smeur et al. 2016
 and 2018, Tal & Karaman 2021 (INDI); Lee, Leok & McClamroch 2010, Brescianini
 & D'Andrea 2020, Mellinger & Kumar 2011 (geometry, flatness, min-snap);
-Stellato et al. 2020, Williams et al. 2017, Ames et al. 2019 (QP, MPPI, CBF); any control
+Stellato et al. 2020, Williams et al. 2017, Ames et al. 2019 (QP, MPPI, CBF);
+Hovakimyan & Cao 2010, Wu et al. 2025, O'Connell et al. 2022, Kaufmann et al. 2023,
+Kunapuli et al. 2025 (adaptive and learned control); any control
 textbook's chapter on LQR and Kalman filtering (e.g. Åström & Murray,
 _Feedback Systems_, chapters on state feedback and output feedback, freely
 available online).

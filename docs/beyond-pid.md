@@ -1,6 +1,7 @@
 # Part II — Beyond PID
 
-> **Status (2026-09-28):** M7–M11 implemented; M12 planned.
+> **Status (2026-09-28):** Part II is complete — M7–M12 implemented, lessons II.1–II.21.
+> Measured arena results: [arena.md](arena.md).
 > Milestones in [roadmap.md](roadmap.md) point here.
 
 Part I (lessons 1–14) teaches PID from first principles up to the full
@@ -405,6 +406,36 @@ changed:
 **Done when:** `make bench` prints the arena table, and the lesson "The grand
 comparison" shows that each controller wins at least one column.
 
+**✅ Done — with the second criterion honestly not met.** `make bench` runs 9
+configurations × 6 scenarios in ≈ 25 s ([arena.md](arena.md)); the lesson runs
+the same arena in the browser. With accuracy, motor smoothness and compute
+cost as columns, 5 of the 9 win something (MPC + INDI four scenarios,
+geometric + INDI the step, L1 adaptive ties on the figure-8, the PID the
+smoothest motors, the policy the cheapest compute); MPPI, MPC alone, the
+learned residual and geometric without compensation win nothing here. The
+lesson says so. Other findings:
+
+- **Node without dependencies**: `scripts/ts-loader.mjs` resolves `@/` and
+  extensionless imports; Node's type stripping runs the simulator directly
+  (`make bench`, `make train`).
+- **L1 adaptive** (L1 and as an L3 compensation): payload max error 3.9 cm
+  (ADRC 12.2, PID 27.7); the C(s) bandwidth trades noise against speed.
+- **Learned residual**: RLS on physics-shaped features. It beats the
+  integrator ≈ 4× on a trajectory through wind but, with this simulator's
+  clean accelerometer, not L1 or INDI; with poor sensors all three track
+  alike and it gives by far the smoothest thrust. Needed a covariance bound
+  (RLS windup when hovering). Features are hand-crafted (no meta-learned
+  network) — a stretch goal left open.
+- **Policy**: imitation of the geometric controller (≈ 235 k samples) +
+  evolution strategies (40 iterations, gentle settings — the first,
+  aggressive ES setting only made it worse). Validation: teacher 78 cm,
+  imitation 89 cm, after ES 76 cm on demanding target jumps. In the lesson it
+  flies but hunts around targets in a ±15 cm limit cycle and degrades outside
+  its training range. Training bug found on the way: a parameter layout
+  mismatch between unpacking and backprop (now one shared module).
+- **Geometric controller fix**: its integral wound up on large steps (10 cm
+  offset for many seconds); it now uses conditional integration like Part I.
+
 ## 6. Lessons (Part II)
 
 Part II is the **second semester**: numbering restarts (II.1–II.21) and the
@@ -450,12 +481,12 @@ lesson panel shows the two parts as separate courses. Priority: **must** (core s
 
 ### Chapter E — Adapting and learning
 
-| #   | id         | Title                        | Setup and events                                                         | What the student sees / goal                                                                                                | Prio   |
-| --- | ---------- | ---------------------------- | ------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- | ------ |
-| 18  | `l1ac`     | Adapt fast, act smooth       | L1: payload drop; L3: motor 2 at 60 % efficiency at t = 15 s.            | Adaptation bandwidth vs filter bandwidth as separate knobs; compare with I term and ESO.                                    | should |
-| 19  | `residual` | Learn the shape of the wind  | L3, rotor drag on, strong steady wind + turbulence, figure-8.            | Adapted coefficients converge; estimated vs true aerodynamic force. Beats the I term on a moving trajectory, where I lags.  | could  |
-| 20  | `policy`   | A controller nobody designed | Learned policy; then mass +50 % (outside training range).                | Crisp transients; small steady-state error; fails outside its training distribution. Matches [Kunapuli 2025].               | could  |
-| 21  | `arena`    | The grand comparison         | Arena: step, gust challenge, payload drop, figure-8, motor fault, noise. | Table of RMS / max error / energy / saturation / µs per tick. No controller wins every column — the real lesson of Part II. | must   |
+| #   | id         | Title                        | Setup and events                                                   | What the student sees / goal                                                                                           | Prio   |
+| --- | ---------- | ---------------------------- | ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- | ------ |
+| 18  | `l1ac`     | Adapt fast, act smooth       | L1: payload at 12 s, noisy velocity sensor, filter C(s) wide open. | Adaptation speed vs filter bandwidth as separate knobs. Goal: max error < 6 cm with thrust jitter < 0.3 N.             | should |
+| 19  | `residual` | Learn the shape of the wind  | L3, rotor drag, 3 m/s wind, fast figure-8.                         | Integrator 14 cm → learned model ≈ 3 cm; honest note that L1/INDI do better with clean sensors, the model is smoother. | could  |
+| 20  | `policy`   | A controller nobody designed | Learned policy vs geometric ghost; target jump, then mass +50 %.   | Flies, hunts around targets (limit cycle), degrades outside its training range. Matches [Kunapuli 2025].               | could  |
+| 21  | `arena`    | The grand comparison         | Arena: step, gusts, payload, broken prop, figure-8, noisy sensors. | RMS per scenario + motor jitter + µs/step, run in the browser. No controller wins every column.                        | must   |
 
 Goals use the existing `goal.check` mechanism; reference scores (like the
 gust challenge today) are computed headlessly on the same seed.

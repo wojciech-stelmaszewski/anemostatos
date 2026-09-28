@@ -123,6 +123,9 @@ crosshair and values in all). Time window: 5 / 10 / 30 / 60 s.
   (expensive). Keep-out zones are translucent red (a ceiling plane, a
   pillar) and glow while the drone is inside. The CBF filter's correction
   is a red arrow at the drone.
+- **Arena** (lesson II.21): a button runs all controllers through all arena
+  scenarios in the browser, one flight per tick, and fills a table (RMS error
+  per scenario, motor jitter, µs/step; best per column highlighted).
 - **Compute meter** (chart header): average wall-clock µs the controller
   takes per physics step. Display only — the simulation never depends on
   wall-clock time. Matters once Part II's optimisers arrive.

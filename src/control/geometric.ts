@@ -42,13 +42,24 @@ export class GeometricOuter {
     const ep = sub(s.pos, sp.pos);
     const ev = sub(s.vel, vRef);
     const ki = noIntegral ? 0 : g.ki;
+    const aH = GRAVITY * Math.tan((c.maxTiltDeg * Math.PI) / 180);
+    const aUp = (4 * p.drone.maxMotorThrust) / Math.max(p.control.model.mass, 0.1) - GRAVITY;
     if (ki > 0) {
-      // Bounded integral: at most 3 m/s² of correction.
+      // Bounded integral (at most 3 m/s² of correction) with conditional integration, as in
+      // Part I: freeze it while the command without it is saturated (a big step), so it only
+      // accumulates the steady offsets it is meant for.
       const lim = 3 / ki;
+      const pre = v3(
+        aRef.x - g.kp * ep.x - g.kv * ev.x,
+        aRef.y - g.kp * ep.y - g.kv * ev.y,
+        aRef.z - g.kp * ep.z - g.kv * ev.z,
+      );
+      const satH = Math.hypot(pre.x, pre.z) > aH;
+      const satV = pre.y > aUp || pre.y < -0.8 * GRAVITY;
       const next = v3(
-        this.integral.x + ep.x * dt,
-        this.integral.y + ep.y * dt,
-        this.integral.z + ep.z * dt,
+        satH ? this.integral.x : this.integral.x + ep.x * dt,
+        satV ? this.integral.y : this.integral.y + ep.y * dt,
+        satH ? this.integral.z : this.integral.z + ep.z * dt,
       );
       this.integral = v3(
         clamp(next.x, -lim, lim),
@@ -63,8 +74,6 @@ export class GeometricOuter {
       aRef.y - g.kp * ep.y - g.kv * ev.y - ki * this.integral.y,
       aRef.z - g.kp * ep.z - g.kv * ev.z - ki * this.integral.z,
     );
-    const aH = GRAVITY * Math.tan((c.maxTiltDeg * Math.PI) / 180);
-    const aUp = (4 * p.drone.maxMotorThrust) / Math.max(p.control.model.mass, 0.1) - GRAVITY;
     const h = clampLength(v3(raw.x, 0, raw.z), aH);
     const out = v3(h.x, clamp(raw.y, -0.8 * GRAVITY, aUp), h.z);
     for (const k of ['x', 'y', 'z'] as const) {

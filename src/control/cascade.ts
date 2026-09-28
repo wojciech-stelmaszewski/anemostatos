@@ -7,9 +7,13 @@ import { GRAVITY, type Params } from '@/sim/params';
 import type { Measurement } from '@/sim/sensors';
 import { attitudeRates, flatnessRates, GeometricOuter } from './geometric';
 import { safetyFilter } from './cbf';
+import { L1Compensation } from './l1ac';
 import { mix } from './mixer';
 import { mpcTiming, MpcOuter } from './mpc';
 import { MppiOuter } from './mppi';
+import { PolicyOuter } from './policy';
+import { policyWeights } from './policy-registry';
+import { LearnedResidual } from './residual';
 import { defaultGains, Pid, type PidTerms } from './pid';
 import {
   AccelIndi,
@@ -67,6 +71,7 @@ export class CascadeController implements Controller {
   readonly geo: GeometricOuter | null;
   readonly mpc: MpcOuter | null;
   readonly mppi: MppiOuter | null;
+  readonly policy: PolicyOuter | null;
   private readonly cbfSolver = new QpSolver();
   /** Desired acceleration before the safety filter, and how many barriers were active. */
   private aNominal = v3();
@@ -95,10 +100,19 @@ export class CascadeController implements Controller {
 
   constructor(p?: Params) {
     this.rate = p?.control.l3.inner === 'indi' ? new RateIndi() : new PidRateStage();
-    this.comp = p?.control.l3.compensation === 'indi' ? new AccelIndi() : new NoCompensation();
+    const comp = p?.control.l3.compensation;
+    this.comp =
+      comp === 'indi'
+        ? new AccelIndi()
+        : comp === 'l1ac'
+          ? new L1Compensation()
+          : comp === 'learned'
+            ? new LearnedResidual()
+            : new NoCompensation();
     this.geo = p?.control.l3.outer === 'geometric' ? new GeometricOuter() : null;
     this.mpc = p?.control.l3.outer === 'mpc' ? new MpcOuter() : null;
     this.mppi = p?.control.l3.outer === 'mppi' ? new MppiOuter(p.sim.seed) : null;
+    this.policy = p?.control.l3.outer === 'policy' ? new PolicyOuter(policyWeights()) : null;
   }
 
   reset(): void {
@@ -108,6 +122,7 @@ export class CascadeController implements Controller {
     this.geo?.reset();
     this.mpc?.reset();
     this.mppi?.reset();
+    this.policy?.reset();
     this.cbfSolver.reset();
     this.aNominal = v3();
     this.aSafe = v3();
@@ -144,8 +159,20 @@ export class CascadeController implements Controller {
     if (due(c.hzRate)) this.comp.sample(sense(), P, dtOf(c.hzRate));
 
     const predictive = this.mpc || this.mppi;
+    // A learned policy replaces everything down to the rate loop: thrust + body rates.
+    if (this.policy && due(c.hzVel)) {
+      const s = sense();
+      const r = this.policy.update(s, setpoint, P);
+      const lim = c.maxRateDeg;
+      this.thrust = r.thrust;
+      this.wSp = v3(
+        clamp(r.ratesDeg.x, -lim, lim),
+        clamp(r.ratesDeg.y, -lim, lim),
+        clamp(r.ratesDeg.z, -lim, lim),
+      );
+    }
     // 1. Position P → velocity setpoint (PID cascade only).
-    if (!this.geo && !predictive && due(c.hzPos)) {
+    if (!this.geo && !predictive && !this.policy && due(c.hzPos)) {
       const s = sense();
       const dt = dtOf(c.hzPos);
       const gH = defaultGains({ kp: c.posKpH, ki: 0, kd: 0 });
@@ -158,7 +185,7 @@ export class CascadeController implements Controller {
     }
 
     // 2. Velocity PID → acceleration → [compensation] → thrust vector → attitude setpoint.
-    if (due(c.hzVel)) {
+    if (!this.policy && due(c.hzVel)) {
       const s = sense();
       const dt = dtOf(c.hzVel);
       const aH = GRAVITY * Math.tan((c.maxTiltDeg * Math.PI) / 180);
@@ -211,7 +238,7 @@ export class CascadeController implements Controller {
     }
 
     // 3. Attitude P → body-rate setpoint (deg/s).
-    if (due(c.hzAtt)) {
+    if (!this.policy && due(c.hzAtt)) {
       const s = sense();
       const att = attitudeRates(c.attitude, s.q, this.qSp, c.attKpRP, c.attKpYaw);
       const err = att.err;
@@ -247,16 +274,18 @@ export class CascadeController implements Controller {
   loops(): Record<string, LoopTerms> {
     const outer: Record<string, LoopTerms> = this.geo
       ? this.geo.loops()
-      : this.mpc || this.mppi
-        ? this.plannerLoops()
-        : {
-            'pos.x': pidLoop(this.pos.x.last),
-            'pos.y': pidLoop(this.pos.y.last),
-            'pos.z': pidLoop(this.pos.z.last),
-            'vel.x': pidLoop(this.vel.x.last),
-            'vel.y': pidLoop(this.vel.y.last),
-            'vel.z': pidLoop(this.vel.z.last),
-          };
+      : this.policy
+        ? this.policy.loops()
+        : this.mpc || this.mppi
+          ? this.plannerLoops()
+          : {
+              'pos.x': pidLoop(this.pos.x.last),
+              'pos.y': pidLoop(this.pos.y.last),
+              'pos.z': pidLoop(this.pos.z.last),
+              'vel.x': pidLoop(this.vel.x.last),
+              'vel.y': pidLoop(this.vel.y.last),
+              'vel.z': pidLoop(this.vel.z.last),
+            };
     return {
       ...outer,
       'att.roll': pidLoop(this.att.roll),
@@ -293,6 +322,7 @@ export class CascadeController implements Controller {
 
   describe(p: Params, loopId: string): InfoRow[] {
     const rows: InfoRow[] = [];
+    if (this.policy && loopId.startsWith('pos.')) rows.push(...this.policy.describe());
     if (this.geo && loopId.startsWith('pos.')) {
       const g = p.control.geometric;
       const wn = Math.sqrt(g.kp);

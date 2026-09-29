@@ -1,0 +1,99 @@
+\lesson{10}{Find the edge}{Stiffer is faster — until the lags in the loop decide otherwise.}{1}{edge}{Part I · PID}
+\label{les:edge}
+
+\lead{Lesson 3 said that a stiffer spring sags less, and Lesson 4 that a damper can tame any spring. So why not use $K_p = 1000$? This lesson raises the proportional gain step by step, with the damper fixed, until the drone starts to shake by itself. Then it computes, from the motor lag alone, where that edge must be — and finds that a classic tuning recipe does not apply to drones at all.}
+
+\section{The experiment}
+
+The lesson keeps $K_d = 7$ and flies a small square wave while you raise $K_p$ through 30, 100, 200 and 400. \Cref{fig:edge-runs} shows what happens. At 30 the response is crisp. At 100 it rings a little after every step. At 200 the ringing hardly decays. At 400 the drone oscillates by itself, and the square wave is barely recognisable.
+
+\widefig{edge_runs}{The altitude with $K_d = 7$ and increasing $K_p$. Near the edge the loop \enquote{rings} longer and longer; past it the oscillation sustains itself, bounded only by the motor limits.}{fig:edge-runs}
+
+Nothing in the ideal model of \lessonref{les:damper} predicts this. For $m\ddot x + K_d\dot x + K_p x = 0$ every positive $K_p$ and $K_d$ gives a stable loop; a larger $K_p$ merely reduces the damping ratio $\zeta = K_d/(2\sqrt{K_p m})$. At $K_p = 400$, $\zeta = 0.18$ — lightly damped, but stable. The simulator disagrees because the drone is not an ideal mass: its motors lag.
+
+\section{The motor lag as a third pole}
+
+The motors follow the command with a first-order lag: $\tau_m\dot T + T = u$. Combine it with the PD law and the mass (exact feedforward, constant setpoint):
+\begin{equation}
+  m\ddot x = T - \text{(weight, cancelled)},\qquad \tau_m\dot T + T = -K_p x - K_d\dot x .
+\end{equation}
+Eliminate $T$: differentiate the first equation, multiply by $\tau_m$ and add it to itself,
+\begin{equation}\label{eq:edge-cubic}
+  \tau_m m\,\dddot x + m\,\ddot x + K_d\,\dot x + K_p\,x = 0,
+  \qquad
+  \tau_m m\,s^3 + m\,s^2 + K_d\,s + K_p = 0 .
+\end{equation}
+A third-order characteristic polynomial, and the Routh–Hurwitz condition of \cref{eq:integral-routh} ($a_2a_1 > a_3a_0$) gives
+\begin{equation}\label{eq:edge-limit}
+  m\,K_d > \tau_m m\,K_p \qquad\Longleftrightarrow\qquad K_p < \frac{K_d}{\tau_m} = \frac{7}{0.03} \approx 233 .
+\end{equation}
+Including the D filter and the sample-and-hold of the controller moves the edge a little lower, to $K_p \approx 200$ — just where the simulator's ringing becomes permanent (\cref{fig:edge-region}).
+
+\simfig{edge_region}{The stability region of the altitude loop in the $(K_d, K_p)$ plane. Dashed: the motor lag alone, \cref{eq:edge-limit}. Solid: with the \SI{20}{Hz} D filter and the \SI{250}{Hz} sample-and-hold. The dots are the lesson's runs; the square is the default tune, deep inside.}{fig:edge-region}
+
+\begin{keyidea}[Every lag sets a speed limit]
+The motors cannot follow faster than about $1/\tau_m \approx \SI{33}{rad/s}$. A loop that tries to be faster than its slowest lag becomes unstable: \cref{eq:edge-limit} says, roughly, that the loop's natural frequency must stay well below the actuator's bandwidth. Delays (\lessonref{les:slow}), filters (\lessonref{les:noise}) and actuator lags all add up to the same limit. Gains can be chosen; the lags of the hardware cannot.
+\end{keyidea}
+
+Interestingly, the edge depends on $K_d$ too: a stronger damper allows a stiffer spring, which is why the tuning procedures of practice raise $K_p$ and $K_d$ in turns. But the damper itself runs into the noise of \lessonref{les:noise}, so this game also ends.
+
+\section{About Ziegler and Nichols}
+
+In 1942 John Ziegler and Nathaniel Nichols of the Taylor Instrument Company published a recipe that is still taught everywhere:
+\begin{enumerate}
+  \item switch off I and D and raise $K_p$ until the loop oscillates with constant amplitude; call that gain the \emph{ultimate gain} $K_u$, and the period $T_u$;
+  \item set $K_p = 0.6\,K_u$, $K_i = 1.2\,K_u/T_u$, $K_d = 0.075\,K_u T_u$.
+\end{enumerate}
+Try step 1 on a hovering drone. With P alone the loop is the spring of \lessonref{les:spring}: it oscillates at \emph{every} gain, and the motor lag makes it slightly unstable at every gain (Exercise~2.3). There is no gain below which it is calm, so there is no $K_u$.
+
+\begin{watchout}[Heuristics come with assumptions]
+The Ziegler–Nichols rules were derived for plants that are stable on their own and have some delay: temperatures, levels, pressures in process plants — the systems Ziegler and Nichols worked with. A hovering drone is a \emph{double integrator}: without control it simply falls. Always ask what a recipe assumes about the plant before you use it.
+\end{watchout}
+
+\screen[0 0 495 998]{edge}{Lesson 10 at $K_p = 200$: every step rings for many periods, and the thrust swings between the motor limits.}{fig:edge-screen}
+
+\begin{inapp}
+\begin{itemize}[leftmargin=1.2em]
+  \item The lesson sets \param{control.alt.iOn = false} and a \SI{0.3}{m} square wave with a \SI{6}{s} period. The motor time constant is \ui{Physics\then Motor time constant} (\param{drone.motorTau}).
+  \item The $K_p$ slider is logarithmic, so the steps 30 → 100 → 200 → 400 are evenly spaced on it.
+  \item The info card's \enquote{theory} is the ideal mass–spring–damper: it will call $K_p = 400$ \enquote{underdamped} while the drone shakes. That discrepancy is the lesson.
+\end{itemize}
+\end{inapp}
+
+\begin{trythis}
+\begin{enumerate}
+  \item Raise $K_p$: 30, 50, 100, 200, 400. At which gain does the ringing stop decaying?
+  \item Set \ui{Physics\then Motor time constant} to \SI{15}{ms}, then \SI{60}{ms}. Predict the new edge from \cref{eq:edge-limit} and check it.
+  \item At $K_p = 200$, raise $K_d$ to 12. Why does the ringing calm down?
+\end{enumerate}
+\predict{with $\tau_m = \SI{60}{ms}$, is the default tune ($K_p = 10$, $K_d = 7$) still stable? With how much margin?}
+\end{trythis}
+
+\begin{curiosity}{An aircraft that could not fly by itself}
+\photo{x29}{The Grumman X-29 over the Mojave Desert. Its forward-swept wings made it so unstable that no pilot could have flown it unaided.}
+The X-29, flown by NASA and the US Air Force from 1984 to 1992, looks as if it had been assembled backwards: its wings sweep forward and a pair of small canard wings sits in front of them. The design reduced drag and improved agility at high angles of attack, but it had a price. The aircraft was aerodynamically unstable in pitch — a small nose-up disturbance made the nose rise further, faster and faster, like the unstable poles of \lessonref{les:spring}'s exercises.
+
+A pilot cannot correct such an instability: the time to double the disturbance was far shorter than human reaction time. So the X-29 flew with three redundant digital flight-control computers that corrected its attitude about 40 times per second. The whole aircraft relied on a loop running well inside its stability margins; a computer failure would have meant losing the aircraft within a fraction of a second.
+
+What the X-29 made extreme is now routine. Modern fighters are designed slightly unstable for agility and rely on their flight-control computers, and the lesson's rule applies to all of them: the control loop must be fast enough to catch the instability — and its actuators and computers fast enough for the loop.
+\end{curiosity}
+
+\begin{remember}
+\begin{itemize}
+  \item The ideal mass–spring–damper is stable for any positive gains; real loops are not.
+  \item A first-order actuator lag $\tau_m$ turns the loop into a third-order system that is stable only for $K_p < K_d/\tau_m$.
+  \item Delays, filters and sampling lower the edge further. Gains are free; lags are not.
+  \item Tuning recipes such as Ziegler–Nichols assume a type of plant; a hovering drone is not that type.
+\end{itemize}
+\end{remember}
+
+\begin{exercises}
+\exercise[1] With $\tau_m = \SI{30}{ms}$, what is the smallest $K_d$ that allows $K_p = 300$?
+\answer{$K_d > \tau_m K_p = 0.03 \cdot 300 = 9$.}
+\exercise[2] At the edge of \cref{eq:edge-limit} the cubic has a pair of imaginary roots $\pm j\omega$. Find $\omega$ and the period of the resulting oscillation for $K_d = 7$.
+\answer{From Exercise 5.3: $\omega^2 = a_1/a_3 = K_d/(\tau_m m) = 233$, $\omega = \SI{15.3}{rad/s}$, period \SI{0.41}{s} — about the period of the shaking at $K_p = 400$ in \cref{fig:edge-runs} (which is beyond the edge and saturating, so only roughly).}
+\exercise[2] Express the condition of \cref{eq:edge-limit} with the natural frequency $\omega_n = \sqrt{K_p/m}$ and the damping ratio $\zeta = K_d/(2\sqrt{K_p m})$, and interpret it.
+\answer{$K_p = m\omega_n^2$, $K_d = 2\zeta\omega_n m$, so $m\omega_n^2 < 2\zeta\omega_n m/\tau_m$, i.e.\ $\omega_n\tau_m < 2\zeta$. For a well-damped loop ($\zeta \approx 1$) the natural frequency must stay below about $2/\tau_m$; practical designs stay several times below it.}
+\exercise[3] Apply the Ziegler–Nichols step 1 to a plant that does have an ultimate gain: $G(s) = 1/(s+1)^3$ with P control. Find $K_u$ and $T_u$ and the resulting ZN PID gains.
+\answer{Characteristic polynomial $(s+1)^3 + K = s^3 + 3s^2 + 3s + 1 + K$. Routh: $3\cdot3 = 1 + K_u$, so $K_u = 8$, $\omega = \sqrt3$, $T_u = 2\pi/\sqrt3 = \SI{3.63}{s}$. ZN: $K_p = 4.8$, $K_i = 1.2\cdot8/3.63 = 2.64$, $K_d = 0.075\cdot8\cdot3.63 = 2.18$.}
+\end{exercises}

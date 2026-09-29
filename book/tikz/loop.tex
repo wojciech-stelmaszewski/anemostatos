@@ -1,0 +1,22 @@
+% The feedback loop of Lesson 1, labelled with the app's colours.
+\begin{tikzpicture}[node distance=9mm and 11mm]
+  \node[sumn] (sum) {};
+  \node[font=\scriptsize] at ($(sum)+(-1.8mm,1.9mm)$) {$+$};
+  \node[font=\scriptsize] at ($(sum)+(1.9mm,-2.4mm)$) {$-$};
+  \node[blkc, right=8mm of sum] (pid) {controller\\[-1pt]{\footnotesize\color{muted}PID}};
+  \node[blk, right=8mm of pid] (act) {motors\\[-1pt]{\footnotesize\color{muted}lag 30 ms}};
+  \node[blk, right=8mm of act] (plant) {drone\\[-1pt]{\footnotesize\color{muted}$m\ddot y = T - mg + d$}};
+  \node[blkd, below=9mm of act] (sens) {sensor\\[-1pt]{\footnotesize\color{muted}altimeter}};
+  \node[left=7mm of sum, labc=sigsp] (r) {setpoint $r$};
+  \draw[sig] (r) -- (sum);
+  \draw[sigc=sigerr] (sum) -- node[above, labc=sigerr] {$e$} (pid);
+  \draw[sigc=ink] (pid) -- node[above, lab] {$u$} (act);
+  \draw[sig] (act) -- node[above, lab] {$T$} (plant);
+  \coordinate[right=6mm of plant] (out);
+  \draw[sig] (plant) -- node[above, lab] {$y_\text{true}$} (out);
+  \draw[sig] ($(plant.east)+(4mm,0)$) |- (sens);
+  \draw[sigc=sigmeas] (sens) -| node[pos=0.75, left, labc=sigmeas] {$y$} (sum);
+  \node[above=7mm of plant, labc=sigwind] (d) {wind, gravity $d$};
+  \draw[dist] (d) -- (plant);
+  \node[below=1.5mm of sens, lab] {noise, bias, delay};
+\end{tikzpicture}

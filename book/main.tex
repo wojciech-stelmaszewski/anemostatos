@@ -1,0 +1,50 @@
+% Standing in the Wind — a course in feedback control with the Anemostatos simulator.
+% Build: make book   (lualatex, twice; see book/README.md)
+\documentclass[11pt,oneside,openany]{book}
+\usepackage{style/anemostatos-book}
+
+\begin{document}
+\frontmatter
+\input{front/cover}
+\input{front/contents}
+\input{front/preface}
+
+\mainmatter
+\input{front/prelude}
+
+\bookpart{I}{The PID Controller}
+  {“The controller never sees the wind. It only reacts to the error it causes — that is the whole idea of feedback.”}
+  {Fourteen lessons, one idea each. Levels L1 → L3. From a single spring-like gain to a four-loop cascade that flies a quadrotor through the wind.}
+\input{part1/01-meet}
+\input{part1/02-spring}
+\input{part1/03-droop}
+\input{part1/04-damper}
+\input{part1/05-integral}
+\input{part1/06-windup}
+\input{part1/07-kick}
+\input{part1/08-noise}
+\input{part1/09-slow}
+\input{part1/10-edge}
+\input{part1/11-challenge}
+\input{part1/12-tilt}
+\input{part1/13-cascade}
+\input{part1/14-inversion}
+
+\bookpart{II}{Beyond PID}
+  {“The real lesson of Part II is not which controller is best, but which one is best \emph{for what} — and knowing why.”}
+  {Twenty-one lessons in five chapters: models and optimal gains, disturbance estimation, geometry and trajectories, optimisation in the loop, adaptation and learning.}
+\input{part2/A}
+\input{part2/B}
+\input{part2/C}
+\input{part2/D}
+\input{part2/E}
+
+\closeanswers
+\appendix
+\input{back/math}
+\input{back/appmap}
+\input{back/answers}
+\input{back/reading}
+\input{back/credits}
+\input{back/colophon}
+\end{document}

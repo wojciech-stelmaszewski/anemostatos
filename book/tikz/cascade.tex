@@ -1,0 +1,24 @@
+% The L3 cascade: position -> velocity -> thrust vector -> attitude -> rate -> mixer
+\begin{tikzpicture}[node distance=5mm and 5.5mm, every node/.style={font=\sffamily\footnotesize}]
+  \node[blk, minimum width=15mm] (pos) {position\\[-1pt]{\color{muted}P · 50 Hz}};
+  \node[blk, minimum width=15mm, right=of pos] (vel) {velocity\\[-1pt]{\color{muted}PID · 100 Hz}};
+  \node[blkc, minimum width=15mm, right=of vel] (tv) {thrust\\[-1pt]vector};
+  \node[blk, minimum width=15mm, right=of tv] (att) {attitude\\[-1pt]{\color{muted}P · 250 Hz}};
+  \node[blk, minimum width=15mm, right=of att] (rate) {rate\\[-1pt]{\color{muted}PID · 1 kHz}};
+  \node[blkd, minimum width=13mm, right=of rate] (mix) {mixer};
+  \draw[sig] ($(pos.west)+(-6mm,0)$) node[above right, lab, xshift=-1mm] {$\vec p_{sp}$} -- (pos);
+  \draw[sig] (pos) -- node[above, lab] {$\vec v_{sp}$} (vel);
+  \draw[sig] (vel) -- node[above, lab] {$\vec a_{sp}$} (tv);
+  \draw[sig] (tv) -- node[above, lab] {$q_{sp}$} (att);
+  \draw[sig] (att) -- node[above, lab] {$\vec\omega_{sp}$} (rate);
+  \draw[sig] (rate) -- node[above, lab] {$\vec\tau$} (mix);
+  \draw[sig] (tv.south) -- ++(0,-5mm) -| node[pos=0.25, below, lab] {collective thrust $T$} (mix.south);
+  \draw[sig] (mix.east) -- ++(5mm,0) node[right, lab] {$f_1\dots f_4$};
+  \node[above=2mm of vel, labc=sigI, font=\sffamily\scriptsize] {holds the wind};
+  \node[above=2mm of tv, labc=accent, font=\sffamily\scriptsize] {“to move, tilt”};
+  % time-scale bar
+  \draw[faint, line width=0.5pt] ($(pos.south west)+(0,-13mm)$) -- ($(rate.south east)+(0,-13mm)$);
+  \node[lab, anchor=north] at ($(pos.south)+(0,-14mm)$) {seconds};
+  \node[lab, anchor=north] at ($(rate.south)+(0,-14mm)$) {milliseconds};
+  \node[lab, anchor=north] at ($(tv.south)+(0,-14mm)$) {\color{faint}inner loops are faster →};
+\end{tikzpicture}

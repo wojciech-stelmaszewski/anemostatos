@@ -1,0 +1,65 @@
+\bookchapter{}{Preface}{How this book and the simulator work together.}
+\label{ch:preface}
+
+\lead{This is a book about one idea — feedback — told through one machine: a small quadcopter that tries to stand still in the wind. It is written to be read next to a running copy of Anemostatos, the simulator in which every experiment of the book can be repeated, changed and broken.}
+
+Control theory has a reputation for being abstract. Its textbooks begin with Laplace transforms and pole-zero maps, and many students learn to manipulate transfer functions long before they have seen a single loop misbehave. This book goes the other way round. Every chapter starts from something you can watch: a drone that bounces, sags, overshoots, shakes or flips. Then it asks \emph{why}, and builds exactly as much mathematics as the answer needs — no more, but also no less.
+
+\section*{Who it is for}
+The book assumes what a bachelor's degree in engineering, physics, mathematics or computer science usually provides: calculus of one and several variables, the basics of ordinary differential equations (linear equations with constant coefficients, above all), linear algebra (matrices, eigenvalues), and a little probability. Everything beyond that — Laplace transforms, the phase margin, the Riccati equation, the Kalman filter, quadratic programming, quaternions — is introduced where it is first needed, and summarised in \hyperref[app:math]{the mathematical toolbox} at the end.
+
+\section*{How it is organised}
+The book follows the lessons of the simulator, one lesson per chapter, with the same numbers and titles you see in the application's lesson panel.
+\begin{description}[leftmargin=0pt, font=\sffamily\small\bfseries]
+  \item[Part I · PID] (Lessons 1–14) builds the PID controller term by term on a drone that can only move up and down, meets the practical problems of a real digital controller — saturation, windup, derivative kick, noise, sampling, delay, actuator lag — and ends with the cascade of loops that flies a full quadrotor.
+  \item[Part II · Beyond PID] (Lessons II.1–II.21) is a second semester in five chapters: optimal state feedback and estimation (LQR, Kalman filter), disturbance observers and incremental control (ADRC, INDI), geometry and trajectories (rotations, differential flatness, minimum-snap planning), optimisation in the loop (MPC, MPPI, control barrier functions), and adaptation and learning (L1 adaptive control, learned models, neural-network policies) — ending with a comparison of all of them on equal terms.
+\end{description}
+The \hyperref[ch:prelude]{Prelude} introduces the simulator and its physics. Read it first, or come back to it when a lesson refers to it.
+
+\section*{The anatomy of a lesson}
+Every chapter has the same parts, set in the same way throughout the book:
+
+\begin{keyidea}[the one thing to take away]
+Boxes like this state the central idea of a section in a few sentences.
+\end{keyidea}
+\begin{definition}{a precise term}
+Definitions fix the vocabulary.
+\end{definition}
+\begin{inapp}[where the idea lives in the application]
+These dark boxes, styled like the application itself, say where to find an idea on the screen — \ui{Group\then Parameter} — which parameter (\param{control.alt.kp}) and which source file (\src{src/control/pid.ts}) implement it, and which keys to press (\key{R}). File names are links to the repository.
+\end{inapp}
+\begin{trythis}
+Experiments to run in the simulator, usually with a question to answer \emph{before} running them.
+\end{trythis}
+\begin{watchout}
+Common mistakes and the limits of a result.
+\end{watchout}
+Each chapter ends with a page \emph{Out in the World} — the same idea at work somewhere else, with a photograph — a short summary, and exercises marked by difficulty ({\tiny$\bullet$} to {\tiny$\bullet\bullet\bullet$}). Brief answers to all exercises are collected at the end of the book.
+
+\section*{One colour, one meaning}
+The simulator gives every quantity its own colour, in its charts, its 3D view and its parameter panel. This book uses the same colours, so that a figure here and a chart on the screen read the same way:
+
+\begin{center}\small\sffamily
+\begin{tabular}{@{}lll@{\hspace{2.5em}}lll@{}}
+  \textcolor{sigsp}{\rule[0.5ex]{1.2em}{1.2pt}} & setpoint $r$ & dashed grey &
+  \textcolor{sigP}{\rule[0.3ex]{1.2em}{2pt}} & \Pt term & orange\\
+  \textcolor{sigmeas}{\rule[0.3ex]{1.2em}{2pt}} & measurement $y$ & blue &
+  \textcolor{sigI}{\rule[0.3ex]{1.2em}{2pt}} & \It term & green\\
+  \textcolor{sigerr}{\rule[0.3ex]{1.2em}{2pt}} & error $e$ & red &
+  \textcolor{sigD}{\rule[0.3ex]{1.2em}{2pt}} & \Dt term & violet\\
+  \textcolor{sigwind}{\rule[0.3ex]{1.2em}{2pt}} & wind & green &
+  \textcolor{sigFF}{\rule[0.3ex]{1.2em}{2pt}} & \FFt (feedforward) & amber\\
+\end{tabular}
+\end{center}
+Red shading in a time plot means that an actuator is saturated, as in the application.
+
+\section*{Where the numbers come from}
+All time series in this book were produced by the simulator itself. A script, \src{scripts/book-data.ts}, sets up each lesson exactly as the application does, flies it headlessly with the same code, and records the telemetry; the figures are drawn from those recordings. When a number in the text says \enquote{the simulator shows \SI{0.45}{m}}, you can reproduce it. Where theory and simulation disagree — and they sometimes do, instructively — the book says so and explains why.
+
+\section*{Running the simulator}
+Anemostatos runs locally in a web browser. With Node.js installed:
+\begin{center}
+\texttt{git clone https://github.com/wojciech-stelmaszewski/anemostatos}\\
+\texttt{cd anemostatos \&\& make dev}
+\end{center}
+The lesson panel on the right of the screen has two tabs, \ui{Part I · PID} and \ui{Part II · Beyond PID}; select a lesson and press \ui{Start}. Everything else — every gain, every physical parameter, the wind, the sensors — stays unlocked: the lessons are starting points, not rails.

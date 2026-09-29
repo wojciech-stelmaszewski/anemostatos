@@ -1,0 +1,114 @@
+\bookchapter{}{Prelude: a drone in the wind}{The simulator, its three levels of reality, and the physics every lesson builds on.}
+\label{ch:prelude}
+
+\lead{Anemostatos — from the Greek \emph{ánemos}, wind, and \emph{statós}, standing: \enquote{the one that stands in the wind}. It is a simulator built for one purpose: to make feedback control visible. A quadcopter hovers above an endless grid, gravity pulls it down, random gusts push it around, and a controller fights back while every one of its terms is drawn on the screen. This chapter is the tour.}
+
+\section*{The screen}
+
+\screen[0 0 0 0]{meet}{The Anemostatos screen. Toolbar (top): run and pause, simulation speed, time, reset, the controller switch, a manual gust, the random seed, the level (L1/L2/L3) and a snapshot for comparing runs. 3D view (centre): the drone, the setpoint sphere, force arrows coloured by controller term, the live formula (bottom left) and the wind indicator (bottom right). Charts (bottom): tracking, error, controller terms, motor thrusts, and a switchable extra chart with the info card. Right: the lesson panel and every parameter, grouped.}{fig:prelude-screen}
+
+\Cref{fig:prelude-screen} shows the whole application. Three things are worth knowing from the start.
+\begin{itemize}
+  \item \textbf{Everything is live.} Every slider acts immediately. Changing the controller type or the level restarts the run; everything else is changed in flight.
+  \item \textbf{Everything is reproducible.} All randomness — wind, gusts, sensor noise — comes from one seeded generator. The same seed and the same parameters give exactly the same run, so two tunings can be compared on the same wind. The \ui{Snapshot} button (\key{S}) freezes the current run as a grey \emph{ghost} on the charts.
+  \item \textbf{Everything is shareable.} The link button copies a URL that contains the complete parameter tree.
+\end{itemize}
+
+\section*{Three levels of reality}
+
+The simulator offers three models of the drone, of increasing fidelity. The lessons move from one to the next as the ideas require.
+
+\begin{center}\small
+\begin{tabularx}{\linewidth}{@{}l>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}X@{}}
+\toprule
+ & \sffamily\bfseries L1 · Altitude & \sffamily\bfseries L2 · Point mass & \sffamily\bfseries L3 · Quadrotor\\
+\midrule
+motion & vertical only & 3D translation & 3D translation + rotation\\
+state & $y,\ \dot y$ & $\vec p,\ \vec v$ & $\vec p,\ \vec v,\ q,\ \vec\omega$, motors\\
+input & total thrust $T$ & force vector $\vec F$ & four motor thrusts\\
+controller & one PID & three PIDs & cascade of loops\\
+lessons & 1–11, most of II.A–B & 12 & 12–14, most of Part II\\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+At every level the drone is drawn as a full quadcopter with spinning propellers; only its freedom of motion changes. L2 is a deliberate cheat — real multicopters cannot push sideways — and \lessonref{les:tilt} exposes it.
+
+\section*{The physics}
+
+The model is simple enough to reason about and rich enough to make control interesting. All units are SI; the world frame has $y$ pointing up and the floor at $y = 0$.
+
+\subsection*{Motors}
+Each motor $i$ receives a thrust command $f_i^{cmd} \in [0, f_{max}]$ with $f_{max} = \SI{6.1}{N}$, and its rotor responds with a first-order lag,
+\begin{equation}\label{eq:prelude-motor}
+  \tau_m\,\dot r_i = f_i^{cmd} - r_i,\qquad f_i = \eta_i\,r_i ,\qquad \tau_m = \SI{30}{ms}.
+\end{equation}
+$r_i$ is the rotor speed, expressed as the thrust a healthy propeller would make at that speed; the efficiency $\eta_i$ is 1 unless a lesson breaks a propeller (\lessonref{les:indi}). The four motors together lift at most \SI{24.4}{N}, a thrust-to-weight ratio of about 2.5 for the \SI{1}{kg} drone.
+
+\subsection*{Translation}
+Newton's second law, with the thrust along the body's up-axis:
+\begin{equation}\label{eq:prelude-trans}
+  m\,\dot{\vec v} = R(q)\begin{pmatrix}0\\ \textstyle\sum_i f_i\\ 0\end{pmatrix} + m\vec g + \vec F_{drag} + \vec F_{ext}.
+\end{equation}
+$R(q)$ rotates body coordinates into world coordinates (it is the identity at L1). Drag acts on the velocity relative to the air, $\vec v_{rel} = \vec v - \vec w$, quadratically on each axis,
+\begin{equation}
+  F_{drag,j} = -c_j\,|v_{rel,j}|\,v_{rel,j},\qquad c_y = \SI{0.25}{}, \ c_x = c_z = \SI{0.12}{N.s^2/m^2},
+\end{equation}
+which is how the wind acts on the drone: a hovering drone in a wind $\vec w$ is pushed along the wind with a force that grows with its square.
+
+\subsection*{Rotation (L3)}
+The motors sit on an X-shaped frame (\cref{fig:prelude-motors}). Their thrust differences produce roll and pitch torques, and the rotors' aerodynamic drag produces a yaw torque, clockwise and counter-clockwise rotors in opposite directions:
+\begin{equation}
+  \tau_x = d\,(f_1 + f_4 - f_2 - f_3),\quad
+  \tau_z = d\,(f_1 + f_2 - f_3 - f_4),\quad
+  \tau_y = c_\tau\,(f_1 - f_2 + f_3 - f_4),
+\end{equation}
+with $d = L/\sqrt2$, $L = \SI{0.17}{m}$ and $c_\tau = \SI{0.016}{m}$. The body rotates according to Euler's equation and the attitude quaternion $q$ integrates the angular velocity:
+\begin{equation}\label{eq:prelude-rot}
+  I\,\dot{\vec\omega} = \vec\tau - \vec\omega \times (I\vec\omega) - c_\omega\vec\omega ,\qquad
+  \dot q = \tfrac12\,q\otimes(0, \vec\omega).
+\end{equation}
+The inertia is diagonal, $I = \diag(0.0082,\ 0.0149,\ 0.0082)\,\si{kg.m^2}$, the middle entry being the yaw axis. Quaternions — four numbers that describe a rotation without the singularities of angles — are explained in \lessonref{les:geometric} and the \hyperref[app:quat]{appendix}.
+\marginnote{\input{tikz/motors}\par\vspace{2pt}\captionsetup{type=figure}\caption{The motor layout seen from above.}\label{fig:prelude-motors}}
+
+\subsection*{Ground}
+The floor is solid. Touching it slowly means landing; touching it faster than \SI{3}{m/s}, or with a tilt of more than $80^\circ$, is a crash that stops the run. A run starts on the ground; the setpoint rises at \SI{1}{m/s} during take-off, and the integrators of the controllers are held at zero until the take-off is over.
+
+\subsection*{Wind}
+The air velocity is uniform in space and the sum of a constant mean wind, Ornstein–Uhlenbeck turbulence and discrete \enquote{one-minus-cosine} gusts. The details are in \lessonref{les:challenge}, where they matter most.
+
+\subsection*{Sensors}
+The controller never reads the true state. It reads a sensor model that can add Gaussian noise, a bias and a transport delay to each signal, and can hold the position between slow fixes (like a barometer or a GPS receiver). Besides position, velocity, attitude and body rates, the sensors provide an accelerometer — which measures the \emph{specific force} $R^\T(\dot{\vec v} - \vec g)$, so it reads $+g$ upward while hovering and zero in free fall — and the rotor speeds of the motors. Part~II uses both.
+
+\section*{Time}
+
+The physics advances in fixed steps of \SI{1}{ms} with the semi-implicit (symplectic) Euler method: velocities are updated from the forces, then positions from the \emph{new} velocities; the same for the angular velocity and the quaternion, which is renormalised every step. The controllers run on their own clocks — \SI{250}{Hz} for the altitude controller, up to \SI{1}{kHz} for the fastest loop of the quadrotor — and hold their outputs between samples, exactly like the software of a real flight controller. Rendering is decoupled from all of this: the screen shows interpolated states at whatever frame rate the browser manages.
+
+\begin{inapp}[The source code]
+The simulator is written in TypeScript. The physics and the controllers are plain classes with no dependence on the user interface, so they can run headlessly — which is how this book's data were produced.
+\begin{itemize}[leftmargin=1.2em]
+  \item \src{src/sim/} — the drone, the dynamics (\texttt{dynamics.ts}), wind (\texttt{wind.ts}), sensors (\texttt{sensors.ts}), keep-out zones, and all parameters with their defaults (\texttt{params.ts}).
+  \item \src{src/control/} — every controller of the book, one file each, from \texttt{pid.ts} to \texttt{policy.ts}.
+  \item \src{src/estimation/} — the Kalman filter and the disturbance observers of Part~II.
+  \item \src{src/engine/simulation.ts} — the loop that ties it together; \texttt{telemetry.ts} records every signal at \SI{200}{Hz}.
+  \item \src{src/lessons/} — the lessons of this book, as code: set-ups, scripted events, goals.
+\end{itemize}
+\end{inapp}
+
+\section*{Notation}
+
+\begin{center}\small
+\begin{tabularx}{\linewidth}{@{}lX@{\hspace{1.5em}}lX@{}}
+\toprule
+$y$ & altitude (up) & $\vec p,\ \vec v$ & position, velocity\\
+$r$ & setpoint (reference) & $q,\ R(q)$ & attitude quaternion, rotation matrix\\
+$e = r - y$ & error & $\vec\omega$ & body angular velocity\\
+$u$ & controller output & $T,\ f_i$ & collective thrust, motor thrusts\\
+$K_p,\ K_i,\ K_d$ & PID gains & $\tau_m$ & motor time constant\\
+$m,\ \hat m$ & true and assumed mass & $\Delta t$ & controller sample period\\
+$\omega_n,\ \zeta$ & natural frequency, damping ratio & $s$ & Laplace variable\\
+$x$ & state vector (Part II) & $d$ & disturbance\\
+\bottomrule
+\end{tabularx}
+\end{center}
+A hat marks an estimate or a belief ($\hat m$, $\hat x$); a subscript $sp$ a setpoint; $ss$ a steady-state value. Vectors in 3D space carry arrows; state vectors and matrices of Part~II do not.

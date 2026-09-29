@@ -1,0 +1,18 @@
+% Quadrotor X layout seen from above (+x forward, +z right), motor numbers and spin directions
+\begin{tikzpicture}[scale=1.0, every node/.style={font=\sffamily\scriptsize}]
+  \def\d{1.15}
+  \draw[line width=2.2pt, ink!80, line cap=round] (-\d,-\d) -- (\d,\d) (-\d,\d) -- (\d,-\d);
+  \fill[accent, rounded corners=2pt] (-0.35,-0.25) rectangle (0.35,0.25);
+  \foreach \x/\y/\n/\dir in {\d/-\d/1/cw, \d/\d/2/ccw, -\d/\d/3/cw, -\d/-\d/4/ccw} {
+    \draw[hair, fill=mist] (\y,\x) circle (0.55);
+    \fill[ink] (\y,\x) circle (0.13);
+    \node[text=ink] at ($(\y,\x)+(0,0.3)$) {M\n};
+    \ifthenelse{\equal{\dir}{cw}}
+      {\draw[->, sigP, line width=0.6pt] ($(\y,\x)+(150:0.42)$) arc (150:30:0.42);}
+      {\draw[->, sigmeas, line width=0.6pt] ($(\y,\x)+(30:0.42)$) arc (30:150:0.42);}
+  }
+  \draw[->, line width=0.6pt] (0,1.95) -- (0,2.45) node[above] {$+x_b$ (front)};
+  \draw[->, line width=0.6pt] (1.95,0) -- (2.45,0) node[right] {$+z_b$};
+  \node[text=sigP] at (-2.3,-1.6) {CW};
+  \node[text=sigmeas] at (-2.3,-1.9) {CCW};
+\end{tikzpicture}

@@ -1,0 +1,115 @@
+\lesson{5}{Integral to the rescue}{A term that remembers every error — and therefore can only rest when there is none.}{1}{integral}{Part I · PID}
+\label{les:integral}
+
+\lead{The drone has picked up a \SI{400}{g} payload, and nobody told the controller. The feedforward still holds up one kilogram; the extra weight hangs on the spring of the P term, and the drone settles almost forty centimetres low. We already know one cure from \lessonref{les:droop}. This lesson looks at it closely: why it works, how fast it can be, and what it costs.}
+
+\section{A wrong model, a constant error}
+
+The controller believes $\hat m = \SI{1}{kg}$; the drone weighs $m = \SI{1.4}{kg}$. The feedforward $\hat m g$ is short by
+\begin{equation}
+  \Delta F = (m - \hat m)\,g = 0.4 \cdot 9.81 = \SI{3.92}{N},
+\end{equation}
+and by the result of \lessonref{les:droop} the PD loop settles with
+\begin{equation}
+  e_{ss} = \frac{\Delta F}{K_p} = \frac{3.92}{10} \approx \SI{0.39}{m}.
+\end{equation}
+The simulator agrees: in \cref{fig:integral-run} the drone hovers at \SI{1.61}{m} until the integral is switched on at $t = \SI{10}{s}$.
+
+This situation is the rule, not the exception. Real models are always a little wrong: the mass changes with the payload, the thrust per unit command falls as the battery drains, a constant wind adds a drag force. Each of these is a constant (or slowly varying) load that the feedforward does not know. We want a controller that removes the resulting error \emph{without} knowing its cause.
+
+\section{Why the integral must win}
+
+Add the integral term, $I(t) = K_i\int_0^t e\,\dd\tau$, so that $\dot I = K_i\,e$. Suppose the closed loop comes to rest somewhere. At rest every signal is constant, so in particular $\dot I = 0$, which means
+\begin{equation}
+  K_i\,e_{ss} = 0 \qquad\Longrightarrow\qquad e_{ss} = 0 .
+\end{equation}
+That is the whole argument, and it does not mention the size of the load, the mass, the wind or even the other gains. \emph{If} the loop settles, it settles at zero error, and the integral then holds exactly the missing force: $I_{ss} = \Delta F$. \Cref{fig:integral-run} shows the green curve climbing to \SI{3.92}{N}.
+
+\simfig{integral_run}{A \SI{1.4}{kg} drone and a controller that believes it weighs \SI{1}{kg}. Top: the altitude; bottom: the integral term. With the integral off the drone hangs \SI{0.39}{m} low; with $K_i = 0.8$ it creeps up over tens of seconds; with $K_i = 5$ it arrives in about four.}{fig:integral-run}
+
+\begin{keyidea}[Integral action]
+An integrator in the loop makes a constant disturbance produce zero steady-state error, whatever its size and origin. It does so by \emph{learning} the missing force: at equilibrium the integral equals it. This is the reason almost every practical controller has an integral term — and, in a more general form (the \emph{internal model principle}), why Part~II's controllers carry integrators, observers or adaptive estimates.
+\end{keyidea}
+
+\section{How fast? The third-order loop}
+
+The word \enquote{if} above matters: an integral can also destabilise the loop. With P, I and D, the closed loop for $x = y - r$ and a constant load $\Delta F$ is
+\begin{equation}
+  m\ddot x = -K_p x - K_d\dot x - K_i\!\int\! x\,\dd t - \Delta F .
+\end{equation}
+Differentiate once to remove the integral (and the constant load):
+\begin{equation}\label{eq:integral-cubic}
+  m\dddot x + K_d\ddot x + K_p\dot x + K_i x = 0 ,\qquad
+  m s^3 + K_d s^2 + K_p s + K_i = 0 .
+\end{equation}
+For a cubic $a_3 s^3 + a_2 s^2 + a_1 s + a_0$ with positive coefficients, the Routh–Hurwitz criterion says that all roots have negative real parts if and only if
+\begin{equation}\label{eq:integral-routh}
+  a_2 a_1 > a_3 a_0 \qquad\Longleftrightarrow\qquad K_d K_p > m K_i .
+\end{equation}
+For our \SI{1.4}{kg} drone with $K_p = 10$, $K_d = 7$ the integral gain must stay below $70/1.4 = 50$. That is a generous limit, but the approach to it is not gentle: as $K_i$ grows, a pair of poles moves towards the imaginary axis and the response rings longer and longer. In practice $K_i$ is chosen far below the limit.\aside{The Routh–Hurwitz criterion is proved in the math appendix, \cref{app:routh}. For higher orders it becomes a table, but the idea is the same: stability can be decided from the coefficients without solving for the roots.}
+
+For small $K_i$ one root of \cref{eq:integral-cubic} is real and close to $-K_i/K_p$ (Exercise~\ref*{les:droop}.3), which is the slow creep of \cref{eq:droop-tau}: with $K_i = 0.8$ a time constant of \SI{12.5}{s}, with $K_i = 5$ only \SI{2}{s}.
+
+\section{The price: overshoot you cannot avoid}
+
+In the payload experiment, the $K_i = 5$ run arrives at the setpoint without overshooting. So is integral action free? Look instead at a \emph{setpoint} step with an unchanged load (\cref{fig:integral-area}), and you will find a surprising rule.
+
+\simfig{integral_area}{A setpoint step with the integral on. The integral must return to the value it had before the step, so the green (positive) area of the error must be cancelled by a red (negative) one — the drone has to go above the setpoint. A larger $K_i$ makes this overshoot larger.}{fig:integral-area}
+
+Before the step the drone is in equilibrium with integral $I_0$ (the load it had learned). After the step, once everything has settled, the load is the same, so the integral must be back at $I_0$. Therefore
+\begin{equation}
+  I(\infty) - I(t_0) = K_i\int_{t_0}^{\infty} e(t)\,\dd t = 0 .
+\end{equation}
+During the climb the error is positive. For the integral of the error to vanish, the error must spend some time negative: \textbf{the drone must overshoot}. This is not a tuning mistake; it is arithmetic. A larger $K_i$ makes the integral grow more during the climb and the overshoot larger (\SI{4.9}{cm} with $K_i = 0.8$, \SI{14}{cm} with $K_i = 3$ in \cref{fig:integral-area}).
+
+That is exactly why good controllers let the feedforward carry the known load and keep $K_i$ small: the integral then only has to learn the small unknown remainder, and the overshoot it causes stays small. And it explains the difference with the payload experiment: there the integral had to \emph{change} its value, from 0 to \SI{3.92}{N}, so no negative area was needed.
+
+\begin{inapp}
+\begin{itemize}[leftmargin=1.2em]
+  \item The lesson sets \param{drone.mass = 1.4} (the truth, \ui{Physics\then Mass}) while \param{control.model.mass} stays at 1 (the belief, \ui{Controller\then Assumed mass}). Keeping the two apart is a design principle of the simulator: every controller has a \emph{model} that may be wrong.
+  \item Goal: steady-state error below \SI{1}{cm}.
+  \item The integral stores the already-scaled sum $\sum K_i e_k\Delta t$ (\src{src/control/pid.ts}), so changing $K_i$ in flight does not make the output jump — try it.
+  \item The integrators are held at zero on the ground and during take-off (\src{src/engine/simulation.ts}); otherwise they would wind up before the drone even leaves the floor. Real autopilots do the same.
+\end{itemize}
+\end{inapp}
+
+\begin{trythis}
+\begin{enumerate}
+  \item Switch \It on and watch the green curve climb to about \SI{3.9}{N} in the PID-terms chart.
+  \item Try $K_i = 5$: faster. Then give the drone a setpoint step (\key{↑} with \key{Shift} for \SI{1}{m}) and look for the overshoot.
+  \item Push $K_i$ to 30 and then 45, and make steps. Compare with the limit $K_i < K_d K_p/m = 50$.
+\end{enumerate}
+\predict{if you now remove the payload (\ui{Physics\then Mass} = \SI{1}{kg}) in mid-flight, which way does the drone jump, and what does the integral do?}
+\end{trythis}
+
+\begin{curiosity}{How a battleship taught PID}
+\photo{newmexico}{USS New Mexico (BB-40) in 1920. In 1923 Nicolas Minorsky's automatic steering was tested on board.}
+\sidephoto{minorsky}{34mm}{Nicolas Minorsky (1885–1970).}
+In the early 1920s the US Navy asked a Russian-born engineer, Nicolas Minorsky, to look at automatic ship steering. He did something unusual: he watched helmsmen. A good helmsman, he noticed, does not just turn the wheel in proportion to how far the ship is off course. He also watches how fast the bow is swinging and anticipates it; and if a steady wind or current keeps pushing the ship to one side, he learns to hold a little extra rudder to compensate.
+
+In his 1922 paper \emph{Directional stability of automatically steered bodies}, Minorsky turned these three habits into mathematics: a rudder angle proportional to the heading error, to its rate of change, and to its integral. He analysed the stability of the resulting loop with a linearised model of the ship — the method of this book — and in 1923 his controller steered the battleship USS New Mexico, holding the heading to within a few degrees.
+
+The Navy did not adopt it then; helmsmen were cheap and the equipment was not. But the paper is generally considered the first theoretical description of the PID controller, and the three habits of a good helmsman are still the three terms on the screen of Anemostatos.
+\end{curiosity}
+
+\begin{remember}
+\begin{itemize}
+  \item A constant unmodelled load leaves a PD loop with an error $\Delta F/K_p$.
+  \item An integral can only be at rest when the error is zero, so a stable PID loop removes any constant load; the integral ends up equal to the load.
+  \item P, I and D on a mass give a third-order loop; it is stable iff $K_d K_p > m K_i$.
+  \item After a setpoint step with unchanged load, integral action \emph{must} overshoot. Keep $K_i$ small and let feedforward carry the known load.
+\end{itemize}
+\end{remember}
+
+\begin{exercises}
+\exercise[1] A constant downward wind adds a drag force of \SI{1.2}{N}. With the default PID, what is the final value of the I term? And of the error?
+\answer{The error goes to zero and the integral holds the extra load: $I_{ss} = +\SI{1.2}{N}$ (upwards).}
+\exercise[1] Convert the default gains $K_p = 10$, $K_i = 0.8$, $K_d = 7$ to the standard form $K_p(e + \tfrac1{T_i}\int e + T_d\dot e)$.
+\answer{$T_i = K_p/K_i = \SI{12.5}{s}$, $T_d = K_d/K_p = \SI{0.7}{s}$.}
+\exercise[2] Prove the Routh–Hurwitz condition for the cubic $s^3 + a_2 s^2 + a_1 s + a_0$ at the boundary: show that it has a pair of roots $\pm j\omega$ exactly when $a_2 a_1 = a_0$, and find $\omega$.
+\answer{Substitute $s = j\omega$: $-j\omega^3 - a_2\omega^2 + j a_1\omega + a_0 = 0$. Real part: $a_0 = a_2\omega^2$; imaginary part: $\omega^2 = a_1$. Both hold iff $a_0 = a_2 a_1$, with $\omega = \sqrt{a_1}$.}
+\exercise[2] For the \SI{1.4}{kg} drone with $K_p=10$, $K_d=7$, at which $K_i$ does the loop oscillate forever, and with which period?
+\answer{Normalise by $m$: $a_2 = 5$, $a_1 = 7.14$, $a_0 = K_i/1.4$. Boundary $a_0 = a_2a_1$ gives $K_i = 50$; $\omega = \sqrt{7.14} = \SI{2.67}{rad/s}$, period \SI{2.35}{s}.}
+\exercise[3] Show the overshoot rule more generally: for any stable loop with an integrator, a unit setpoint step and no change of load, $\int_{t_0}^\infty e\,\dd t = 0$ — even if the loop is not linear, as long as it settles. Why does the rule not force overshoot when the load changes?
+\answer{The integral state is $I = K_i\int e$; before the step and after settling the plant is in the same equilibrium with the same load, which requires the same thrust and hence (P and D being zero at rest) the same $I$. So $\Delta I = K_i\int e = 0$. If the load changes by $\Delta F$, then $\Delta I = \Delta F$ and $\int e = \Delta F/K_i \neq 0$: a one-signed error is allowed.}
+\end{exercises}

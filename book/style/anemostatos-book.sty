@@ -1,0 +1,531 @@
+% ============================================================================
+%  anemostatos-book.sty — the design of "Standing in the Wind"
+%  One quantity = one colour, as in the simulator (src/ui/colors.ts).
+% ============================================================================
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{anemostatos-book}[2026/09/28]
+
+% ---------------------------------------------------------------- page ------
+\RequirePackage[
+  paperwidth=210mm, paperheight=297mm,
+  left=24mm, textwidth=124mm,
+  marginparsep=7mm, marginparwidth=46mm,
+  top=27mm, textheight=238mm, headsep=9mm, headheight=14pt, footskip=12mm
+]{geometry}
+\RequirePackage{calc}
+\newlength{\fullwidthlen}
+\setlength{\fullwidthlen}{\dimexpr\textwidth+\marginparsep+\marginparwidth\relax}
+
+% ---------------------------------------------------------------- fonts -----
+\RequirePackage{fontspec}
+\RequirePackage{amsmath,amssymb,mathtools}
+\RequirePackage[math-style=ISO,bold-style=ISO]{unicode-math}
+\setmainfont{LibertinusSerif}[
+  Extension=.otf, UprightFont=*-Regular, ItalicFont=*-Italic,
+  BoldFont=*-Semibold, BoldItalicFont=*-SemiboldItalic,
+  Numbers={Proportional,OldStyle}, Ligatures=TeX]
+\newfontfamily\liningserif{LibertinusSerif}[
+  Extension=.otf, UprightFont=*-Regular, ItalicFont=*-Italic,
+  BoldFont=*-Semibold, BoldItalicFont=*-SemiboldItalic, Numbers=Lining]
+\newfontfamily\displayserif{LibertinusSerifDisplay-Regular.otf}
+\setsansfont{FiraSans}[
+  Extension=.otf, UprightFont=*-Book, ItalicFont=*-BookItalic,
+  BoldFont=*-SemiBold, BoldItalicFont=*-SemiBoldItalic, Numbers=Lining]
+\newfontfamily\sanslight{FiraSans}[Extension=.otf, UprightFont=*-Light, ItalicFont=*-LightItalic, BoldFont=*-Medium, Numbers=Lining]
+\newfontfamily\sansthin{FiraSans}[Extension=.otf, UprightFont=*-ExtraLight, Numbers=Lining]
+\newfontfamily\sansmedium{FiraSans}[Extension=.otf, UprightFont=*-Medium, ItalicFont=*-MediumItalic, Numbers=Lining]
+\newfontfamily\sansdisplay{FiraSans}[Extension=.otf, UprightFont=*-Light, BoldFont=*-Regular, WordSpace={1.45}, Numbers=Lining]
+\newfontfamily\sanscaps{FiraSans}[Extension=.otf, UprightFont=*-Medium, LetterSpace=9, Numbers=Lining]
+\setmonofont{FiraMono}[Extension=.otf, UprightFont=*-Regular, BoldFont=*-Medium, Scale=0.86]
+\setmathfont{LibertinusMath-Regular.otf}
+\setmathfont{LibertinusMath-Regular.otf}[range={up/{num}}, Numbers=Lining]
+\linespread{1.08}
+\RequirePackage[protrusion=true,expansion=true,tracking=true]{microtype}
+\SetTracking{encoding=*, shape=sc}{40}
+
+% ---------------------------------------------------------------- colour ----
+\RequirePackage[dvipsnames]{xcolor}
+\definecolor{ink}{HTML}{1C2330}
+\definecolor{muted}{HTML}{5D6675}
+\definecolor{faint}{HTML}{8A93A3}
+\definecolor{hair}{HTML}{D9DDE3}
+\definecolor{mist}{HTML}{F3F5F8}
+\definecolor{accent}{HTML}{E8661A}       % the app's orange (#ff7a1a), deepened for paper
+\definecolor{accentsoft}{HTML}{FFF4EB}
+\definecolor{night}{HTML}{0B0E13}        % the 3D scene
+\definecolor{nightsky}{HTML}{1A2230}
+\definecolor{gridmajor}{HTML}{3D4A5E}
+\definecolor{gridminor}{HTML}{2A3342}
+\definecolor{nighttext}{HTML}{E6E9EF}
+\definecolor{nightmuted}{HTML}{9AA3B2}
+\definecolor{deepblue}{HTML}{2F5D8A}
+\definecolor{bluesoft}{HTML}{F1F5FA}
+\definecolor{warn}{HTML}{C9453E}
+\definecolor{warnsoft}{HTML}{FDF3F2}
+\definecolor{paper}{HTML}{F7F3EA}        % curiosity pages
+\definecolor{sepia}{HTML}{7A5C3A}
+% signals, as in src/ui/colors.ts (a touch darker where white paper needs it)
+\definecolor{sigsp}{HTML}{8A93A3}
+\definecolor{sigmeas}{HTML}{3987E5}
+\definecolor{sigerr}{HTML}{D64F4F}
+\definecolor{sigP}{HTML}{D95926}
+\definecolor{sigI}{HTML}{199E70}
+\definecolor{sigD}{HTML}{7C70DA}
+\definecolor{sigFF}{HTML}{C98500}
+\definecolor{sigwind}{HTML}{2DA44E}
+\color{ink}
+
+% ---------------------------------------------------------------- tools -----
+\RequirePackage{graphicx}
+\graphicspath{{figures/out/}{photos/}{screens/}{../docs/images/}}
+\RequirePackage{tikz}
+\usetikzlibrary{arrows.meta,calc,positioning,shapes.geometric,decorations.pathmorphing,
+  decorations.markings,fadings,shadows.blur,backgrounds,fit,patterns,intersections}
+\RequirePackage[most]{tcolorbox}
+\RequirePackage{booktabs,tabularx,array,multirow,colortbl}
+\RequirePackage{enumitem}
+\RequirePackage[strict]{changepage}
+\RequirePackage{siunitx}
+\sisetup{detect-all, group-minimum-digits=4, per-mode=symbol, range-phrase=--, range-units=single}
+\RequirePackage{csquotes}
+\RequirePackage{xspace}
+\RequirePackage{etoolbox}
+\RequirePackage{ifthen}
+\RequirePackage{fancyhdr}
+\RequirePackage{titlesec}
+\RequirePackage{titletoc}
+\RequirePackage{emptypage}
+\RequirePackage{afterpage}
+\RequirePackage{needspace}
+\RequirePackage[export]{adjustbox}
+\RequirePackage{wrapfig}
+\RequirePackage{placeins}
+
+% margin notes and side captions
+\RequirePackage{marginnote}
+\renewcommand*{\marginfont}{\sffamily\footnotesize\color{muted}\raggedright\linespread{1.05}\selectfont}
+\RequirePackage[font={small,sf,color=muted},labelfont={bf,color=ink},
+  labelsep=period,justification=raggedright,singlelinecheck=false,skip=5pt]{caption}
+\DeclareCaptionFont{muted}{\color{muted}}
+\RequirePackage{sidenotes}
+\DeclareCaptionStyle{sidecaption}{font={footnotesize,sf,color=muted},labelfont={bf,color=ink},
+  labelsep=period,justification=raggedright,singlelinecheck=false}
+\DeclareCaptionStyle{marginfigure}{font={footnotesize,sf,color=muted},labelfont={bf,color=ink},
+  labelsep=period,justification=raggedright,singlelinecheck=false}
+\DeclareCaptionStyle{margintable}{font={footnotesize,sf,color=muted},labelfont={bf,color=ink},
+  labelsep=period,justification=raggedright,singlelinecheck=false}
+\renewcommand{\sidenotetext}[2][]{\marginnote{\sffamily\footnotesize\color{muted}\makebox[0pt][r]{\textsuperscript{\color{accent}\thesidenote}\,}#2}}
+\RequirePackage{hyperref}
+\hypersetup{colorlinks=true, linkcolor=deepblue, urlcolor=deepblue, citecolor=deepblue,
+  pdftitle={Standing in the Wind — A course in feedback control with Anemostatos},
+  pdfauthor={Anemostatos}, pdfsubject={Control theory}, bookmarksnumbered=true}
+\RequirePackage[nameinlink,capitalise,noabbrev]{cleveref}
+\crefname{lesson}{Lesson}{Lessons}
+\crefname{figure}{Figure}{Figures}
+\crefname{equation}{Equation}{Equations}
+\creflabelformat{equation}{#2(#1)#3}
+
+\setlist{itemsep=2pt, topsep=4pt, leftmargin=1.4em}
+\setlist[itemize]{label={\color{accent}\small\raisebox{0.1ex}{$\blacktriangleright$}}}
+\setlist[enumerate]{label={\sffamily\small\color{accent}\arabic*}, leftmargin=1.6em}
+
+\setlength{\parindent}{1.2em}
+\setlength{\parskip}{0pt}
+\frenchspacing
+\widowpenalty=10000 \clubpenalty=10000
+\raggedbottom
+
+% ---------------------------------------------------------------- lesson label plumbing
+% \thechapter prints the lesson's own label (1 … 14, II.1 … II.21).
+\newcommand{\lessonlabel}{0}
+\renewcommand{\thechapter}{\lessonlabel}
+\renewcommand{\thesection}{\lessonlabel.\arabic{section}}
+\renewcommand{\theequation}{\lessonlabel.\arabic{equation}}
+\renewcommand{\thefigure}{\lessonlabel.\arabic{figure}}
+\renewcommand{\thetable}{\lessonlabel.\arabic{table}}
+\newcommand{\lessontitle}{}
+\newcommand{\lessonpart}{}
+
+% ---------------------------------------------------------------- headings --
+\titleformat{\section}[hang]{\sffamily\fontsize{15}{19}\selectfont\color{ink}}
+  {\llap{\color{accent}\sanslight\thesection\hspace{0.8em}}}{0pt}{}
+\titlespacing*{\section}{0pt}{22pt plus 4pt minus 2pt}{8pt}
+\titleformat{\subsection}[hang]{\sffamily\fontsize{11.5}{14}\selectfont\bfseries\color{ink}}
+  {}{0pt}{}
+\titlespacing*{\subsection}{0pt}{14pt plus 3pt}{4pt}
+\titleformat{\subsubsection}[runin]{\normalfont\itshape\color{ink}}{}{0pt}{}[.]
+\titlespacing*{\subsubsection}{0pt}{8pt}{0.6em}
+\setcounter{secnumdepth}{1}
+\setcounter{tocdepth}{0}
+
+% ---------------------------------------------------------------- header ----
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhfoffset[R]{\dimexpr\marginparsep+\marginparwidth\relax}
+\renewcommand{\headrulewidth}{0pt}
+\fancyhead[L]{\sffamily\footnotesize\color{faint}%
+  \ifdefempty{\lessontitle}{\leftmark}{{\color{accent}\lessonlabel}\hspace{0.6em}\lessontitle}}
+\fancyhead[R]{\sffamily\footnotesize\color{faint}%
+  \ifdefempty{\lessonpart}{}{\lessonpart\hspace{1.2em}}{\color{ink}\thepage}}
+\fancypagestyle{plain}{\fancyhf{}\fancyfoot[R]{\sffamily\footnotesize\color{faint}\thepage}}
+\fancypagestyle{empty}{\fancyhf{}}
+
+% ---------------------------------------------------------------- the night scene
+% A perspective floor grid like the simulator's, used on openers and the cover.
+% #1 = height of the band, #2 = horizon position (fraction of height from top)
+\newcommand{\nightgrid}[2]{%
+  \fill[night] (0,0) rectangle (\paperwidth,-#1);
+  \shade[top color=night, bottom color=nightsky] (0,0) rectangle (\paperwidth,-#2*#1);
+  \begin{scope}
+    \clip (0,-#2*#1) rectangle (\paperwidth,-#1);
+    \pgfmathsetmacro{\hy}{-#2*#1/1cm}
+    \pgfmathsetmacro{\by}{-#1/1cm}
+    \pgfmathsetmacro{\cx}{0.62*\paperwidth/1cm}
+    \foreach \i in {-40,...,40} {
+      \pgfmathsetmacro{\xb}{\cx+\i*2.1}
+      \draw[gridminor, line width=0.35pt] (\cx,\hy) -- (\xb,\by-6);
+    }
+    \foreach \k in {1,...,26} {
+      \pgfmathsetmacro{\yy}{\hy+(\by-\hy-6)*(1/(1+0.33*(26-\k)))}
+      \draw[gridmajor, line width={0.2pt+0.02pt*\k}] (0,\yy) -- (\paperwidth,\yy);
+    }
+    \shade[top color=nightsky, bottom color=nightsky, middle color=nightsky, opacity=0.0] (0,\hy) rectangle (\paperwidth,\hy-0.3);
+    \fill[nightsky, path fading=south] (0,\hy) rectangle (\paperwidth,\hy-1.6);
+  \end{scope}
+}
+
+% ---------------------------------------------------------------- lesson opener
+% \lesson{label}{title}{subtitle}{level}{app id}{part tag}
+\newcommand{\lessonlevelname}[1]{%
+  \ifstrequal{#1}{1}{L1 · altitude}{\ifstrequal{#1}{2}{L2 · point mass}{\ifstrequal{#1}{3}{L3 · quadrotor}{#1}}}}
+\newcommand{\lesson}[6]{%
+  \clearpage
+  \refstepcounter{chapter}%
+  \renewcommand{\lessonlabel}{#1}%
+  \renewcommand{\lessontitle}{#2}%
+  \renewcommand{\lessonpart}{#6}%
+  \setcounter{section}{0}\setcounter{equation}{0}\setcounter{figure}{0}\setcounter{table}{0}%
+  \setcounter{sidenote}{0}%
+  \protected@edef\@currentlabel{#1}%
+  \addcontentsline{toc}{chapter}{\protect\numberline{#1}#2}%
+  \markboth{#2}{#2}%
+  \thispagestyle{plain}%
+  \begin{tikzpicture}[remember picture, overlay, shift={(current page.north west)}]
+    \nightgrid{88mm}{0.62}
+    % a soft glow where the drone would hover
+    \shade[inner color=accent!55!night, outer color=night, opacity=0.35]
+      ($(0.72\paperwidth,-46mm)$) circle (30mm);
+    \node[anchor=north west, inner sep=0pt, text=nightmuted] at (24mm,-19mm)
+      {\sanscaps\footnotesize LESSON\hspace{1.2em}\color{accent}\lessonlevelname{#4}};
+    \node[anchor=north west, inner sep=0pt, text=accent] at (22.5mm,-27mm)
+      {\sansthin\fontsize{64}{64}\selectfont #1};
+    \node[anchor=south west, inner sep=0pt, text=nighttext, inner sep=0pt] at (24mm,-72mm)
+      {\parbox[b]{150mm}{\raggedright\sansdisplay\fontsize{28}{32}\selectfont #2}};
+    \node[anchor=north west, inner sep=0pt, text=nightmuted, inner sep=0pt] at (24mm,-76mm)
+      {\parbox[t]{150mm}{\raggedright\displayserif\itshape\fontsize{12.5}{15}\selectfont #3}};
+    \node[anchor=north east, inner sep=0pt, text=nightmuted] at ($(\paperwidth-14mm,-19mm)$)
+      {\ttfamily\footnotesize\color{nightmuted}lesson id \color{accent}'#5'};
+  \end{tikzpicture}%
+  \vspace*{73mm}%
+  \@afterindentfalse\@afterheading
+}
+
+% A lesson-free chapter (preface, prelude, appendices) with the same opener.
+\newcommand{\bookchapter}[3]{% {toc label}{title}{subtitle}
+  \clearpage
+  \refstepcounter{chapter}%
+  \renewcommand{\lessonlabel}{#1}%
+  \renewcommand{\lessontitle}{#2}%
+  \renewcommand{\lessonpart}{}%
+  \setcounter{section}{0}\setcounter{equation}{0}\setcounter{figure}{0}\setcounter{table}{0}%
+  \protected@edef\@currentlabel{#1}%
+  \ifstrempty{#1}{\addcontentsline{toc}{chapter}{#2}}{\addcontentsline{toc}{chapter}{\protect\numberline{#1}#2}}%
+  \markboth{#2}{#2}%
+  \thispagestyle{plain}%
+  \begin{tikzpicture}[remember picture, overlay, shift={(current page.north west)}]
+    \nightgrid{70mm}{0.66}
+    \node[anchor=south west, inner sep=0pt, text=nighttext, inner sep=0pt] at (24mm,-52mm)
+      {\parbox[b]{160mm}{\raggedright\sansdisplay\fontsize{28}{32}\selectfont #2}};
+    \node[anchor=north west, inner sep=0pt, text=nightmuted, inner sep=0pt] at (24mm,-56mm)
+      {\parbox[t]{160mm}{\raggedright\displayserif\itshape\fontsize{12.5}{15}\selectfont #3}};
+    \ifstrempty{#1}{}{\node[anchor=north west, inner sep=0pt, text=accent] at (24mm,-17mm)
+      {\sansthin\fontsize{40}{40}\selectfont #1};}
+  \end{tikzpicture}%
+  \vspace*{55mm}%
+  \@afterindentfalse\@afterheading
+}
+
+% ---------------------------------------------------------------- part pages
+\newcommand{\bookpart}[4]{% {numeral}{title}{epigraph}{intro}
+  \clearpage
+  \thispagestyle{empty}%
+  \renewcommand{\lessontitle}{}\renewcommand{\lessonpart}{}%
+  \addcontentsline{toc}{part}{\protect\numberline{#1}#2}%
+  \begin{tikzpicture}[remember picture, overlay, shift={(current page.north west)}]
+    \nightgrid{\paperheight}{0.52}
+    \shade[inner color=accent!60!night, outer color=night, opacity=0.35]
+      ($(0.62\paperwidth,-0.47\paperheight)$) circle (45mm);
+    \node[anchor=north west, text=nightmuted, inner sep=0pt] at (24mm,-40mm) {\sanscaps\small PART};
+    \node[anchor=north west, text=accent, inner sep=0pt] at (21mm,-47mm)
+      {\displayserif\fontsize{120}{120}\selectfont #1};
+    \node[anchor=north west, text=nighttext, inner sep=0pt] at (24mm,-100mm)
+      {\parbox[t]{165mm}{\raggedright\sansdisplay\fontsize{38}{44}\selectfont #2}};
+    \node[anchor=north west, text=nightmuted, inner sep=0pt] at (24mm,-128mm)
+      {\parbox[t]{120mm}{\raggedright\displayserif\itshape\fontsize{13}{17}\selectfont #3}};
+    \node[anchor=south west, text=nighttext, inner sep=0pt] at (24mm,-280mm)
+      {\parbox[b]{150mm}{\raggedright\sffamily\small\color{nightmuted}#4}};
+  \end{tikzpicture}%
+  \null\clearpage
+}
+
+% Part II's five chapters (A–E): a light divider page
+\newcommand{\movement}[3]{% {letter}{title}{text}
+  \clearpage
+  \thispagestyle{empty}%
+  \renewcommand{\lessontitle}{}\renewcommand{\lessonpart}{}%
+  \addcontentsline{toc}{section}{#1\quad #2}%
+  \begin{tikzpicture}[remember picture, overlay, shift={(current page.north west)}]
+    \fill[mist] (0,0) rectangle (\paperwidth,-\paperheight);
+    \node[anchor=north west, text=accent!22, inner sep=0pt] at (14mm,-18mm)
+      {\sansthin\fontsize{260}{260}\selectfont #1};
+    \node[anchor=north west, text=muted, inner sep=0pt] at (24mm,-112mm) {\sanscaps\small CHAPTER #1 OF PART II};
+    \node[anchor=north west, text=ink, inner sep=0pt] at (24mm,-120mm)
+      {\parbox[t]{160mm}{\raggedright\sansdisplay\fontsize{30}{36}\selectfont #2}};
+    \node[anchor=north west, text=ink, inner sep=0pt] at (24mm,-146mm)
+      {\parbox[t]{124mm}{\normalsize #3}};
+  \end{tikzpicture}%
+  \null\clearpage
+}
+
+% ---------------------------------------------------------------- table of contents
+\titlecontents{part}[0pt]{\addvspace{18pt}\sffamily\large\bfseries}
+  {\makebox[2.2em][l]{\color{accent}\thecontentslabel}}{}{\hfill\contentspage}[\addvspace{4pt}]
+\titlecontents{section}[2.2em]{\addvspace{8pt}\sffamily\small\color{muted}}
+  {}{}{}[\addvspace{2pt}]
+\titlecontents{chapter}[2.2em]{\addvspace{2.5pt}\normalsize}
+  {\contentslabel[{\sffamily\small\color{accent}\thecontentslabel}]{2.2em}}{\hspace*{-2.2em}}
+  {\titlerule*[0.6pc]{\color{hair}.}\sffamily\small\contentspage}
+
+% ---------------------------------------------------------------- boxes -----
+\tcbset{
+  base/.style={enhanced, breakable, coltitle=ink, boxrule=0pt, arc=1.5pt, outer arc=1.5pt,
+    left=10pt, right=10pt, top=7pt, bottom=7pt, before skip=12pt, after skip=12pt,
+    fontupper=\normalsize, parbox=false},
+  label/.style={title={#1}, attach title to upper, coltitle=ink,
+    fonttitle={\sanscaps\scriptsize}, after title={\par\smallskip}},
+}
+\newcommand{\boxlabel}[2]{{\color{#1}\sanscaps\scriptsize #2}}
+
+% Definition — deep blue rule
+\newtcolorbox{definition}[1]{base, colback=bluesoft, borderline west={2.2pt}{0pt}{deepblue},
+  title={\boxlabel{deepblue}{DEFINITION}\hspace{0.8em}{\sffamily\small\bfseries #1}}, attach title to upper,
+  after title={\par\smallskip}}
+
+% Key idea — accent rule
+\newtcolorbox{keyidea}[1][]{base, colback=accentsoft, borderline west={2.2pt}{0pt}{accent},
+  title={\boxlabel{accent}{KEY IDEA}\ifstrempty{#1}{}{\hspace{0.8em}{\sffamily\small\bfseries #1}}},
+  attach title to upper, after title={\par\smallskip}}
+
+% Result (a boxed formula or statement)
+\newtcolorbox{result}[1][]{base, colback=white, colframe=accent, boxrule=0.6pt, arc=2pt,
+  title={\boxlabel{accent}{RESULT}\ifstrempty{#1}{}{\hspace{0.8em}{\sffamily\small\bfseries #1}}},
+  attach title to upper, after title={\par\smallskip}}
+
+% Worked example
+\newtcolorbox{example}[1][]{base, colback=white, colframe=hair, boxrule=0.6pt,
+  title={\boxlabel{muted}{WORKED EXAMPLE}\ifstrempty{#1}{}{\hspace{0.8em}{\sffamily\small\bfseries #1}}},
+  attach title to upper, after title={\par\smallskip}}
+
+% Watch out
+\newtcolorbox{watchout}[1][]{base, colback=warnsoft, borderline west={2.2pt}{0pt}{warn},
+  title={\boxlabel{warn}{WATCH OUT}\ifstrempty{#1}{}{\hspace{0.8em}{\sffamily\small\bfseries #1}}},
+  attach title to upper, after title={\par\smallskip}}
+
+% In Anemostatos — styled like the app itself
+\newcommand{\appmark}{\tikz[baseline=-0.1em]{\draw[accent, line width=1.2pt, line cap=round] (0,0)--(0.62em,0.62em) (0,0.62em)--(0.62em,0);}}
+\newtcolorbox{inapp}[1][]{base, colback=night, colupper=nighttext, coltitle=nighttext, arc=3pt,
+  fontupper={\sffamily\small\linespread{1.18}\selectfont\raggedright},
+  title={\appmark\hspace{0.5em}\boxlabel{nightmuted}{IN ANEMOSTATOS}\ifstrempty{#1}{}{\hspace{0.8em}{\color{nighttext}\sffamily\small\bfseries #1}}},
+  attach title to upper, after title={\par\smallskip},
+  before upper app={\let\src\srcnight\let\param\paramnight\let\ui\uinight\let\key\keynight}}
+
+% Try this — the app's own orange-bordered box
+\newtcolorbox{trythis}[1][]{base, colback=accentsoft!55, colframe=accent, boxrule=0.7pt, arc=3pt,
+  title={\boxlabel{accent}{TRY THIS}\ifstrempty{#1}{}{\hspace{0.8em}{\sffamily\small\bfseries #1}}},
+  attach title to upper, after title={\par\smallskip}}
+\newcommand{\predict}[1]{\par\smallskip\noindent{\color{accent}\sffamily\small\bfseries Predict first.}\enspace\textit{#1}\par\smallskip}
+
+% What to remember
+\newtcolorbox{remember}{base, colback=mist, arc=3pt, left=12pt, right=12pt, top=9pt, bottom=9pt,
+  title={\boxlabel{ink}{WHAT TO REMEMBER}}, attach title to upper, after title={\par\medskip},
+  before upper app={\setlist[itemize]{label={\color{sigI}\small\checkmark}, leftmargin=1.3em}}}
+
+% Out in the world — the curiosity pages
+\newtcolorbox{curiosity}[1]{enhanced, breakable, colback=paper, boxrule=0pt, arc=0pt,
+  left=14pt, right=14pt, top=12pt, bottom=12pt, before skip=16pt, after skip=16pt,
+  enlarge right by=-\dimexpr\marginparsep+\marginparwidth\relax,
+  width=\fullwidthlen,
+  fontupper={\normalsize},
+  title={\boxlabel{sepia}{OUT IN THE WORLD}\par\smallskip{\displayserif\fontsize{19}{23}\selectfont\color{ink}#1}},
+  attach title to upper, after title={\par\medskip},
+  borderline north={0.6pt}{0pt}{sepia!60}}
+\newcommand{\photo}[3][]{% [options] {key} {caption}
+  \par\medskip\noindent\begin{minipage}{\linewidth}
+    \includegraphics[width=\linewidth,#1]{photos/#2}\par\vspace{3pt}
+    {\sffamily\scriptsize\color{sepia}#3\hfill\hyperref[credit:#2]{\textsc{photo credit}}}
+  \end{minipage}\par\medskip}
+\newcommand{\photopair}[5]{% {key1}{caption1}{key2}{caption2}{height}
+  \par\medskip\noindent
+  \begin{minipage}[t]{0.49\linewidth}\includegraphics[height=#5,width=\linewidth,keepaspectratio]{photos/#1}\par\vspace{2pt}{\sffamily\scriptsize\color{sepia}#2 \hyperref[credit:#1]{\textsc{credit}}}\end{minipage}\hfill
+  \begin{minipage}[t]{0.49\linewidth}\includegraphics[height=#5,width=\linewidth,keepaspectratio]{photos/#3}\par\vspace{2pt}{\sffamily\scriptsize\color{sepia}#4 \hyperref[credit:#3]{\textsc{credit}}}\end{minipage}\par\medskip}
+% a photo placed at the side of the curiosity text
+\newcommand{\sidephoto}[3]{% {key}{width}{caption}
+  \begin{wrapfigure}{r}{#2}\vspace{-6pt}\includegraphics[width=#2]{photos/#1}\par\vspace{2pt}
+  {\sffamily\scriptsize\color{sepia}\raggedright #3 \hyperref[credit:#1]{\textsc{credit}}\par}\vspace{-8pt}\end{wrapfigure}}
+
+% keep box titles with their content
+\BeforeBeginEnvironment{keyidea}{\needspace{7\baselineskip}}
+\BeforeBeginEnvironment{definition}{\needspace{8\baselineskip}}
+\BeforeBeginEnvironment{result}{\needspace{6\baselineskip}}
+\BeforeBeginEnvironment{example}{\needspace{8\baselineskip}}
+\BeforeBeginEnvironment{watchout}{\needspace{7\baselineskip}}
+\BeforeBeginEnvironment{inapp}{\needspace{8\baselineskip}}
+\BeforeBeginEnvironment{trythis}{\needspace{8\baselineskip}}
+\BeforeBeginEnvironment{remember}{\needspace{10\baselineskip}}
+\BeforeBeginEnvironment{curiosity}{\clearpage}
+\newcommand{\nohyph}{\hyphenpenalty=10000\exhyphenpenalty=10000\relax}
+
+% ---------------------------------------------------------------- inline marks
+\newcommand{\repo}{https://github.com/wojciech-stelmaszewski/anemostatos/blob/main/}
+\newcommand{\src}[1]{\href{\repo#1}{\texttt{\color{deepblue}#1}}}
+\newcommand{\srcnight}[1]{\href{\repo#1}{\texttt{\color{accent!85!white}#1}}}
+\newcommand{\param}[1]{\texttt{\color{muted}#1}}
+\newcommand{\paramnight}[1]{\texttt{\color{nightmuted}#1}}
+\newcommand{\ui}[1]{{\sffamily\small\color{ink}#1}}
+\newcommand{\uinight}[1]{{\sffamily\color{white}#1}}
+\newcommand{\then}{\,{\color{accent}›}\,}
+\NewDocumentCommand{\key}{m}{\tikz[baseline=(k.base)]\node[draw=hair, fill=mist, rounded corners=1.5pt,
+  inner xsep=3pt, inner ysep=1.5pt, font=\ttfamily\footnotesize, text=ink](k){#1};}
+\NewDocumentCommand{\keynight}{m}{\tikz[baseline=(k.base)]\node[draw=gridmajor, fill=nightsky, rounded corners=1.5pt,
+  inner xsep=3pt, inner ysep=1.5pt, font=\ttfamily\footnotesize, text=white](k){#1};}
+% the coloured terms, exactly as the app colours them
+\newcommand{\Pt}[1][P]{{\color{sigP}\sffamily\bfseries #1}\xspace}
+\newcommand{\It}[1][I]{{\color{sigI}\sffamily\bfseries #1}\xspace}
+\newcommand{\Dt}[1][D]{{\color{sigD}\sffamily\bfseries #1}\xspace}
+\newcommand{\FFt}[1][FF]{{\color{sigFF}\sffamily\bfseries #1}\xspace}
+\newcommand{\sig}[2]{{\color{#1}\sffamily\bfseries #2}}
+\newcommand{\term}[1]{\textbf{#1}}
+\newcommand{\lessonref}[1]{\hyperref[#1]{Lesson~\ref*{#1}}}
+\newcommand{\Lessonref}[1]{\hyperref[#1]{Lesson~\ref*{#1}}}
+\newcommand{\aside}[1]{\marginnote{#1}}
+\newcommand{\eg}{e.g.\xspace}
+\newcommand{\ie}{i.e.\xspace}
+
+% ---------------------------------------------------------------- figures ---
+% Figure with a side caption in the margin (text-width graphic).
+\newcommand{\simfig}[4][]{% [width] {file} {caption} {label}
+  \begin{figure}[tbp]
+    \ifstrempty{#1}{\includegraphics[width=\textwidth]{#2}}{\includegraphics[width=#1]{#2}}%
+    \sidecaption{#3\label{#4}}
+  \end{figure}}
+% Full-width figure (text + margin), caption below.
+\newcommand{\widefig}[3]{% {file} {caption} {label}
+  \begin{figure}[tbp]
+    \begin{adjustwidth}{0pt}{-\dimexpr\marginparsep+\marginparwidth\relax}
+      \includegraphics[width=\linewidth]{#1}
+      \caption{#2}\label{#3}
+    \end{adjustwidth}
+  \end{figure}}
+\newcommand{\widefigH}[3]{% same, placed here
+  \begin{figure}[h!]
+    \begin{adjustwidth}{0pt}{-\dimexpr\marginparsep+\marginparwidth\relax}
+      \includegraphics[width=\linewidth]{#1}
+      \caption{#2}\label{#3}
+    \end{adjustwidth}
+  \end{figure}}
+% An app screenshot, full width, with a thin frame.
+\newcommand{\screen}[4][]{% [trim l b r t in px of 3200x2000] {file} {caption} {label}
+  \begin{figure}[tbp]
+    \begin{adjustwidth}{0pt}{-\dimexpr\marginparsep+\marginparwidth\relax}
+      \ifstrempty{#1}{\includegraphics[width=\linewidth]{screens/#2}}%
+        {\adjincludegraphics[width=\linewidth, trim={#1}, clip]{screens/#2}}%
+      \caption{#3}\label{#4}
+    \end{adjustwidth}
+  \end{figure}}
+\newenvironment{fullwidth}{\begin{adjustwidth}{0pt}{-\dimexpr\marginparsep+\marginparwidth\relax}}{\end{adjustwidth}}
+\setlength{\abovecaptionskip}{6pt}
+\renewcommand{\floatpagefraction}{0.75}
+\renewcommand{\topfraction}{0.85}
+\renewcommand{\textfraction}{0.12}
+\setcounter{topnumber}{3}
+
+% A crop of an app screenshot in the margin (e.g. the lesson panel).
+\newcommand{\marginscreen}[4]{% {trim l b r t} {file} {caption} {label}
+  \marginnote{\adjincludegraphics[width=\marginparwidth, trim={#1}, clip, valign=t]{screens/#2}\par\vspace{2pt}%
+  \captionsetup{type=figure}\caption{#3}\label{#4}}}
+% A small figure in the margin, top-aligned with the line where it is called.
+\newcommand{\marginfig}[3]{\marginnote{\includegraphics[width=\marginparwidth,valign=t]{#1}\par\vspace{2pt}%
+  \captionsetup{type=figure}\caption{#2}\label{#3}}}
+\newcommand{\marginphoto}[2]{\marginnote{\includegraphics[width=\marginparwidth,valign=t]{photos/#1}\par\vspace{2pt}%
+  {\sffamily\scriptsize\color{sepia}#2 \hyperref[credit:#1]{\textsc{credit}}}}}
+
+% ---------------------------------------------------------------- equations
+\setlength{\abovedisplayskip}{9pt plus 3pt minus 3pt}
+\setlength{\belowdisplayskip}{9pt plus 3pt minus 3pt}
+\newcommand{\dd}{\mathrm{d}}
+\newcommand{\T}{{\mathsf{T}}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\E}{\mathbb{E}}
+\renewcommand{\vec}[1]{\vv{#1}}
+\newcommand{\vv}[1]{\overrightarrow{#1}}
+\newcommand{\bv}[1]{\symbf{#1}}
+\newcommand{\hatm}{\hat m}
+\newcommand{\sat}{\operatorname{sat}}
+\newcommand{\diag}{\operatorname{diag}}
+\newcommand{\sign}{\operatorname{sign}}
+\newcommand{\tr}{\operatorname{tr}}
+\DeclareMathOperator*{\argmin}{arg\,min}
+
+% ---------------------------------------------------------------- exercises -
+\newcounter{exercise}[chapter]
+\renewcommand{\theexercise}{\lessonlabel.\arabic{exercise}}
+\newenvironment{exercises}{%
+  \section*{\color{ink}Exercises}\addcontentsline{toc}{section}{}%
+  \begin{list}{}{\setlength{\leftmargin}{2.6em}\setlength{\labelwidth}{2.4em}\setlength{\itemsep}{5pt}}}
+  {\end{list}}
+\newcommand{\exercise}[1][1]{\refstepcounter{exercise}\item[{\sffamily\small\color{accent}\theexercise}\,%
+  {\color{faint}\ifcase#1\or\raisebox{0.2ex}{\tiny$\bullet$}\or\raisebox{0.2ex}{\tiny$\bullet\bullet$}\or\raisebox{0.2ex}{\tiny$\bullet\bullet\bullet$}\fi}]}
+% answers collected for the appendix
+\newwrite\answersfile
+\immediate\openout\answersfile=\jobname.ans
+\newcommand{\answer}[1]{\immediate\write\answersfile{\string\answeritem{\theexercise}{\unexpanded{#1}}}}
+\newcommand{\answeritem}[2]{\par\noindent\hangindent=3.2em\makebox[3.2em][l]{\sffamily\small\color{accent}#1}#2\par\smallskip}
+\newcommand{\closeanswers}{\immediate\closeout\answersfile}
+
+% ---------------------------------------------------------------- diagrams --
+\tikzset{
+  >={Stealth[length=5pt,width=4pt]},
+  every picture/.append style={font=\sffamily\small},
+  blk/.style={draw=ink, line width=0.6pt, fill=white, rounded corners=2pt, minimum height=9mm,
+    minimum width=18mm, align=center, font=\sffamily\small},
+  blkc/.style={blk, draw=accent, fill=accentsoft},
+  blkd/.style={blk, draw=deepblue, fill=bluesoft},
+  blkn/.style={blk, draw=gridmajor, fill=night, text=nighttext},
+  sumn/.style={draw=ink, line width=0.6pt, circle, minimum size=5.5mm, inner sep=0pt, fill=white},
+  sig/.style={->, line width=0.6pt, draw=ink},
+  sigc/.style={->, line width=0.8pt, draw=#1},
+  lab/.style={font=\sffamily\footnotesize, text=muted},
+  labc/.style={font=\sffamily\footnotesize\bfseries, text=#1},
+  dist/.style={->, line width=0.6pt, draw=sigwind, decorate, decoration={snake, amplitude=0.6pt, segment length=4pt, post length=4pt}},
+  dot/.style={circle, fill=ink, inner sep=0pt, minimum size=3pt},
+}
+
+% ---------------------------------------------------------------- misc ------
+\newcommand{\lead}[1]{{\displayserif\fontsize{13.2}{18}\selectfont #1}\par\medskip}
+\newcommand{\dropcap}[1]{{\color{accent}\sansthin\fontsize{30}{30}\selectfont #1}}
+\newcommand{\photocredit}[4]{% {key}{artist}{license}{url}
+  \par\noindent\hangindent=1.5em\phantomsection\label{credit:#1}%
+  {\sffamily\small\bfseries\color{ink}\getphototitle{#1}}\enspace {\small #2.\enspace \textsc{#3}.\enspace {\footnotesize #4}}\par\smallskip}
+\newcommand{\getphototitle}[1]{\ifcsname phototitle@#1\endcsname\csname phototitle@#1\endcsname\else #1\fi}
+\newcommand{\phototitle}[2]{\expandafter\def\csname phototitle@#1\endcsname{#2}}
+\endinput

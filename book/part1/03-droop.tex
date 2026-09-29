@@ -1,0 +1,112 @@
+\lesson{3}{The gravity droop}{A proportional controller can only push when there is an error — so it keeps one.}{1}{droop}{Part I · PID}
+\label{les:droop}
+
+\lead{Take the feedforward away. The controller no longer knows that the drone has weight; it only has its error and three gains, and the integral is switched off. The drone takes off, climbs — and stops a metre short of the setpoint, hovering there perfectly calm, perfectly wrong.}
+
+\section{An equilibrium with an error}
+
+Without feedforward, and with the integral off, the thrust is
+\begin{equation}
+  T = K_p\,e - K_d\,\dot y ,\qquad e = r - y .
+\end{equation}
+(The D term acts on the measured velocity; we will see why in \lessonref{les:kick}.) The closed loop becomes
+\begin{equation}\label{eq:droop-loop}
+  m\ddot y = K_p\,(r - y) - K_d\,\dot y - m g .
+\end{equation}
+\marginscreen{1905 675 0 112}{droop}{The lesson panel in the app, with the same prediction.}{fig:droop-panel}Where can this system rest? At an equilibrium nothing moves, $\dot y = \ddot y = 0$, and \cref{eq:droop-loop} leaves
+\begin{equation}\label{eq:droop-ess}
+  K_p\,e_{ss} = m g \qquad\Longrightarrow\qquad e_{ss} = \frac{mg}{K_p} = \frac{1 \cdot 9.81}{10} \approx \SI{0.98}{m}.
+\end{equation}
+There is nothing else that could hold the drone up: the D term is zero at rest, so the whole weight must be carried by the P term, and P can only push if there is an error. The drone \emph{must} hang below the setpoint, by exactly the amount that makes the spring force equal to the weight. The subscript \emph{ss} stands for \term{steady state}.
+
+\begin{keyidea}[Steady-state error of a proportional loop]
+Under a constant load $F$ that nothing else compensates, a proportional loop settles with the error
+\begin{equation*}
+  e_{ss} = F / K_p .
+\end{equation*}
+Stiffer springs sag less, but no finite stiffness removes the sag. The same holds for a constant wind (the load is the drag) or a wrong mass estimate (the load is the part of the weight that the feedforward misses).
+\end{keyidea}
+
+\Cref{fig:droop-run} confirms the prediction to the centimetre: the drone settles at \SI{1.02}{m}, i.e.\ \SI{0.98}{m} low, and with $K_p = 40$ at \SI{1.75}{m}, \SI{0.25}{m} low. On the right, the P term is exactly \SI{9.81}{N} in both runs: it is doing the feedforward's job.
+
+\simfig{droop_run}{Left: the altitude with P (and D) only, no feedforward, for two stiffnesses; the dotted lines are the predictions of \cref{eq:droop-ess}. Right: the P term (dashed: $K_p=10$, solid: $K_p=40$) ends at \SI{9.81}{N} in both cases — the whole weight hangs on the spring.}{fig:droop-run}
+
+\subsection{Why not just raise the gain?}
+Equation~\eqref{eq:droop-ess} suggests an easy way out: make $K_p$ huge and the droop disappears. In \lessonref{les:spring} we saw the first problem — a stiffer spring saturates the motors and oscillates harder. \Lessonref{les:edge} will show the fundamental one: the motors lag and the controller samples, and together they put an upper limit on any gain. There are two better ways, both shown in the lesson.
+
+\section{Cure one: remember the error}
+
+The integral term accumulates the error:
+\begin{equation}
+  I(t) = K_i\int_0^t e(\tau)\,\dd\tau .
+\end{equation}
+As long as the drone hangs low, $e > 0$ and $I$ grows. It keeps growing until it can carry the weight by itself; only then can the error — and P — return to zero. Formally: at any equilibrium, $\dot I = K_i\,e = 0$, so $e = 0$. \emph{The only place where an integral can rest is zero error.} \Lessonref{les:integral} is devoted to this idea; here we just watch it work (\cref{fig:droop-ion}).
+
+\simfig{droop_ion}{At $t = \SI{10}{s}$ the integral is switched on. It slowly takes over the weight from the P term (bottom); the altitude creeps up to the setpoint (top). With the default $K_i = 0.8$ this takes a long time.}{fig:droop-ion}
+
+How long? For a slow creep the drone is nearly at rest, so the weight is shared by P and I at every moment:
+\begin{equation}
+  K_p\,e + I \approx mg ,\qquad \dot I = K_i\,e .
+\end{equation}
+Differentiating the first relation gives $K_p\dot e = -\dot I = -K_i\,e$, and so
+\begin{equation}\label{eq:droop-tau}
+  e(t) = e_{ss}\,e^{-(t-t_0)/\tau_I},\qquad \tau_I = \frac{K_p}{K_i} = \frac{10}{0.8} = \SI{12.5}{s}.
+\end{equation}
+The simulator agrees: ten seconds after switching I on, the error should be $0.98\,e^{-10/12.5} = \SI{0.44}{m}$; the telemetry shows \SI{0.45}{m}. This time constant, $K_p/K_i$, is exactly the \term{integral time} $T_i$ of the \enquote{standard form} of the PID that industrial controllers use,\aside{Standard form: $u = K_p\big(e + \tfrac{1}{T_i}\int e + T_d\,\dot e\big)$ with $T_i = K_p/K_i$ and $T_d = K_d/K_p$. It is the same controller with different knobs.} and it tells you how long the integral needs to pay back a load.
+
+\section{Cure two: know the load}
+
+The other cure is not to wait for an error at all. The weight is known — roughly. So add it to the command directly:
+\begin{equation}
+  T = \underbrace{\hat m\,g}_{\text{feedforward}} + \underbrace{K_p\,e + I - K_d\,\dot y}_{\text{feedback}} .
+\end{equation}
+Now the feedback only has to correct the \emph{difference} between the real weight and the assumed one. Switch the feedforward back on in the app and the droop disappears instantly — no creep, no waiting.
+
+\begin{keyidea}[Feedforward and feedback]
+Feedforward acts on what you know, before any error exists. Feedback acts on what you do not know, after it has caused an error. Good controllers use both: the feedforward carries the bulk of the known load, the feedback (and especially its integral) mops up the model errors. Every flight controller in this book, up to the trajectory planners of Part~II, is built this way.
+\end{keyidea}
+
+\begin{inapp}
+\begin{itemize}[leftmargin=1.2em]
+  \item The lesson sets \param{control.feedforward = false} and \param{control.alt.iOn = false}. The switch is \ui{Controller\then Gravity feedforward}; the assumed mass $\hat m$ is \param{control.model.mass}.
+  \item The feedforward is added in \src{src/control/altitude.ts}: the altitude loop passes $\hat m g$ to the PID as its \texttt{ff} argument, and the PID reports it as its own coloured part, \FFt.
+  \item The info card always prints the \ui{predicted e\_ss}: the part of the weight the feedforward does not carry, divided by $K_p$ — $mg/K_p$ without feedforward, $(m - \hat m)g/K_p$ with it — or \enquote{0 (I term on)}. It is computed in \src{src/ui/charts/InfoCard.tsx}.
+\end{itemize}
+\end{inapp}
+
+\begin{trythis}
+\begin{enumerate}
+  \item Raise $K_p$ to 40: the droop shrinks to about \SI{0.25}{m} but never vanishes.
+  \item Back to 10. Switch \It on and time the creep. Compare with \cref{eq:droop-tau}. Then try $K_i = 3$.
+  \item Switch \It off again and the feedforward on instead: the droop disappears at once.
+\end{enumerate}
+\predict{with the feedforward on but $\hat m = \SI{0.9}{kg}$ (and I off), where does the drone settle?}
+\end{trythis}
+
+\begin{curiosity}{The grid that sags on purpose}
+\photo{turbinehall}{A turbine hall of the 1920s. Every generator in a power grid runs a speed governor — with a deliberate droop.}
+The electrical grid of a continent is one enormous machine turning in synchrony: every generator in Europe spins in step with a frequency of \SI{50}{Hz}. When you switch on a kettle, the load rises, the turbines slow down a little, and the frequency dips. Each power station answers with a speed governor that opens its steam or water valve.
+
+Here is the surprise: those governors are \emph{proportional} controllers, and their droop is deliberate. A typical setting is 4–5\,\%: a generator increases its output by its full rated power if the frequency falls by 4–5\,\%. Why not an integral, which would restore \SI{50}{Hz} exactly? Because hundreds of generators share the load. If each of them integrated its own error, they would fight over it forever; with proportional droop every machine takes a share proportional to its size, and the sharing is stable.
+
+The small remaining frequency error is then removed on a slower time scale, over tens of seconds to minutes, by a single central \emph{integral} loop, the secondary control, which asks selected plants to raise their setpoints. It is the structure of this lesson, spread over a continent: a fast proportional loop that accepts a droop, and a slow integral that pays it back.
+\end{curiosity}
+
+\begin{remember}
+\begin{itemize}
+  \item A proportional loop under a constant load $F$ settles with $e_{ss} = F/K_p$. Raising $K_p$ reduces the droop but cannot remove it.
+  \item An integral can only rest at zero error, so it removes any constant droop — slowly, with time constant about $K_p/K_i$.
+  \item Feedforward removes the known part of the load immediately; feedback handles what the model gets wrong.
+\end{itemize}
+\end{remember}
+
+\begin{exercises}
+\exercise[1] The drone carries a \SI{200}{g} camera that the controller does not know about ($\hat m = \SI{1}{kg}$, feedforward on, I off, $K_p = 10$). Where does it hover when asked for \SI{2}{m}?
+\answer{The missing force is $0.2 \cdot 9.81 = \SI{1.96}{N}$, so $e_{ss} = 1.96/10 = \SI{0.196}{m}$: it hovers at about \SI{1.80}{m}.}
+\exercise[1] A steady horizontal wind of \SI{5}{m/s} blows on the L2 point-mass drone, whose horizontal drag is $c_h|v|v$ with $c_h = \SI{0.12}{N.s^2/m^2}$. With a P-only horizontal controller of $K_p = 6$, how far downwind does it settle?
+\answer{Drag force $0.12 \cdot 25 = \SI{3}{N}$, so $e_{ss} = 3/6 = \SI{0.5}{m}$ downwind.}
+\exercise[2] Derive \cref{eq:droop-tau} again, this time keeping the D term and the inertia: write the closed-loop characteristic polynomial $m s^3 + K_d s^2 + K_p s + K_i$ and show that for small $K_i$ it has one real root close to $-K_i/K_p$. (Hint: substitute $s = -\varepsilon$ and keep first-order terms.)
+\answer{With $s=-\varepsilon$ small: $-m\varepsilon^3 + K_d\varepsilon^2 - K_p\varepsilon + K_i \approx -K_p\varepsilon + K_i = 0$, so $\varepsilon \approx K_i/K_p$. The other two roots stay close to those of $m s^2 + K_d s + K_p$.}
+\exercise[2] In the power-grid story, two generators of \SI{100}{MW} and \SI{300}{MW} both have a 5\,\% droop. A load of \SI{40}{MW} is added. How does it split, and how far does the frequency fall (before secondary control acts)?
+\answer{Each machine's output change is $\Delta P_i = (P_{i,rated}/0.05)\cdot(\Delta f/f_0)$. Shares are proportional to rating: \SI{10}{MW} and \SI{30}{MW}. $\Delta f/f_0 = 0.05 \cdot 40/400 = 0.5\,\%$, i.e.\ \SI{0.25}{Hz} at \SI{50}{Hz}.}
+\end{exercises}

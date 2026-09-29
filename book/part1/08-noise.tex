@@ -1,0 +1,100 @@
+\lesson{8}{Noisy sensor}{A derivative is a magnifying glass for fast things — and noise is the fastest thing there is.}{1}{noise}{Part I · PID}
+\label{les:noise}
+
+\lead{Give the altimeter one centimetre of random noise. That is less than the width of a finger, and the P term hardly notices. But the D term, which reacts to the rate of change, sees two readings four milliseconds apart that differ by a centimetre and concludes that the drone is moving at two and a half metres per second. This lesson is about that trade-off, and about the low-pass filter that every real derivative needs.}
+
+\section{How much a derivative amplifies}
+
+Let the measurement be the truth plus independent noise, $y_k = y^{true}_k + n_k$ with standard deviation $\sigma$. The discrete derivative is
+\begin{equation}
+  \frac{y_k - y_{k-1}}{\Delta t} = \frac{y^{true}_k - y^{true}_{k-1}}{\Delta t} + \frac{n_k - n_{k-1}}{\Delta t}.
+\end{equation}
+The difference of two independent samples has standard deviation $\sqrt2\,\sigma$, so the noise in the derivative is
+\begin{equation}\label{eq:noise-gain}
+  \sigma_{\dot y} = \frac{\sqrt2\,\sigma}{\Delta t} = \frac{1.41 \cdot \SI{0.01}{m}}{\SI{0.004}{s}} \approx \SI{3.5}{m/s},
+\end{equation}
+and the D term, $K_d$ times that, fluctuates by about \SI{25}{N} — two and a half times the weight of the drone. \Cref{fig:noise-filters} (left column) shows exactly that: a violet hairball of $\pm\SI{50}{N}$.
+
+The same thing looks clearer in the frequency domain. A sinusoid $\sin\omega t$ has the derivative $\omega\cos\omega t$: the differentiator multiplies each frequency by $\omega$. The drone's motion lives below a few hertz; the noise spreads evenly up to the Nyquist frequency, half the sample rate, \SI{125}{Hz}. So the derivative amplifies the noise a hundred times more than the signal (\cref{fig:noise-bode}).\aside{Sampling at rate $f_s$ can only represent frequencies up to $f_s/2$, the Nyquist frequency. Faster sampling moves the noise to higher frequencies, where an unfiltered derivative amplifies it even more — \cref{eq:noise-gain} grows as $1/\Delta t$.}
+
+\simfig{noise_bode}{The gain of a differentiator grows with frequency (red). A first-order low-pass filter caps it above the cutoff. The art is to put the cutoff above the frequencies of the motion (grey) and below those of the noise (red band).}{fig:noise-bode}
+
+\section{The filtered derivative}
+
+The standard fix is to low-pass filter the derivative. Anemostatos uses a first-order filter with cutoff $f_c$:
+\begin{equation}\label{eq:noise-filter}
+  D_k = \alpha\,D_{k-1} + (1 - \alpha)\,D^{raw}_k,\qquad
+  \alpha = \frac{T_f}{T_f + \Delta t},\qquad T_f = \frac{1}{2\pi f_c}.
+\end{equation}
+It is the discrete version of $T_f\dot D + D = D^{raw}$: the output follows the input with a time constant $T_f$. In the frequency domain the filtered differentiator has the transfer function
+\begin{equation}
+  \frac{K_d\,s}{T_f s + 1},
+\end{equation}
+which behaves like $K_d s$ below the cutoff and like the constant $K_d/T_f$ above it (\cref{fig:noise-bode}). High-frequency noise is no longer amplified without limit.
+
+\widefig{noise_filters}{One centimetre of altimeter noise, four D filters (the default tune otherwise). Without a filter the D term swings by tens of newtons, the thrust chatters and — surprisingly — the drone hovers \SI{20}{cm} too high. At \SI{20}{Hz} (the default) and \SI{5}{Hz} everything is calm. At \SI{1}{Hz} the D term is smooth but late.}{fig:noise-filters}
+
+\subsection{A surprise: noise that moves the drone}
+Look again at the unfiltered run in \cref{fig:noise-filters}: the drone does not merely jitter, it hovers \SI{20}{cm} above the setpoint. Noise has zero mean — how can it push?
+
+Through saturation. The D term swings by $\pm\SI{50}{N}$ around the hover thrust of \SI{9.81}{N}, but the motors can only deliver between 0 and \SI{24.4}{N}. The downward swings are clipped at $-9.81$, the upward ones at $+14.6$: more of the upward half survives. The average thrust is therefore \emph{higher} than commanded, and the controller settles where its P and I terms cancel that bias. A nonlinearity has turned symmetric noise into a constant force. This effect — \emph{rectification} — is common in real systems with noisy signals and hard limits.
+
+\section{The price of filtering}
+
+A filter is not free: it delays. For a slowly varying input the first-order filter lags behind by about $T_f$: \SI{8}{ms} at \SI{20}{Hz}, \SI{32}{ms} at \SI{5}{Hz}, \SI{160}{ms} at \SI{1}{Hz}. The damper therefore reacts to the velocity the drone had a moment ago. A late damper is a weaker damper, and a very late one starts to push at the wrong time. At \SI{1}{Hz} the D term in \cref{fig:noise-filters} is beautifully smooth, but in the square-wave experiment of the lesson you will see the loop begin to ring.
+
+\begin{keyidea}[Noise against delay]
+Every way of reducing noise — filtering, averaging, slower sampling — adds delay, and delay reduces stability. Choosing a filter is choosing a point on that trade-off: the cutoff should sit above the frequencies you want to control and below the frequencies of the noise. When the two overlap, no filter can help, and you need a better sensor or a better estimator. Part II's Kalman filter (\lessonref{les:kalman}) is the systematic answer: it uses a model to separate signal from noise without paying the full price in delay.
+\end{keyidea}
+
+A useful rule: the filter time constant should be several times shorter than the time scale of the closed loop. The altitude loop has $\omega_n \approx \SI{3}{rad/s}$, a time scale of about \SI{0.3}{s}; a \SI{20}{Hz} filter ($T_f = \SI{8}{ms}$) is far below it and costs almost nothing, a \SI{1}{Hz} filter ($\SI{160}{ms}$) does not.
+
+\begin{watchout}[Derivative on measurement does not help with noise]
+\Lessonref{les:kick} moved the derivative from the error to the measurement. That removes the kick from setpoint steps, but not the noise: the noise is in the measurement.
+\end{watchout}
+
+\screen[0 0 495 998]{noise}{Lesson 8 in the app: with the D filter off, the violet D term in the \ui{PID terms} chart is a hairball and the motor thrusts chatter.}{fig:noise-screen}
+
+\begin{inapp}
+\begin{itemize}[leftmargin=1.2em]
+  \item The lesson sets \param{sensors.posNoise = 0.01} (\ui{Sensors\then Position noise}) and \param{control.alt.dFilterHz = 0}. When noise is on, the tracking chart also shows the \emph{true} altitude (dotted) next to the measurement.
+  \item The filter of \cref{eq:noise-filter} is three lines in \src{src/control/pid.ts}; $\alpha$ comes from \texttt{lowPassAlpha} in \src{src/math/util.ts}.
+  \item Sensor noise is Gaussian and seeded (\src{src/sim/sensors.ts}), so the same seed gives exactly the same noise — you can compare filters on identical data.
+\end{itemize}
+\end{inapp}
+
+\begin{trythis}
+\begin{enumerate}
+  \item Set the \ui{D filter} to \SI{20}{Hz}, then \SI{5}{Hz}, then \SI{1}{Hz}. Watch the violet curve and the motor bars.
+  \item At \SI{1}{Hz}, switch \ui{Automatic motion} to \ui{square} and watch the steps ring: the delayed damper is too weak.
+  \item Back to no filter, and lower the \ui{controller rate} to \SI{50}{Hz}. Why is the D term calmer? (Use \cref{eq:noise-gain}.)
+\end{enumerate}
+\predict{if the noise doubles to \SI{2}{cm}, what happens to the D-term fluctuation without a filter?}
+\end{trythis}
+
+\begin{curiosity}{The sensor in every drone}
+\sidephoto{mpu6050}{45mm}{An MPU-6050: a three-axis gyroscope and a three-axis accelerometer in a package of 4\,$\times$\,4\,mm.}
+Open almost any small drone, game controller or phone and you will find a chip like the one in the photograph: a MEMS inertial sensor. Inside, microscopic silicon structures move. The accelerometer has a proof mass on tiny springs whose deflection is read as a change of capacitance. The gyroscope keeps a structure vibrating at kilohertz and measures the Coriolis force that appears when the chip rotates. Such sensors cost about a dollar. Their price and their small size are what made the modern quadrotor possible.
+
+They are also noisy. Their noise is specified as a density — micro-$g$ or degrees per second per $\sqrt{\text{Hz}}$ — because the noise you see depends on how much bandwidth you let through. That is \cref{fig:noise-bode} in a data sheet. On a drone the electronic noise is the smaller problem: the propellers shake the frame at their rotation frequency, a few hundred hertz, and the sensor measures that too. Flight-controller software such as Betaflight or PX4 therefore runs whole banks of filters: low-pass filters, and \emph{notch} filters that follow the motor speed and cut out exactly the frequency of the propellers. Tuning those filters is a large part of tuning a racing drone, and it is the same trade-off you just explored: every filter removes noise and adds delay.
+\end{curiosity}
+
+\begin{remember}
+\begin{itemize}
+  \item A differentiator multiplies each frequency by $\omega$; sampled noise reaches the D term amplified by about $\sqrt2/\Delta t$.
+  \item A low-pass filter with cutoff $f_c$ caps the amplification at $K_d/T_f$, $T_f = 1/(2\pi f_c)$.
+  \item Filtering costs a delay of about $T_f$. Keep it well below the time scale of the loop.
+  \item Noise plus saturation can create a constant bias (rectification).
+\end{itemize}
+\end{remember}
+
+\begin{exercises}
+\exercise[1] Compute $\alpha$ of \cref{eq:noise-filter} for $f_c = \SI{20}{Hz}$ at the controller rate of \SI{250}{Hz}.
+\answer{$T_f = 1/(2\pi\cdot20) = \SI{7.96}{ms}$, $\alpha = 7.96/(7.96 + 4) = 0.666$.}
+\exercise[2] Feed white measurement noise $n_k$ (standard deviation $\sigma$) through the raw derivative and the filter of \cref{eq:noise-filter}. Show that the filtered derivative has standard deviation
+\[ \sigma_D = \frac{\sigma}{\Delta t}\,(1-\alpha)\sqrt{\frac{2}{1+\alpha}} , \]
+and evaluate $K_d\sigma_D$ for \SI{1}{cm} of noise and a \SI{20}{Hz} filter. Compare with \cref{fig:noise-filters}.
+\answer{The map from $n$ to the filtered derivative is $\frac{1-\alpha}{\Delta t}\cdot\frac{1 - z^{-1}}{1 - \alpha z^{-1}}$, with impulse response $h_0 = 1$, $h_k = -(1-\alpha)\alpha^{k-1}$. So $\sum h_k^2 = 1 + \frac{(1-\alpha)^2}{1-\alpha^2} = \frac{2}{1+\alpha}$ and the variance is $\frac{\sigma^2(1-\alpha)^2}{\Delta t^2}\cdot\frac{2}{1+\alpha}$. With $\alpha = 0.666$: $\sigma_D = 2.5 \cdot 0.334 \cdot 1.096 = \SI{0.915}{m/s}$, $K_d\sigma_D = \SI{6.4}{N}$ — the simulator measures \SI{6.2}{N}. (Without filter, $\alpha = 0$: $\sqrt2\sigma/\Delta t$, \cref{eq:noise-gain}.)}
+\exercise[2] A \SI{1}{Hz} filter delays the D term by about \SI{0.16}{s}. Using $\dot y(t - T_f) \approx \dot y(t) - T_f\ddot y(t)$, show that a delayed damper adds a \emph{negative mass} term $-K_d T_f\,\ddot y$. What is the effective mass for $K_d = 7$ and \SI{1}{Hz}? What happens to $\omega_n$ and $\zeta$?
+\answer{$-K_d\dot y(t-T_f) \approx -K_d\dot y + K_dT_f\ddot y$, so $(m - K_dT_f)\ddot y + K_d\dot y + K_p y = 0$. $m_{eff} = 1 - 7\cdot0.16 = -0.12$: negative! The approximation breaks down, but it signals that the loop is on the edge — in the simulator it rings strongly. (With \SI{5}{Hz}: $m_{eff} = 0.78$, $\omega_n$ rises and $\zeta$ rises a little.)}
+\end{exercises}

@@ -1,0 +1,100 @@
+\lesson{7}{Derivative kick}{Differentiate the error and every setpoint step becomes an infinite spike. Differentiate the drone instead.}{1}{kick}{Part I · PID}
+\label{les:kick}
+
+\lead{The D term was introduced as a damper: a force against the drone's velocity. But the formula says something slightly different — it differentiates the \emph{error}, and the error contains the setpoint. Whenever a human (or a planner) moves the setpoint abruptly, the derivative of the error is enormous. This lesson measures that spike and removes it with a one-line change.}
+
+\section{The derivative of a step}
+
+In discrete time the D term computes a difference quotient:
+\begin{equation}
+  D_k = K_d\,\frac{e_k - e_{k-1}}{\Delta t} = K_d\,\frac{(r_k - r_{k-1}) - (y_k - y_{k-1})}{\Delta t}.
+\end{equation}
+The second part is the drone's velocity, as intended. The first part is zero for a constant setpoint — and huge for one sample when the setpoint jumps. The lesson's square wave jumps by \SI{1}{m}, and with the filter on D switched off:
+\begin{equation}
+  D = K_d\,\frac{\Delta r}{\Delta t} = 7 \cdot \frac{\SI{1}{m}}{\SI{0.004}{s}} = \SI{1750}{N}.
+\end{equation}
+In continuous time it would be infinite: the derivative of a step is a Dirac delta. This spike is called the \term{derivative kick}.\aside{A setpoint step also makes the P term jump by $K_p\,\Delta r = \SI{10}{N}$. That jump is finite and is usually harmless; if it is not, the fix is \emph{setpoint weighting}, see below.}
+
+\section{What the kick does}
+
+\widefig{kick_compare}{The square-wave lesson with D acting on the error (violet) and on the measurement (green). Left: the altitude responses are indistinguishable, but the D term spikes to $\pm\SI{1750}{N}$ at every step. Right, zoomed on one step: the kick drives the motor command to its limit for one controller period; the \SI{30}{ms} motor lag smooths it into a small bump of actual thrust.}{fig:kick}
+
+\Cref{fig:kick} holds a small surprise. The spike is dramatic in the D-term chart, yet the altitude with and without it is practically the same. Two things protect the drone:
+\begin{itemize}
+  \item \textbf{Saturation.} The motor command cannot exceed \SI{24.4}{N}, so the \SI{1750}{N} request is clipped to about \SI{14}{N} of extra thrust.
+  \item \textbf{Brevity and lag.} The spike lasts exactly one controller period, \SI{4}{ms}. The motors respond with a time constant of \SI{30}{ms}, so they barely begin to spin up before the command drops back (right panel).
+\end{itemize}
+The simulated drone forgives the kick. Real systems are often less forgiving. An electric motor or its driver sees a current spike; a hydraulic valve or a steam valve is slammed open and shut and wears out; a flexible structure is struck like a bell and rings. And if the D term is low-pass filtered (as it usually is, \lessonref{les:noise}), the spike is not removed but spread out over the filter's time constant — a smaller, longer kick that the actuator does feel.
+
+\section{Derivative on measurement}
+
+The cure follows from what we wanted in the first place. For a constant setpoint $\dot e = -\dot y$, so we may differentiate the \emph{measurement} instead of the error:
+\begin{equation}\label{eq:kick-dom}
+  D_k = -K_d\,\frac{y_k - y_{k-1}}{\Delta t}.
+\end{equation}
+Between setpoint changes nothing changes: the damping is identical. At a setpoint change the drone's position cannot jump — it has mass — so there is no spike. In \cref{fig:kick} the green D term is smooth.
+
+\begin{keyidea}[Act on the plant, not on the command]
+Terms whose job is to shape the \emph{dynamics} of the loop (like damping) should act on the measured plant output, which is continuous. Terms whose job is to track the setpoint (P and I) must see the error. Industrial controllers call the resulting structure \enquote{PI-D}: P and I on the error, D on the measurement.
+\end{keyidea}
+
+\subsection{Setpoint weighting}
+The idea generalises. Many controllers use
+\begin{equation}
+  u = K_p\,(b\,r - y) + K_i\!\int (r - y)\,\dd t + K_d\,(c\,\dot r - \dot y),
+\end{equation}
+with weights $0 \le b, c \le 1$. The integral must use the full error (otherwise the steady-state error would not vanish), but $b$ and $c$ are free: they change how the loop responds to the setpoint without changing how it rejects disturbances, because disturbances enter through $y$ only. $c = 0$ is derivative on measurement; $b = 0$ as well gives the \enquote{I-PD} controller, which reacts to a setpoint step only through the integral and is very gentle. Anemostatos implements $c \in \{0, 1\}$ (\ui{D acts on}) and offers another gentle alternative: a \ui{rate limit} on the setpoint itself, which turns steps into ramps.
+
+\begin{watchout}[When the setpoint moves on purpose]
+If the setpoint follows a smooth trajectory, $\dot r$ carries useful information: it is the velocity the drone should have. Derivative on measurement throws it away and the loop lags behind moving targets. The cure is not to go back to D on error but to add $\dot r$ explicitly as a feedforward. That is exactly what the trajectory-tracking controllers of Part~II do (\lessonref{les:flatness}).
+\end{watchout}
+
+\screen[0 0 495 998]{kick}{Lesson 7 in the app. In the \ui{PID terms} chart the violet D term shows the kick at every setpoint step; the motor-thrust chart shows the commands hitting their limit.}{fig:kick-screen}
+
+\begin{inapp}
+\begin{itemize}[leftmargin=1.2em]
+  \item The lesson sets \param{control.alt.derivativeOn = 'error'} and \param{dFilterHz = 0} (no filter), with a square wave of \SI{0.5}{m} amplitude and \SI{6}{s} period.
+  \item The switch is \ui{Practical details\then D acts on\then error / measurement}. The default is \emph{measurement}.
+  \item In the code (\src{src/control/pid.ts}) the difference is literally one line: \texttt{(error - prevError)/dt} or \texttt{-(measurement - prevMeasurement)/dt}.
+  \item On the first sample after a reset the PID has no previous value and outputs $D = 0$: otherwise every reset would kick.
+\end{itemize}
+\end{inapp}
+
+\begin{trythis}
+\begin{enumerate}
+  \item Watch the violet spikes in the PID chart and the motor bars at every setpoint step.
+  \item Switch \ui{D acts on} to \ui{measurement}. The spikes vanish, the altitude response does not change.
+  \item Switch back to \ui{error} and set the D filter to \SI{5}{Hz}. The kick is smaller but longer — look at the motor thrust now.
+  \item Set \ui{Setpoint\then Rate limit} to \SI{1}{m/s} with D on error. What happens to the kick, and to the rise time?
+\end{enumerate}
+\predict{with the D filter at \SI{5}{Hz}, how large is the peak of the filtered kick? (A first-order filter with time constant $T_f$ turns a spike of area $A$ into a jump of height $A/T_f$.)}
+\end{trythis}
+
+\begin{curiosity}{The thermostat on the wall}
+\sidephoto{thermostat}{50mm}{Henry Dreyfuss's round thermostat for Honeywell (1953), one of the most produced industrial designs ever.}
+Most control loops in the world have a human who moves the setpoint: a thermostat on the wall, a speed knob, an operator's console in a chemical plant. People move setpoints in steps. They turn the dial from 19 to \SI{22}{\celsius}, they type a new flow rate. A controller that differentiates the error answers every such step with a kick to the boiler, the pump or the valve.
+
+That is why industrial PID controllers from the 1950s on — first pneumatic, then electronic, now digital — have used derivative on the measurement by default. You will find the option in any modern controller's manual under names like \enquote{PV derivative}, \enquote{PI-D} or \enquote{derivative on process variable}.
+
+The round Honeywell thermostat of 1953 is a nice reminder of how long this has been going on. Inside it is a bimetallic coil and a mercury switch — an on–off controller with a little hysteresis, the simplest feedback loop there is. It sold by the millions, and its dial is exactly the kind of setpoint that people turn in steps.
+\end{curiosity}
+
+\begin{remember}
+\begin{itemize}
+  \item The derivative of a setpoint step is a spike: $K_d\Delta r/\Delta t$ in discrete time, a delta in continuous time.
+  \item For a constant setpoint, $\dot e = -\dot y$: differentiating the measurement gives the same damping without the kick.
+  \item Setpoint weighting separates the response to the setpoint from the response to disturbances.
+  \item For moving setpoints, supply the reference's velocity as feedforward instead of differentiating it.
+\end{itemize}
+\end{remember}
+
+\begin{exercises}
+\exercise[1] The controller runs at \SI{1}{kHz} instead of \SI{250}{Hz}, D on error, no filter. How big is the kick for the same \SI{1}{m} step?
+\answer{$7 \cdot 1/0.001 = \SI{7000}{N}$, four times larger (and four times shorter): the area $K_d\Delta r = \SI{7}{N.s}$ is the same.}
+\exercise[1] Show that the \emph{impulse} of the kick, $\int D\,\dd t$, does not depend on $\Delta t$. What velocity change would it cause if the motors could deliver it (\SI{1}{kg} drone)?
+\answer{$\int D\,\dd t = D\,\Delta t = K_d\Delta r = \SI{7}{N.s}$ — independent of $\Delta t$. Delivered fully it would change the velocity by \SI{7}{m/s}; the saturation limits it to about $\SI{14.6}{N} \times \SI{4}{ms} \approx \SI{0.06}{N.s}$.}
+\exercise[2] With setpoint weighting, show that the transfer function from a disturbance force $d$ to the altitude $y$ does not depend on $b$ and $c$.
+\answer{With $r = 0$ the control law is $u = -K_p y - K_i\int y - K_d\dot y$, which contains neither $b$ nor $c$; so the closed loop from $d$ to $y$ is the same for all weights.}
+\exercise[2] For the I-PD controller ($b = c = 0$), find the closed-loop transfer function from $r$ to $y$ for the plant $m\ddot y = u$ and compare its numerator with that of the ordinary PID.
+\answer{I-PD: $Y/R = K_i/(ms^3 + K_d s^2 + K_p s + K_i)$. PID: $(K_d s^2 + K_p s + K_i)/(\dots)$ with the same denominator. The poles are identical; the PID's zeros speed up (and kick) the setpoint response, the I-PD has none and responds gently.}
+\end{exercises}

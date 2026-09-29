@@ -1,0 +1,149 @@
+\lesson{4}{Add a damper}{A force against velocity drains the energy the spring cannot — and one number, ζ, says how much.}{1}{damper}{Part I · PID}
+\label{les:damper}
+
+\lead{Lesson 2 left us with a drone that bounced forever. The cure is the third letter of PID. The derivative term looks at how fast the error is changing and pushes against it — the shock absorber to the proportional spring. In this lesson we tune it by the book and meet the most useful single number in classical control.}
+
+\section{The derivative term is a damper}
+
+With a constant setpoint, the error changes only because the drone moves: $\dot e = \dot r - \dot y = -\dot y$. The derivative term is therefore
+\begin{equation}
+  D = K_d\,\dot e = -K_d\,\dot y ,
+\end{equation}
+a force proportional to the vertical velocity and opposing it. With exact feedforward, P and D together give the closed loop (with $x = y - r$ as before)
+\begin{equation}\label{eq:damper-msd}
+  m\,\ddot x + K_d\,\dot x + K_p\,x = 0 ,
+\end{equation}
+the equation of a \term{mass–spring–damper}. The energy argument of \lessonref{les:spring} now gives
+\begin{equation}
+  \frac{\dd}{\dd t}\Big(\tfrac12 m\dot x^2 + \tfrac12 K_p x^2\Big) = \dot x\,(m\ddot x + K_p x) = -K_d\,\dot x^2 \;\le\; 0 .
+\end{equation}
+Whenever the drone moves, the D term removes energy at the rate $K_d\dot x^2$. The oscillation must die out.
+
+\section{Natural frequency and damping ratio}
+
+The characteristic equation of \cref{eq:damper-msd} is $m s^2 + K_d s + K_p = 0$. Dividing by $m$ and writing it in the standard form
+\begin{equation}\label{eq:damper-std}
+  s^2 + 2\zeta\omega_n\,s + \omega_n^2 = 0,\qquad
+  \omega_n = \sqrt{\frac{K_p}{m}},\qquad
+  \zeta = \frac{K_d}{2\sqrt{K_p\,m}}
+\end{equation}
+separates two questions. The \term{natural frequency} $\omega_n$ sets the time scale: how fast the loop wants to move. The \term{damping ratio} $\zeta$ (zeta) sets the shape: how the motion approaches the target. The poles are
+\begin{equation}\label{eq:damper-poles}
+  s_{1,2} = -\zeta\omega_n \pm \omega_n\sqrt{\zeta^2 - 1} ,
+\end{equation}
+and three cases follow.
+
+\begin{definition}{The three kinds of damping}
+\begin{description}[leftmargin=0pt, itemsep=3pt, font=\sffamily\small\bfseries]
+  \item[Underdamped, $0<\zeta<1$.] Complex poles $-\zeta\omega_n \pm j\omega_d$ with $\omega_d = \omega_n\sqrt{1-\zeta^2}$: a decaying oscillation. The response overshoots.
+  \item[Critically damped, $\zeta = 1$.] A double real pole at $-\omega_n$: the fastest approach that never overshoots.
+  \item[Overdamped, $\zeta > 1$.] Two real poles. The one closer to the origin, near $-\omega_n/(2\zeta)$ for large $\zeta$, makes the response slow: the damper is so strong that it resists the motion towards the target too.
+\end{description}
+\end{definition}
+
+\widefig{zeta_family}{The damping ratio in two pictures. Left: the poles of \cref{eq:damper-std}, scaled by $\omega_n$. For $\zeta<1$ they lie on the unit circle (their distance from the origin is $\omega_n$) and move towards the real axis as $\zeta$ grows; at $\zeta=1$ they meet; beyond it they split along the axis and one of them crawls towards the origin. Right: the corresponding step responses. The grey band is the $\pm2\,\%$ tolerance used for the settling time.}{fig:zeta-family}
+
+\Cref{fig:zeta-family} is worth a long look. It shows that the pole plane is a map of behaviour: the height of a pole above the real axis is the frequency of oscillation, its distance to the left of the imaginary axis is the speed of decay, and the angle from the negative real axis tells the damping, $\cos\theta = \zeta$.
+
+\section{Reading a step response}
+
+To compare controllers we need numbers, not adjectives. The simulator measures four of them after every setpoint step, and shows them in the \ui{step metrics} table.
+
+\begin{definition}{Step-response metrics}
+For a step of the setpoint from $y_0$ to $y_1$:
+\begin{description}[leftmargin=0pt, itemsep=2pt, font=\sffamily\small\bfseries]
+  \item[Rise time $t_r$] from 10\,\% to 90\,\% of the step.
+  \item[Overshoot $M_p$] the peak beyond $y_1$, in \% of the step size.
+  \item[Settling time $t_s$] the time after which the output stays within $\pm2\,\%$ of the step around $y_1$.
+  \item[Steady-state error $e_{ss}$] what is left once everything has settled.
+\end{description}
+\end{definition}
+
+For the underdamped second-order system there are classic formulas:
+\begin{equation}\label{eq:damper-metrics}
+  M_p = e^{-\pi\zeta/\sqrt{1-\zeta^2}},\qquad
+  t_s \approx \frac{4}{\zeta\,\omega_n},\qquad
+  t_{r} \approx \frac{1.8}{\omega_n}\ \ (\zeta \approx 0.5).
+\end{equation}
+The overshoot depends on $\zeta$ only. The settling time is four time constants of the envelope $e^{-\zeta\omega_n t}$, since $e^{-4} \approx 2\,\%$. For the critically damped case the response is $1 - (1+\omega_n t)e^{-\omega_n t}$, which enters the 2\,\% band at $\omega_n t \approx 5.83$.
+
+\section{The experiment}
+
+The lesson flies a square wave: the setpoint jumps between \SI{1.5}{m} and \SI{2.5}{m} every four seconds. \Cref{fig:damper-sweep} overlays one upward step for five values of $K_d$ (with $K_p = 10$, $m=\SI{1}{kg}$, so $\omega_n = \SI{3.16}{rad/s}$ and $\zeta = K_d/6.32$).
+
+\simfig{damper_sweep}{Five dampers, one step. The low-$\zeta$ runs start slightly off because the previous step had not finished settling.}{fig:damper-sweep}
+
+\begin{table}[h]
+\centering\small\sffamily
+\begin{tabular}{rrrrrrr}
+\toprule
+ & & \multicolumn{2}{c}{overshoot} & \multicolumn{2}{c}{settling time} & rise time\\
+\cmidrule(lr){3-4}\cmidrule(lr){5-6}
+$K_d$ & $\zeta$ & theory & measured & theory & measured & measured\\
+\midrule
+3 & 0.47 & 18.4\,\% & 15.8\,\% & \SI{2.7}{s} & \SI{2.5}{s} & \SI{0.50}{s}\\
+6.3 & 1.00 & 0 & 0 & \SI{1.84}{s} & \SI{1.97}{s} & \SI{1.09}{s}\\
+15 & 2.37 & 0 & 0 & \SI{5.7}{s} & $>\SI{4}{s}$ & \SI{3.2}{s}\\
+\bottomrule
+\end{tabular}
+\caption{Theory against the simulator. The small differences come from what \cref{eq:damper-msd} leaves out: the \SI{30}{ms} motor lag, sampling at \SI{250}{Hz}, the low-pass filter on D and the air drag.}
+\label{tab:damper}
+\end{table}
+
+\Cref{tab:damper} puts the formulas next to the measurements. The agreement is good enough to design with — which is the point of a model. The overdamped runs illustrate the other half of the lesson: more damping is not better. At $\zeta = 2.37$ the slow pole sits at $-\omega_n(\zeta - \sqrt{\zeta^2-1}) = \SI{-0.70}{s^{-1}}$, a time constant of \SI{1.4}{s}, and the drone crawls towards the setpoint.
+
+\begin{keyidea}[Critical damping]
+For a given stiffness the fastest response without overshoot is the critically damped one, $\zeta = 1$, i.e.\ $K_d = 2\sqrt{K_p m}$. For the default $K_p = 10$ that is $K_d \approx 6.3$. Many practical tunes aim slightly below, $\zeta \approx 0.7$–$0.9$: a few percent of overshoot buys a noticeably faster rise.
+\end{keyidea}
+
+The default tune of Anemostatos, $K_d = 7$, is $\zeta = 1.11$: slightly overdamped, deliberately, because the integral term — next lesson — adds some overshoot of its own.
+
+\screen[0 0 495 998]{damper}{Lesson 4 in the app, with $K_d = 0.8$: a ringing square-wave response. The info card (right) says \enquote{underdamped — overshoots} and computes $\zeta$ from the gains; the tracking chart marks the peak and the settling point.}{fig:damper-screen}
+
+\begin{inapp}[Step metrics and the goal]
+\begin{itemize}[leftmargin=1.2em]
+  \item After every setpoint step \src{src/engine/metrics.ts} (\texttt{analyzeLastStep}) measures rise time, overshoot, settling time and steady-state error from the telemetry; \src{src/ui/charts/StepMetrics.tsx} shows them.
+  \item The lesson has a \emph{goal}: overshoot below 2\,\% and settling time below \SI{2.5}{s}. The lesson panel turns green when the last step meets it.
+  \item The square wave is \ui{Setpoint\then Automatic motion\then square}, with amplitude and period below it (\param{setpoint.profile}).
+\end{itemize}
+\end{inapp}
+
+\begin{trythis}
+\begin{enumerate}
+  \item Raise $K_d$ step by step from 0.8: 2, 4, 6.3. Watch the overshoot and the settling time in the step metrics, and $\zeta$ in the info card.
+  \item Go past critical: 15, then 30. The response gets lazy — and the settling time grows again.
+  \item Set $K_p = 40$ and find the $K_d$ that is critical for it. Is the result faster? By how much?
+\end{enumerate}
+\predict{which $K_d$ gives about 5\,\% overshoot? (Invert the $M_p$ formula; the answer is close to $\zeta = 0.69$.)}
+\end{trythis}
+
+\begin{curiosity}{A 660-tonne pendulum}
+\photo{taipei}{The tuned mass damper of Taipei 101: a steel sphere of 660 tonnes hanging between the 87th and the 92nd floor.}
+Taipei 101 was the tallest building in the world when it opened in 2004, and it stands in a place that is hit by typhoons and earthquakes. A tall building is a spring with very little damping: steel and concrete dissipate almost no energy, so wind gusts can set it swaying in a way that makes the people at the top seasick.
+
+The engineers hung a giant pendulum — a sphere of welded steel plates weighing 660 tonnes — near the top of the tower, tuned so that its natural frequency matches the building's. When the tower sways, the pendulum lags behind and pushes against the motion; eight large hydraulic dampers connected to it turn that relative motion into heat. In our language, the pendulum and its dampers add a large $K_d$ to a structure that had almost none, and they cut the swaying by up to 40\,\% in strong winds. During Typhoon Soudelor in 2015 the sphere swung by a metre.
+
+Your car contains four much smaller dampers doing the same job. Car suspensions are usually tuned to $\zeta \approx 0.2$–$0.4$ — well below critical — because a completely non-oscillating ride feels harsh. Comfort, it turns out, is a choice of damping ratio.
+\end{curiosity}
+
+\begin{remember}
+\begin{itemize}
+  \item With a constant setpoint the D term is $-K_d\dot y$: a damper. It removes energy at the rate $K_d\dot y^2$.
+  \item P and D make a mass–spring–damper with $\omega_n = \sqrt{K_p/m}$ and $\zeta = K_d/(2\sqrt{K_p m})$.
+  \item $\zeta<1$ overshoots, $\zeta=1$ is the fastest without overshoot, $\zeta>1$ crawls.
+  \item Overshoot depends only on $\zeta$; the settling time scales as $1/(\zeta\omega_n)$.
+\end{itemize}
+\end{remember}
+
+\begin{exercises}
+\exercise[1] The drone carries a payload so that $m = \SI{1.5}{kg}$, with $K_p = 10$. Which $K_d$ is critical? If $K_d$ stays at 6.3, what are $\zeta$ and the overshoot?
+\answer{$K_d = 2\sqrt{15} = 7.75$. With $K_d = 6.3$: $\zeta = 6.3/7.75 = 0.81$, $M_p = e^{-\pi\cdot0.81/0.586} \approx 1.3\,\%$.}
+\exercise[1] Find $K_p$ and $K_d$ for $m = \SI{1}{kg}$ such that $\zeta = 0.7$ and $t_s \approx \SI{1}{s}$.
+\answer{$\zeta\omega_n = 4/t_s = 4$, so $\omega_n = 5.71$, $K_p = m\omega_n^2 = 32.7$, $K_d = 2\zeta\omega_n m = 8.0$.}
+\exercise[2] Derive the overshoot formula of \cref{eq:damper-metrics}: solve \cref{eq:damper-msd} for a unit step, find the time of the first peak and evaluate the response there.
+\answer{$y(t) = 1 - e^{-\zeta\omega_n t}\big(\cos\omega_d t + \tfrac{\zeta}{\sqrt{1-\zeta^2}}\sin\omega_d t\big)$. $\dot y = \tfrac{\omega_n}{\sqrt{1-\zeta^2}}e^{-\zeta\omega_n t}\sin\omega_d t = 0$ first at $t_p = \pi/\omega_d$, where $y = 1 + e^{-\zeta\omega_n\pi/\omega_d} = 1 + e^{-\pi\zeta/\sqrt{1-\zeta^2}}$.}
+\exercise[2] Show that for $\zeta > 1$ the slow pole satisfies $s \approx -\omega_n/(2\zeta)$ when $\zeta \gg 1$. Interpret: the drone then moves as if only the damper and the spring existed, with no mass.
+\answer{$-\zeta\omega_n + \omega_n\sqrt{\zeta^2-1} = -\zeta\omega_n + \zeta\omega_n\sqrt{1 - 1/\zeta^2} \approx -\zeta\omega_n + \zeta\omega_n(1 - \tfrac{1}{2\zeta^2}) = -\tfrac{\omega_n}{2\zeta} = -K_p/K_d$. That is the pole of $K_d\dot x + K_p x = 0$: inertia no longer matters, the damper sets the pace.}
+\exercise[3] The pole angle: show that complex poles of \cref{eq:damper-std} make the angle $\theta$ with the negative real axis such that $\cos\theta = \zeta$. What region of the $s$-plane guarantees overshoot below 5\,\% and settling within \SI{2}{s}?
+\answer{$|s| = \omega_n$ and $\operatorname{Re}s = -\zeta\omega_n$, so $\cos\theta = \zeta$. 5\,\% overshoot needs $\zeta \ge 0.69$, i.e.\ $\theta \le 46^\circ$ (a wedge around the negative real axis); $t_s \le 2$ needs $\operatorname{Re} s \le -2$ (left of a vertical line). The intersection of the wedge and the half-plane.}
+\end{exercises}

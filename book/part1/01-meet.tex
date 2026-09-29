@@ -1,0 +1,141 @@
+\lesson{1}{Meet the loop}{Measure, compare, act — and do it again every four milliseconds.}{1}{meet}{Part I · PID}
+\label{les:meet}
+
+\lead{A drone hovers two metres above the floor. Gravity pulls it down with a force of almost ten newtons, and the wind shoves it around at random. Nobody tells the drone how strong the next gust will be. And yet it stays where it was told to stay. This first lesson is about the one idea that makes that possible.}
+
+\section{The problem}
+
+Anemostatos begins with the simplest vehicle it can offer: a quadrotor that can only move \emph{up and down}. Its four motors always push together, so the only thing that can be chosen is the total thrust $T$. Newton's second law along the vertical axis reads
+\begin{equation}\label{eq:meet-plant}
+  m\,\ddot y = T - m g + d(t),
+\end{equation}
+where $y$ is the altitude, $m=\SI{1}{kg}$ the mass, $g = \SI{9.81}{m/s^2}$ and $d(t)$ everything else that pushes: drag from the air moving past the drone, gusts, a hand poking it.\aside{The full physics model — motor lag, quadratic drag, the gust generator — is in the \hyperref[ch:prelude]{Prelude}. For this lesson Equation~\eqref{eq:meet-plant} is all we need.} Our job is to choose $T(t)$ so that $y(t)$ stays at a desired value $r$, the \term{setpoint}.
+
+\subsection{Why not just compute the answer?}
+In still air the answer looks obvious: hovering needs $\ddot y = 0$, so set $T = mg = \SI{9.81}{N}$ and be done. This is called \term{open-loop} control: the command is computed from a model, once, and never checked against reality.
+
+Let us see how long it lasts. Suppose the mass is slightly wrong — a battery \SI{50}{g} heavier than we thought — so the thrust is short by $\Delta = 0.05 \cdot 9.81 \approx \SI{0.49}{N}$. Then $m\ddot y = -\Delta$ and, starting from rest,
+\begin{equation}
+  y(t) = y_0 - \frac{\Delta}{2m}\,t^2 .
+\end{equation}
+After one second the drone has sunk \SI{25}{cm}; after five seconds, more than six metres. The error does not merely persist, it \emph{accelerates}, because a force error is integrated twice on its way to a position error. Every unmodelled newton — and the wind supplies plenty — ends the same way.
+
+\marginfig{meet_off}{Switch the controller off (\key{M}) and the drone falls: nothing holds it up anymore.}{fig:meet-off}
+
+\begin{keyidea}[Feedback]
+Instead of predicting the right command, \emph{measure} what actually happens, \emph{compare} it with what should happen, and \emph{act} on the difference. Repeat forever. A feedback controller does not need to know the disturbance to reject it: it only needs to see its effect.
+\end{keyidea}
+
+\section{The loop and its vocabulary}
+
+\Cref{fig:meet-loop} is the picture behind every chapter of this book. Its pieces have standard names, and it is worth learning them now, because the simulator uses them everywhere — with the same colours as in this book.
+
+\begin{figure}[h]
+  \centering\input{tikz/loop}
+  \sidecaption{The feedback loop. The error (red) is the only thing the controller reacts to; the measurement (blue) is the only thing it knows about the drone. The wind enters the plant, not the controller.\label{fig:meet-loop}}
+\end{figure}
+
+\begin{definition}{The parts of a control loop}
+\begin{description}[leftmargin=0pt, itemsep=3pt, font=\sffamily\small\bfseries]
+  \item[Plant] the system being controlled: here the drone and Equation~\eqref{eq:meet-plant}.
+  \item[Setpoint $r$] the desired value of the controlled variable (the \emph{reference}).
+  \item[Measurement $y$] what the sensor reports — not necessarily the truth.
+  \item[Error $e = r - y$] how far the measurement is from the setpoint. Positive $e$ means ``too low''.
+  \item[Command $u$] what the controller asks of the actuators; here the thrust command.
+  \item[Actuator] the part that turns a command into a physical effect: the motors.
+  \item[Disturbance $d$] every input we do not control and usually do not measure.
+\end{description}
+\end{definition}
+
+Notice where the arrows go. The wind enters the \emph{plant}. The controller only sees the error. This is not a limitation, it is the point: whatever the disturbance is — a gust, a wrong mass, a tired battery — it can only hurt us by creating an error, and the error is exactly what the controller watches.\aside{Norbert Wiener named the science of feedback \emph{cybernetics} (1948), from the Greek \emph{kybernētēs}, the steersman. The Latin form of the same word gave English \emph{governor}.}
+
+\section{The PID law}
+
+What should the controller do with the error? Anemostatos uses, in Part~I, the most successful answer in the history of engineering: the \term{PID} controller,
+\begin{equation}\label{eq:meet-pid}
+  u(t) \;=\; \underbrace{K_p\,e(t)}_{\text{\Pt}} \;+\; \underbrace{K_i\!\int_0^t e(\tau)\,\dd\tau}_{\text{\It}} \;+\; \underbrace{K_d\,\dot e(t)}_{\text{\Dt}} \;+\; \underbrace{\hat m\,g}_{\text{\FFt}} .
+\end{equation}
+Each term looks at the error from a different point in time:
+\begin{itemize}
+  \item \Pt, the \emph{proportional} term, reacts to where the drone \emph{is}: the larger the error, the harder the push. It behaves like a spring (\lessonref{les:spring}).
+  \item \It, the \emph{integral} term, reacts to where the drone \emph{has been}: it accumulates the error, so a small error that persists eventually produces a large push. It is the memory of the loop (\lessonref{les:integral}).
+  \item \Dt, the \emph{derivative} term, reacts to where the drone is \emph{going}: it opposes the rate of change of the error, like a shock absorber (\lessonref{les:damper}).
+  \item \FFt, the \emph{feedforward}, is not feedback at all: it is the open-loop guess $\hat m g$ from above, with $\hat m$ the mass the controller \emph{believes} in. Feedback then only has to correct the guess (\lessonref{les:droop}).
+\end{itemize}
+The three gains $K_p$, $K_i$, $K_d$ are the knobs. The default tune of the altitude loop is $K_p = 10$, $K_i = 0.8$, $K_d = 7$ (units: \si{N/m}, \si{N/(m.s)}, \si{N.s/m}).
+
+\subsection{A controller that runs in steps}
+Equation~\eqref{eq:meet-pid} is written in continuous time, but a flight computer does not think continuously. Anemostatos runs the altitude controller at \SI{250}{Hz}: every $\Delta t = \SI{4}{ms}$ it reads the sensor, computes $u$, and holds that command until the next tick.\aside{The physics itself runs at \SI{1}{kHz}. The controller sees only every fourth step, exactly like a real autopilot that samples a continuous world.} The integral becomes a running sum and the derivative a difference quotient:
+\begin{equation}\label{eq:meet-discrete}
+\begin{aligned}
+  e_k &= r_k - y_k, & I_k &= I_{k-1} + K_i\,e_k\,\Delta t,\\
+  D_k &= K_d\,\frac{e_k - e_{k-1}}{\Delta t}, & u_k &= K_p e_k + I_k + D_k + \hat m g .
+\end{aligned}
+\end{equation}
+Most of Part~I is about what these four lines get wrong in practice, and how to fix it.
+
+\section{Watching it work}
+
+\Cref{fig:meet-overview} shows the first forty seconds of the lesson's run, drawn from the simulator's own telemetry. The drone takes off, climbs to its two-metre setpoint and then spends the rest of the time being pushed around by turbulence.
+
+\simfig{meet_overview}{Lesson 1 in numbers. At $t \approx \SI{16}{s}$ a gust blows upward at \SI{4}{m/s} and lifts the drone \SI{22}{cm}. The error goes negative, P (orange) and D (violet) push down together, and in two seconds it is over. I (green) hardly moves: it is built for slow, persistent errors, not for quick ones.}{fig:meet-overview}
+
+Look at the gust at $t \approx \SI{16}{s}$ in detail, because it contains the whole lesson:
+\begin{enumerate}
+  \item The upward wind (bottom panel) creates drag that pushes the drone up. The controller cannot see the wind.
+  \item It does see the altitude rise above the setpoint, so the error becomes negative. \Pt immediately turns that into a downward push: $K_p e = 10 \cdot (-0.22) = \SI{-2.2}{N}$.
+  \item \Dt reacts even earlier. It sees the \emph{velocity} of the rise and pushes down while the error is still small — then, as the drone comes back down, it reverses and brakes the descent so that it does not overshoot.
+  \item Once the gust is over, both terms return to zero, and the thrust returns to the feedforward value $\hat m g = \SI{9.81}{N}$.
+\end{enumerate}
+
+
+\screen[0 0 495 0]{meet}{The Anemostatos screen during Lesson 1. Top: the 3D scene with the drone, the translucent setpoint sphere and the coloured arrows of the P, I, D and FF contributions. Bottom left: the \emph{live formula} with the numbers being added at this instant. Bottom: the charts, in the same colours as this book. Right: the lesson panel and the parameters.}{fig:meet-screen}
+
+\begin{inapp}[Where this lesson lives]
+Start it from the lesson panel: \ui{Part I · PID\then 1. Meet the loop\then Start}. Everything on the screen is a view of the loop in \cref{fig:meet-loop}:
+\begin{itemize}[leftmargin=1.2em]
+  \item the \ui{Altitude: tracking} chart shows setpoint and measurement; \ui{Error} shows $e$; \ui{PID terms} shows the three terms separately; \ui{Motor thrust} shows the actuators;
+  \item the \ui{live formula} at the bottom left of the 3D view prints Equation~\eqref{eq:meet-pid} with the current numbers, e.g.\ \texttt{u = 10·−0.010 +0.02 +0.06 +9.81};
+  \item the controller itself is \src{src/control/pid.ts} (the PID building block, one function \texttt{update}) and \src{src/control/altitude.ts} (the altitude loop around it);
+  \item the loop is closed in \src{src/engine/simulation.ts}, method \texttt{step()}: read the sensors, call the controller, apply the thrust, integrate the physics.
+\end{itemize}
+Keys: \key{↑}\,\key{↓} move the setpoint, \key{G} fires a gust, \key{M} switches the controller off, \key{R} resets, \key{Space} pauses.
+\end{inapp}
+
+\begin{trythis}
+\begin{enumerate}
+  \item Press \key{↑} a few times, or drag the setpoint sphere. Watch all four charts react: the error jumps, P reacts at once, I slowly follows.
+  \item Press \key{G} for a gust. How far does it knock the drone? Compare with the wind chart.
+  \item Press \key{M} to switch the controller off and watch the drone fall (\cref{fig:meet-off}). Press \key{R} to reset.
+\end{enumerate}
+\predict{when the controller is off, the drone falls like a stone. How long does the fall from \SI{2}{m} take? (Use $y = \tfrac12 g t^2$ and compare with the chart.)}
+\end{trythis}
+
+\begin{curiosity}{The governor that started it all}
+\sidephoto{governor}{52mm}{A centrifugal governor by Boulton \& Watt. As the shaft spins faster, the balls fly outward and close the steam valve.}
+In 1788 James Watt fitted his steam engines with a device borrowed from windmills: two heavy balls on hinged arms, spun by the engine. When the engine ran too fast, the balls swung outward and, through a linkage, closed the steam valve; when it slowed, they fell and opened it. It is a proportional controller made of iron — measure (the ball height), compare (with the linkage geometry), act (on the valve) — and it made the steam engine usable in factories.
+
+Governors had a curious habit, though: some of them \emph{hunted}, oscillating around the desired speed instead of settling. In 1868 James Clerk Maxwell — the same Maxwell of electromagnetism — published \emph{On Governors}, the first mathematical analysis of a feedback loop. He linearised the equations of motion and showed that stability depends on the roots of a characteristic polynomial: if any root has a positive real part, the governor hunts. That is exactly the tool we will use in \lessonref{les:damper} and \lessonref{les:edge}.
+
+Eighty years later Norbert Wiener named his new science \emph{cybernetics} partly in homage to Maxwell's paper. Today the same loop you see in \cref{fig:meet-loop} runs in your car's engine, your phone's camera stabiliser, the thermostat on your wall, and in every one of the hundreds of millions of drones sold so far.
+\end{curiosity}
+
+\begin{remember}
+\begin{itemize}
+  \item Open-loop control computes a command from a model; every model error grows, often without bound.
+  \item Feedback measures the result, compares it with the setpoint and acts on the error. It does not need to know the disturbance, only to see its effect.
+  \item The PID controller combines three views of the error: present (P), past (I), future (D) — plus a feedforward guess.
+  \item A real controller runs in discrete steps, $\Delta t = \SI{4}{ms}$ here; that detail will matter in \lessonref{les:slow}.
+\end{itemize}
+\end{remember}
+
+\begin{exercises}
+\exercise[1] The feedforward uses $\hat m = \SI{1.00}{kg}$ but the true mass is \SI{1.05}{kg}. With the controller switched off after hovering (so $T = \hat m g$ stays applied), how far has the drone sunk after \SI{2}{s}?
+\answer{$\Delta = 0.05 \cdot 9.81 = \SI{0.49}{N}$, $\ddot y = -0.49/1.05 = \SI{-0.467}{m/s^2}$, so $\tfrac12 \cdot 0.467 \cdot 2^2 \approx \SI{0.93}{m}$.}
+\exercise[1] Using Equation~\eqref{eq:meet-discrete}, compute $u_k$ for $e_k = \SI{0.1}{m}$, $e_{k-1} = \SI{0.098}{m}$, $I_{k-1} = \SI{0.3}{N}$, with the default gains and $\hat m g = \SI{9.81}{N}$.
+\answer{$P = 1$, $I = 0.3 + 0.8\cdot0.1\cdot0.004 = 0.30032$, $D = 7\cdot0.002/0.004 = 3.5$; $u = 1 + 0.300 + 3.5 + 9.81 \approx \SI{14.61}{N}$. Note how large D is: the error is changing at \SI{0.5}{m/s}.}
+\exercise[2] Show that with $d = \text{const}$ and \emph{no} controller, the altitude error grows quadratically, and with a pure P controller ($u = K_p e + mg$) it stays bounded. What is the bound?
+\answer{Open loop: $\ddot y = d/m$ gives $y = y_0 + \tfrac{d}{2m} t^2$. With P: $m\ddot y = K_p(r - y) + d$ is a harmonic oscillator around $y^* = r + d/K_p$; $y$ oscillates between $y_0$ and $2y^* - y_0$, so $|y - r| \le |y_0 - r| + 2|d|/K_p$ (bounded but undamped — the subject of Lesson 2).}
+\exercise[2] In the app, press \key{M} while hovering at \SI{2}{m}. Estimate the fall time from Equation~\eqref{eq:meet-plant} and check it on the altitude chart. Why is the measured time slightly longer?
+\answer{$t = \sqrt{2h/g} = \sqrt{4/9.81} \approx \SI{0.64}{s}$. Measured is longer because the motors spin down with a \SI{30}{ms} lag and air drag ($c_v|v|v$) slows the fall.}
+\end{exercises}

@@ -1,0 +1,376 @@
+{
+ "governor": {
+  "title": "File:Boulton and Watt centrifugal governor-MJ.jpg",
+  "artist": "Dr. Mirko Junge",
+  "credit": "Own work",
+  "license": "CC BY 3.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Boulton_and_Watt_centrifugal_governor-MJ.jpg",
+  "size": [
+   1152,
+   1536
+  ]
+ },
+ "tacoma": {
+  "title": "File:Tacoma Narrows still.png",
+  "artist": "Barney Elliot",
+  "credit": "Still image from approximately the 3:21 in the video from the Stillman Fires Collection.",
+  "license": "Public Domain",
+  "page": "https://commons.wikimedia.org/wiki/File:Tacoma_Narrows_still.png",
+  "size": [
+   1422,
+   1066
+  ]
+ },
+ "turbinehall": {
+  "title": "File:VIEW OF TURBINE HALL LOOKING SOUTHWEST AT WESTINGHOUSE-PARSONS TURBINE NUMBER 2. THIS UNIT WAS INSTALLED IN 1925. - New York, New Haven and Hartford Railroad, Cos Cob Power HAER CONN,1-GREWI,15A-40.tif",
+  "artist": "Lowe, Jet, creator",
+  "credit": "https://www.loc.gov/pictures/item/ct0568.photos.383665p",
+  "license": "Public domain",
+  "page": "https://commons.wikimedia.org/wiki/File:VIEW_OF_TURBINE_HALL_LOOKING_SOUTHWEST_AT_WESTINGHOUSE-PARSONS_TURBINE_NUMBER_2._THIS_UNIT_WAS_INSTALLED_IN_1925._-_New_York,_New_Haven_and_Hartford_Railroad,_Cos_Cob_Power_HAER_CONN,1-GREWI,15A-40.tif",
+  "size": [
+   2200,
+   1600
+  ]
+ },
+ "taipei": {
+  "title": "File:Taipei 101 Tuned Mass Damper 2010.jpg",
+  "artist": "Armand du Plessis",
+  "credit": "Own work",
+  "license": "CC BY 3.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Taipei_101_Tuned_Mass_Damper_2010.jpg",
+  "size": [
+   2200,
+   1461
+  ]
+ },
+ "newmexico": {
+  "title": "File:USS New Mexico (BB-40) at anchor in 1920.jpg",
+  "artist": "Lt. Thomas Marshall Colston, U.S. Navy",
+  "credit": "U.S. Navy National Museum of Naval Aviation photo No. 1986.094.001.363; [1]",
+  "license": "Public domain",
+  "page": "https://commons.wikimedia.org/wiki/File:USS_New_Mexico_(BB-40)_at_anchor_in_1920.jpg",
+  "size": [
+   2200,
+   1619
+  ]
+ },
+ "cruise": {
+  "title": "File:Cruise control Mercedes C220.jpg",
+  "artist": "Adam Jahr",
+  "credit": "Photo collection of Adam Jahr",
+  "license": "Public domain",
+  "page": "https://commons.wikimedia.org/wiki/File:Cruise_control_Mercedes_C220.jpg",
+  "size": [
+   2200,
+   1461
+  ]
+ },
+ "thermostat": {
+  "title": "File:Honeywell round thermostat.jpg",
+  "artist": "Flickr user midnightcomm",
+  "credit": "https://www.flickr.com/photos/midnightcomm/447335691/",
+  "license": "CC BY 2.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Honeywell_round_thermostat.jpg",
+  "size": [
+   2200,
+   1467
+  ]
+ },
+ "mpu6050": {
+  "title": "File:IvenSense 3-Axis-Gyro-Accelerometer-IC MPU-6050 10937-01.jpg",
+  "artist": "SparkFun",
+  "credit": "https://www.sparkfun.com/products/10937",
+  "license": "CC BY 2.0",
+  "page": "https://commons.wikimedia.org/wiki/File:IvenSense_3-Axis-Gyro-Accelerometer-IC_MPU-6050_10937-01.jpg",
+  "size": [
+   600,
+   600
+  ]
+ },
+ "f8": {
+  "title": "File:F-8 Digital Fly-by-Wire (DFBW) in flight over snow capped mountains DVIDS692994.jpg",
+  "artist": "Glenn Research Center",
+  "credit": "https://www.dvidshub.net/image/692994",
+  "license": "Public domain",
+  "page": "https://commons.wikimedia.org/wiki/File:F-8_Digital_Fly-by-Wire_(DFBW)_in_flight_over_snow_capped_mountains_DVIDS692994.jpg",
+  "size": [
+   1536,
+   1321
+  ]
+ },
+ "dsky": {
+  "title": "File:Apollo display and keyboard unit (DSKY) used on F-8 DFBW DVIDS683588.jpg",
+  "artist": "NASA/Dennis Taylor",
+  "credit": "https://www.dfrc.nasa.gov/Gallery/Photo/F-8DFBW/HTML/EC96-43408-1.html; see also https://www.dvidshub.net/image/683588",
+  "license": "Public domain",
+  "page": "https://commons.wikimedia.org/wiki/File:Apollo_display_and_keyboard_unit_(DSKY)_used_on_F-8_DFBW_DVIDS683588.jpg",
+  "size": [
+   2200,
+   1725
+  ]
+ },
+ "curiosity": {
+  "title": "File:Curiosity rover selfie at Namib Dune Sol 1128 (53678107023).jpg",
+  "artist": "semeion.photo",
+  "credit": "Curiosity rover selfie at Namib Dune Sol 1128",
+  "license": "Public domain",
+  "page": "https://commons.wikimedia.org/wiki/File:Curiosity_rover_selfie_at_Namib_Dune_Sol_1128_(53678107023).jpg",
+  "size": [
+   2200,
+   1775
+  ]
+ },
+ "x29": {
+  "title": "File:X-29 in Flight - GPN-2002-000193.jpg",
+  "artist": "NASA / DFRC / Larry Sammons",
+  "credit": "Armstrong Photo Gallery: Home page – Source – Image Great Images in NASA: Home page – Source – Image",
+  "license": "Public domain",
+  "page": "https://commons.wikimedia.org/wiki/File:X-29_in_Flight_-_GPN-2002-000193.jpg",
+  "size": [
+   2200,
+   1440
+  ]
+ },
+ "nwtc": {
+  "title": "File:National Wind Technology Center - Colorado.jpg",
+  "artist": "Photo by Dennis Schroeder – ENERGY.GOV",
+  "credit": "National Wind Technology Center - Colorado",
+  "license": "Public domain",
+  "page": "https://commons.wikimedia.org/wiki/File:National_Wind_Technology_Center_-_Colorado.jpg",
+  "size": [
+   2200,
+   1464
+  ]
+ },
+ "ingenuity": {
+  "title": "File:Ingenuity is tested at the Kennedy Space Center.jpg",
+  "artist": "Cory Huston",
+  "credit": "KSC-20200310-PH-CSH01_0040",
+  "license": "Public domain",
+  "page": "https://commons.wikimedia.org/wiki/File:Ingenuity_is_tested_at_the_Kennedy_Space_Center.jpg",
+  "size": [
+   2200,
+   1467
+  ]
+ },
+ "hummingbird": {
+  "title": "File:Hovering Hummingbird (14900025010).jpg",
+  "artist": "USFWS Mountain-Prairie",
+  "credit": "Hovering Hummingbird",
+  "license": "Public domain",
+  "page": "https://commons.wikimedia.org/wiki/File:Hovering_Hummingbird_(14900025010).jpg",
+  "size": [
+   2200,
+   1318
+  ]
+ },
+ "distillation": {
+  "title": "File:Colonne distillazione.jpg",
+  "artist": "User:Luigi Chiesa",
+  "credit": "Own work",
+  "license": "CC BY 3.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Colonne_distillazione.jpg",
+  "size": [
+   1609,
+   2120
+  ]
+ },
+ "cheetah": {
+  "title": "File:Cheetah Run.jpg",
+  "artist": "Mark Dumont",
+  "credit": "Flickr: Cheetah Run",
+  "license": "CC BY 2.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Cheetah_Run.jpg",
+  "size": [
+   2200,
+   1466
+  ]
+ },
+ "kalman": {
+  "title": "File:ETH-BIB-Kalman, Rudolf E. (1930-2016)-HK 04-01925.jpg",
+  "artist": "Unbekannt",
+  "credit": "This image is from the collection of the ETH-Bibliothek and has been published on Wikimedia Commons as part of a cooperation with Wikimedia CH. Corrections and additional information are welcome.",
+  "license": "CC BY-SA 4.0",
+  "page": "https://commons.wikimedia.org/wiki/File:ETH-BIB-Kalman,_Rudolf_E._(1930-2016)-HK_04-01925.jpg",
+  "size": [
+   2200,
+   1467
+  ]
+ },
+ "segway": {
+  "title": "File:Segway PT (2006).jpg",
+  "artist": "Richard from DC, US",
+  "credit": "A flock of Segways",
+  "license": "CC BY 2.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Segway_PT_(2006).jpg",
+  "size": [
+   936,
+   660
+  ]
+ },
+ "apollo15": {
+  "title": "File:View of the Apollo 15 Command-Service Module in lunar orbit (as15-88-11974).jpg",
+  "artist": "NASA Johnson Space Center",
+  "credit": "This image or video was catalogued by Lyndon B. Johnson Space Center of the United States National Aeronautics and Space Administration (NASA) under Photo ID: as15-88-11974.",
+  "license": "Public domain",
+  "page": "https://commons.wikimedia.org/wiki/File:View_of_the_Apollo_15_Command-Service_Module_in_lunar_orbit_(as15-88-11974).jpg",
+  "size": [
+   2200,
+   2275
+  ]
+ },
+ "gps": {
+  "title": "File:GPS-IIF-11.jpg",
+  "artist": "Michael Howard/Spaceflight Insider",
+  "credit": "https://www.dvidshub.net/image/2261588/45th-space-wing-supports-air-force-gps-iif-11-launch-aboard-atlas-v",
+  "license": "Public domain",
+  "page": "https://commons.wikimedia.org/wiki/File:GPS-IIF-11.jpg",
+  "size": [
+   1920,
+   1280
+  ]
+ },
+ "phlab": {
+  "title": "File:Cessna Citation II ‘PH-LAB’ (49295064688).jpg",
+  "artist": "Alan Wilson from Peterborough, Cambs, UK",
+  "credit": "Cessna Citation II ‘PH-LAB’",
+  "license": "CC BY-SA 2.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Cessna_Citation_II_%E2%80%98PH-LAB%E2%80%99_(49295064688).jpg",
+  "size": [
+   2200,
+   1467
+  ]
+ },
+ "apolloimu": {
+  "title": "File:Inertial Measurement Unit, Apollo Guidance and Navigation System, fabricated for vibration testing, 1961-1966, view 1 - MIT Museum - Cambridge, MA - DSC09135.jpg",
+  "artist": "Daderot",
+  "credit": "Own work",
+  "license": "CC0",
+  "page": "https://commons.wikimedia.org/wiki/File:Inertial_Measurement_Unit,_Apollo_Guidance_and_Navigation_System,_fabricated_for_vibration_testing,_1961-1966,_view_1_-_MIT_Museum_-_Cambridge,_MA_-_DSC09135.jpg",
+  "size": [
+   2200,
+   1467
+  ]
+ },
+ "droneshow": {
+  "title": "File:US flag at drone light show.jpg",
+  "artist": "Hannah Clover",
+  "credit": "Own work",
+  "license": "CC BY 4.0",
+  "page": "https://commons.wikimedia.org/wiki/File:US_flag_at_drone_light_show.jpg",
+  "size": [
+   2200,
+   1843
+  ]
+ },
+ "coaster": {
+  "title": "File:Loop Coaster MOMOnGA vertical loop - Yomiuriland.jpg",
+  "artist": "Jeremy Thompson",
+  "credit": "https://www.flickr.com/photos/rollercoasterphilosophy/5885702285/",
+  "license": "CC BY 2.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Loop_Coaster_MOMOnGA_vertical_loop_-_Yomiuriland.jpg",
+  "size": [
+   2112,
+   2816
+  ]
+ },
+ "falcon9": {
+  "title": "File:Falcon 9 first stage landing on Droneship.jpg",
+  "artist": "SpaceX",
+  "credit": "https://www.spacex.com/media-gallery/detail/149426/9346",
+  "license": "CC0",
+  "page": "https://commons.wikimedia.org/wiki/File:Falcon_9_first_stage_landing_on_Droneship.jpg",
+  "size": [
+   2200,
+   1467
+  ]
+ },
+ "racingdrone": {
+  "title": "File:Racing Drone.jpg",
+  "artist": "Commanderbryce",
+  "credit": "Own work",
+  "license": "CC BY-SA 4.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Racing_Drone.jpg",
+  "size": [
+   2200,
+   1457
+  ]
+ },
+ "a320": {
+  "title": "File:Airbus A320-214 Vueling EC-HHA cockpit (5508849819).jpg",
+  "artist": "Curimedia",
+  "credit": "Airbus A320-214 Vueling EC-HHA cockpit",
+  "license": "CC BY 2.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Airbus_A320-214_Vueling_EC-HHA_cockpit_(5508849819).jpg",
+  "size": [
+   1024,
+   683
+  ]
+ },
+ "windtunnel": {
+  "title": "File:MEDIUM CLOSE UP OF FAN IN FULL-SCALE WIND TUNNEL.tiff",
+  "artist": "Lowe, Jet, creator",
+  "credit": "https://www.loc.gov/pictures/item/va1794.photos.192352p",
+  "license": "Public domain",
+  "page": "https://commons.wikimedia.org/wiki/File:MEDIUM_CLOSE_UP_OF_FAN_IN_FULL-SCALE_WIND_TUNNEL.tiff",
+  "size": [
+   2200,
+   1590
+  ]
+ },
+ "swift": {
+  "title": "File:Drone racing – AI piloted drone vs human champions.webp",
+  "artist": "Authors of the study: Elia Kaufmann, Leonard Bauersfeld, Antonio Loquercio, Matthias Müller, Vladlen Koltun & Davide Scaramuzza",
+  "credit": "https://www.nature.com/articles/s41586-023-06419-4",
+  "license": "CC BY 4.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Drone_racing_%E2%80%93_AI_piloted_drone_vs_human_champions.webp",
+  "size": [
+   1417,
+   1222
+  ]
+ },
+ "knife": {
+  "title": "File:Swiss army knife open 20050612 (cropped).jpg",
+  "artist": "Jonas Bergsten",
+  "credit": "Photo taken by Jonas Bergsten using a Canon PowerShot G3.kk",
+  "license": "Public domain",
+  "page": "https://commons.wikimedia.org/wiki/File:Swiss_army_knife_open_20050612_(cropped).jpg",
+  "size": [
+   1982,
+   1105
+  ]
+ },
+ "hubble": {
+  "title": "File:Hubble Released 2009.jpg",
+  "artist": "NASA on The Commons",
+  "credit": "Flickr",
+  "license": "Public domain",
+  "page": "https://commons.wikimedia.org/wiki/File:Hubble_Released_2009.jpg",
+  "size": [
+   2200,
+   1432
+  ]
+ },
+ "minorsky": {
+  "title": "File:Portrait of Nicolas Minorsky.jpg",
+  "artist": "Peter Minorsky, grandson of Nicolas Minorsky",
+  "credit": "Peter Minorsky, grandson of Nicolas Minorsky",
+  "license": "CC BY-SA 1.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Portrait_of_Nicolas_Minorsky.jpg",
+  "size": [
+   1359,
+   1962
+  ]
+ },
+ "rally": {
+  "title": "File:Kris Meeke Rally Finland 2016 Äänekoski–Valtra.JPG",
+  "artist": "Antti Leppänen",
+  "credit": "Own work",
+  "license": "CC BY 4.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Kris_Meeke_Rally_Finland_2016_%C3%84%C3%A4nekoski%E2%80%93Valtra.JPG",
+  "size": [
+   2200,
+   1467
+  ]
+ }
+}

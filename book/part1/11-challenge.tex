@@ -1,0 +1,103 @@
+\lesson{11}{Gust challenge}{One minute of violent, repeatable wind. Beat the default tune.}{1}{challenge}{Part I · PID}
+\label{les:challenge}
+
+\lead{Everything you have learned so far comes together in one game. Strong, mostly vertical gusts hit the drone for a minute, always exactly the same gusts, because the random generator starts from a fixed seed. Your score is the root-mean-square altitude error. The default tune scores \SI{21}{cm}; this chapter explains what limits it and how far you can go.}
+
+\section{The wind of Anemostatos}
+
+The simulated air velocity $\vec w(t)$ is the sum of three parts:
+\begin{equation}
+  \vec w(t) = \vec w_{mean} + \vec w_{turb}(t) + \vec w_{gust}(t).
+\end{equation}
+
+\subsection{Turbulence: the Ornstein–Uhlenbeck process}
+Turbulence is random but not arbitrary: the wind now is similar to the wind a moment ago. The simulator models each component as an \term{Ornstein–Uhlenbeck process},
+\begin{equation}
+  \dd w = -\frac{w}{\tau_w}\,\dd t + \sigma_w\sqrt{\frac{2}{\tau_w}}\,\dd W ,
+\end{equation}
+a velocity that is constantly pulled back towards zero (the first term) and constantly kicked by white noise $\dd W$ (the second). Its stationary standard deviation is $\sigma_w$ and its correlation time $\tau_w$: values more than a few $\tau_w$ apart are nearly independent. Over one simulation step $\Delta t$ it can be advanced exactly,
+\begin{equation}
+  w_{k+1} = w_k\,e^{-\Delta t/\tau_w} + \sigma_w\sqrt{1 - e^{-2\Delta t/\tau_w}}\;\xi_k,\qquad \xi_k \sim \mathcal N(0,1),
+\end{equation}
+which is how \src{src/sim/wind.ts} does it.\aside{The OU process is the continuous-time version of the AR(1) model of statistics, and the simplest model of a velocity subject to friction and random forces — Brownian motion of a heavy particle.}
+
+\subsection{Gusts: the one-minus-cosine}
+On top of the turbulence come discrete gusts. They arrive at random times (a Poisson process), each with a random direction, peak speed $A$ and duration $T_g$, and each follows the classic shape of aviation engineering:
+\begin{equation}
+  w_{gust}(t) = \frac{A}{2}\left(1 - \cos\frac{2\pi(t - t_0)}{T_g}\right),\qquad t_0 \le t \le t_0 + T_g .
+\end{equation}
+It starts and ends smoothly, which is what a real gust does and what makes it a fair test: no infinite accelerations, only a shove.
+
+\subsection{From wind to force}
+The drone feels the wind through drag on the velocity \emph{relative to the air}, $\vec v_{rel} = \vec v - \vec w$: vertically $F = -c_v|v_{rel}|v_{rel}$ with $c_v = \SI{0.25}{N.s^2/m^2}$. A hovering drone hit by an \SI{8}{m/s} vertical gust feels $0.25\cdot 64 = \SI{16}{N}$ — more than one and a half times its weight. The challenge's gusts reach \SI{10}{m/s}. These are not small disturbances, and the motors, with \SI{24.4}{N} of total thrust, will saturate when a gust pushes down.
+
+\widefig{challenge_runs}{The gust challenge: the altitude error for the default tune (grey) and for a stiffer tune (orange) on exactly the same wind (bottom). The large excursions coincide with the gusts; the stiffer loop halves them.}{fig:challenge-runs}
+
+\section{How a loop rejects a disturbance}
+
+Where does the error come from, and what can the gains do about it? Treat the gust as a disturbance force $d(t)$ acting on the mass. With the PID in the loop, the response of the altitude to that force is — in Laplace terms, with the motor lag $1/(\tau_m s+1)$ —
+\begin{equation}\label{eq:challenge-sens}
+  \frac{Y(s)}{D(s)} = \frac{\dfrac{1}{m s^2}}{1 + C(s)\,\dfrac{1}{m s^2(\tau_m s + 1)}},\qquad C(s) = K_p + \frac{K_i}{s} + \frac{K_d s}{T_f s + 1}.
+\end{equation}
+\Cref{fig:challenge-sens} plots its magnitude over frequency. Three regions are visible.
+\begin{itemize}
+  \item \textbf{Slow disturbances} (left) are crushed by the integral: the response falls towards zero at low frequency — the steady-state result of \lessonref{les:integral}.
+  \item \textbf{Middle frequencies}, where the gusts live, are resisted by the stiffness and damping of the loop: roughly $|Y/D| \approx 1/K_p$. Four times the stiffness, a quarter of the error.
+  \item \textbf{Fast disturbances} (right) are too quick for any controller: there the response is simply that of the free mass, $1/(m\omega^2)$. Only mass — inertia — helps.
+\end{itemize}
+
+\simfig{challenge_sens}{How much a disturbing force of each frequency moves the drone, \cref{eq:challenge-sens}. The tuned loop is about four times stiffer in the band of the gusts (grey); at high frequency no tune can beat the inertia of the drone.}{fig:challenge-sens}
+
+\begin{keyidea}[Disturbance rejection is bandwidth]
+A feedback loop can only reject disturbances that are slower than itself. To fight faster gusts you need a faster loop: higher $K_p$ with enough $K_d$ to damp it and enough $K_i$ to remove what remains. Every earlier lesson sets a limit on how far you can go: saturation (\lessonref{les:windup}), sensor noise amplified by D (\lessonref{les:noise}), delay (\lessonref{les:slow}) and actuator lag (\lessonref{les:edge}).
+\end{keyidea}
+
+\section{A tune that wins}
+
+The orange run in \cref{fig:challenge-runs} uses $K_p = 40$, $K_i = 8$, $K_d = 12$, with the D filter opened to \SI{30}{Hz}. Check it against the rules: $\zeta = 12/(2\sqrt{40}) = 0.95$; the edge of \cref{eq:edge-limit} is at $K_p = 12/0.03 = 400$, ten times away; the integral is far inside the Routh limit $K_i < K_dK_p/m = 480$. The score falls from \SI{21.0}{cm} to \SI{9.9}{cm}. The price is visible in the motors: the thrust changes about 50\,\% more from sample to sample.
+
+\begin{inapp}[The challenge]
+\begin{itemize}[leftmargin=1.2em]
+  \item Seed \texttt{4242}, 14 gusts per minute of 4–\SI{10}{m/s}, all vertical (\param{wind.gustVertical = 1}), turbulence $\sigma_w = \SI{1.2}{m/s}$. The seed is shown and editable in the toolbar.
+  \item The score is the RMS of \texttt{alt.err} between $t = \SI{5}{s}$ and $\SI{65}{s}$. The reference is computed by flying the default tune headlessly on the same wind when you open the lesson (\src{src/lessons/lessons.tsx}, \texttt{referenceScore}).
+  \item All randomness in the simulator comes from one seeded generator (\src{src/math/prng.ts}); the same seed and parameters reproduce the same run exactly — the basis of fair comparisons.
+  \item Use \ui{4×} speed in the toolbar to get through the minute faster.
+\end{itemize}
+\end{inapp}
+
+\begin{trythis}
+\begin{enumerate}
+  \item Fly the default tune once and press \ui{Snapshot}.
+  \item Raise $K_p$ and $K_d$ together, keeping $\zeta$ near 1. Where do you start seeing the motors saturate?
+  \item Increase $K_i$: which part of \cref{fig:challenge-sens} does it improve?
+  \item Try the D filter: does opening it to \SI{50}{Hz} help or hurt without sensor noise?
+\end{enumerate}
+\predict{is there a tune that brings the RMS error below \SI{5}{cm}? What would limit it?}
+\end{trythis}
+
+\begin{curiosity}{Machines that live in the wind}
+\photo{nwtc}{A blade being fitted at the US National Wind Technology Center in Colorado. Each blade of a modern turbine is turned by its own pitch controller.}
+A large wind turbine is a feedback system fighting gusts all day long. Above its rated wind speed the generator is already delivering full power, and every extra gust would overspeed the rotor and overload the drive train. So a pitch controller — at its core a PI loop on the rotor speed, with gains scheduled on the wind speed — turns the blades about their long axes to spill the excess wind. On modern machines each blade has its own actuator, and the controllers also damp the tower's swaying and reduce the fatigue loads that a lifetime of gusts would cause.
+
+The one-minus-cosine gust of this lesson comes from aviation. Aircraft certification rules (for example EASA CS-25 and the American FAR Part 25) require airliners to be designed for \enquote{discrete gusts} of exactly this shape, with gradient lengths from about 9 to \SI{107}{m} and speeds depending on altitude. Engineers fly the aircraft model through a family of such gusts and check the loads on the wings. Many modern airliners go further: their flight-control computers deflect ailerons and spoilers as a gust arrives to relieve the wing — gust load alleviation, disturbance rejection at the scale of a jet.
+\end{curiosity}
+
+\begin{remember}
+\begin{itemize}
+  \item The simulator's wind is mean + Ornstein–Uhlenbeck turbulence + 1−cos gusts, all from one seed: identical wind for fair comparisons.
+  \item Wind acts through drag on the relative velocity; strong gusts produce forces larger than the weight.
+  \item A loop rejects slow disturbances with its integral, medium ones with its stiffness, and cannot reject disturbances faster than itself.
+  \item A faster loop scores better until saturation, noise, delay and lag stop it.
+\end{itemize}
+\end{remember}
+
+\begin{exercises}
+\exercise[1] Show that the OU recursion keeps the variance at $\sigma_w^2$: if $\operatorname{Var}w_k = \sigma_w^2$, then $\operatorname{Var}w_{k+1} = \sigma_w^2$.
+\answer{$\operatorname{Var}w_{k+1} = e^{-2\Delta t/\tau_w}\sigma_w^2 + \sigma_w^2(1 - e^{-2\Delta t/\tau_w}) = \sigma_w^2$.}
+\exercise[1] A \SI{6}{m/s} upward gust hits the hovering drone. Estimate the initial acceleration if nothing else changed.
+\answer{$F = c_v w^2 = 0.25\cdot36 = \SI{9}{N}$ upward: $a = \SI{9}{m/s^2}$ — almost $g$.}
+\exercise[2] From \cref{eq:challenge-sens} with $\tau_m = 0$, $T_f = 0$, show that $Y/D \to 0$ as $s \to 0$ when $K_i > 0$, and $\to 1/K_p$ when $K_i = 0$. Relate this to Lessons 3 and 5.
+\answer{$Y/D = 1/(ms^2 + K_d s + K_p + K_i/s) = s/(ms^3 + K_ds^2 + K_ps + K_i)$. At $s = 0$: $0$ if $K_i>0$ (no steady error), $1/K_p$ if $K_i = 0$ (the droop $F/K_p$ of Lesson 3).}
+\exercise[2] The mean of the 1−cos gust over its duration is $A/2$ and its peak $A$. Compute the impulse (force × time) that a gust of peak \SI{8}{m/s} and duration \SI{1.5}{s} delivers to a hovering drone, and the velocity it would give it without control.
+\answer{$F = c_v w^2$, and the mean of $(\tfrac A2(1-\cos))^2$ is $\tfrac{A^2}{4}\cdot\tfrac32 = \tfrac38 A^2$. Impulse $= 0.25\cdot\tfrac38\cdot64\cdot1.5 = \SI{9}{N.s}$, i.e.\ \SI{9}{m/s} for a \SI{1}{kg} drone (in reality less, because the drone starts moving with the air).}
+\end{exercises}

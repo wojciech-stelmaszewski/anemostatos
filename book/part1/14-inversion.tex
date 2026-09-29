@@ -1,0 +1,88 @@
+\lesson{14}{Cascade inversion}{An outer loop that outruns its inner loop asks for things that have not happened yet — and the drone wobbles, then flips.}{3}{inversion}{Part I · PID}
+\label{les:inversion}
+
+\lead{The cascade rests on one assumption: when the velocity loop asks for a tilt, the tilt is there almost at once. This last lesson of Part~I breaks the assumption on purpose. Slow the attitude loop down until the loops around it are faster than it is, and watch the whole structure come apart.}
+
+\section{What the outer loop believes}
+
+The velocity loop of \lessonref{les:cascade} computes a desired acceleration and hands it on as a tilt. It never checks how long the tilt takes. Implicitly it assumes that its command is executed instantly — that it drives an ideal actuator. Let us make that assumption explicit and then relax it.
+
+Model the closed attitude loop as a first-order lag with time constant $\tau_{att}$: the tilt $\theta$ follows its setpoint as $\tau_{att}\dot\theta + \theta = \theta_{sp}$. Horizontally, for small angles, the acceleration is $g\theta$. The velocity loop with a proportional gain $K_v$ then sees
+\begin{equation}
+  \dot v = g\,\theta,\qquad \tau_{att}\dot\theta + \theta = \frac{K_v}{g}\,(v_{sp} - v),
+\end{equation}
+and eliminating $\theta$ gives
+\begin{equation}\label{eq:inv-loop}
+  \tau_{att}\,\ddot v + \dot v + K_v\,v = K_v\,v_{sp} .
+\end{equation}
+With an ideal inner loop ($\tau_{att} = 0$) this is a first-order system with the pole $-K_v$: perfectly well behaved at any gain. With a lagging inner loop it is second order, with
+\begin{equation}
+  \omega_n = \sqrt{K_v/\tau_{att}},\qquad \zeta = \frac{1}{2\sqrt{K_v\,\tau_{att}}} .
+\end{equation}
+The damping depends only on the product of the outer gain and the inner time constant. Good damping, $\zeta \ge 0.7$, requires
+\begin{equation}\label{eq:inv-rule}
+  K_v\,\tau_{att} \le 0.5 ,\qquad\text{i.e.}\qquad \tau_{att} \le \frac{1}{2K_v}.
+\end{equation}
+Roughly: the inner loop must be at least twice as fast as the outer loop's own time constant $1/K_v$ — and in practice, with all the other lags and the position loop around the velocity loop, five to ten times.
+
+\begin{keyidea}[The inner loop is part of the outer loop's plant]
+An outer loop does not control the physical plant; it controls the \emph{closed inner loop}. If the inner loop is slow, the outer loop's plant has an extra lag, and all the results of \lessonref{les:slow} and \lessonref{les:edge} apply: lag costs phase, phase costs stability. Time-scale separation is the condition under which the inner loop may be ignored.
+\end{keyidea}
+
+\section{Two ways to break it}
+
+The lesson flies a square wave of $\pm\SI{1.5}{m}$ in $x$, and offers two experiments (\cref{fig:inversion-runs}).
+
+\paragraph{Slow sampling of the attitude loop.} Lower the attitude loop's rate from \SI{250}{Hz} to 10, 5, \SI{3}{Hz}. The attitude P law itself is unchanged, but its commands now arrive in a staircase with delays of a hundred milliseconds and more. At \SI{10}{Hz} the flight is still recognisable; at \SI{5}{Hz} the pitch swings through $\pm50^\circ$; at \SI{3}{Hz} it reaches $80^\circ$ and the position wobbles around its setpoint. A little further, at \SI{2}{Hz}, the drone flips.
+
+\paragraph{A soft attitude gain.} Keep \SI{250}{Hz}, but lower the attitude gain from 8 to 1.5. The attitude loop is now slow in the sense of \cref{eq:inv-rule} — a time constant of roughly $1/K_{att} \approx \SI{0.7}{s}$. Nothing is unstable, but the position overshoots on every step (violet curve): the velocity loop keeps asking for more tilt because the tilt it asked for has not arrived yet.
+
+\widefig{inversion_runs}{Breaking the time-scale separation. Top: the position response to a square wave in $x$. Bottom: the pitch angle. As the attitude loop slows from \SI{250}{Hz} to \SI{3}{Hz} its sampling delay approaches the time scale of the velocity loop; the pitch swings up to $80^\circ$ and the position wobbles. A soft attitude gain (violet) causes overshoot instead of wobble.}{fig:inversion-runs}
+
+\begin{watchout}[Rate is not bandwidth]
+The rule \enquote{inner loops 5–10 times faster} is about \emph{bandwidth} — how quickly a loop follows its setpoint — not about how often it runs. A loop sampled at \SI{1}{kHz} with low gains can still be too slow for the loop around it (the second experiment), and a fast loop sampled too rarely gets delay instead (the first).
+\end{watchout}
+
+\screen[0 0 495 998]{inversion}{Lesson 14 with the attitude loop at \SI{5}{Hz}: the attitude chart (loop \texttt{att.pitch}) shows the staircase of the slow loop and the large swings it causes.}{fig:inversion-screen}
+
+\begin{inapp}
+\begin{itemize}[leftmargin=1.2em]
+  \item The loop rates are \ui{L3 cascade\then Rates} (\param{control.l3.hzRate}, \param{hzAtt}, \param{hzVel}, \param{hzPos}); the attitude gain is \param{control.l3.attKpRP}.
+  \item Each loop of the cascade checks the step counter and runs only every $n$-th physics step, holding its output in between (\src{src/control/cascade.ts}).
+  \item A crash (hitting the ground too fast, or a tilt above $80^\circ$ near the ground) stops the run; press \key{R}.
+\end{itemize}
+\end{inapp}
+
+\begin{trythis}
+\begin{enumerate}
+  \item Lower the \ui{attitude rate}: 30, 10, 5, 3, \SI{2}{Hz}. Watch the pitch chart and the drone.
+  \item Reset, then lower \ui{Kp roll/pitch} of the attitude loop to 1.5. Watch the position overshoot.
+  \item With the attitude gain at 1.5, lower the velocity loop's $K_p$ from 2.2 to 1. Does the overshoot go away? Check with \cref{eq:inv-rule}.
+\end{enumerate}
+\predict{if you slow down the \emph{velocity} loop to \SI{10}{Hz} instead (and keep the attitude loop at \SI{250}{Hz}), will the drone be in trouble? Why or why not?}
+\end{trythis}
+
+\begin{curiosity}{Your body is a cascade}
+\photo{cheetah}{A cheetah at full speed. Its legs are controlled by fast spinal reflex loops, supervised by slower loops in the brain.}
+Stand on one foot and close your eyes. You wobble, but you do not fall — and most of the corrections you make are not decided by your conscious brain. The fastest loops of human motor control are spinal reflexes: a muscle stretched by a sudden disturbance contracts again within a few tens of milliseconds, through a circuit that only goes to the spinal cord and back. Slower loops in the brainstem and cerebellum coordinate whole limbs, and the slowest, involving vision and conscious decisions, take a fifth of a second or more.
+
+It is the architecture of this lesson: slow outer loops that decide \emph{what} should happen, fast inner loops that make it happen and reject disturbances before the outer loops even notice. A running cheetah relies on the same arrangement, and so does every legged robot that walks over rough ground. When disease slows down the inner loops — as in some neurological conditions that delay reflexes — the result is familiar from \cref{fig:inversion-runs}: tremor and overshoot, exactly the symptoms of a cascade whose time scales are no longer separated.
+\end{curiosity}
+
+\begin{remember}
+\begin{itemize}
+  \item An outer loop controls the closed inner loop, not the raw plant; a slow inner loop is an extra lag for it.
+  \item For an inner loop modelled as a lag $\tau$ and an outer P gain $K$, damping needs $K\tau \lesssim 0.5$.
+  \item Break the separation by delay (slow sampling) and you get wobble and, finally, a flip; break it by low gain and you get overshoot.
+  \item Tune from the inside out and keep a bandwidth ratio of about 5–10 between neighbouring loops.
+\end{itemize}
+\end{remember}
+
+\begin{exercises}
+\exercise[1] The velocity loop has $K_v = 2.2$ (per second). What attitude time constant gives $\zeta = 0.7$ in \cref{eq:inv-loop}?
+\answer{$\zeta = 1/(2\sqrt{K_v\tau}) = 0.7$ gives $K_v\tau = 0.51$, $\tau = \SI{0.23}{s}$. The default attitude loop ($\approx \SI{0.05}{s}$ including the rate loop) is far faster.}
+\exercise[2] Derive \cref{eq:inv-loop} and find its poles for $K_v = 2.2$, $\tau_{att} = \SI{0.5}{s}$.
+\answer{$0.5 s^2 + s + 2.2 = 0$: $s = -1 \pm j\sqrt{3.4} = -1 \pm 1.84j$, $\zeta = 0.48$ — about 18\,\% overshoot.}
+\exercise[3] Replace the lag by a pure delay $T$ (slow sampling): $\dot v(t) = K_v(v_{sp} - v(t - T))$. Show that the loop oscillates when $K_v T = \pi/2$. What delay makes the default velocity loop unstable?
+\answer{Characteristic equation $s + K_v e^{-sT} = 0$. At $s = j\omega$: $|K_v| = \omega$ and $\omega T = \pi/2$, so $K_v T = \pi/2$. For $K_v = 2.2$: $T = \SI{0.71}{s}$ — in a real cascade the position loop and the other lags make it lower, which is why the flip happens at about \SI{2}{Hz}.}
+\end{exercises}

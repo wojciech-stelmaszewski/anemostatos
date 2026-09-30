@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { sensitivities, type LoopModel } from '@/analysis/loop';
 import type { SweepPoint } from '@/analysis/sweep';
+import type { RobustTest } from '@/analysis/uncertainty';
 import { cabs, type Complex } from '@/math/complex';
 import { logspace, unwrapPhase } from '@/math/margins';
 import { useParams } from '@/store/params';
@@ -9,7 +10,16 @@ import { Button } from '@/ui/components/button';
 import { Select } from '@/ui/components/select';
 import { ChartCard } from './ChartCard';
 import { dot, FONT, INK, niceTicks, SERIES, useChartCanvas, type Frame } from './canvas';
-import { F_MIN, useLoopData, useMeasure, useMeasured, type LoopData } from './store';
+import {
+  F_MIN,
+  familyKey,
+  useCampaign,
+  useLoopData,
+  useMeasure,
+  useMeasured,
+  useRobustTest,
+  type LoopData,
+} from './store';
 
 const DEG = 180 / Math.PI;
 const dB = (x: number) => 20 * Math.log10(x);
@@ -24,14 +34,22 @@ const VIEWS: { value: BodeView; label: string }[] = [
   { value: 'ref', label: 'following the setpoint Y/R' },
   { value: 'sens', label: 'sensitivity S' },
   { value: 'waterbed', label: 'waterbed: |S|, linear axis' },
+  { value: 'robust', label: 'robust stability: |T| against 1/|W|' },
 ];
 const TITLE: Record<BodeView, string> = {
   loop: 'Bode plot of the open loop L',
   ref: 'Bode plot of the closed loop Y/R',
   sens: 'Bode plot of the sensitivity S',
   waterbed: 'The waterbed: |S| on a linear frequency axis',
+  robust: 'Robust stability: |T| must stay below 1/|W|',
 };
-const SYMBOL: Record<BodeView, string> = { loop: 'L', ref: 'Y/R', sens: 'S', waterbed: 'S' };
+const SYMBOL: Record<BodeView, string> = {
+  loop: 'L',
+  ref: 'Y/R',
+  sens: 'S',
+  waterbed: 'S',
+  robust: 'T',
+};
 
 /** Phases in degrees, continuous, shifted by whole turns so that they start in (−360°, 0°]. */
 function phasesDeg(l: Complex[]): number[] {
@@ -166,6 +184,95 @@ function drawWaterbed({ ctx, w, h, hover }: Frame, wb: ReturnType<typeof waterbe
   ctx.stroke();
   dot(ctx, X(wb.f[i]!), Y(wb.db[i]!), SERIES.model, 3);
   return `${wb.f[i]!.toPrecision(3)} Hz   |S| ${wb.db[i]!.toFixed(1)} dB   a disturbance here is ${wb.db[i]! > 0 ? 'amplified' : 'reduced'} ×${(10 ** (wb.db[i]! / 20)).toFixed(2)}`;
+}
+
+/** The small-gain test as a picture: the nominal |T| and the ceiling 1/|W| the family sets. */
+function drawRobust({ ctx, w, h, hover }: Frame, rt: RobustTest) {
+  const x0 = LEFT;
+  const x1 = w - RIGHT;
+  const y0 = TOP;
+  const y1 = h - BOTTOM;
+  const f = rt.fHz;
+  const fMax = f[f.length - 1]!;
+  const X = (hz: number) =>
+    x0 +
+    ((Math.log10(hz) - Math.log10(f[0]!)) / (Math.log10(fMax) - Math.log10(f[0]!))) * (x1 - x0);
+  const tDb = rt.t.map(dB);
+  const limDb = rt.w.map((v) => -dB(Math.max(v, 1e-6)));
+  const lo = -40;
+  const hi = 30;
+  const Y = (v: number) => y0 + ((hi - Math.min(Math.max(v, lo), hi)) / (hi - lo)) * (y1 - y0);
+  ctx.font = FONT;
+  ctx.lineWidth = 1;
+  ctx.textBaseline = 'middle';
+  for (const v of niceTicks(lo, hi, Math.max(3, Math.floor((y1 - y0) / 28)))) {
+    ctx.strokeStyle = v === 0 ? INK.axis : INK.grid;
+    ctx.beginPath();
+    ctx.moveTo(x0, Y(v));
+    ctx.lineTo(x1, Y(v));
+    ctx.stroke();
+    ctx.fillStyle = INK.muted;
+    ctx.textAlign = 'right';
+    ctx.fillText(`${v}`, x0 - 5, Y(v));
+  }
+  for (let d = -2; d <= 2; d++)
+    for (const k of [1, 2, 5]) {
+      const hz = k * 10 ** d;
+      if (hz < f[0]! || hz > fMax * 1.0001) continue;
+      ctx.strokeStyle = INK.grid;
+      ctx.beginPath();
+      ctx.moveTo(X(hz), y0);
+      ctx.lineTo(X(hz), y1);
+      ctx.stroke();
+      ctx.fillStyle = INK.muted;
+      ctx.textAlign = 'center';
+      ctx.fillText(String(+hz.toPrecision(1)), X(hz), y1 + 9);
+    }
+  ctx.textAlign = 'right';
+  ctx.fillText('Hz', x1, h - 3);
+  ctx.fillText('dB', x1 - 3, y0 + 7);
+
+  // Where the nominal |T| pokes through the ceiling, some member of the family may be unstable.
+  ctx.fillStyle = 'rgba(230,103,103,0.30)';
+  for (let i = 1; i < f.length; i++) {
+    if (tDb[i]! <= limDb[i]! && tDb[i - 1]! <= limDb[i - 1]!) continue;
+    ctx.beginPath();
+    ctx.moveTo(X(f[i - 1]!), Y(Math.max(tDb[i - 1]!, limDb[i - 1]!)));
+    ctx.lineTo(X(f[i]!), Y(Math.max(tDb[i]!, limDb[i]!)));
+    ctx.lineTo(X(f[i]!), Y(limDb[i]!));
+    ctx.lineTo(X(f[i - 1]!), Y(limDb[i - 1]!));
+    ctx.closePath();
+    ctx.fill();
+  }
+  const line = (ys: number[], color: string, dash: number[]) => {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.lineJoin = 'round';
+    ctx.setLineDash(dash);
+    ctx.beginPath();
+    ys.forEach((v, i) => (i ? ctx.lineTo(X(f[i]!), Y(v)) : ctx.moveTo(X(f[i]!), Y(v))));
+    ctx.stroke();
+    ctx.setLineDash([]);
+  };
+  line(limDb, SERIES.measured, [6, 4]);
+  line(tDb, SERIES.model, []);
+  const iw = f.findIndex((v) => v >= rt.fWorst);
+  if (iw >= 0) {
+    dot(ctx, X(f[iw]!), Y(tDb[iw]!), INK.text, 3.5);
+    drawNotes(ctx, [[`|W·T| = ${rt.worst.toFixed(2)}`, X(f[iw]!) + 8, Y(tDb[iw]!) - 10]], x1);
+  }
+  if (!hover || hover.x < x0 || hover.x > x1) return;
+  const hz = 10 ** (Math.log10(f[0]!) + ((hover.x - x0) / (x1 - x0)) * Math.log10(fMax / f[0]!));
+  const i = nearest(f, hz);
+  ctx.strokeStyle = INK.axis;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(X(f[i]!), y0);
+  ctx.lineTo(X(f[i]!), y1);
+  ctx.stroke();
+  dot(ctx, X(f[i]!), Y(tDb[i]!), SERIES.model, 3);
+  dot(ctx, X(f[i]!), Y(limDb[i]!), SERIES.measured, 3);
+  return `${f[i]!.toPrecision(3)} Hz   |T| ${tDb[i]!.toFixed(1)} dB   ceiling ${limDb[i]!.toFixed(1)} dB   |W·T| ${(rt.w[i]! * rt.t[i]!).toFixed(2)}`;
 }
 
 const pick = (p: SweepPoint, view: BodeView) =>
@@ -394,6 +501,10 @@ export function BodeChart() {
       : null,
   );
   const m = data.margins;
+  const rt = useRobustTest(view === 'robust');
+  const campaign = useCampaign();
+  const famKey = useParams((s) => familyKey(s.params));
+  const flown = campaign.key === famKey ? campaign.trials : [];
   const wb = useMemo(
     () => (view === 'waterbed' && data.model ? waterbed(data.model) : null),
     [view, data],
@@ -405,12 +516,28 @@ export function BodeChart() {
         ? wb
           ? drawWaterbed(frame, wb)
           : undefined
-        : drawBode(frame, data, measured, view, level, probeHz),
-    [data, measured, level, view, wb, probeHz],
+        : view === 'robust'
+          ? rt
+            ? drawRobust(frame, rt)
+            : undefined
+          : drawBode(frame, data, measured, view, level, probeHz),
+    [data, measured, level, view, wb, probeHz, rt],
   );
 
+  const failed = flown.filter((t) => !t.stable).length;
   const summary =
-    view === 'waterbed' ? (
+    view === 'robust' ? (
+      rt ? (
+        <span>
+          {rt.worst < 1
+            ? `● test passed: every member of the family is stable (largest |W·T| ${rt.worst.toFixed(2)})`
+            : `▲ test failed at ${rt.fWorst.toFixed(1)} Hz (|W·T| ${rt.worst.toFixed(2)}): some member may be unstable`}
+          {flown.length
+            ? ` · flown: ${flown.length - failed} of ${flown.length} stable${campaign.running ? '…' : ''}`
+            : ''}
+        </span>
+      ) : null
+    ) : view === 'waterbed' ? (
       wb ? (
         <span>
           area rejected {wb.below.toFixed(2)} = area amplified {wb.above.toFixed(2)} (∫ ln|S| df,
@@ -447,16 +574,32 @@ export function BodeChart() {
       legend={
         view === 'waterbed'
           ? [{ label: 'model', color: SERIES.model, mark: 'line' }]
-          : [
-              { label: 'model', color: SERIES.model, mark: 'line' },
-              { label: 'measured', color: SERIES.measured, mark: 'dot' },
-            ]
+          : view === 'robust'
+            ? [
+                { label: '|T| nominal', color: SERIES.model, mark: 'line' },
+                { label: 'ceiling 1/|W|', color: SERIES.measured, mark: 'line' },
+              ]
+            : [
+                { label: 'model', color: SERIES.model, mark: 'line' },
+                { label: 'measured', color: SERIES.measured, mark: 'dot' },
+              ]
       }
       summary={summary}
       controls={
         <>
           <Select value={view} onValueChange={(v) => setView(v as BodeView)} options={VIEWS} />
-          {view !== 'waterbed' && (
+          {view === 'robust' && (
+            <Button
+              size="sm"
+              className="h-5 px-2 text-[11px]"
+              disabled={campaign.running || level !== 1}
+              onClick={() => campaign.start(60)}
+              title="Draw sixty drones at random from the family and fly each one for ten seconds."
+            >
+              {campaign.running ? `flying ${flown.length} / 60` : 'Fly 60 members'}
+            </Button>
+          )}
+          {view !== 'waterbed' && view !== 'robust' && (
             <Button
               size="sm"
               className="h-5 px-2 text-[11px]"

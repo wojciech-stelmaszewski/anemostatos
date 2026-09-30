@@ -10,6 +10,7 @@ import {
 import type { Simulation } from '@/engine/simulation';
 import { cabs } from '@/math/complex';
 import { logspace, margins, type Margins } from '@/math/margins';
+import { robustTest } from '@/analysis/uncertainty';
 import { v3 } from '@/math/vec3';
 import type { Params } from '@/sim/params';
 import { Notice, Try } from './Bits';
@@ -25,6 +26,7 @@ import type { Lesson } from './types';
 
 const F = 'F · The loop as a filter';
 const G = 'G · Stability and structure';
+const H = 'H · Robust by construction';
 const TWO_PI = 2 * Math.PI;
 
 const calm = (p: Params) => {
@@ -72,6 +74,17 @@ const criticalDive = (p: Params): number => {
   const key = JSON.stringify([p.control, p.drone, p.setpoint.y, p.sensors]);
   if (diveCache?.key !== key) diveCache = { key, v: criticalDiveSpeed(p, 0) };
   return diveCache.v;
+};
+/** The small-gain test of lesson III.11; cached, because goals poll it. */
+let robustCache: { key: string; worst: number } | null = null;
+const worstWT = (p: Params): number | null => {
+  const key = JSON.stringify([p.control, p.drone, p.sensors, p.uncertainty]);
+  if (robustCache?.key !== key) {
+    const t = robustTest(p);
+    if (!t) return null;
+    robustCache = { key, worst: t.worst };
+  }
+  return robustCache.worst;
 };
 /** Downward speeds of the scripted dives of lesson III.7, m/s. */
 const DIVES = [0.8, 1.4, 2.0, 2.6];
@@ -515,6 +528,75 @@ export const PART_THREE: Lesson[] = [
           An unobservable state cannot be fixed by tuning or by more data of the same kind. It needs
           a sensor that sees the states differently. What the fourth state buys is honesty: a filter
           that knows what it does not know. Navigation systems are full of such states.
+        </Notice>
+      </>
+    ),
+  },
+  {
+    id: 'smallgain',
+    n: 11,
+    part: 3,
+    chapter: H,
+    title: 'How wrong can I be?',
+    level: 1,
+    chart: 'bode',
+    bode: 'robust',
+    setup: (p) => {
+      calm(p);
+      smallSteps(p);
+      p.control.alt = { ...p.control.alt, kp: 50, kd: 30 };
+    },
+    goal: {
+      text: 'Retune until the test guarantees the whole family (|W·T| < 1 at every frequency), and keep the loop fast: a crossover of at least 2.7 Hz.',
+      check: ({ sim }) => {
+        const worst = worstWT(sim.params);
+        const m = marginsOf(sim.params);
+        if (worst === null || !m) return 'this lesson needs a controller with a linear model';
+        const fc = m.wc / TWO_PI;
+        return (
+          (worst < 1 && fc >= 2.7) ||
+          `largest |W·T| ${worst.toFixed(2)} · crossover ${fc.toFixed(2)} Hz`
+        );
+      },
+    },
+    solution: (p) => {
+      p.control.alt = { ...p.control.alt, kp: 20, kd: 20 };
+    },
+    body: (
+      <>
+        <p>
+          This tune flies well: the nominal drone has 35° of phase margin. But no real drone is the
+          nominal one. Its mass may be off by 30 %, its motors may be twice as slow, its sensor may
+          be 20 ms late. That is not one plant but a <b>family</b> of them, and a design is only as
+          good as its worst member.
+        </p>
+        <p>
+          Write every member's loop as the nominal one times a relative error,{' '}
+          <M>{'L_\\Delta = L\\,(1 + \\Delta)'}</M>, and let <M>{'|W(j\\omega)|'}</M> be the largest
+          error any member has at each frequency. The <b>small-gain theorem</b> then gives a test on
+          the nominal loop alone:
+        </p>
+        <M display>
+          {
+            '|W(j\\omega)\\,T(j\\omega)| < 1 \\ \\text{for all } \\omega \\quad\\Rightarrow\\quad \\text{every member is stable.}'
+          }
+        </M>
+        <p>
+          The chart draws it as a ceiling: <M>{'|T|'}</M> must stay below <M>{'1/|W|'}</M>. Where it
+          pokes through, the chart turns red.
+        </p>
+        <Try>
+          Press <b>Fly 60 members</b>: sixty drones drawn at random from the family, ten seconds
+          each. Then lower <b>Kp</b> and <b>Kd</b> until the curve fits under the ceiling, and fly
+          the family again. The ranges are in <b>Uncertainty</b>, near the end of the parameter
+          panel.
+        </Try>
+        <Notice>
+          Only three of sixty random drones fail here, and they sit in one corner of the family: a
+          light drone (the same thrust accelerates it more, so the loop gain is higher) with a late
+          sensor. Random sampling finds such corners by luck; the test finds them by construction,
+          without flying anything. The price is that the test is <i>sufficient</i>, not necessary:
+          it may reject a design that every member would fly.
         </Notice>
       </>
     ),

@@ -9,7 +9,9 @@ import {
   referenceResponse,
   type LoopModel,
 } from '@/analysis/loop';
+import { Campaign, type Trial } from '@/analysis/montecarlo';
 import { Sweep, type SweepPoint } from '@/analysis/sweep';
+import { robustTest, type RobustTest } from '@/analysis/uncertainty';
 import { C_ONE, cadd, cdiv, type Complex } from '@/math/complex';
 import { logspace, margins, type Margins } from '@/math/margins';
 import type { Params } from '@/sim/params';
@@ -136,3 +138,44 @@ export function useMeasured(data: LoopData): SweepPoint[] {
   return key === data.key ? points : EMPTY;
 }
 const EMPTY: SweepPoint[] = [];
+
+/** The loop and the family around it: what the robust-stability view depends on. */
+export const familyKey = (p: Params): string => loopKey(p) + JSON.stringify(p.uncertainty);
+
+/** The small-gain test for the current loop and family (null without a linear model). */
+export function useRobustTest(on: boolean): RobustTest | null {
+  const key = useParams((s) => (on ? familyKey(s.params) : null));
+  return useMemo(() => (key === null ? null : robustTest(useParams.getState().params)), [key]);
+}
+
+interface CampaignStore {
+  key: string | null;
+  trials: Trial[];
+  n: number;
+  running: boolean;
+  start: (n?: number) => void;
+}
+
+let campaignRaf = 0;
+
+/** A Monte Carlo campaign over the plant family, flown in slices. */
+export const useCampaign = create<CampaignStore>((set, get) => ({
+  key: null,
+  trials: [],
+  n: 0,
+  running: false,
+  start: (n = 60) => {
+    cancelAnimationFrame(campaignRaf);
+    const p = useParams.getState().params;
+    if (p.sim.level !== 1) return;
+    const campaign = new Campaign(p, n);
+    const key = familyKey(p);
+    set({ key, trials: [], n, running: true });
+    const tick = () => {
+      const done = campaign.advance(SLICE);
+      set({ trials: [...campaign.trials], running: !done });
+      if (!done && get().key === key) campaignRaf = requestAnimationFrame(tick);
+    };
+    campaignRaf = requestAnimationFrame(tick);
+  },
+}));

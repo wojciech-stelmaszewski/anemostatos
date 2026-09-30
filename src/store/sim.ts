@@ -23,7 +23,7 @@ export type AnalysisChart = 'bode' | 'nyquist' | 'poles' | 'covariance';
  * What the Bode chart draws: the open loop L, the closed loop from setpoint to altitude Y/R, the
  * sensitivity S, or ln|S| on a linear frequency axis (the waterbed view).
  */
-export type BodeView = 'loop' | 'ref' | 'sens' | 'waterbed';
+export type BodeView = 'loop' | 'ref' | 'sens' | 'waterbed' | 'robust';
 
 export type CameraMode = 'orbit' | 'follow' | 'side' | 'top';
 

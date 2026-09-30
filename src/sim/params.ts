@@ -83,6 +83,19 @@ export interface ProbeParams {
   durationS: number;
 }
 
+/**
+ * How far the real vehicle may differ from the nominal one (docs/analysis.md §4, Chapter H).
+ * Together the three ranges define a family of plants; robust analysis asks about all of them.
+ */
+export interface UncertaintyParams {
+  /** The mass may be off by this many per cent either way. */
+  massPct: number;
+  /** The motor time constant may be this many times shorter or longer. */
+  tauFactor: number;
+  /** Up to this much extra sensor delay, ms. */
+  delayMs: number;
+}
+
 /** What the controller believes about the vehicle. The truth lives in `DroneParams`. */
 export interface ModelParams {
   /** Assumed mass m̂, kg. */
@@ -262,6 +275,7 @@ export interface Params {
   sensors: SensorParams;
   control: ControlParams;
   probe: ProbeParams;
+  uncertainty: UncertaintyParams;
 }
 
 export const defaultParams = (): Params => ({
@@ -376,6 +390,7 @@ export const defaultParams = (): Params => ({
       safety: 'none',
     },
   },
+  uncertainty: { massPct: 30, tauFactor: 2, delayMs: 20 },
   probe: { point: 'none', signal: 'sine', amp: 0.3, freqHz: 1, f0Hz: 0.1, f1Hz: 20, durationS: 60 },
 });
 

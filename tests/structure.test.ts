@@ -7,6 +7,9 @@ import {
   touchesFloor,
 } from '@/analysis/attraction';
 import { altitudeFilterModel, controllabilityRank, observabilityRank } from '@/analysis/structure';
+import { isLoopStable, l1Loop } from '@/analysis/loop';
+import { fliesStable, runCampaign } from '@/analysis/montecarlo';
+import { familyGrid, familyMember, robustTest } from '@/analysis/uncertainty';
 import { Simulation } from '@/engine/simulation';
 import { AltitudeKalman } from '@/estimation/kalman';
 import { rank } from '@/math/mat';
@@ -157,5 +160,57 @@ describe('regions of attraction', () => {
       }
       expect(Math.abs(sim.state.pos.y - 0.6)).toBeLessThan(0.01);
     }
+  });
+});
+
+describe('a family of plants and the small-gain test', () => {
+  const tuned = (kp: number, kd: number) =>
+    calm((p) => {
+      p.control.alt.kp = kp;
+      p.control.alt.kd = kd;
+    });
+
+  it('the family spans the stated ranges', () => {
+    const p = calm();
+    const heavy = familyMember(p, 1, 1, 1);
+    expect(heavy.drone.mass).toBeCloseTo(1.3, 12);
+    expect(heavy.drone.motorTau).toBeCloseTo(0.06, 12);
+    expect(heavy.sensors.delayMs).toBe(20);
+    expect(familyMember(p, -1, -1, 0).drone.motorTau).toBeCloseTo(0.015, 12);
+    expect(familyMember(p, 0, 0, 0)).toEqual(p);
+    expect(familyGrid(p)).toHaveLength(75);
+  });
+
+  it('a passed test means every member is stable, on the grid and in flight', () => {
+    for (const p of [tuned(10, 7), tuned(20, 20)]) {
+      expect(robustTest(p)!.worst).toBeLessThan(1);
+      for (const q of familyGrid(p)) expect(isLoopStable(l1Loop(q)!)).toBe(true);
+      expect(runCampaign(p, 25).every((t) => t.stable)).toBe(true);
+    }
+  });
+
+  it('the aggressive tune fails the test, and the failures sit in one corner', () => {
+    const p = tuned(50, 30);
+    expect(isLoopStable(l1Loop(p)!)).toBe(true); // the nominal drone is fine
+    const test = robustTest(p)!;
+    expect(test.worst).toBeGreaterThan(1.2);
+    const unstable = familyGrid(p).filter((q) => !isLoopStable(l1Loop(q)!));
+    expect(unstable.length).toBeGreaterThan(0);
+    // Every unstable member is lighter than nominal (more loop gain) and has the full extra
+    // delay; the worst corner does not fly.
+    for (const q of unstable) {
+      expect(q.drone.mass).toBeLessThan(p.drone.mass);
+      expect(q.sensors.delayMs).toBe(20);
+    }
+    expect(fliesStable(familyMember(p, -1, 1, 1))).toBe(false);
+    expect(fliesStable(p)).toBe(true);
+  });
+
+  it('flight and model agree on every trial of a campaign, and a seed repeats it', () => {
+    const p = tuned(50, 30);
+    const a = runCampaign(p, 40);
+    for (const t of a) expect(t.stable).toBe(t.predicted);
+    expect(a.some((t) => !t.stable)).toBe(true);
+    expect(runCampaign(p, 40)).toEqual(a);
   });
 });

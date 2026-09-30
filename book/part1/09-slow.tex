@@ -2,66 +2,144 @@
 \label{les:slow}
 
 \lead{\setupcard{\setuprow{Level}{L1}\setuprow{Controller}{the default PID at \SI{250}{Hz}}\setuprow{Setpoint}{a square wave of $\pm\SI{0.5}{m}$, a step every \SI{4}{s}}\setuprow{To change}{the controller rate and the sensor delay}}%
-Every lesson so far quietly assumed that the controller reacts instantly. It does not. It samples the altimeter every few milliseconds and holds its command in between, and real sensors add their own delays. In this lesson we slow the controller down until the drone can no longer keep up, and we learn the tool that predicts where that happens: the phase margin.}
+Every lesson so far quietly assumed that the controller reacts instantly. It does not. It samples the altimeter every few milliseconds and holds its command in between, and real sensors add their own delays. In this lesson we slow the controller down until the drone can no longer keep up, and we learn the tool that predicts exactly where that happens: the phase margin.}
 
-\section{Sample and hold}
+\section{Two ways to be late}
 
-At \SI{250}{Hz} the controller computes a new thrust every \SI{4}{ms} and holds it constant until the next sample: a \term{zero-order hold}. Seen from the drone, the command is a staircase that follows the ideal continuous command with a lag. On average the staircase is half a step behind, so
-\begin{equation}
-  \text{zero-order hold} \;\approx\; \text{a delay of } \tfrac12\Delta t .
-\end{equation}
-At \SI{250}{Hz} that is \SI{2}{ms} — negligible next to the \SI{30}{ms} of the motors. At \SI{5}{Hz} it is \SI{100}{ms}, and on top of it the controller may see a situation that is up to \SI{200}{ms} old. \Cref{fig:slow-rates} shows what that does: the same gains that were well damped at \SI{250}{Hz} overshoot by 35\,\% at \SI{5}{Hz}.
+\subsection{A sensor that reports late}
+A barometer that averages, a camera whose images must be processed, a radio link: many sensors deliver a reading that describes the past.
 
-\widefig{slow_rates}{Left: the square-wave step with the default gains at four controller rates. Down to \SI{10}{Hz} almost nothing changes; at \SI{7}{Hz} the response starts to ring; at \SI{5}{Hz} it overshoots by 35\,\%. Right: a pure sensor delay at full rate. \SI{100}{ms} is almost harmless; \SI{200}{ms} makes the loop oscillate on its own, held in check only by the motor limits.}{fig:slow-rates}
+\begin{definition}{Transport delay}
+A \term{transport delay} (or dead time) $T$ turns a signal $y(t)$ into $y(t - T)$: the same signal, unchanged in shape, arriving late. In Anemostatos it is \ui{Sensors\then Delay}.
+\end{definition}
 
-The right half of the figure adds a \term{transport delay}: every sensor reading arrives late, as it does with a slow barometer, a video link or a network. The picture is striking. At \SI{100}{ms} the loop hardly cares; at \SI{200}{ms} it oscillates by itself and never settles. Something happens in between — a threshold. To find it we need to look at the loop in a new way.
+\subsection{A controller that looks rarely}
+At \SI{250}{Hz} the controller computes a new thrust every \SI{4}{ms} and holds it until the next sample: a \term{zero-order hold}. Seen from the drone, the command is a staircase. That is a delay too, although a less obvious one.
+
+\begin{example}[How late is a sampled controller?]
+\label{ex:slow-zoh}
+A controller samples every $\Delta t$. By how much, on average, does the thrust acting on the drone lag behind what a continuous controller would command?
+
+\textbf{Step 1 — the age of the command.} At a time $t$ between two samples, the thrust in force was computed at the last sample, $t_k \le t$. Its age is $t - t_k$, which runs from 0 (just after a sample) to $\Delta t$ (just before the next).
+
+\textbf{Step 2 — the average.} The age grows linearly over each period, so its mean is $\tfrac12\Delta t$. A staircase follows a smooth command as if it were that command delayed by half a step.
+
+\textbf{Step 3 — the derivative is late as well.} The D term uses $(y_k - y_{k-1})/\Delta t$, the slope between the last two samples. That is the velocity at the \emph{middle} of the interval, $\tfrac12\Delta t$ before the sample: another half step.
+
+\textbf{Step 4 — together.} The damping acts with a delay of about $\Delta t$, the P term with about $\tfrac12\Delta t$.
+
+\textbf{Step 5 — numbers.} At \SI{250}{Hz}: \SI{4}{ms} and \SI{2}{ms}, small against the \SI{30}{ms} of the motors. At \SI{5}{Hz}: \SI{200}{ms} and \SI{100}{ms}.
+\end{example}
+
+\Cref{fig:slow-rates} shows what both kinds of lateness do to the same gains.
+
+\widefig{slow_rates}{Left: the square-wave step with the default gains at four controller rates. Down to \SI{10}{Hz} almost nothing changes; at \SI{7}{Hz} the response starts to ring; at \SI{5}{Hz} it never settles. Right: a pure sensor delay at full rate. \SI{100}{ms} is almost harmless; \SI{200}{ms} makes the loop oscillate on its own, held in check only by the motor limits.}{fig:slow-rates}
+
+The picture is striking, and it is not what intuition expects. At \SI{100}{ms} of delay the loop hardly cares; at \SI{200}{ms} it oscillates by itself and never settles. There is a threshold in between. To find it we need to look at the loop in a new way.
 
 \section{The loop as a sinusoid machine}
 
-Suppose that the loop is cut open just before the controller and a sinusoid $\sin\omega t$ is fed in as the error. It passes through the controller, the motors, the drone and the sensor, and comes back as another sinusoid of the same frequency — scaled by a gain and shifted by a phase. For a linear loop both are captured by one complex number, the \term{loop transfer function} evaluated at $s = j\omega$:
-\begin{equation}\label{eq:slow-loop}
-  L(j\omega) = \underbrace{(K_p + K_d\,j\omega)}_{\text{PD controller}}\;
-  \underbrace{\frac{1}{\tau_m j\omega + 1}}_{\text{motors}}\;
-  \underbrace{\frac{1}{m\,(j\omega)^2}}_{\text{drone}}\;
-  \underbrace{e^{-j\omega T}}_{\text{delay}} .
-\end{equation}
-\aside{Transfer functions are the Laplace-domain description of linear systems: a derivative becomes a multiplication by $s$, an integral a division by $s$. The math appendix (\cref{app:laplace}) summarises what we need.}
-Now the key observation. The loop feeds its output back with a minus sign. If at some frequency the signal comes back with gain 1 \emph{and} a phase lag of $180^\circ$, the minus sign turns it into exactly the signal that went in: the loop sustains that oscillation by itself, with no input at all. That is the boundary of stability.
+In \lessonref{les:noise} we learned that a linear block turns a sinusoid into a sinusoid of the same frequency, with a gain and a phase shift given by one complex number, its frequency response $H(j\omega)$ (\cref{thm:noise-freq}). Now apply this to the whole loop. Cut it open just before the controller, feed in $\sin\omega t$ as the error, and follow it once around: through the controller, the motors, the drone and the sensor. Blocks in series multiply their frequency responses.
 
-\begin{definition}{Crossover frequency and phase margin}
-The \term{crossover frequency} $\omega_c$ is where the loop gain is one, $|L(j\omega_c)| = 1$. The \term{phase margin} is how far the phase is from $-180^\circ$ there:
+\begin{definition}{Loop transfer function}
+The \term{loop transfer function} $L(s)$ is the product of the transfer functions of all blocks around the loop. For the altitude loop with a P–D controller, motor lag and a sensor delay $T$:
+\begin{equation}\label{eq:slow-loop}
+  L(s) = \underbrace{(K_p + K_d\,s)}_{\text{controller}}\;
+  \underbrace{\frac{1}{\tau_m s + 1}}_{\text{motors}}\;
+  \underbrace{\frac{1}{m\,s^2}}_{\text{drone}}\;
+  \underbrace{e^{-sT}}_{\text{delay}} .
+\end{equation}
+\end{definition}
+
+Each factor comes from its block's equation by the rule of \cref{thm:noise-freq}: $m\ddot y = T$ gives $1/(ms^2)$; $\tau_m\dot T + T = u$ gives $1/(\tau_ms + 1)$; $u = K_pe + K_d\dot e$ gives $K_p + K_ds$. The delay needs one line: $e^{s(t - T)} = e^{-sT}\,e^{st}$, so delaying an exponential multiplies it by $e^{-sT}$.
+
+Now the key observation. The loop feeds its output back with a minus sign ($e = r - y$). Suppose that at some frequency $\omega_0$ a sinusoid comes back around the loop with the \emph{same amplitude} and a phase lag of exactly \emph{half a period}, $180^\circ$. A half-period lag is a change of sign; the minus sign of the feedback changes it back. The signal that returns is exactly the signal that was sent. The loop can then sustain that oscillation by itself, with no input at all. In symbols: $L(j\omega_0) = -1$. That is the boundary of stability.
+
+\begin{definition}{Crossover frequency, phase margin, delay margin}
+The \term{crossover frequency} $\omega_c$ is where the loop gain is one: $|L(j\omega_c)| = 1$. The \term{phase margin} is how far the phase is from $-180^\circ$ there:
 \begin{equation*}
   \mathrm{PM} = 180^\circ + \angle L(j\omega_c).
 \end{equation*}
-A loop with $\mathrm{PM} > 0$ is stable (for the ordinary loops of this book); $\mathrm{PM} = 0$ oscillates forever; the smaller the margin, the more the step response rings. Designers typically ask for 45–60°.
+The \term{delay margin} is the extra delay that would use the phase margin up: $T_{max} = \mathrm{PM}/\omega_c$ (with PM in radians).
 \end{definition}
 
-\subsection{The altitude loop's margin}
-For the default gains, $|L|=1$ gives $\omega^4 = 49\omega^2 + 100$ (ignoring the small motor lag in the magnitude), so $\omega_c \approx \SI{7.1}{rad/s}$. The phases add up at that frequency:
+A loop with a positive phase margin is stable (for loops like ours; the exact statement is below); with zero margin it oscillates forever; and the smaller the margin, the longer its responses ring. Designers typically ask for 45–60°.
+
+\begin{example}[The phase margin of the altitude loop]
+\label{ex:slow-pm}
+Compute $\omega_c$ and the phase margin for the default gains, without delay.
+
+\textbf{Step 1 — the gain.} $|L(j\omega)| = \dfrac{\sqrt{K_p^2 + K_d^2\omega^2}}{m\,\omega^2\sqrt{1 + \tau_m^2\omega^2}}$. The last root is close to 1 for the frequencies of interest ($\tau_m\omega \approx 0.2$); we drop it for the moment.
+
+\textbf{Step 2 — crossover.} $|L| = 1$: $\;m^2\omega^4 = K_p^2 + K_d^2\omega^2$, i.e.\ $\omega^4 - 49\,\omega^2 - 100 = 0$. A quadratic in $\omega^2$: $\omega^2 = \tfrac12\big(49 + \sqrt{49^2 + 400}\big) = 50.96$, so $\omega_c = \SI{7.14}{rad/s}$.
+
+\textbf{Step 3 — the phase, factor by factor.} At $\omega_c$:
 \begin{align*}
-  \angle(K_p + K_d j\omega_c) &= \arctan(7 \cdot 7.1/10) = +78.7^\circ,\\
-  \angle\,1/(j\omega_c)^2 &= -180^\circ,\\
-  \angle\,1/(\tau_m j\omega_c + 1) &= -\arctan(0.03\cdot7.1) = -12.1^\circ,
+  \angle(K_p + jK_d\omega_c) &= \arctan(7 \cdot 7.14/10) = +78.7^\circ &&\text{(D leads)}\\
+  \angle\,1/(j\omega_c)^2 &= -180^\circ &&\text{(two integrators)}\\
+  \angle\,1/(1 + j\tau_m\omega_c) &= -\arctan(0.03 \cdot 7.14) = -12.1^\circ &&\text{(motors lag)}
 \end{align*}
-so $\mathrm{PM} \approx 66^\circ$ before any delay. The D term's phase lead of $+79^\circ$ is what makes the loop stable at all: without it a double integrator has $-180^\circ$ at every frequency.
 
-\subsection{Delay eats phase}
-A pure delay $e^{-j\omega T}$ has gain 1 — it does not change amplitudes — but it subtracts the phase $\omega T$ (in radians). At the crossover frequency every millisecond of delay costs
-\begin{equation}
-  \omega_c \cdot \SI{1}{ms} = 7.1 \times 10^{-3}\ \text{rad} = 0.41^\circ .
-\end{equation}
-The margin is gone when $\omega_c T = 66^\circ$, i.e.\ at the \term{delay margin}
+\textbf{Step 4 — the margin.} $\angle L = 78.7 - 180 - 12.1 = -113.4^\circ$, so $\mathrm{PM} = 180 - 113.4 = 66.6^\circ$.
+
+\textbf{Step 5 — the fine print.} The integral term and the \SI{20}{Hz} D filter take away another $3^\circ$, and the sample-and-hold of \SI{250}{Hz} about $1^\circ$. A numerical evaluation of the full loop gives $\omega_c = \SI{7.04}{rad/s}$ and $\mathrm{PM} = 62.7^\circ$.
+
+\textbf{Step 6 — read it.} The drone itself contributes $-180^\circ$ at every frequency: a double integrator alone has no margin at all, which is the marginal stability of \lessonref{les:spring}. All of the margin comes from the phase \emph{lead} of the D term. That is the frequency-domain way of saying that D is the damper.
+\end{example}
+
+\section{Delay eats phase}
+
+A pure delay has the frequency response $e^{-j\omega T}$. Its magnitude is 1: a delay does not change any amplitude. Its phase is $-\omega T$: a lag that grows in proportion to the frequency. A delay leaves $\omega_c$ where it was and subtracts $\omega_cT$ from the margin.
+
+\begin{example}[The delay margin]
+\label{ex:slow-dm}
+How much sensor delay can the default altitude loop take?
+
+\textbf{Step 1 — the cost per millisecond.} At $\omega_c = 7.04$: $\omega_c \cdot \SI{0.001}{s} = \SI{0.00704}{rad} = 0.40^\circ$.
+
+\textbf{Step 2 — the margin in radians.} $62.7^\circ = \SI{1.094}{rad}$.
+
+\textbf{Step 3 — divide.}
 \begin{equation}\label{eq:slow-dm}
-  T_{max} = \frac{\mathrm{PM}}{\omega_c} = \frac{1.15\ \text{rad}}{\SI{7.1}{rad/s}} \approx \SI{0.16}{s}.
+  T_{max} = \frac{\mathrm{PM}}{\omega_c} = \frac{1.094}{7.04} = \SI{0.155}{s}.
 \end{equation}
 
-\simfig{slow_margin}{The phase margin of the default altitude loop as delay is added, computed from \cref{eq:slow-loop} with the D filter included. It crosses zero at about \SI{160}{ms}: \SI{100}{ms} still leaves some margin, \SI{200}{ms} none.}{fig:slow-margin}
+\textbf{Step 4 — what happens at the limit.} The loop oscillates at the crossover frequency, $\omega_c = \SI{7.04}{rad/s}$: a period of $2\pi/7.04 = \SI{0.89}{s}$.
 
-\Cref{fig:slow-margin} and \cref{eq:slow-dm} explain \cref{fig:slow-rates}: \SI{100}{ms} of delay is inside the margin, \SI{200}{ms} is beyond it. A linear model says that beyond it the oscillation grows without bound; in the simulator the motor limits catch it and it settles into a limit cycle of about half a metre. The sampling experiment fits too: at \SI{5}{Hz} the hold and the stale sample together amount to roughly \SI{100}{}–\SI{150}{ms}, close enough to the edge to ring hard.
+\textbf{Step 5 — check} (\cref{fig:slow-predict}, left). Flown with 130, 150, 170 and \SI{200}{ms} of delay, the step responses ring with periods of 0.79, 0.86, 0.92 and \SI{1.08}{s}; the model predicts 0.82, 0.88, 0.94 and \SI{1.03}{s}. At \SI{130}{ms} the ringing decays; at \SI{170}{ms} it grows until the motors saturate. The threshold lies between them, where \cref{eq:slow-dm} puts it.
+\end{example}
+
+\simfig{slow_margin}{The phase margin of the default altitude loop as delay is added, computed from \cref{eq:slow-loop} with the D filter included. It crosses zero at about \SI{155}{ms}: \SI{100}{ms} still leaves some margin, \SI{200}{ms} none.}{fig:slow-margin}
+
+\simfig{slow_predict}{Prediction next to measurement. Left: the period of the ringing against the sensor delay; the model is the dominant pole pair of the loop with delay. Right: the sampled loop as an exact discrete-time system (Example~\ref{ex:slow-discrete}): the size of its largest eigenvalue against the controller rate. Above 1 the loop is unstable.}{fig:slow-predict}
+
+This explains the surprise of \cref{fig:slow-rates}. A loop does not degrade in proportion to its delay. While the margin is large, a delay changes little — the step response with \SI{100}{ms} is nearly the one without — and then, within a few tens of milliseconds, the margin is gone.
 
 \begin{keyidea}[Delay eats stability]
 Delay does not change how strongly the loop reacts, only \emph{when}. At the frequency where the loop gain is one, a delay $T$ subtracts $\omega_c T$ of phase margin. Faster loops (larger $\omega_c$) are more sensitive to the same delay. That is why flight controllers run their innermost loops at kilohertz rates, and why every source of delay — sampling, filtering, communication, actuators — is budgeted.
 \end{keyidea}
+
+\subsection{And the slow controller?}
+Example~\ref{ex:slow-zoh} says that a controller sampling every $\Delta t$ is late by about $\Delta t$ where it matters most, in the damping. With a delay margin of \SI{0.155}{s} the rule of thumb predicts trouble when $\Delta t \approx \SI{0.155}{s}$, a rate of about \SI{6.5}{Hz}. For a sampled loop there is also an exact calculation.
+
+\begin{example}[The sampled loop, exactly]
+\label{ex:slow-discrete}
+Find the lowest controller rate at which the default altitude loop is stable.
+
+\textbf{Step 1 — between samples.} The drone and its motors are a linear system, $\dot{\vx} = A\vx + Bu$ with $\vx = (y, v, T)$, and the command $u$ is constant during a period. By \cref{thm:meet-solution} the state at the next sample is then a linear function of the state and the command at this one: $\vx_{k+1} = A_d\,\vx_k + B_d\,u_k$ with $A_d = e^{A\Delta t}$. No approximation is involved.
+
+\textbf{Step 2 — at a sample.} The controller of \cref{eq:meet-discrete} is already a rule from one sample to the next: it updates its integral and its filtered derivative, and computes $u_k$ from $y_k$ and $y_{k-1}$.
+
+\textbf{Step 3 — one matrix.} Collect the drone's state and the controller's memory, $(y, v, T, I, D, y_{prev})$. One period of the loop multiplies this vector by a fixed $6 \times 6$ matrix $F$.
+
+\textbf{Step 4 — stability.} After $k$ periods the state is $F^k$ times the initial one. It decays if and only if every eigenvalue of $F$ has a magnitude below 1 — the discrete-time counterpart of \enquote{poles in the left half-plane}.
+
+\textbf{Step 5 — numbers.} Computing the eigenvalues for a range of rates: the largest magnitude is 0.988 at \SI{7}{Hz}, 1.084 at \SI{5}{Hz} and 1.44 at \SI{3}{Hz}. It crosses 1 at \SI{5.9}{Hz}.
+
+\textbf{Step 6 — check} (\cref{fig:slow-predict}, right). At \SI{7}{Hz} the simulator's drone settles, with 6\,\% overshoot. At \SI{5}{Hz} it overshoots by 35\,\% and keeps oscillating between the motor limits; at \SI{3}{Hz} it swings over three metres.
+\end{example}
+
+The rule of thumb (\SI{6.5}{Hz}) and the exact calculation (\SI{5.9}{Hz}) agree well enough for design. The controller's \SI{250}{Hz} is forty times above the edge.
 
 \screen[0 0 495 998]{slow}{Lesson 9 at \SI{7}{Hz}: the thrust in the motor chart is a visible staircase, one step per controller period.}{fig:slow-screen}
 
@@ -76,18 +154,108 @@ Delay does not change how strongly the loop reacts, only \emph{when}. At the fre
 \begin{trythis}
 \begin{enumerate}
   \item Lower the \ui{controller rate}: 50, 10, 7, \SI{5}{Hz}. Watch the staircase in the thrust and the overshoot grow.
-  \item Back at \SI{250}{Hz}, add sensor delay: 100, 150, \SI{200}{ms}. Where does the ringing start?
+  \item Back at \SI{250}{Hz}, add sensor delay: 100, 130, 150, 170, \SI{200}{ms}. Time the ringing and compare with Example~\ref{ex:slow-dm}.
   \item With \SI{150}{ms} of delay, halve $K_p$ and $K_d$. The loop gets slower ($\omega_c$ drops) and the same delay costs less phase: the oscillation should calm down.
 \end{enumerate}
 \predict{if you double both $K_p$ and $K_d$, does the delay margin grow or shrink? (Think about what happens to $\omega_c$.)}
 \end{trythis}
 
+\section{The engineer's view: margins}
+
+\subsection{Why a second way of looking at stability}
+Lessons 2–8 judged a loop by its poles. That works when the loop is a differential equation of finite order. A delay is not: $e^{-sT}$ is not a polynomial, and a loop with delay has infinitely many poles. The frequency response does not mind. It needs only the gain and the phase of each block at each frequency — numbers that can even be \emph{measured} on a real vehicle, by shaking it with sinusoids, without any model at all. That is why engineers who certify flight control systems think in margins.
+
+Two margins are quoted for every loop:
+\begin{itemize}
+  \item the \term{phase margin}, which measures tolerance to delay and lag — everything that acts late;
+  \item the \term{gain margin}, the factor by which the loop gain could be raised before the loop becomes unstable, which measures tolerance to a wrong gain — a lighter vehicle, a stronger actuator. It is the subject of \lessonref{les:edge}.
+\end{itemize}
+
+\subsection{A budget of phase}
+Because phases add, the margin can be budgeted like money. For the altitude loop at $\omega_c \approx \SI{7}{rad/s}$:
+\begin{center}\small\sffamily
+\begin{tabular}{lr}
+\toprule
+item & phase at $\omega_c$\\
+\midrule
+double integrator (the drone) & $-180^\circ$\\
+P and D (lead) & $+78.7^\circ$\\
+motor lag, \SI{30}{ms} & $-12.1^\circ$\\
+integral term and D filter & $-3.1^\circ$\\
+sample and hold at \SI{250}{Hz} & $-0.8^\circ$\\
+\midrule
+total & $-117.3^\circ$\\
+margin to $-180^\circ$ & $62.7^\circ$\\
+\bottomrule
+\end{tabular}
+\end{center}
+Every filter, every millisecond of computation, every slower sensor is a withdrawal from this account. The \SI{1}{Hz} D filter of \lessonref{les:noise} would cost $26.7^\circ$ on the D path; a \SI{50}{ms} video link $20^\circ$.
+
+\subsection{The same budget, a long way from home}
+
+\begin{example}[Driving on the Moon from Earth]
+\label{ex:slow-moon}
+In 1970 Soviet operators drove the Lunokhod rover on the Moon by radio, steering from television pictures. A radio signal needs about \SI{1.3}{s} each way. How fast can a loop closed through a human on Earth be?
+
+\textbf{Step 1 — the delay.} Picture down, command up: $T = \SI{2.6}{s}$, before the operator's own reaction time.
+
+\textbf{Step 2 — the budget.} Suppose the loop without delay had a comfortable margin of $60^\circ = \SI{1.05}{rad}$, and we accept losing half of it: the delay may cost \SI{0.52}{rad}.
+
+\textbf{Step 3 — the crossover.} $\omega_cT \le 0.52$ gives $\omega_c \le 0.52/2.6 = \SI{0.2}{rad/s}$.
+
+\textbf{Step 4 — what that means.} A loop with a crossover at \SI{0.2}{rad/s} reacts over $1/\omega_c \approx \SI{5}{s}$ and settles in tens of seconds. At walking speed the rover would travel many metres before a correction took effect. The operators drove at around \SI{1}{km/h}, in short moves with pauses.
+
+\textbf{Step 5 — the alternative.} Mars is 4 to 24 \emph{minutes} away. No loop can be closed through Earth at all; the rover's steering, and its landing, must be closed on board.
+\end{example}
+
+\subsection{In formal terms}
+
+\begin{theorem}[A delay in the frequency domain]
+\label{thm:slow-delay}
+The delay $y(t) = x(t - T)$ has the frequency response $e^{-j\omega T}$: gain 1 and phase $-\omega T$ at every frequency. It is linear and time-invariant, and it is not described by any differential equation of finite order.
+\end{theorem}
+\begin{proof}
+$e^{j\omega(t - T)} = e^{-j\omega T}e^{j\omega t}$. A rational transfer function has finitely many poles and zeros, while $e^{-sT}$ has none and is not constant.
+\end{proof}
+
+\begin{theorem}[Stability from the margins]
+\label{thm:slow-bode}
+Let $L(s)$ be a loop transfer function with no poles in the open right half-plane, whose gain $|L(j\omega)|$ crosses 1 exactly once, at $\omega_c$, and decreases through the crossing, and whose phase crosses $-180^\circ$ at most once, at a frequency above $\omega_c$. Then the closed loop is asymptotically stable if and only if its phase margin is positive. (A special case of the Nyquist criterion: Åström and Murray, 2021, ch.~10.)
+\end{theorem}
+
+The altitude loop meets the hypotheses: its open-loop poles are at the origin and at $-1/\tau_m$, and its gain falls steadily. The full Nyquist criterion, which needs no such hypotheses, is Lesson~III.3. A loop whose gain crosses 1 several times, or which is unstable when opened — an aircraft designed unstable, a rocket — can have a positive phase margin at one crossing and still be unstable; for those the full criterion is needed.
+
+\begin{theorem}[The sampled loop]
+\label{thm:slow-sampled}
+Let $\dot{\vx} = A\vx + Bu$ with $u$ held constant over each period $\Delta t$. Then the samples obey
+\begin{equation*}
+  \vx_{k+1} = A_d\,\vx_k + B_d\,u_k, \qquad A_d = e^{A\Delta t}, \quad B_d = \int_0^{\Delta t} e^{A\tau}\,\dd\tau\;B ,
+\end{equation*}
+exactly. A linear recursion $\symbf z_{k+1} = F\symbf z_k$ is asymptotically stable if and only if every eigenvalue of $F$ has magnitude less than one.
+\end{theorem}
+\begin{proof}
+The first part is \cref{thm:meet-solution} on one period with a constant input. For the second, in a basis that brings $F$ to Jordan form each component of $F^k\symbf z_0$ is a sum of terms $k^j\lambda^k$, which tend to zero exactly when $|\lambda| < 1$.
+\end{proof}
+
+An eigenvalue $\lambda$ of the sampled loop corresponds to a continuous-time pole $s$ with $\lambda = e^{s\Delta t}$: the left half-plane becomes the inside of the unit circle. Designing directly in discrete time, as Example~\ref{ex:slow-discrete} analysed, is the subject of Lesson~III.18.
+
+\begin{lookahead}
+\begin{itemize}[leftmargin=1.2em]
+  \item Lesson~III.1 measures $L(j\omega)$ on the flying drone with a sinusoidal probe; III.3 draws its Bode and Nyquist charts with the margins marked, and III.4 adds delay with a slider and watches the phase curve bend.
+  \item A controller that knows its delay can compensate for part of it by predicting: that is one of the things an observer and a model predictive controller do (Lessons~II.4 and~II.13).
+  \item How slow can the rate loop of the quadrotor be? Lesson~III.18, on the z-plane map of Example~\ref{ex:slow-discrete}.
+  \item A pilot is a delay of about \SI{0.2}{s} in series with the aircraft. Lesson~IV.16 puts a pilot model in the loop; a rocket's margins must survive fuel slosh and a bending structure near crossover (IV.8, IV.9).
+  \item The other margin, against too much gain, is the next lesson.
+\end{itemize}
+\end{lookahead}
+
 \begin{remember}
 \begin{itemize}
-  \item Sampling with a zero-order hold behaves like a delay of about half a sample period.
-  \item A loop oscillates by itself when the signal comes back around it with gain 1 and $180^\circ$ of phase lag.
-  \item The phase margin $180^\circ + \angle L(j\omega_c)$ measures how far from that the loop is; a delay $T$ costs $\omega_c T$.
-  \item Delay margin $= \mathrm{PM}/\omega_c$: faster loops tolerate less delay.
+  \item A controller sampling every $\Delta t$ acts about half a period late, and its difference-quotient derivative a whole period late.
+  \item Blocks around a loop multiply their frequency responses into $L(j\omega)$. The loop oscillates by itself when $L(j\omega_0) = -1$.
+  \item Phase margin: $180^\circ + \angle L(j\omega_c)$ at the crossover $|L| = 1$. For the default altitude loop $\omega_c = \SI{7}{rad/s}$ and $\mathrm{PM} = 63^\circ$, all of it from the lead of the D term.
+  \item A delay $T$ costs $\omega_cT$ of margin. Delay margin $= \mathrm{PM}/\omega_c$: \SI{155}{ms} here. Faster loops tolerate less delay.
+  \item A sampled loop is stable iff the eigenvalues of its one-period matrix lie inside the unit circle.
 \end{itemize}
 \end{remember}
 
@@ -101,12 +269,22 @@ Delay has an even more extreme form. A radio signal needs between 4 and 24 minut
 \end{curiosity}
 
 \begin{exercises}
-\exercise[1] The altitude loop has $\omega_c = \SI{7.1}{rad/s}$ and $\mathrm{PM} = 66^\circ$. What phase margin is left with a \SI{50}{ms} sensor delay?
-\answer{$\omega_c T = 7.1 \cdot 0.05 = \SI{0.355}{rad} = 20.3^\circ$, so $\mathrm{PM} \approx 46^\circ$.}
+\exercise[1] The altitude loop has $\omega_c = \SI{7.04}{rad/s}$ and $\mathrm{PM} = 62.7^\circ$. What phase margin is left with a \SI{50}{ms} sensor delay? With \SI{120}{ms}?
+\answer{$7.04 \cdot 0.05 = \SI{0.352}{rad} = 20.2^\circ$: $42.5^\circ$ left. \SI{120}{ms}: $48.4^\circ$ used, $14.3^\circ$ left.}
 \exercise[1] At which controller rate is the zero-order-hold delay alone equal to the motor time constant?
 \answer{$\tfrac12\Delta t = \SI{30}{ms}$, $\Delta t = \SI{60}{ms}$: about \SI{17}{Hz}.}
-\exercise[2] Double both gains, $K_p = 20$, $K_d = 14$. Compute the new crossover frequency (ignore the lag in the magnitude), the phase margin including the motor lag, and the delay margin. Compare with the default tune.
-\answer{$\omega^4 = 196\omega^2 + 400$ gives $\omega_c = \SI{14.1}{rad/s}$. Lead $\arctan(14\cdot14.1/20) = 84.2^\circ$, lag $\arctan(0.03\cdot14.1) = 22.9^\circ$, so $\mathrm{PM} = 61.3^\circ$ — almost unchanged. But the delay margin $1.07/14.1 = \SI{76}{ms}$ is less than half of the default's \SI{163}{ms}: a faster loop tolerates less delay.}
-\exercise[3] Derive the Barkhausen condition: show that if $L(j\omega_0) = -1$ then $y(t) = \sin\omega_0 t$ circulates in the closed loop with zero input.
-\answer{With zero reference the error is $e = -y$. If $y = \operatorname{Im} e^{j\omega_0 t}$, the loop maps $e = -y$ to $L(j\omega_0)\cdot(-y) = (-1)(-y) = y$: the signal reproduces itself.}
+\exercise[1] Extend the phase budget of the engineer's view: a designer wants to add a \SI{5}{Hz} D filter and a sensor with \SI{40}{ms} of delay. What margin remains? (The D filter's lag acts on the D path; take it as the full $\arctan(\omega_cT_f)$ for a pessimistic estimate.)
+\answer{$\arctan(7.04 \cdot 0.0318) = 12.6^\circ$ instead of the $3^\circ$ of the default filter, and $7.04 \cdot 0.04 = 16.1^\circ$: about $62.7 - 9.6 - 16.1 = 37^\circ$.}
+\exercise[2]\exkind{derive} Double both gains, $K_p = 20$, $K_d = 14$. Compute the new crossover frequency (ignore the lag in the magnitude), the phase margin including the motor lag, and the delay margin. Compare with the default tune.
+\answer{$\omega^4 = 196\omega^2 + 400$ gives $\omega_c = \SI{14.1}{rad/s}$. Lead $84.2^\circ$, lag $22.9^\circ$: $\mathrm{PM} = 61.3^\circ$, almost unchanged. Delay margin $1.07/14.1 = \SI{76}{ms}$, less than half: a faster loop tolerates less delay.}
+\exercise[2]\exkind{derive} Show that for the pure double integrator with P–D control (no lag, no delay) the phase margin is $\arctan(K_d\omega_c/K_p)$ and that it tends to $90^\circ$ as $K_d \to \infty$ and to $0$ as $K_d \to 0$. Relate the second limit to \lessonref{les:spring}.
+\answer{$\angle L = \arctan(K_d\omega/K_p) - 180^\circ$. With $K_d \to 0$ the margin vanishes: the P-only loop is marginally stable, the undamped oscillation of Lesson 2 — and any lag or delay makes it unstable.}
+\exercise[2]\exkind{derive} Barkhausen's condition. Show that if $L(j\omega_0) = -1$ then $y(t) = \sin\omega_0 t$ circulates in the closed loop with zero reference.
+\answer{With $r = 0$ the error is $e = -y$. The loop maps $e = -\sin\omega_0t$ to $|L|\sin(\omega_0t + \angle L)\cdot(-1) = -\sin(\omega_0t - 180^\circ) = \sin\omega_0t = y$: the signal reproduces itself.}
+\exercise[2]\exkind{fly} In Lesson~9 set the sensor delay to \SI{140}{ms} and time ten periods of the ringing after a step. Compare with the model's \SI{0.85}{s}. Then find, to within \SI{5}{ms}, the delay at which the ringing neither grows nor decays (use small steps with \key{↑} so that the motors do not saturate), and compare with \cref{eq:slow-dm}.
+\answer{About \SI{0.83}{s}. The threshold is close to \SI{155}{ms}.}
+\exercise[2]\exkind{code} The sensor delay in \src{src/sim/sensors.ts} is a ring buffer of past states (\texttt{HISTORY = 1001}). What is the longest delay it can represent, and what happens if \texttt{delayMs} asks for more? Add a \SI{20}{ms} delay to the \emph{actuator} instead: where in \src{src/engine/simulation.ts} would it go? Predict from the phase budget whether the loop cares which side of the plant the delay is on.
+\answer{\SI{1}{s}; larger values are clamped to the length of the history. An actuator delay would buffer \texttt{this.actuation} before \texttt{stepDynamics}. The loop transfer function is a product, so the order of the blocks does not matter for stability: \SI{20}{ms} costs $8^\circ$ either way. (It does matter for what a disturbance does before the loop reacts.)}
+\exercise[3]\exkind{derive} The smallest sampled loop. A pure integrator $\dot y = u$ is controlled by $u_k = -K\,y_k$, held for $\Delta t$. Find the exact recursion for $y_k$, the range of $K\Delta t$ for stability, and the value that brings $y$ to zero in one step. Compare the stability limit with the delay-margin rule ($\mathrm{PM} = 90^\circ$, $\omega_c = K$, delay $\tfrac12\Delta t$).
+\answer{$y_{k+1} = (1 - K\Delta t)\,y_k$: stable for $0 < K\Delta t < 2$, deadbeat at $K\Delta t = 1$. The rule: $\tfrac12\Delta t \cdot K < \pi/2$, i.e.\ $K\Delta t < \pi$ — the right order, but optimistic: the half-period approximation of the hold is only good well below the sampling rate.}
 \end{exercises}

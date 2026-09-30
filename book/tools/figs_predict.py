@@ -470,3 +470,86 @@ def noise_predict():
     a.set_ylabel("N  (3 s averages)")
     xlab_time(a)
     save(f, "noise_predict")
+
+
+# ─── Lesson 9 ──────────────────────────────────────────────────────────────
+def _pade(T, n=6):
+    from math import factorial
+    c = [factorial(2 * n - k) * factorial(n) / (factorial(2 * n) * factorial(k) * factorial(n - k)) for k in range(n + 1)]
+    return (np.array([c[k] * (-T) ** k for k in range(n, -1, -1)]),
+            np.array([c[k] * T**k for k in range(n, -1, -1)]))
+
+
+def delay_poles(T, kp=10.0, ki=0.8, kd=7.0, fc=20.0, tau=0.03, m=1.0, zoh=0.002):
+    """Poles of the altitude loop with a sensor delay T (Padé approximation of order six), sorted by real part."""
+    P = np.polymul
+    tf = 1 / (2 * np.pi * fc)
+    num, den = _pade(T + zoh)
+    plant = P(P([m, 0, 0, 0], [tau, 1]), [tf, 1])
+    ctrl = np.polyadd(np.polyadd(P([kp, 0], [tf, 1]), P([ki], [tf, 1])), [kd, 0, 0])
+    r = np.roots(np.polyadd(P(plant, den), P(ctrl, num)))
+    return r[np.argsort(-r.real)]
+
+
+def sampled_loop(rate, kp=10.0, ki=0.8, kd=7.0, m=1.0, tau=0.03, fc=20.0):
+    """One-period transition matrix of the altitude loop sampled at `rate`, states (y, v, T, I, D, y_prev)."""
+    from scipy.linalg import expm
+    ts = 1 / rate
+    a = np.array([[0, 1, 0], [0, 0, 1 / m], [0, 0, -1 / tau]])
+    b = np.array([[0], [0], [1 / tau]])
+    mm = expm(np.block([[a, b], [np.zeros((1, 4))]]) * ts)
+    ad, bd = mm[:3, :3], mm[:3, 3:]
+    tf = 1 / (2 * np.pi * fc)
+    al = tf / (tf + ts)
+    n = 6
+    i_new = np.zeros(n); i_new[3] = 1; i_new[0] = -ki * ts
+    d_new = np.zeros(n); d_new[4] = al; d_new[0] = -(1 - al) / ts; d_new[5] = (1 - al) / ts
+    u = -kp * np.eye(n)[0] + i_new + kd * d_new
+    f = np.zeros((n, n))
+    f[:3, :3] = ad
+    f[:3, :] += bd @ u[None, :]
+    f[3, :], f[4, :], f[5, 0] = i_new, d_new, 1
+    return f
+
+
+@fig
+def slow_predict():
+    f, ax = plt.subplots(1, 2, figsize=(TEXT_W, 56 * MM), gridspec_kw=dict(wspace=0.36))
+    a = ax[0]
+    ts = np.linspace(0.06, 0.22, 60)
+    per, re = [], []
+    for T in ts:
+        r = delay_poles(T)
+        c = [x for x in r if x.imag > 0.5][0]
+        per.append(2 * np.pi / c.imag)
+        re.append(c.real)
+    a.axvspan(155, 230, color="#FBEDEA", lw=0)
+    a.plot(1000 * ts, per, color=C["ink"], lw=0.9, ls=DASH)
+    a.plot([130, 150, 170, 200], [0.79, 0.86, 0.92, 1.08], "o", color=C["meas"], ms=4)
+    a.text(158, 0.62, "unstable\nbeyond 155 ms", color=C["err"], fontsize=6.3)
+    a.text(62, 0.98, "period of the ringing:\nmodel (dashed), simulator (dots)", color=C["ink"], fontsize=6.3)
+    a.set_xlim(60, 225)
+    a.set_ylim(0.55, 1.15)
+    a.set_xlabel("sensor delay  [ms]", loc="right")
+    a.set_ylabel("period  [s]")
+    a.set_title("Delay: the ringing slows down")
+
+    a = ax[1]
+    rates = np.logspace(np.log10(2.5), np.log10(60), 200)
+    rho = [np.abs(np.linalg.eigvals(sampled_loop(r))).max() for r in rates]
+    a.axvspan(2.5, 5.9, color="#FBEDEA", lw=0)
+    a.semilogx(rates, rho, color=C["ink"], lw=0.9, ls=DASH)
+    a.axhline(1, color=C["err"], lw=0.6)
+    for r, lab, dy in [(7, "7 Hz: settles", 0.05), (5, "5 Hz: never settles", 0.06), (3, "3 Hz", 0.04)]:
+        v = np.abs(np.linalg.eigvals(sampled_loop(r))).max()
+        a.plot(r, v, "o", color=C["meas"], ms=4)
+        a.text(r * 1.12, v + dy, lab, fontsize=6.3, color=C["meas"])
+    a.text(2.7, 0.93, "unstable below 5.9 Hz", color=C["err"], fontsize=6.3)
+    a.set_xlim(2.5, 60)
+    a.set_ylim(0.9, 1.6)
+    a.set_xticks([3, 5, 10, 20, 50])
+    a.set_xticklabels(["3", "5", "10", "20", "50"])
+    a.set_xlabel("controller rate  [Hz]", loc="right")
+    a.set_ylabel("largest $|$eigenvalue$|$ per sample")
+    a.set_title("Sampling: the exact discrete loop")
+    save(f, "slow_predict")

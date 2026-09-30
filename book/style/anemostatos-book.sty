@@ -264,6 +264,12 @@
   \@afterindentfalse\@afterheading
 }
 
+% A chapter of the mathematical toolbox: the opener of \bookchapter, a letter for a label, and a
+% margin card that lists the lessons in which the tool is used (rows of \setuprow).
+\newcommand{\toolchapter}[3]{% {letter}{title}{subtitle}
+  \bookchapter{#1}{#2}{#3}\renewcommand{\lessonpart}{Mathematical toolbox}}
+\newcommand{\usedcard}[1]{\marginpar{\marginfont{\sanscaps\scriptsize\color{accent}WHERE IT IS USED}\par\vspace{4pt}#1}}
+
 % ---------------------------------------------------------------- part pages
 \newcommand{\bookpart}[4]{% {numeral}{title}{epigraph}{intro}
   \clearpage

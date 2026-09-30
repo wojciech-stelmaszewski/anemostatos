@@ -1,1 +1,38 @@
-% TODO
+\bookchapter{}{The mathematical toolbox}{Every tool the lessons use beyond a first course in calculus, differential equations and linear algebra — each derived once, in one place.}
+\label{app:math}
+
+\lead{The lessons introduce their mathematics where they need it, and only as much as they need. That is the right order for learning control and the wrong one for looking something up. The appendices that follow collect the same tools by subject. Each is a short course: definitions, theorems with a proof or a source, and worked examples with the numbers of the drone. None of it is required before Lesson~1. All of it will have been used by the end of the book.}
+
+\section*{What is in it}
+
+\begin{center}\small
+\renewcommand{\arraystretch}{1.3}
+\begin{tabularx}{\linewidth}{@{}>{\sffamily\bfseries\color{accent}}l>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}p{30mm}@{}}
+\toprule
+ & \normalfont\sffamily\color{ink} subject & \sffamily first needed in\\
+\midrule
+A & \hyperref[app:ode]{Linear differential equations and state space}: characteristic equation, the matrix exponential, controllability & \lessonref{les:spring}\\
+B & \hyperref[app:routh]{Polynomials and stability}: the Routh–Hurwitz criterion, the root locus & \lessonref{les:integral}\\
+C & \hyperref[app:laplace]{Complex numbers and transforms}: frequency response, Fourier series, the Laplace transform, transfer functions, the Nyquist criterion & \lessonref{les:noise}\\
+D & \hyperref[app:sampling]{Sampling and the z-transform}: aliasing, difference equations, exact discretisation & \lessonref{les:slow}\\
+E & \hyperref[app:prob]{Probability and random signals}: variance and covariance, white noise, spectra, least squares & \lessonref{les:noise}\\
+F & \hyperref[app:num]{Numerical methods}: roots, integrals, the integration of differential equations & \lessonref{les:meet}\\
+G & \hyperref[app:stab]{Stability of nonlinear systems}: linearisation, Lyapunov functions, the invariance principle, time scales & \lessonref{les:spring}\\
+H & \hyperref[app:quat]{Rotations and quaternions}: rotation matrices, axis and angle, quaternion kinematics, the attitude error & \lessonref{les:tilt}\\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+Two more appendices belong to Part~II and are printed with it: \textsf{\textbf{I}}, linear algebra beyond eigenvalues (singular values, positive definite matrices, the Riccati equation), and \textsf{\textbf{J}}, optimisation (convexity, the Karush–Kuhn–Tucker conditions, quadratic and cone programs). The later volumes add \textsf{\textbf{K}}, norms of signals and systems, and \textsf{\textbf{L}}, the calculus of variations and dynamic programming. The letters stay the same throughout the course.
+
+\section*{How to use it}
+
+\begin{itemize}
+  \item \textbf{As a reference.} Each appendix opens with a margin card, \emph{Where it is used}, that names the lessons relying on it, and the lessons point back here. Equations and theorems are numbered with the letter of the appendix: \enquote{Theorem~A.2}, \enquote{Equation~(C.7)}.
+  \item \textbf{As a refresher.} The appendices can be read in order. A and C together are the classical \enquote{signals and systems} course in forty pages; B and G are its stability theory; D, E and F are what a digital, noisy, computed loop adds; H is the geometry of a body that turns.
+  \item \textbf{With a pencil.} The worked examples use the drone of the lessons — $m = \SI{1}{kg}$, $K_p = 10$, $K_d = 7$, $K_i = 0.8$, a motor lag of \SI{30}{ms}, a controller at \SI{250}{Hz} — so that every number can be checked against a chapter or against the simulator.
+\end{itemize}
+
+The statements follow the conventions of the \hyperref[sec:notation]{Prelude}: a \emph{Definition} fixes a term, a \emph{Theorem} is general and comes with a proof or with the source of one, a \emph{Result} is a formula for our vehicle. The toolbox has no exercises; those are in the lessons.
+
+\input{back/toolbox/A-linear}

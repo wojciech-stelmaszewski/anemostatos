@@ -1,0 +1,343 @@
+\toolchapter{A}{Linear differential equations and state space}{One guess, $e^{st}$, solves them all. The rest is bookkeeping — and the bookkeeping has a name: the state.}
+\label{app:ode}
+
+\lead{\usedcard{\setuprow{Lesson 2}{the characteristic equation, poles}\setuprow{Lessons 3–5}{third-order loops, fitting initial conditions}\setuprow{Lessons 1, 9}{the state, the matrix exponential, the sampled loop}\setuprow{Lessons 4, 12}{controllability}\setuprow{Part II}{state feedback, observers: everything}}%
+Every closed loop in Part~I is a linear differential equation with constant coefficients, or is treated as one. This appendix solves such equations once and for all: first the scalar ones, of first, second and any order; then the same equations written as a system of first-order ones, $\dot{\vx} = A\vx + B\symbf u$, whose solution is a single formula with a matrix in the exponent.}
+
+\section{First order: the exponential and its time constant}
+
+The simplest dynamical system there is has one variable whose rate of change is proportional to its distance from a target:
+\begin{equation}\label{eq:A-first}
+  \tau\,\dot x + x = u , \qquad \tau > 0 .
+\end{equation}
+The motors of the drone obey it ($x$ is the thrust, $u$ the command), and so do the D filter of \lessonref{les:noise}, the creeping integral of \lessonref{les:droop} and each loop of the cascade in \lessonref{les:cascade}.
+
+\paragraph{No input.} For $u = 0$ the equation reads $\dot x = -x/\tau$. Separating the variables, $\dd x/x = -\dd t/\tau$, and integrating from $0$ to $t$ gives $\ln x(t) - \ln x_0 = -t/\tau$, that is,
+\begin{equation}
+  x(t) = x_0\,e^{-t/\tau} .
+\end{equation}
+The number $\tau$ is the \term{time constant}. After one time constant $x$ has fallen to $e^{-1} = 37\,\%$ of its initial value, after three to 5\,\%, after five to below 1\,\%.\tip{The tangent to $e^{-t/\tau}$ at any moment reaches zero exactly $\tau$ later. On a chart, draw the tangent at the start of a response: where it meets the final value, read off $\tau$.}
+
+\paragraph{A constant input.} For $u = u_0$ the constant $x = u_0$ is a solution. Subtract it: $z = x - u_0$ obeys $\tau\dot z + z = 0$, which we have just solved. Hence
+\begin{equation}\label{eq:A-step}
+  x(t) = u_0 + (x_0 - u_0)\,e^{-t/\tau} .
+\end{equation}
+The response starts at $x_0$, ends at $u_0$ and covers 63\,\% of the distance in the first time constant.
+
+\begin{example}[A motor spins up]
+\label{ex:A-motor}
+A motor of the drone delivers \SI{2.45}{N} in hover. The command jumps to \SI{3.45}{N}. With $\tau_m = \SI{30}{ms}$, what is the thrust after one controller period (\SI{4}{ms}), after \SI{30}{ms} and after \SI{90}{ms}?
+
+\textbf{Step 1 — identify.} $x_0 = 2.45$, $u_0 = 3.45$, so $x_0 - u_0 = -1$ and $x(t) = 3.45 - e^{-t/0.03}$.
+
+\textbf{Step 2 — evaluate.} $e^{-4/30} = 0.875$: after \SI{4}{ms} the thrust is \SI{2.575}{N}, 12.5\,\% of the way. $e^{-1} = 0.368$: after \SI{30}{ms}, \SI{3.08}{N}. $e^{-3} = 0.050$: after \SI{90}{ms}, \SI{3.40}{N}.
+
+\textbf{Step 3 — read it.} A controller that runs every \SI{4}{ms} sees only an eighth of each of its commands carried out before it issues the next. That is why the kick of \lessonref{les:kick} hardly reaches the drone.
+\end{example}
+
+\paragraph{Any input.} Multiply \cref{eq:A-first} by $e^{t/\tau}/\tau$. The left-hand side becomes the derivative of a product, $\frac{\dd}{\dd t}\big(e^{t/\tau}x\big) = e^{t/\tau}u/\tau$, and integrating gives
+\begin{equation}\label{eq:A-conv1}
+  x(t) = e^{-t/\tau}\,x_0 + \frac{1}{\tau}\int_0^t e^{-(t - s)/\tau}\,u(s)\,\dd s .
+\end{equation}
+The first term is what the initial value leaves behind. The second adds up the input of every past moment $s$, each weighted by how much of it survives until $t$. Everything in this appendix is a generalisation of this one line.
+
+\section{Second order: the characteristic equation}
+
+A mass with a spring and a damper — the P–D loop of \lessonref{les:damper} — obeys
+\begin{equation}\label{eq:A-second}
+  m\,\ddot x + c\,\dot x + k\,x = 0 .
+\end{equation}
+Try $x = e^{st}$. Each derivative multiplies by $s$, so the equation becomes $(ms^2 + cs + k)\,e^{st} = 0$, and since the exponential never vanishes,
+\begin{equation}
+  m s^2 + c s + k = 0 .
+\end{equation}
+This \term{characteristic equation} has two roots, $s_{1,2} = \big({-c} \pm \sqrt{c^2 - 4mk}\,\big)/2m$. Three cases arise, and \lessonref{les:damper} gave them their names.
+
+\begin{result}[The general solution of \cref{eq:A-second}]
+\begin{center}\small
+\renewcommand{\arraystretch}{1.35}
+\begin{tabular}{@{}lll@{}}
+\toprule
+roots & general solution & name\\
+\midrule
+real, $s_1 \ne s_2$ & $C_1 e^{s_1 t} + C_2 e^{s_2 t}$ & overdamped\\
+real, $s_1 = s_2 = s$ & $(C_1 + C_2\,t)\,e^{st}$ & critically damped\\
+complex, $\sigma \pm j\omega$ & $e^{\sigma t}\,(C_1\cos\omega t + C_2\sin\omega t)$ & underdamped\\
+\bottomrule
+\end{tabular}
+\end{center}
+The two constants are fixed by the two initial conditions $x(0)$ and $\dot x(0)$.
+\end{result}
+
+Where do the second and third lines come from? For complex roots, $e^{(\sigma \pm j\omega)t} = e^{\sigma t}(\cos\omega t \pm j\sin\omega t)$ by Euler's formula; the sum and the difference of the two solutions are real, and they are the cosine and the sine of the table. For a double root only one exponential is available, and a second solution is needed. Try $x = t\,e^{st}$: then $\dot x = (1 + st)e^{st}$ and $\ddot x = (2s + s^2t)e^{st}$, so
+\begin{equation*}
+  m\ddot x + c\dot x + kx = \big[(ms^2 + cs + k)\,t + (2ms + c)\big]e^{st} .
+\end{equation*}
+The first bracket vanishes because $s$ is a root, the second because it is a \emph{double} root: $2ms + c$ is the derivative of the characteristic polynomial, and a polynomial and its derivative vanish together exactly at a repeated root.
+
+\begin{example}[The heavy drone, step by step]
+\label{ex:A-heavy}
+The \SI{1.4}{kg} drone of \lessonref{les:integral} flies with $K_p = 10$, $K_d = 7$ and exact feedforward. It is \SI{1}{m} below its setpoint and at rest. Find its motion.
+
+\textbf{Step 1 — the equation.} $1.4\,\ddot x + 7\,\dot x + 10\,x = 0$ with $x(0) = -1$, $\dot x(0) = 0$.
+
+\textbf{Step 2 — the roots.} $c^2 - 4mk = 49 - 56 = -7$: complex. $s = (-7 \pm j\sqrt7)/2.8 = -2.5 \pm 0.945j$. The extra mass has made the default tune, which is overdamped for \SI{1}{kg}, slightly underdamped.
+
+\textbf{Step 3 — the general solution.} $x(t) = e^{-2.5t}(C_1\cos 0.945t + C_2\sin 0.945t)$.
+
+\textbf{Step 4 — the first condition.} $x(0) = C_1 = -1$.
+
+\textbf{Step 5 — the second condition.} Differentiate with the product rule and set $t = 0$: $\dot x(0) = -2.5\,C_1 + 0.945\,C_2 = 0$, so $C_2 = 2.5\,C_1/0.945 = -2.646$.
+
+\textbf{Step 6 — the answer.} $x(t) = -e^{-2.5t}(\cos 0.945t + 2.646\sin 0.945t)$. Check: $x(0) = -1$; and in the standard form of \cref{eq:damper-std}, $\omega_n = \sqrt{10/1.4} = \SI{2.67}{rad/s}$ and $\zeta = 7/(2\sqrt{14}) = 0.94$, so $\zeta\omega_n = 2.5$ and $\omega_n\sqrt{1 - \zeta^2} = 0.945$, as found.
+\end{example}
+
+\section{Any order, and any input}
+
+\begin{theorem}[Linear equations with constant coefficients]
+\label{thm:A-order-n}
+Consider $a_n x^{(n)} + \dots + a_1\dot x + a_0 x = 0$ with real coefficients, $a_n \ne 0$, and let its characteristic polynomial $p(s) = a_ns^n + \dots + a_0$ have the distinct roots $s_1, \dots, s_r$ with multiplicities $\mu_1, \dots, \mu_r$.
+\begin{enumerate}[label=(\roman*)]
+  \item The $n$ functions $t^k e^{s_i t}$, $k = 0, \dots, \mu_i - 1$, are solutions, and every solution is a combination of them with constant coefficients.
+  \item For every set of initial values $x(0), \dot x(0), \dots, x^{(n-1)}(0)$ there is exactly one solution.
+\end{enumerate}
+(Hirsch, Smale and Devaney, 2013, ch.~6.)
+\end{theorem}
+
+Three consequences are used constantly in the lessons.
+\begin{itemize}
+  \item \textbf{Count.} An equation of order $n$ has $n$ poles and needs $n$ initial conditions. The loop with an integral (\lessonref{les:integral}) is of third order; with the motor lag as well, fourth.
+  \item \textbf{Superpose.} Because the equation is linear, the sum of two solutions is a solution, and the response to a sum of inputs is the sum of the responses. This is why a step twice as large gives a response twice as large, and why it fails as soon as a motor saturates.
+  \item \textbf{Complex roots come in pairs.} The coefficients are real, so if $\sigma + j\omega$ is a root then so is $\sigma - j\omega$, and together they give a real oscillation $e^{\sigma t}\cos(\omega t + \varphi)$.
+\end{itemize}
+
+\subsection{Fitting initial conditions}
+With distinct roots, $x = \sum_i C_i e^{s_i t}$ and its derivatives at $t = 0$ are $x^{(k)}(0) = \sum_i s_i^k C_i$: $n$ linear equations for the $n$ constants. Examples~\ref{ex:droop-exact} and~\ref{ex:integral-overshoot} solve such a set for three poles.
+
+\subsection{A forced equation}
+With an input on the right-hand side,
+\begin{equation}\label{eq:A-forced}
+  a_n x^{(n)} + \dots + a_0 x = f(t),
+\end{equation}
+every solution is \emph{one} particular solution plus a solution of the equation without input (the \emph{homogeneous} equation). The reason is one line: the difference of two solutions of \cref{eq:A-forced} solves the homogeneous equation. If all roots have negative real parts, the homogeneous part dies out and the particular solution is what remains — the steady response.
+
+For the inputs that matter in control a particular solution can be guessed:
+\begin{center}\small
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{}lll@{}}
+\toprule
+input $f(t)$ & try & result\\
+\midrule
+constant $f_0$ & a constant & $x = f_0/a_0$ \quad (if $a_0 \ne 0$)\\
+$e^{\lambda t}$ & $X e^{\lambda t}$ & $X = 1/p(\lambda)$ \quad (if $p(\lambda) \ne 0$)\\
+$\sin\omega t$ & the imaginary part of $X e^{j\omega t}$ & $X = 1/p(j\omega)$\\
+\bottomrule
+\end{tabular}
+\end{center}
+The second line contains the other two ($\lambda = 0$ and $\lambda = j\omega$), and it is again the miracle of the exponential: substituting $X e^{\lambda t}$ turns every derivative into a factor $\lambda$, so the left-hand side becomes $p(\lambda)\,X e^{\lambda t}$.\pitfall{If $\lambda$ is itself a root of $p$, the guess fails: $p(\lambda) = 0$. The input then excites a natural motion of the system, the response grows like $t\,e^{\lambda t}$, and this is \emph{resonance}.}
+
+\begin{example}[A sinusoidal force on the P–D loop]
+\label{ex:A-forced}
+A gust pushes the \SI{1}{kg} drone with the force $\sin\omega t$ newtons at \SI{0.4}{Hz}. The loop is $\ddot x + 7\dot x + 10x = \sin\omega t$. Find the steady motion.
+
+\textbf{Step 1 — the frequency.} $\omega = 2\pi \cdot 0.4 = \SI{2.513}{rad/s}$.
+
+\textbf{Step 2 — the complex problem.} Solve $\ddot z + 7\dot z + 10 z = e^{j\omega t}$ instead, with $z = X e^{j\omega t}$. Its imaginary part will solve the real problem, because the equation is linear with real coefficients.
+
+\textbf{Step 3 — the amplitude.} $p(j\omega) = (j\omega)^2 + 7j\omega + 10 = (10 - 6.32) + 17.59j = 3.68 + 17.59j$, so $X = 1/(3.68 + 17.59j)$.
+
+\textbf{Step 4 — magnitude and angle.} $|p| = \sqrt{3.68^2 + 17.59^2} = 17.97$ and $\angle p = \arctan(17.59/3.68) = 78.2^\circ$. Hence $|X| = 1/17.97 = 0.0556$ and $\angle X = -78.2^\circ$.
+
+\textbf{Step 5 — the answer.} $x(t) = 0.0556\,\sin(\omega t - 78.2^\circ)$: the drone swings by \SI{5.6}{cm} and lags the force by almost a quarter of a period. Example~\ref{ex:challenge-freq} does the same calculation with the integral included.
+\end{example}
+
+\section{State space}
+
+An equation of order $n$ can always be rewritten as $n$ equations of first order. Take the third-order loop of \lessonref{les:edge}, $\tau_m m\,\dddot x + m\,\ddot x + K_d\,\dot x + K_p\,x = 0$, and give names to the derivatives: $x_1 = x$, $x_2 = \dot x$, $x_3 = \ddot x$. Then $\dot x_1 = x_2$ and $\dot x_2 = x_3$ by definition, and the equation itself, solved for the highest derivative, gives $\dot x_3$:
+\begin{equation}\label{eq:A-companion}
+  \frac{\dd}{\dd t}\begin{pmatrix} x_1\\ x_2\\ x_3\end{pmatrix}
+  = \begin{pmatrix} 0 & 1 & 0\\ 0 & 0 & 1\\ -\dfrac{K_p}{\tau_m m} & -\dfrac{K_d}{\tau_m m} & -\dfrac{1}{\tau_m}\end{pmatrix}
+  \begin{pmatrix} x_1\\ x_2\\ x_3\end{pmatrix} .
+\end{equation}
+A matrix of this shape — ones above the diagonal, the coefficients in the last row — is a \term{companion matrix}.
+
+\begin{definition}{State-space form}
+A linear time-invariant system in \term{state-space form} is
+\begin{equation}\label{eq:A-ss}
+  \dot{\vx} = A\,\vx + B\,\symbf u, \qquad \symbf y = C\,\vx + D\,\symbf u ,
+\end{equation}
+with the state $\vx \in \mathbb{R}^n$, the input $\symbf u \in \mathbb{R}^p$, the output $\symbf y \in \mathbb{R}^q$ and constant matrices of fitting sizes. $A$ is the \term{state matrix}, $B$ the input matrix, $C$ the output matrix; $D$ passes the input straight to the output and is zero for every plant in this book.
+\end{definition}
+
+\begin{theorem}[The characteristic polynomial]
+\label{thm:A-charpoly}
+The companion matrix of $s^n + a_{n-1}s^{n-1} + \dots + a_0$ has exactly this polynomial as $\det(s\Id - A)$. For any system $\dot{\vx} = A\vx$ the poles — the exponents $s$ of its solutions $e^{st}\symbf v$ — are the eigenvalues of $A$.
+\end{theorem}
+\begin{proof}
+A solution $e^{st}\symbf v$ with $\symbf v \ne 0$ requires $s\symbf v = A\symbf v$. For the companion matrix this reads $v_2 = s v_1$, $v_3 = s v_2$, \dots, and the last row gives $s\,v_n = -a_0v_1 - \dots - a_{n-1}v_n$. With $v_1 = 1$ the first $n - 1$ equations give $v_k = s^{k-1}$, and the last one becomes the polynomial. So the eigenvalues are its roots, and two polynomials of degree $n$ with leading coefficient one and the same roots (with multiplicity) are equal.
+\end{proof}
+
+The proof also gives the eigenvectors of a companion matrix: $(1, s, s^2, \dots)^\T$. They say that in a pure motion $e^{st}$ the velocity is $s$ times the position and the acceleration $s$ times the velocity — which is what differentiating an exponential means.
+
+\begin{example}[The loop with its motors, as a matrix]
+\label{ex:A-state}
+Write the loop of \lessonref{les:edge} for $K_p = 100$, $K_d = 7$, $m = 1$, $\tau_m = 0.03$ in state form and find its poles.
+
+\textbf{Step 1 — the last row.} $K_p/(\tau_m m) = 3333$, $K_d/(\tau_m m) = 233.3$, $1/\tau_m = 33.3$.
+
+\textbf{Step 2 — the matrix.} $A = \begin{pmatrix} 0 & 1 & 0\\ 0 & 0 & 1\\ -3333 & -233.3 & -33.3\end{pmatrix}$.
+
+\textbf{Step 3 — the polynomial.} By \cref{thm:A-charpoly}, $\det(s\Id - A) = s^3 + 33.3\,s^2 + 233.3\,s + 3333$: the cubic \eqref{eq:edge-cubic} divided by $\tau_m m$.
+
+\textbf{Step 4 — the eigenvalues.} Numerically $-29.25$ and $-2.04 \pm 10.48j$. The pair is the ringing of \cref{fig:edge-runs} at $K_p = 100$: a period of $2\pi/10.48 = \SI{0.60}{s}$ and a decay rate of \SI{2.04}{s^{-1}} (the table of Example~\ref{ex:edge-ringing}, with the D filter and the hold included, has 0.576 and 1.87).
+\end{example}
+
+\subsection{The state is not unique}
+Any invertible matrix $T$ defines new coordinates $\symbf z = T\vx$, in which
+\begin{equation}
+  \dot{\symbf z} = T A T^{-1}\,\symbf z + T B\,\symbf u, \qquad \symbf y = C T^{-1}\,\symbf z .
+\end{equation}
+The same system, described by different numbers. The matrices $A$ and $TAT^{-1}$ are called \emph{similar}; they have the same eigenvalues, because $\det(s\Id - TAT^{-1}) = \det\big(T(s\Id - A)T^{-1}\big) = \det(s\Id - A)$. Poles belong to the system, not to the coordinates. The freedom is used all the time: position and velocity are natural for a drone, but a controller design may prefer coordinates in which $A$ is diagonal, and an estimator may carry extra states of its own.\tip{When two people get different matrices for the same system, compare the eigenvalues of $A$ first. If they agree, the two descriptions probably differ only by a change of coordinates.}
+
+\section{The matrix exponential}
+
+The scalar equation $\dot x = ax$ has the solution $e^{at}x_0$. The vector equation $\dot{\vx} = A\vx$ has the solution $e^{At}\vx_0$, provided the exponential of a matrix is defined by the same power series:
+\begin{equation}\label{eq:A-expm}
+  e^{At} = \Id + At + \frac{(At)^2}{2!} + \frac{(At)^3}{3!} + \dots
+\end{equation}
+
+\begin{theorem}[Properties of the matrix exponential]
+\label{thm:A-expm}
+For every square matrix $A$ the series \eqref{eq:A-expm} converges for all $t$, and
+\begin{enumerate}[label=(\roman*)]
+  \item $\frac{\dd}{\dd t}e^{At} = A\,e^{At} = e^{At}A$, and $e^{A\cdot 0} = \Id$;
+  \item $e^{A(t + s)} = e^{At}e^{As}$; in particular $e^{At}$ is invertible, with the inverse $e^{-At}$;
+  \item if $A\symbf v = \lambda\symbf v$, then $e^{At}\symbf v = e^{\lambda t}\symbf v$;
+  \item $e^{TAT^{-1}t} = T\,e^{At}\,T^{-1}$;
+  \item $e^{(A + B)t} = e^{At}e^{Bt}$ if $AB = BA$ — and in general \emph{only} then.
+\end{enumerate}
+\end{theorem}
+\begin{proof}
+Convergence: the norm of the $k$-th term is at most $(\|A\|\,|t|)^k/k!$, the terms of the series of $e^{\|A\||t|}$. (i)~Differentiate term by term. (ii)~Both sides solve $\dot X = AX$ as functions of $t$ with the same value at $t = 0$, and the solution is unique (\cref{thm:meet-solution}). (iii)~$A^k\symbf v = \lambda^k\symbf v$ in every term. (iv)~$(TAT^{-1})^k = TA^kT^{-1}$ in every term. (v)~With $AB = BA$ the binomial theorem holds for $(A + B)^k$ and the product of the two series can be rearranged as for numbers.
+\end{proof}
+
+Three ways to compute $e^{At}$ by hand cover every case in this book.
+
+\paragraph{1. The series stops.} If some power of $A$ is zero, the series is a polynomial. For the double integrator, $A = \begin{psmallmatrix}0 & 1\\ 0 & 0\end{psmallmatrix}$ has $A^2 = 0$, so $e^{At} = \Id + At = \begin{psmallmatrix}1 & t\\ 0 & 1\end{psmallmatrix}$: position grows by velocity times time, velocity stays (\lessonref{les:meet}).
+
+\paragraph{2. Diagonalise.} If $A$ has $n$ independent eigenvectors, collect them as the columns of $V$ and the eigenvalues in $\Lambda = \diag(\lambda_1, \dots, \lambda_n)$. Then $A = V\Lambda V^{-1}$, and by (iv)
+\begin{equation}\label{eq:A-diag}
+  e^{At} = V\,\diag\!\big(e^{\lambda_1 t}, \dots, e^{\lambda_n t}\big)\,V^{-1} .
+\end{equation}
+
+\paragraph{3. One eigenvalue, twice.} A $2 \times 2$ matrix with a double eigenvalue $\lambda$ satisfies $(A - \lambda\Id)^2 = 0$. Write $A = \lambda\Id + N$ with $N = A - \lambda\Id$; the two parts commute, so by (v) and method~1, $e^{At} = e^{\lambda t}(\Id + Nt)$. This is where the factor $t$ of critical damping comes from.
+
+\begin{example}[The exponential of the P–D loop]
+\label{ex:A-expm}
+Compute $e^{At}$ for the default altitude loop, $A = \begin{psmallmatrix}0 & 1\\ -10 & -7\end{psmallmatrix}$.
+
+\textbf{Step 1 — eigenvalues.} $\det(s\Id - A) = s^2 + 7s + 10 = (s + 2)(s + 5)$: $\lambda_1 = -2$, $\lambda_2 = -5$.
+
+\textbf{Step 2 — eigenvectors.} For a companion matrix they are $(1, \lambda)^\T$: $\symbf v_1 = (1, -2)^\T$, $\symbf v_2 = (1, -5)^\T$.
+
+\textbf{Step 3 — the matrices.} $V = \begin{pmatrix}1 & 1\\ -2 & -5\end{pmatrix}$, $\det V = -3$, $V^{-1} = \dfrac13\begin{pmatrix}5 & 1\\ -2 & -1\end{pmatrix}$.
+
+\textbf{Step 4 — multiply out} \cref{eq:A-diag}:
+\begin{equation*}
+  e^{At} = \frac13\begin{pmatrix}
+    5e^{-2t} - 2e^{-5t} & e^{-2t} - e^{-5t}\\[2pt]
+    -10e^{-2t} + 10e^{-5t} & -2e^{-2t} + 5e^{-5t}
+  \end{pmatrix} .
+\end{equation*}
+
+\textbf{Step 5 — check.} At $t = 0$ it is the identity. Its first column is the motion from $x_0 = 1$, $v_0 = 0$: the position $\tfrac13(5e^{-2t} - 2e^{-5t})$ and, below it, its derivative. The second column is the motion from a unit velocity.
+\end{example}
+
+\simfig{tb_phase}{Four matrices, four portraits: the solutions $e^{At}\vx_0$ of $\ddot x + c\,\dot x + k\,x = 0$ in the plane of position and velocity, computed from \cref{eq:A-expm}. With two real poles the curves line up along the eigenvectors (grey). With complex poles they spiral. Without damping they close. With a spring that pushes away, $k < 0$, one eigenvector leads in and the other out: a saddle.}{fig:A-phase}
+
+\subsection{Modes}
+Property (iii) has a picture (\cref{fig:A-phase}). If the state starts on an eigenvector, it stays on it and merely shrinks or grows: $\vx(t) = e^{\lambda t}\symbf v$. Such a motion is a \term{mode}. With $n$ independent eigenvectors every initial state is a combination $\vx_0 = \sum c_i\symbf v_i$, and then
+\begin{equation}
+  \vx(t) = \sum_i c_i\,e^{\lambda_i t}\,\symbf v_i .
+\end{equation}
+The modes do not interact; each runs at its own rate. In the top-left panel the fast mode ($\lambda = -5$) dies first, and every trajectory ends by sliding in along the slow eigenvector $(1, -2)^\T$: near the end of a response the velocity is always $-2$ times the distance to the setpoint. That is what a \emph{dominant pole} looks like in the plane.
+
+\section{The response to an input}
+
+\Cref{thm:meet-solution} gave the solution of $\dot{\vx} = A\vx + B\symbf u$:
+\begin{equation}\label{eq:A-voc}
+  \vx(t) = e^{At}\,\vx_0 + \int_0^t e^{A(t - s)}\,B\,\symbf u(s)\,\dd s .
+\end{equation}
+It is \cref{eq:A-conv1} with matrices, and it is derived the same way: multiply the equation by $e^{-At}$ and recognise $\frac{\dd}{\dd t}\big(e^{-At}\vx\big) = e^{-At}B\symbf u$. The name is \term{variation of constants}. The output is $\symbf y = C\vx$, so for a system at rest at $t = 0$
+\begin{equation}\label{eq:A-conv}
+  \symbf y(t) = \int_0^t h(t - s)\,\symbf u(s)\,\dd s, \qquad h(t) = C\,e^{At}B .
+\end{equation}
+The function $h$ is the \term{impulse response}: what the output does after a single, infinitely short push of unit area at $t = 0$. The integral is a \term{convolution}: every past input contributes the impulse response, shifted to its own time and scaled by its size.\recall{The discrete version is \cref{thm:noise-variance}: $z_k = \sum_j h_j\,n_{k-j}$. There $h_j$ was the response of a filter to one unit sample.}
+
+\begin{example}[A step of force, by the formula]
+\label{ex:A-step}
+The default loop of Example~\ref{ex:A-expm} is at rest at the setpoint when a constant force of \SI{1}{N} appears. Find $x(t)$.
+
+\textbf{Step 1 — the input matrix.} The force enters the acceleration: $B = (0, 1/m)^\T = (0, 1)^\T$, and $u = 1$.
+
+\textbf{Step 2 — the impulse response.} $e^{At}B$ is the second column of $e^{At}$; its first entry, the position, is $h(t) = \tfrac13\,(e^{-2t} - e^{-5t})$.
+
+\textbf{Step 3 — integrate.} With $\vx_0 = 0$ and $u = 1$, $x(t) = \int_0^t h(t - s)\,\dd s = \int_0^t h(\sigma)\,\dd\sigma$:
+\begin{equation*}
+  x(t) = \frac13\Big[\frac{1 - e^{-2t}}{2} - \frac{1 - e^{-5t}}{5}\Big] = 0.1 - \tfrac16\,e^{-2t} + \tfrac1{15}\,e^{-5t} .
+\end{equation*}
+
+\textbf{Step 4 — check.} $x(0) = 0.1 - 0.1667 + 0.0667 = 0$. For $t \to \infty$, $x \to \SI{0.1}{m}$: the droop $F/K_p$ of \lessonref{les:droop}. And the step response is the integral of the impulse response — a general fact, visible in Step~3.
+\end{example}
+
+\section{Controllability and observability}
+
+Two questions about \cref{eq:A-ss} decide what feedback can do at all. Can the input move the state wherever we want? And can the output tell us where the state is?
+
+\begin{definition}{Controllable, observable}
+The system \eqref{eq:A-ss} is \term{controllable} if for every pair of states $\vx_0$, $\vx_1$ and every time $t_1 > 0$ there is an input that takes the state from $\vx_0$ at $t = 0$ to $\vx_1$ at $t_1$. It is \term{observable} if the initial state $\vx_0$ can be computed from the input and the output over any interval $[0, t_1]$.
+\end{definition}
+
+\begin{theorem}[The rank tests]
+\label{thm:A-rank}
+For a system with $n$ states,
+\begin{align*}
+  \text{controllable} &\iff \operatorname{rank}\begin{pmatrix} B & AB & \cdots & A^{n-1}B\end{pmatrix} = n ,\\
+  \text{observable} &\iff \operatorname{rank}\begin{pmatrix} C^\T & (CA)^\T & \cdots & (CA^{n-1})^\T\end{pmatrix} = n .
+\end{align*}
+The second matrix is written on its side to save space: its transpose has the rows $C$, $CA$, \dots, $CA^{n-1}$.
+(Kálmán, 1960; Kailath, 1980, ch.~2.)
+\end{theorem}
+
+Why these matrices? By \cref{eq:A-voc,eq:A-expm} the input reaches the state only through $e^{A(t-s)}B$, a combination of $B$, $AB$, $A^2B$, \dots: $B$ is the direction the input pushes directly, $AB$ where that push is carried by the dynamics, and so on. Powers beyond $A^{n-1}$ add nothing new, because every matrix satisfies its own characteristic polynomial (the Cayley–Hamilton theorem), so $A^n$ is a combination of the lower powers. For observability, differentiate the output with $\symbf u = 0$: $\symbf y = C\vx$, $\dot{\symbf y} = CA\vx$, $\ddot{\symbf y} = CA^2\vx$, \dots. The output and its derivatives at one instant are the rows $C$, $CA$, \dots\ times the state; the state can be solved for exactly when those rows have rank $n$.
+
+\begin{example}[What the drone can be told, and what it can tell]
+\label{ex:A-rank}
+The L1 drone has $A = \begin{psmallmatrix}0 & 1\\ 0 & 0\end{psmallmatrix}$, $B = \begin{psmallmatrix}0\\ 1/m\end{psmallmatrix}$ and the state (altitude, velocity).
+
+\textbf{Step 1 — controllability.} $AB = (1/m, 0)^\T$, so $(B\ \ AB) = \begin{psmallmatrix}0 & 1/m\\ 1/m & 0\end{psmallmatrix}$: rank 2. One force steers both the altitude and the velocity.
+
+\textbf{Step 2 — an altimeter.} $C = (1\ \ 0)$ and $CA = (0\ \ 1)$: rank 2, observable. The velocity can be recovered from the altitude, by differentiating — which is what the D term does, and what the Kalman filter of Part~II does better.
+
+\textbf{Step 3 — a speed sensor alone.} $C = (0\ \ 1)$ and $CA = (0\ \ 0)$: rank 1, \emph{not} observable. From the velocity one can compute how far the drone has moved, never where it started. Every navigation system that integrates velocities or accelerations has this problem: its position drifts, and only a position measurement can correct it.
+
+\textbf{Step 4 — a system that is not controllable.} Two identical motors driven by the same command: $\dot x_1 = -x_1/\tau + u/\tau$, $\dot x_2 = -x_2/\tau + u/\tau$. Here $B = (1, 1)^\T/\tau$ and $AB = -(1, 1)^\T/\tau^2$: rank 1. The difference $x_1 - x_2$ obeys $\frac{\dd}{\dd t}(x_1 - x_2) = -(x_1 - x_2)/\tau$, with no input in it at all. It cannot be steered. To turn, a multicopter needs motors with separate commands.
+\end{example}
+
+The rank tests say yes or no. How \emph{well} a system can be controlled or observed — with how much effort, with how much noise — is a matter of degree, and the tools for it (Gramians, singular values) are in Appendix~I and Lesson~III.9.
+
+\begin{result}[Appendix A at a glance]
+\begin{center}\small
+\renewcommand{\arraystretch}{1.4}
+\begin{tabularx}{\linewidth}{@{}l>{\raggedright\arraybackslash}X@{}}
+first order & $\tau\dot x + x = u_0$: \quad $x = u_0 + (x_0 - u_0)\,e^{-t/\tau}$\\
+order $n$ & try $e^{st}$; the poles are the roots of the characteristic polynomial; a root of multiplicity $\mu$ contributes $e^{st}, t\,e^{st}, \dots, t^{\mu-1}e^{st}$\\
+forcing $e^{\lambda t}$ & steady response $e^{\lambda t}/p(\lambda)$; for $\sin\omega t$ use $\lambda = j\omega$ and take the imaginary part\\
+state space & $\dot{\vx} = A\vx + B\symbf u$, $\symbf y = C\vx$; poles $=$ eigenvalues of $A$\\
+solution & $\vx(t) = e^{At}\vx_0 + \int_0^t e^{A(t-s)}B\symbf u(s)\,\dd s$\\
+$e^{At}$ & $V\diag(e^{\lambda_it})V^{-1}$ if $A = V\Lambda V^{-1}$; \ $\Id + At$ if $A^2 = 0$\\
+controllable & $\operatorname{rank}(B\ \ AB\ \cdots\ A^{n-1}B) = n$\\
+observable & $\operatorname{rank}(C;\ CA;\ \dots;\ CA^{n-1}) = n$\\
+\end{tabularx}
+\end{center}
+\end{result}

@@ -13,6 +13,7 @@ import figs_theory  # noqa: F401  (registers figures)
 import figs_part1  # noqa: F401
 import figs_part2  # noqa: F401
 import figs_predict  # noqa: F401
+import figs_math  # noqa: F401
 
 
 def build(name):

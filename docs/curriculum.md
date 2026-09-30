@@ -160,20 +160,31 @@ runs, because every figure in the book is flown by the simulator
 ### 5.2 Mathematical toolbox
 
 The preface promises that every tool beyond a bachelor's degree is
-collected at the end. The appendix (`book/back/math.tex`) is planned as:
+collected at the end. The toolbox (`book/back/math.tex`, one file per
+appendix in `book/back/toolbox/`) is a short course, not a formula sheet:
+each appendix runs to about ten pages, states its theorems with a proof or
+a source, works two or three examples with the drone's numbers, and lists
+the lessons that use it. It has no exercises.
 
-| Appendix | Content                                                                      | First needed |
-| -------- | ---------------------------------------------------------------------------- | ------------ |
-| A        | Complex numbers, the Laplace transform, transfer functions                   | lesson 9     |
-| B        | Linear differential equations, state space, the matrix exponential           | lesson 2     |
-| C        | Routh–Hurwitz, root-locus rules                                              | lesson 5     |
-| D        | Linear algebra: eigenvalues, singular values, positive definiteness, Riccati | II.2         |
-| E        | Sampling and the z-transform                                                 | lesson 9     |
-| F        | Probability, random processes, spectra, least squares                        | lesson 8     |
-| G        | Rotations, quaternions, SO(3)                                                | lesson 12    |
-| H        | Optimisation: convexity, KKT conditions, quadratic and cone programs         | II.13        |
-| I        | Calculus of variations                                                       | IV.1         |
-| J        | Norms of signals and systems                                                 | III.11       |
+The letters are fixed for the whole course and follow the order of first
+use. An appendix is written in full for the parts its volume contains;
+material that only later parts need is added now only where it is short
+and completes the subject, and otherwise with the volume that needs it.
+
+| Appendix | Content                                                                             | First needed | Volume | Grows with                                |
+| -------- | ----------------------------------------------------------------------------------- | ------------ | ------ | ----------------------------------------- |
+| A        | Linear differential equations, state space, the matrix exponential                  | lesson 2     | 1      | —                                         |
+| B        | Polynomials and stability: Routh–Hurwitz, root-locus rules                          | lesson 5     | 1      | —                                         |
+| C        | Complex numbers, Fourier series, the Laplace transform, transfer functions, Nyquist | lesson 8     | 1      | Bode relations (III.5)                    |
+| D        | Sampling and the z-transform                                                        | lesson 9     | 1      | multirate loops (III.18)                  |
+| E        | Probability, random processes, spectra, least squares                               | lesson 8     | 1      | Bayesian estimation (III.24, IV.27–IV.29) |
+| F        | Numerical methods                                                                   | lesson 1     | 1      | collocation (IV.6), fixed point (V.3)     |
+| G        | Stability of nonlinear systems: Lyapunov, invariance, time scales                   | lesson 2     | 1      | describing function (III.8)               |
+| H        | Rotations and quaternions                                                           | lesson 12    | 1      | the error state of the MEKF (III.23)      |
+| I        | Linear algebra: singular values, positive definiteness, the Riccati equation        | II.2         | 1      | — (written with Part II)                  |
+| J        | Optimisation: convexity, KKT conditions, quadratic and cone programs                | II.13        | 1      | — (written with Part II)                  |
+| K        | Norms of signals and systems                                                        | III.11       | 2      | —                                         |
+| L        | Calculus of variations and dynamic programming                                      | IV.1         | 3      | —                                         |
 
 ### 5.3 State of volume 1, verified 2026-09-30
 
@@ -199,7 +210,7 @@ eleven seconds.
 | --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
 | 1   | Lessons 5–14 had no worked example and three to five exercises each, over five to seven pages. They did not meet §4.                                           | fixed (rewritten to the level of 1–4)               |
 | 2   | Part II is a title page followed by nothing; its five chapter files are stubs. The cover promises thirty-five lessons.                                         | open: 21 chapters to write                          |
-| 3   | The mathematical toolbox and the app map are stubs. Ten cross-references print as "??" (four to appendices, six to Part II lessons). The references now exist. | open: appendices A–H for volume 1                   |
+| 3   | The mathematical toolbox and the app map are stubs. Ten cross-references print as "??" (four to appendices, six to Part II lessons). The references now exist. | open: appendices A–J for volume 1                   |
 | 4   | The check marks of the _What to remember_ boxes were missing: the math font has no such glyph.                                                                 | fixed (drawn with TikZ)                             |
 | 5   | `main.tex` and `scripts/book-data.ts` referred to `make book`, `make book-data` and `book/README.md`, none of which existed.                                   | fixed (three make targets, the README)              |
 | 6   | The imprint named a script `book/tools/figures` that does not exist.                                                                                           | fixed                                               |
@@ -216,7 +227,7 @@ Findings 1–3 are writing work and belong to the book's own schedule.
    ([analysis.md](analysis.md) §5). Everything later uses its charts and
    its Monte Carlo runner.
 2. **Volume 1 of the book to the standard of §4**: lessons 5–14, Part II,
-   appendices A–H.
+   appendices A–J (A–H first, I and J with Part II).
 3. **The rest of Part III**, then volume 2.
 4. **M19, the vehicle abstraction**, then the must lessons of Part IV,
    then Part V ([aerospace-gnc.md](aerospace-gnc.md) §5).

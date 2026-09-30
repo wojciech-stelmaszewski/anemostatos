@@ -14,7 +14,7 @@ import { cabs } from '@/math/complex';
 import { logspace, margins, type Margins } from '@/math/margins';
 import { robustTest } from '@/analysis/uncertainty';
 import { v3 } from '@/math/vec3';
-import type { Params } from '@/sim/params';
+import { GRAVITY, type Params } from '@/sim/params';
 import { Notice, Try } from './Bits';
 import { M } from './Math';
 import { setAt } from './script';
@@ -69,6 +69,15 @@ const criticalGyroDelay = (p: Params): number => {
 
 /** The IMU rate lesson III.20 starts with, Hz: too slow for rotors at 110 Hz. */
 const SLOW_IMU_HZ = 100;
+
+/** The manoeuvre of lesson III.22: hover, then four laps of a circle. */
+const TURN = { radius: 3, period: 5, start: 10, end: 30 };
+/** By how many per cent the accelerometer reads more than 1 g in the steady turn. */
+const turnExcess = (p: Params): number => {
+  const w = (2 * Math.PI) / p.setpoint.profilePeriod;
+  const a = p.setpoint.profileAmplitude * w * w;
+  return (Math.hypot(1, a / GRAVITY) - 1) * 100;
+};
 
 /** Half the peak-to-peak swing of the altitude over the last `seconds`. */
 const swing = (sim: Simulation, seconds: number): number => {
@@ -867,6 +876,101 @@ export const PART_THREE: Lesson[] = [
           (lower Q) costs phase, like the low-pass. The RPM filter needs one thing the others do
           not: a measurement of each rotor's speed. With it, the notch can be narrow, and the phase
           it costs at crossover is about one degree.
+        </Notice>
+      </>
+    ),
+  },
+  {
+    id: 'attitude',
+    n: 22,
+    part: 3,
+    chapter: I,
+    title: 'Where is up?',
+    level: 3,
+    chart: 'attitude',
+    loop: 'att.roll',
+    setup: (p) => {
+      calm(p);
+      p.control.l3.outer = 'geometric';
+      p.sensors.attitude = 'complementary';
+      p.sensors.gyroBias = { x: 1, y: 0, z: -0.5 };
+      p.control.ahrs = { tau: 1, kp: 1, ki: 0.3, gate: 0 };
+      p.setpoint.profileAmplitude = TURN.radius;
+      p.setpoint.profilePeriod = TURN.period;
+    },
+    events: (sim) => {
+      setAt(sim, TURN.start, 'setpoint.profile', 'circle');
+      setAt(sim, TURN.end, 'setpoint.profile', 'none');
+    },
+    predict: {
+      label: 'Accelerometer reading in the turn, above 1 g',
+      unit: '%',
+      truth: turnExcess,
+      tolerance: 0.1,
+    },
+    goal: {
+      text: 'Predict by how much the accelerometer reads more than 1 g in the turn. Then fly the whole manoeuvre, ten seconds of hover and four laps, with the estimated "up" never more than 2° from the true one.',
+      check: ({ sim, prediction }) => {
+        if (sim.params.sensors.attitude === 'truth')
+          return 'fly on an estimate: the true attitude is not available to a real controller';
+        if (prediction == null)
+          return 'first the prediction: centripetal acceleration v²/r, then the length of the specific force';
+        const truth = turnExcess(sim.params);
+        if (Math.abs(prediction - truth) / truth > 0.1)
+          return 'not within 10 %: the accelerometer reads √(g² + a²), with a = v²/r';
+        if (sim.state.crashed) return 'crashed: press R to fly again';
+        if (sim.t < TURN.end + 2) return 'flying…';
+        const { series } = sim.telemetry.window(['ahrs.err'], TURN.start);
+        const worst = Math.max(...series[0]!.filter((v) => !Number.isNaN(v)));
+        return worst < 2 || `largest error ${worst.toFixed(1)}°: press R to fly it again`;
+      },
+    },
+    solution: (p) => {
+      p.sensors.attitude = 'mahony';
+      p.control.ahrs.gate = 0.03;
+    },
+    body: (
+      <>
+        <p>
+          Every lesson so far handed the controller the true attitude. A real one has two sensors
+          and neither knows where up is. The <b>gyro</b> measures how fast the body turns:
+          integrated, it follows every motion, and its bias (here 1 °/s) grows into an error of a
+          degree per second. The <b>accelerometer</b> measures every force except gravity. At rest
+          that is the push that holds the drone up, so it points up. In a turn it is the thrust, and
+          the thrust points wherever the drone does.
+        </p>
+        <p>
+          A <b>complementary filter</b> believes the gyro for anything faster than its time constant{' '}
+          <M>{'\\tau'}</M> and the accelerometer for anything slower. That leaves two errors which
+          pull in opposite directions:
+        </p>
+        <M display>
+          {
+            'e_{bias} \\approx b\\,\\tau \\qquad\\qquad e_{turn} \\approx \\frac{\\theta}{\\sqrt{1 + (\\Omega\\tau)^2}}'
+          }
+        </M>
+        <p>
+          with <M>{'\\theta'}</M> the tilt in a turn that goes round at <M>{'\\Omega'}</M> rad/s.
+          The <b>Mahony filter</b> is the same blend with two additions. An error that stays is
+          taken for a gyro bias and subtracted (the integral gain). And the accelerometer is used
+          only while it reads close to 1 g (the gate), because a reading of another length cannot be
+          gravity alone.
+        </p>
+        <Try>
+          The drone hovers for ten seconds, then flies four laps of a 3 m circle in 5 s each. Watch
+          the error with the complementary filter, then press <b>R</b> with other values of{' '}
+          <b>Attitude estimate → τ</b>: 0.5, 2, 5, 10 s. No value reaches 2°. Switch to the Mahony
+          filter: the bias is gone before the turn starts, and the turn still fools it. Compute how
+          long the accelerometer's reading is in the turn, enter it, and set the <b>gate</b> well
+          below that: on the way into the turn and out of it the reading passes through every length
+          in between.
+        </Try>
+        <Notice>
+          With the gate closed the filter flies the turn on the gyro alone, so everything rests on
+          the bias it learned in the ten seconds of hover: a filter that is switched on in the
+          middle of a manoeuvre has nothing to learn from. And a gate cannot help in a turn that
+          never ends. For that the filter needs to know the acceleration itself, from a velocity
+          measurement, which is what a navigation filter adds (lesson III.24).
         </Notice>
       </>
     ),

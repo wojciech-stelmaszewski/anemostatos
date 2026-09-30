@@ -149,6 +149,9 @@ motor lag.
 | III.9  | What the filter can't see  | L1    | observability: a state no data can reveal, and a filter honest about it          |
 | III.11 | How wrong can I be?        | L1    | a family of plants, the small-gain test, and sixty drones flown to check it      |
 | III.12 | One loop at a time lies    | L3    | roll and pitch as one loop: singular values, eigen-loops and the disk margin     |
+| III.20 | Ghost frequencies          | L3    | aliasing: rotor vibration sampled too slowly becomes a wobble no filter removes  |
+| III.21 | Notch the noise            | L3    | low-pass, notch and RPM-tracking notch: what each costs in phase margin          |
+| III.22 | Where is up?               | L3    | attitude from gyro and accelerometer: complementary and Mahony filters in a turn |
 
 ## Run it
 

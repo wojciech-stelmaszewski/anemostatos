@@ -1,9 +1,16 @@
 import { Rng } from '@/math/prng';
 import { qConj, qFromAxisAngle, qMul, qRotate, type Quat } from '@/math/quat';
 import { add, clone, v3, type Vec3 } from '@/math/vec3';
+import { AttitudeFilter, type AttitudeGains } from '@/estimation/attitude';
 import { LowPass2 } from '@/estimation/filters';
 import type { DroneState } from './dynamics';
-import { GRAVITY, type DroneParams, type SensorParams, type VibrationParams } from './params';
+import {
+  GRAVITY,
+  type AhrsParams,
+  type DroneParams,
+  type SensorParams,
+  type VibrationParams,
+} from './params';
 import { Vibration } from './vibration';
 
 /** What the controller gets to see. An idealised state estimate plus optional imperfections. */
@@ -47,8 +54,16 @@ export interface ImuContext {
   sensors: SensorParams;
   vibration: VibrationParams;
   drone: DroneParams;
+  /** Settings of the attitude filter, which runs on the IMU's output. */
+  ahrs: AhrsParams;
   dt: number;
 }
+
+/** Gains of the selected attitude filter: the complementary filter is Mahony's without bias or gate. */
+export const attitudeGains = (kind: SensorParams['attitude'], a: AhrsParams): AttitudeGains =>
+  kind === 'mahony'
+    ? { kp: a.kp, ki: a.ki, gate: a.gate }
+    : { kp: 1 / Math.max(a.tau, 1e-3), ki: 0, gate: 0 };
 
 export class Sensors {
   private vib = new Vibration();
@@ -57,6 +72,9 @@ export class Sensors {
   /** The IMU's last sample and the physics steps since it was taken. */
   private imuHeld: { omega: Vec3; acc: Vec3 } | null = null;
   private imuAge = 0;
+  /** The attitude filter of the flight computer; it runs while `sensors.attitude` asks for it. */
+  readonly ahrs = new AttitudeFilter();
+  private ahrsOn = false;
   private history: Measurement[] = [];
   private head = 0;
   private rng: Rng;
@@ -85,10 +103,17 @@ export class Sensors {
    */
   private imuFrontEnd(m: Measurement, s: DroneState, c: ImuContext): void {
     const shaking = c.vibration.gyroDeg > 0 || c.vibration.acc > 0;
-    const { imuRateHz, aaFilterHz } = c.sensors;
-    if (!shaking && imuRateHz <= 0 && aaFilterHz <= 0) return;
+    const { imuRateHz, aaFilterHz, gyroBias: b } = c.sensors;
+    const biased = b.x !== 0 || b.y !== 0 || b.z !== 0;
+    const estimating = c.sensors.attitude !== 'truth';
+    if (!estimating) this.ahrsOn = false;
+    if (!shaking && !biased && !estimating && imuRateHz <= 0 && aaFilterHz <= 0) return;
     let omega = m.omega;
     let acc = m.acc;
+    if (biased) {
+      const k = Math.PI / 180;
+      omega = add(omega, v3(b.x * k, b.y * k, b.z * k));
+    }
     if (shaking) {
       const v = this.vib.step(s.rotors, c.drone, c.vibration, c.dt);
       omega = add(omega, v.gyro);
@@ -116,6 +141,15 @@ export class Sensors {
     }
     m.omega = clone(omega);
     m.acc = clone(acc);
+    if (estimating) {
+      // Start from the truth (a drone is levelled before take-off), then run on the IMU alone,
+      // with an ideal compass for the heading.
+      if (!this.ahrsOn) this.ahrs.reset(s.q);
+      this.ahrsOn = true;
+      const north = qRotate(qConj(s.q), v3(1, 0, 0));
+      const g = attitudeGains(c.sensors.attitude, c.ahrs);
+      m.q = { ...this.ahrs.update(omega, acc, north, g, GRAVITY, c.dt) };
+    }
   }
 
   /** Delayed, biased, noisy reading of the recorded state at simulation time t. */
@@ -169,5 +203,7 @@ export class Sensors {
     for (const f of this.aa) f.reset();
     this.imuHeld = null;
     this.imuAge = 0;
+    this.ahrs.reset();
+    this.ahrsOn = false;
   }
 }

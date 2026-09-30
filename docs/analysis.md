@@ -1,9 +1,9 @@
 # Part III — Why It Works
 
 > **Status (2026-09-30):** M13 (the foundations) and the first pass of M14
-> (lessons III.1–III.5), of M15 (III.7, III.9) and of M16 (III.11, III.12) are
-> implemented; §5 lists what was built and where it differs from this plan.
-> The rest of M14–M16 and M17–M18 are planned.
+> (lessons III.1–III.5), of M15 (III.7, III.9), of M16 (III.11, III.12) and
+> of M17 (III.20–III.22) are implemented; §5 lists what was built and where
+> it differs from this plan. The rest of M14–M17 and M18 are planned.
 > Milestones in [roadmap.md](roadmap.md) point here.
 > Extended on 2026-09-30 from 20 to 30 lessons, so that Parts I–III together
 > cover the analysis and robustness material of a graduate control course
@@ -685,6 +685,58 @@ coupled roll–pitch model. Second pass: `care.ts` and `hinf.ts`, `mu.ts`,
 portrait.
 
 ### M17 — Chapter I (III.18–III.26)
+
+**First pass built (2026-09-30): III.20, III.21 and III.22.**
+
+- `sim/vibration.ts`: one tone per motor at its rotor frequency,
+  $f_i = f_{hover}\sqrt{T_i/T_{hover}}$, with an amplitude that grows
+  with the thrust (`vibration.gyroDeg`, `vibration.acc`,
+  `vibration.hoverHz`). The default hover frequency is 110 Hz, not the
+  180 Hz of §4: it suits a 1 kg drone with 8-inch propellers.
+- The IMU front end runs at the physics rate inside `sim/sensors.ts`:
+  truth, plus gyro bias and vibration, through the anti-alias filter
+  (`sensors.aaFilterHz`, two poles rather than one), then sample-and-hold
+  (`sensors.imuRateHz`). Quantisation is left for III.19.
+- `control/gyrofilter.ts`: a low-pass, a fixed notch, or one notch per
+  motor that follows its speed from the motor telemetry
+  (`control.gyroFilter`). `estimation/filters.ts` has the biquad sections
+  and their frequency response.
+- The rate-loop model of `analysis/mimo.ts` includes the whole gyro chain
+  (anti-alias filter, hold, low-pass, notches), so every filter's cost is
+  read as phase margin. It matches the flown $S$ within 3 %.
+- `engine/tap.ts` records four signals at 1 kHz for eight seconds: the
+  true roll rate, the gyro reading, the reading after the filters and one
+  motor command. The ordinary telemetry (200 Hz) would alias them. The
+  **spectrum chart** draws them, with the rotor frequency and the IMU's
+  Nyquist frequency marked.
+- III.20 samples 110 Hz rotors at 100 Hz: a 10 Hz ghost. The student
+  predicts the frequency. The goal measures the ghost as the part of the
+  gyro reading below 60 Hz that is not motion, and asks for 40° of margin,
+  which rules out a heavy anti-alias filter on a slow IMU.
+- III.21 flies a sine in altitude instead of throttle steps: the tone
+  moves from below 90 Hz to almost 130 Hz and the baseline motor jitter is small and
+  smooth. A low-pass that reaches the goal costs 8° of margin, the fixed
+  notch lets most of the tone through, the RPM notch reaches the
+  no-vibration baseline for one degree.
+- `estimation/attitude.ts`: the complementary filter on the rotation
+  group in Mahony's explicit form. "Complementary" is that filter with a
+  gain $1/\tau$ and nothing else; "Mahony" adds the bias integrator and a
+  gate on the length of the accelerometer reading. The heading comes from
+  an ideal compass; the magnetometer model waits for III.23.
+- `sensors.attitude` selects what the controller flies on; the filter
+  runs in the IMU front end. `sensors.gyroBias` is a constant bias.
+- III.22 hovers for ten seconds and then flies four laps of a 3 m circle
+  with the geometric controller (the PID cascade lags a circle by
+  metres). The accelerometer of a multirotor reads the thrust, which
+  points along the body, so in the turn it reports "level". No time
+  constant of the complementary filter gets below 8° (bias error
+  $b\tau$ against turn error $\theta/\sqrt{1+(\Omega\tau)^2}$). Mahony
+  without the gate is fooled as well; with a gate of 1–3 % it stays
+  under 2°. The student predicts the 11 % by which the reading exceeds
+  1 g. A gate just under that value fails, because the reading passes
+  through every length on the way into and out of the turn.
+
+**Still to build:** III.18, III.19, III.23–III.26.
 
 First pass: vibration model, IMU sample rate and anti-alias pole, notch
 and RPM notch bank, `attitude.ts`, gyro bias, magnetometer. Second pass:

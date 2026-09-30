@@ -28,6 +28,7 @@ const EXTRA: { value: ExtraChart; label: string }[] = [
   { value: 'covariance', label: 'filter uncertainty' },
   { value: 'mimo', label: 'two channels at once' },
   { value: 'spectrum', label: 'spectrum' },
+  { value: 'attitude', label: 'attitude estimate' },
 ];
 /** What can stand in the motor chart's place. */
 const SECOND: { value: AnalysisChart | 'motors'; label: string }[] = [
@@ -36,6 +37,12 @@ const SECOND: { value: AnalysisChart | 'motors'; label: string }[] = [
   { value: 'nyquist', label: 'Nyquist plot' },
   { value: 'poles', label: 'pole map' },
   { value: 'covariance', label: 'filter uncertainty' },
+];
+/** How far the attitude filter's "up" is from the true one, next to the tilt itself. */
+const ATTITUDE: SeriesSpec[] = [
+  { key: 'ahrs.tilt', label: 'true tilt', color: SIGNAL.truth, width: 1.5 },
+  { key: 'ahrs.tiltHat', label: 'estimated tilt', color: SIGNAL.measurement, width: 1.5 },
+  { key: 'ahrs.err', label: 'error', color: SIGNAL.error, width: 2 },
 ];
 /** 1σ of each state of the altitude filter, from its own covariance matrix. */
 const COVARIANCE: SeriesSpec[] = [
@@ -255,6 +262,14 @@ export function ChartsPanel() {
           analysisChart(extra)
         ) : extra === 'phase' ? (
           <PhasePortrait meta={meta} />
+        ) : extra === 'attitude' ? (
+          <TimeChart
+            title="Attitude estimate (shaded: accelerometer ignored)"
+            unit="°"
+            series={ATTITUDE}
+            shadeKey="ahrs.gated"
+            includeZero
+          />
         ) : extra === 'estimate' ? (
           <TimeChart title="Altitude: estimate vs truth" unit="m" series={ESTIMATE} />
         ) : extra === 'disturbance' ? (

@@ -68,6 +68,24 @@ export interface SensorParams {
   imuRateHz: number;
   /** Analog anti-alias filter in front of the IMU's sampler (two poles), Hz. 0 = none. */
   aaFilterHz: number;
+  /** Constant gyro bias, deg/s, body frame. */
+  gyroBias: { x: number; y: number; z: number };
+  /**
+   * Where the attitude the controller flies on comes from (L3): the true one, or an estimate
+   * from the gyro and the accelerometer (docs/analysis.md §3.4).
+   */
+  attitude: 'truth' | 'complementary' | 'mahony';
+}
+
+/** Settings of the attitude filters (src/estimation/attitude.ts). */
+export interface AhrsParams {
+  /** Complementary filter: time constant of the blend between gyro and accelerometer, s. */
+  tau: number;
+  /** Mahony: proportional gain, rad/s, and bias adaptation gain, 1/s². */
+  kp: number;
+  ki: number;
+  /** Mahony: ignore the accelerometer while its magnitude is off 1 g by more than this fraction. */
+  gate: number;
 }
 
 /** Rotor vibration on the IMU (docs/analysis.md §3.4). Off while both amplitudes are zero. */
@@ -142,6 +160,7 @@ export interface ControlParams {
   feedforward: boolean;
   model: ModelParams;
   gyroFilter: GyroFilterParams;
+  ahrs: AhrsParams;
   l1: { kind: L1Kind; estimator: L1Estimator };
   /** L1 LQR / LQI (docs/beyond-pid.md §4). Cost weights of J = Σ (q·x² + r·u²)·dt. */
   lqr: {
@@ -366,6 +385,8 @@ export const defaultParams = (): Params => ({
     imuYawDeg: 0,
     imuRateHz: 0,
     aaFilterHz: 0,
+    gyroBias: { x: 0, y: 0, z: 0 },
+    attitude: 'truth',
   },
   vibration: { gyroDeg: 0, acc: 0, hoverHz: 110 },
   control: {
@@ -373,6 +394,7 @@ export const defaultParams = (): Params => ({
     feedforward: true,
     model: { mass: 1.0, inertiaScale: 1, motorTau: 0.03, imuYawDeg: 0 },
     gyroFilter: { lpfHz: 0, notch: 'off', notchHz: 110, notchQ: 4 },
+    ahrs: { tau: 1, kp: 1, ki: 0.3, gate: 0.05 },
     l1: { kind: 'pid', estimator: 'none' },
     lqr: { qPos: 100, qVel: 10, qInt: 5, r: 1, integral: false, lagState: false },
     adrc: { wc: 3, wo: 15 },

@@ -1,6 +1,7 @@
 import { controllerKey, makeController } from '@/control/registry';
 import type { Controller, LoopTerms, Setpoint } from '@/control/types';
-import { qFromAxisAngle, qToEuler, type Quat } from '@/math/quat';
+import { tiltError } from '@/estimation/attitude';
+import { qFromAxisAngle, qRotate, qToEuler, type Quat } from '@/math/quat';
 import { clone, length, scale, sub, add, v3, type Vec3 } from '@/math/vec3';
 import { ARM_LENGTH, FOOT_HEIGHT } from '@/sim/drone';
 import {
@@ -313,6 +314,7 @@ export class Simulation {
       sensors: p.sensors,
       vibration: p.vibration,
       drone: p.drone,
+      ahrs: p.control.ahrs,
       dt,
     });
 
@@ -434,6 +436,15 @@ export class Simulation {
     tl.set('wind.speed', length(this.wind.velocity));
     tl.set('gust', length(this.wind.gustVelocity));
     tl.set('drag.y', this.forces.drag.y);
+    if (this.level === 3 && this.params.sensors.attitude !== 'truth') {
+      const f = this.sensors.ahrs;
+      tl.set('ahrs.err', tiltError(s.q, f.q) * DEG);
+      tl.set('ahrs.tilt', Math.acos(Math.min(1, qRotate(s.q, v3(0, 1, 0)).y)) * DEG);
+      tl.set('ahrs.tiltHat', Math.acos(Math.min(1, qRotate(f.q, v3(0, 1, 0)).y)) * DEG);
+      tl.set('ahrs.bias.x', f.bias.x * DEG);
+      tl.set('ahrs.bias.z', f.bias.z * DEG);
+      tl.set('ahrs.gated', f.trusted ? 0 : 1);
+    }
     if (this.measurement) {
       const m = this.measurement;
       tl.set('meas.x', m.pos.x);

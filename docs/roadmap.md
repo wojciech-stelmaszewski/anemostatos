@@ -1,7 +1,7 @@
 # Roadmap
 
 > **Status (2026-09-30):** M0–M12 are implemented: Part I (PID) and Part II (beyond PID) are complete. What changed against the
-> original plan is noted under each milestone. M13–M26 (Parts III–V) are planned.
+> original plan is noted under each milestone. M13 (the foundations of Part III) is implemented; M14–M26 are planned.
 
 Built in small milestones; each ends with something runnable and useful.
 The order is chosen so that the **educational core (L1 altitude loop with
@@ -126,7 +126,7 @@ lessons (III.1–III.30). Gap audit, design and lesson plan:
 
 | Milestone | Content                                                                                                                 |
 | --------- | ----------------------------------------------------------------------------------------------------------------------- |
-| M13       | Foundations: LTI toolbox, linear models, probe points and sweeps, Bode / Nyquist / pole–zero charts                     |
+| M13 ✅    | Foundations: LTI toolbox, linear models, probe points and sweeps, Bode / Nyquist / pole–zero charts                     |
 | M14       | Chapter F: poles, margins, delay, sensitivity, loop shaping — lessons III.1–III.6                                       |
 | M15       | Chapter G: Lyapunov, describing functions, observability, LQG — lessons III.7–III.10                                    |
 | M16       | Chapter H: uncertainty, small gain, MIMO margins, H∞, μ, sliding mode, backstepping, MRAC — lessons III.11–III.17       |

@@ -18,6 +18,7 @@ export function startLesson(lesson: Lesson): void {
   const ui = useUi.getState();
   ui.setLoop(lesson.loop ?? DEFAULT_LOOP[lesson.level]);
   ui.setExtraChart(lesson.chart ?? 'wind');
+  ui.setSecondChart(lesson.chart2 ?? null);
   ui.setLesson(lesson.id);
   if (ui.paused) ui.setPaused(false);
 }

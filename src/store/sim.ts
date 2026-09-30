@@ -7,7 +7,10 @@ export const sim = new Simulation(useParams.getState().params);
 useParams.subscribe((s) => sim.setParams(s.params));
 
 /** What the bottom-right chart slot shows. */
-export type ExtraChart = 'wind' | 'disturbance' | 'phase' | 'estimate';
+export type ExtraChart =
+  'wind' | 'disturbance' | 'phase' | 'estimate' | 'bode' | 'nyquist' | 'poles';
+/** The analysis views of Part III, which can also take the place of the motor chart. */
+export type AnalysisChart = 'bode' | 'nyquist' | 'poles';
 
 export type CameraMode = 'orbit' | 'follow' | 'side' | 'top';
 
@@ -26,6 +29,8 @@ interface UiStore {
   window: number;
   loop: string;
   extraChart: ExtraChart;
+  /** A second analysis view, shown instead of the motor chart (docs/analysis.md §3.6). */
+  secondChart: AnalysisChart | null;
   camera: CameraMode;
   overlays: Overlays;
   panelsHidden: boolean;
@@ -36,6 +41,7 @@ interface UiStore {
   setWindow: (w: number) => void;
   setLoop: (l: string) => void;
   setExtraChart: (c: ExtraChart) => void;
+  setSecondChart: (c: AnalysisChart | null) => void;
   setCamera: (c: CameraMode) => void;
   toggleOverlay: (k: keyof Overlays) => void;
   togglePanels: () => void;
@@ -47,6 +53,7 @@ export const useUi = create<UiStore>((set) => ({
   window: 10,
   loop: 'alt',
   extraChart: 'wind',
+  secondChart: null,
   camera: 'follow',
   overlays: {
     forces: true,
@@ -70,6 +77,7 @@ export const useUi = create<UiStore>((set) => ({
   setWindow: (window) => set({ window }),
   setLoop: (loop) => set({ loop }),
   setExtraChart: (extraChart) => set({ extraChart }),
+  setSecondChart: (secondChart) => set({ secondChart }),
   setCamera: (camera) => set({ camera }),
   toggleOverlay: (k) => set((s) => ({ overlays: { ...s.overlays, [k]: !s.overlays[k] } })),
   togglePanels: () => set((s) => ({ panelsHidden: !s.panelsHidden })),

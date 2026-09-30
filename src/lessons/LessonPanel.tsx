@@ -44,6 +44,7 @@ function Goal({ lesson }: { lesson: Lesson }) {
 const PARTS: { part: Part; label: string; prefix: string }[] = [
   { part: 1, label: 'Part I · PID', prefix: '' },
   { part: 2, label: 'Part II · Beyond PID', prefix: 'II.' },
+  { part: 3, label: 'Part III · Why it works', prefix: 'III.' },
 ];
 const partOf = (l: Lesson): Part => l.part ?? 1;
 
@@ -105,13 +106,15 @@ export function LessonPanel() {
                   const first = LESSONS.find((l) => partOf(l) === p.part);
                   if (first) setLesson(first.id);
                 }}
-                className={`flex-1 rounded border px-2 py-0.5 text-[11px] font-semibold transition-colors ${
+                title={p.label}
+                className={`flex-1 rounded border px-1.5 py-0.5 text-[11px] leading-tight transition-colors ${
                   p.part === part
                     ? 'border-accent/60 bg-accent/10 text-fg'
                     : 'border-border text-muted hover:text-fg'
                 }`}
               >
-                {p.label}
+                <span className="block font-semibold">{p.label.split(' · ')[0]}</span>
+                <span className="block text-[10px] opacity-80">{p.label.split(' · ')[1]}</span>
               </button>
             ))}
           </div>
@@ -142,6 +145,22 @@ export function LessonPanel() {
                 <Goal key={lesson.id} lesson={lesson} />
               </div>
             </>
+          ) : part === 3 ? (
+            <div className="space-y-1.5 text-muted">
+              <p className="text-fg">The third semester is being built.</p>
+              <p>
+                Parts I and II were about design. Part III is about analysis: how far a loop is from
+                instability, which frequencies it rejects and which it amplifies, what it does when
+                the model is wrong — each prediction drawn next to the same quantity flown by the
+                simulator.
+              </p>
+              <p>
+                Its instruments are already here, on Level 1: the <b>Bode plot</b>, the{' '}
+                <b>Nyquist plot</b> and the <b>pole map</b> (chart header → extra, and → beside it),
+                the <b>Measure</b> button on the Bode plot, and the <b>Probe</b> group at the end of
+                the parameter panel.
+              </p>
+            </div>
           ) : (
             <div className="space-y-1.5 text-muted">
               <p className="text-fg">The second semester is being written.</p>

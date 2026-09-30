@@ -1,7 +1,10 @@
 import { useMemo, useRef } from 'react';
 import { controllerKey } from '@/control/registry';
 import { useParams } from '@/store/params';
-import { sim, useUi, type ExtraChart } from '@/store/sim';
+import { sim, useUi, type AnalysisChart, type ExtraChart } from '@/store/sim';
+import { BodeChart } from '@/ui/analysis/BodeChart';
+import { NyquistChart } from '@/ui/analysis/NyquistChart';
+import { PoleMap } from '@/ui/analysis/PoleMap';
 import { useRaf } from '@/ui/hud/useRaf';
 import { partColor, SIGNAL } from '@/ui/colors';
 import { Select } from '@/ui/components/select';
@@ -16,7 +19,25 @@ const EXTRA: { value: ExtraChart; label: string }[] = [
   { value: 'disturbance', label: 'disturbance' },
   { value: 'phase', label: 'phase portrait' },
   { value: 'estimate', label: 'estimate vs truth' },
+  { value: 'bode', label: 'Bode plot' },
+  { value: 'nyquist', label: 'Nyquist plot' },
+  { value: 'poles', label: 'pole map' },
 ];
+/** What can stand in the motor chart's place. */
+const SECOND: { value: AnalysisChart | 'motors'; label: string }[] = [
+  { value: 'motors', label: 'motor thrust' },
+  { value: 'bode', label: 'Bode plot' },
+  { value: 'nyquist', label: 'Nyquist plot' },
+  { value: 'poles', label: 'pole map' },
+];
+const analysisChart = (kind: string) =>
+  kind === 'bode' ? (
+    <BodeChart />
+  ) : kind === 'nyquist' ? (
+    <NyquistChart />
+  ) : kind === 'poles' ? (
+    <PoleMap />
+  ) : null;
 
 const ESTIMATE: SeriesSpec[] = [
   { key: 'pos.y', label: 'true', color: SIGNAL.truth, width: 2 },
@@ -49,6 +70,9 @@ export function ChartsPanel() {
   const windowSec = useUi((s) => s.window);
   const extra = useUi((s) => s.extraChart);
   const setExtra = useUi((s) => s.setExtraChart);
+  const second = useUi((s) => s.secondChart);
+  const setSecond = useUi((s) => s.setSecondChart);
+  const tall = extra === 'bode' || extra === 'nyquist' || extra === 'poles';
   const ctrlKey = useParams((s) => controllerKey(s.params));
   const loopOptions = useMemo(
     () => loopsFor(useParams.getState().params).map((l) => ({ value: l.id, label: l.name })),
@@ -153,6 +177,12 @@ export function ChartsPanel() {
         />
         <span className="text-muted">extra</span>
         <Select value={extra} onValueChange={(v) => setExtra(v as ExtraChart)} options={EXTRA} />
+        <span className="text-muted">beside it</span>
+        <Select
+          value={second ?? 'motors'}
+          onValueChange={(v) => setSecond(v === 'motors' ? null : (v as AnalysisChart))}
+          options={SECOND}
+        />
         <span className="ml-auto text-[11px] text-muted">
           Hover a chart to read values; red shading = output saturated.
         </span>
@@ -167,7 +197,12 @@ export function ChartsPanel() {
           shadeKey={`${id}.sat`}
           includeZero
         />
-        <InfoCard meta={meta} />
+        {/* An analysis view needs height: it takes the whole right column, both rows. */}
+        {tall ? (
+          <div className="row-span-2 min-h-0">{analysisChart(extra)}</div>
+        ) : (
+          <InfoCard meta={meta} />
+        )}
         <TimeChart
           title="Error e = setpoint − measured"
           unit={meta.unit}
@@ -177,14 +212,18 @@ export function ChartsPanel() {
           ]}
           includeZero
         />
-        <TimeChart
-          title="Motor thrust"
-          unit="N"
-          series={motors}
-          includeZero
-          hlines={() => [{ value: sim.params.drone.maxMotorThrust, label: 'max' }]}
-        />
-        {extra === 'phase' ? (
+        {second ? (
+          analysisChart(second)
+        ) : (
+          <TimeChart
+            title="Motor thrust"
+            unit="N"
+            series={motors}
+            includeZero
+            hlines={() => [{ value: sim.params.drone.maxMotorThrust, label: 'max' }]}
+          />
+        )}
+        {tall ? null : extra === 'phase' ? (
           <PhasePortrait meta={meta} />
         ) : extra === 'estimate' ? (
           <TimeChart title="Altitude: estimate vs truth" unit="m" series={ESTIMATE} />

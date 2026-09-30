@@ -1,7 +1,8 @@
 # Part III — Why It Works
 
-> **Status (2026-09-30):** planned and reviewed against the code, nothing
-> implemented yet. Milestones M13–M18 in [roadmap.md](roadmap.md) point here.
+> **Status (2026-09-30):** M13 (the foundations) is implemented; §5 lists what
+> was built and where it differs from this plan. M14–M18 are planned.
+> Milestones in [roadmap.md](roadmap.md) point here.
 > Extended on 2026-09-30 from 20 to 30 lessons, so that Parts I–III together
 > cover the analysis and robustness material of a graduate control course
 > (see [curriculum.md](curriculum.md) for the whole programme).
@@ -523,7 +524,7 @@ code those lessons need. The second pass fills in the **should** and
 **could** lessons. Lesson numbers are fixed now, so the first pass leaves
 gaps in the list.
 
-### M13 — Foundations for Part III
+### M13 — Foundations for Part III ✅
 
 - `complex.ts`, `lti.ts`, `eig.ts`, `margins.ts`, `fft.ts` with tests
   against closed-form results.
@@ -539,6 +540,40 @@ near 1.1 Hz, so the band covers a decade on each side. Below it the loop
 gain is so high that the plant input barely moves, and the measurement is
 a ratio of a large signal to a very small one; above it the 250 Hz
 controller and the 1 kHz physics stop looking like one sampled system.
+
+**Built (2026-09-30).** The acceptance test passes with a wide margin:
+model and measurement agree within 0.01 dB and 0.5° across the band, for
+the default PID and for six other configurations (D on the error with
+40 ms of delay, 50 Hz sampling, LQR, LQI with the lag state, LQR without
+motor telemetry, ADRC). The predicted delay margin of 154 ms is confirmed
+in flight: stable at 149 ms, unstable at 160 ms. What differs from the plan
+above:
+
+- **The plant model is discrete.** `analysis/plant.ts` writes the L1 plant
+  exactly as the simulator steps it (1 ms), because the simulator's motor
+  step leads the continuous model by half a step, 3.6° at 20 Hz. The
+  textbook model $1/(m s^2(\tau s + 1))$ is kept beside it for comparison.
+- **Controller models live in one file**, `analysis/controllers.ts`, as
+  functions of the parameters, not as `linearModel()` methods: they need
+  no controller instance. Each is the controller's own update rule in
+  state-space form.
+- **Two rates.** The loop response accounts for the controller sampling
+  every $n$ physics steps and holding: $L = G \cdot K \cdot H$ with the hold
+  gain $H = \frac1n (1 - e^{-j\Omega n})/(1 - e^{-j\Omega})$. Closed-loop
+  poles come from lifting the plant to the controller period, with the
+  sensor delay as extra states (`analysis/loop.ts`).
+- **Probe points and signals.** Implemented: `l1.thrust` and `ref.y`, with
+  `sine` and `chirp`. The L3 points arrive with the L3 models in M17,
+  `multisine` with M14 and `relay` with M17.
+- **Layout.** An analysis chart chosen as the extra view takes the whole
+  right column of the chart grid (both rows, in place of the info card):
+  a Bode plot needs the height. A second analysis view can replace the
+  motor chart (`chart2` in a lesson, "beside it" in the chart header).
+- **Charts are drawn on a canvas**, not with uPlot, like the phase
+  portrait: a logarithmic axis, two panes and annotations are simpler
+  that way. Each has a hover readout; the pole map keeps a trail.
+- `fft.ts` is in place (FFT, Welch PSD, single-frequency correlation); the
+  spectrum chart that uses it belongs to M14.
 
 ### M14 — Chapter F lessons (III.1–III.6)
 

@@ -295,15 +295,6 @@ The quasi-static shortcut of Example~\ref{ex:droop-tau} also has a name and a hy
 \end{itemize}
 \end{lookahead}
 
-\begin{curiosity}{The grid that sags on purpose}
-\photo{turbinehall}{A turbine hall of the 1920s. Every generator in a power grid runs a speed governor — with a deliberate droop.}
-The electrical grid of a continent is one enormous machine turning in synchrony: every generator in Europe spins in step with a frequency of \SI{50}{Hz}. When you switch on a kettle, the load rises, the turbines slow down a little, and the frequency dips. Each power station answers with a speed governor that opens its steam or water valve.
-
-Here is the surprise: those governors are \emph{proportional} controllers, and their droop is deliberate. A typical setting is 4–5\,\%: a generator increases its output by its full rated power if the frequency falls by 4–5\,\%. Why not an integral, which would restore \SI{50}{Hz} exactly? Because hundreds of generators share the load. If each of them integrated its own error, they would fight over it forever; with proportional droop every machine takes a share proportional to its size, and the sharing is stable.
-
-The small remaining frequency error is then removed on a slower time scale, over tens of seconds to minutes, by a single central \emph{integral} loop, the secondary control, which asks selected plants to raise their setpoints. It is the structure of this lesson, spread over a continent: a fast proportional loop that accepts a droop, and a slow integral that pays it back.
-\end{curiosity}
-
 \begin{remember}
 \begin{itemize}
   \item An equilibrium is found by setting all derivatives to zero.
@@ -314,6 +305,15 @@ The small remaining frequency error is then removed on a slower time scale, over
   \item A loop follows without error the inputs that its integrators can produce. Count them, and where they sit relative to the load.
 \end{itemize}
 \end{remember}
+
+\begin{curiosity}{The grid that sags on purpose}
+\photo{turbinehall}{A turbine hall of the 1920s. Every generator in a power grid runs a speed governor — with a deliberate droop.}
+The electrical grid of a continent is one enormous machine turning in synchrony: every generator in Europe spins in step with a frequency of \SI{50}{Hz}. When you switch on a kettle, the load rises, the turbines slow down a little, and the frequency dips. Each power station answers with a speed governor that opens its steam or water valve.
+
+Here is the surprise: those governors are \emph{proportional} controllers, and their droop is deliberate. A typical setting is 4–5\,\%: a generator increases its output by its full rated power if the frequency falls by 4–5\,\%. Why not an integral, which would restore \SI{50}{Hz} exactly? Because hundreds of generators share the load. If each of them integrated its own error, they would fight over it forever; with proportional droop every machine takes a share proportional to its size, and the sharing is stable.
+
+The small remaining frequency error is then removed on a slower time scale, over tens of seconds to minutes, by a single central \emph{integral} loop, the secondary control, which asks selected plants to raise their setpoints. It is the structure of this lesson, spread over a continent: a fast proportional loop that accepts a droop, and a slow integral that pays it back.
+\end{curiosity}
 
 \begin{exercises}
 \exercise[1] The drone carries a \SI{200}{g} camera that the controller does not know about ($\hat m = \SI{1}{kg}$, feedforward on, I off, $K_p = 10$). Where does it hover when asked for \SI{2}{m}?

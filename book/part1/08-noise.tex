@@ -72,13 +72,6 @@ A useful rule: the filter time constant should be several times shorter than the
 \predict{if the noise doubles to \SI{2}{cm}, what happens to the D-term fluctuation without a filter?}
 \end{trythis}
 
-\begin{curiosity}{The sensor in every drone}
-\sidephoto{mpu6050}{45mm}{An MPU-6050: a three-axis gyroscope and a three-axis accelerometer in a package of 4\,$\times$\,4\,mm.}
-Open almost any small drone, game controller or phone and you will find a chip like the one in the photograph: a MEMS inertial sensor. Inside, microscopic silicon structures move. The accelerometer has a proof mass on tiny springs whose deflection is read as a change of capacitance. The gyroscope keeps a structure vibrating at kilohertz and measures the Coriolis force that appears when the chip rotates. Such sensors cost about a dollar. Their price and their small size are what made the modern quadrotor possible.
-
-They are also noisy. Their noise is specified as a density — micro-$g$ or degrees per second per $\sqrt{\text{Hz}}$ — because the noise you see depends on how much bandwidth you let through. That is \cref{fig:noise-bode} in a data sheet. On a drone the electronic noise is the smaller problem: the propellers shake the frame at their rotation frequency, a few hundred hertz, and the sensor measures that too. Flight-controller software such as Betaflight or PX4 therefore runs whole banks of filters: low-pass filters, and \emph{notch} filters that follow the motor speed and cut out exactly the frequency of the propellers. Tuning those filters is a large part of tuning a racing drone, and it is the same trade-off you just explored: every filter removes noise and adds delay.
-\end{curiosity}
-
 \begin{remember}
 \begin{itemize}
   \item A differentiator multiplies each frequency by $\omega$; sampled noise reaches the D term amplified by about $\sqrt2/\Delta t$.
@@ -87,6 +80,13 @@ They are also noisy. Their noise is specified as a density — micro-$g$ or degr
   \item Noise plus saturation can create a constant bias (rectification).
 \end{itemize}
 \end{remember}
+
+\begin{curiosity}{The sensor in every drone}
+\sidephoto{mpu6050}{45mm}{An MPU-6050: a three-axis gyroscope and a three-axis accelerometer in a package of 4\,$\times$\,4\,mm.}
+Open almost any small drone, game controller or phone and you will find a chip like the one in the photograph: a MEMS inertial sensor. Inside, microscopic silicon structures move. The accelerometer has a proof mass on tiny springs whose deflection is read as a change of capacitance. The gyroscope keeps a structure vibrating at kilohertz and measures the Coriolis force that appears when the chip rotates. Such sensors cost about a dollar. Their price and their small size are what made the modern quadrotor possible.
+
+They are also noisy. Their noise is specified as a density — micro-$g$ or degrees per second per $\sqrt{\text{Hz}}$ — because the noise you see depends on how much bandwidth you let through. That is \cref{fig:noise-bode} in a data sheet. On a drone the electronic noise is the smaller problem: the propellers shake the frame at their rotation frequency, a few hundred hertz, and the sensor measures that too. Flight-controller software such as Betaflight or PX4 therefore runs whole banks of filters: low-pass filters, and \emph{notch} filters that follow the motor speed and cut out exactly the frequency of the propellers. Tuning those filters is a large part of tuning a racing drone, and it is the same trade-off you just explored: every filter removes noise and adds delay.
+\end{curiosity}
 
 \begin{exercises}
 \exercise[1] Compute $\alpha$ of \cref{eq:noise-filter} for $f_c = \SI{20}{Hz}$ at the controller rate of \SI{250}{Hz}.

@@ -331,15 +331,6 @@ has rank two, and $K = (K_p,\ K_d)$ gives $\det(s\Id - A + BK) = s^2 + (K_d/m)\,
 \end{itemize}
 \end{lookahead}
 
-\begin{curiosity}{A 660-tonne pendulum}
-\photo{taipei}{The tuned mass damper of Taipei 101: a steel sphere of 660 tonnes hanging between the 87th and the 92nd floor.}
-Taipei 101 was the tallest building in the world when it opened in 2004, and it stands in a place that is hit by typhoons and earthquakes. A tall building is a spring with very little damping: steel and concrete dissipate almost no energy, so wind gusts can set it swaying in a way that makes the people at the top seasick.
-
-The engineers hung a giant pendulum — a sphere of welded steel plates weighing 660 tonnes — near the top of the tower, tuned so that its natural frequency matches the building's. When the tower sways, the pendulum lags behind and pushes against the motion; eight large hydraulic dampers connected to it turn that relative motion into heat. In our language, the pendulum and its dampers add a large $K_d$ to a structure that had almost none, and they cut the swaying by up to 40\,\% in strong winds. During Typhoon Soudelor in 2015 the sphere swung by a metre.
-
-Your car contains four much smaller dampers doing the same job. Car suspensions are usually tuned to $\zeta \approx 0.2$–$0.4$ — well below critical — because a completely non-oscillating ride feels harsh. Comfort, it turns out, is a choice of damping ratio.
-\end{curiosity}
-
 \begin{remember}
 \begin{itemize}
   \item With a constant setpoint the D term is $-K_d\dot y$: a damper. It removes energy at the rate $K_d\dot y^2$.
@@ -350,6 +341,15 @@ Your car contains four much smaller dampers doing the same job. Car suspensions 
   \item $V = \tfrac12 m\dot x^2 + \tfrac12 K_p x^2$ with $\dot V = -K_d\dot x^2 \le 0$ proves stability without solving anything: a Lyapunov function.
 \end{itemize}
 \end{remember}
+
+\begin{curiosity}{A 660-tonne pendulum}
+\photo{taipei}{The tuned mass damper of Taipei 101: a steel sphere of 660 tonnes hanging between the 87th and the 92nd floor.}
+Taipei 101 was the tallest building in the world when it opened in 2004, and it stands in a place that is hit by typhoons and earthquakes. A tall building is a spring with very little damping: steel and concrete dissipate almost no energy, so wind gusts can set it swaying in a way that makes the people at the top seasick.
+
+The engineers hung a giant pendulum — a sphere of welded steel plates weighing 660 tonnes — near the top of the tower, tuned so that its natural frequency matches the building's. When the tower sways, the pendulum lags behind and pushes against the motion; eight large hydraulic dampers connected to it turn that relative motion into heat. In our language, the pendulum and its dampers add a large $K_d$ to a structure that had almost none, and they cut the swaying by up to 40\,\% in strong winds. During Typhoon Soudelor in 2015 the sphere swung by a metre.
+
+Your car contains four much smaller dampers doing the same job. Car suspensions are usually tuned to $\zeta \approx 0.2$–$0.4$ — well below critical — because a completely non-oscillating ride feels harsh. Comfort, it turns out, is a choice of damping ratio.
+\end{curiosity}
 
 \begin{exercises}
 \exercise[1] The drone carries a payload so that $m = \SI{1.5}{kg}$, with $K_p = 10$. Which $K_d$ is critical? If $K_d$ stays at 6.3, what are $\zeta$ and the overshoot?

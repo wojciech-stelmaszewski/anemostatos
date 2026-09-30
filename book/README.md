@@ -30,6 +30,7 @@ Only needed when a lesson, the physics or a figure changes.
 | Take the screenshots | `make dev`, then `node book/tools/shots.mjs` | the running app      | `book/screens/raw/*.png` (not committed) |
 | Compress them        | `python3 book/tools/screens_jpg.py`          | `book/screens/raw/`  | `book/screens/*.jpg`                     |
 | Fetch the photos     | `python3 book/tools/photos.py`               | Wikimedia Commons    | `book/photos/*.jpg`, `credits.tex`       |
+| Crop the portraits   | `python3 book/tools/portraits.py`            | `book/photos/`       | `book/photos/portrait-*.jpg`             |
 
 Both scripts accept a name filter when run directly, for example
 `python3 book/tools/make_figures.py windup`. The Python tools need

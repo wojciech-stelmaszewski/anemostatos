@@ -73,13 +73,6 @@ While an actuator is saturated, the loop is open: the plant receives the same in
 \predict{with anti-windup off, does a bigger $K_i$ make the overshoot bigger or smaller? What about the time spent saturated?}
 \end{trythis}
 
-\begin{curiosity}{Saturation in the real world}
-\photo{cruise}{A cruise-control stalk. Up a steep hill at full throttle, a naive cruise controller winds up — and overshoots at the crest.}
-You have probably met windup in a car. Set the cruise control to \SI{100}{km/h} and drive up a long, steep hill in a car with a small engine: the throttle is wide open, the speed still drops, and the controller's integral keeps growing. At the crest the engine suddenly has more than enough power, the enormous integral keeps the throttle open, and the car races down the other side well above the set speed. Modern cruise controllers include anti-windup for exactly this reason.
-
-Saturation has also crashed aircraft. On 25 April 1992 the YF-22 prototype, the forerunner of the F-22, was flying low over the runway at Edwards Air Force Base when the pilot's inputs and the flight control system fell into a growing oscillation; the control surfaces hit their \emph{rate} limits — they could not move as fast as commanded — which added a delay to the loop and made the oscillation worse. The aircraft hit the runway (the pilot was unhurt). The first Swedish Gripen prototype had crashed in 1989 for a similar reason, and so did a production Gripen at a Stockholm air show in 1993. After these accidents, flight-control designers developed rate-limit compensation — anti-windup for rates.
-\end{curiosity}
-
 \begin{remember}
 \begin{itemize}
   \item Real actuators saturate. While saturated, the loop is open.
@@ -88,6 +81,13 @@ Saturation has also crashed aircraft. On 25 April 1992 the YF-22 prototype, the 
   \item The general lesson: controller states must be driven by what really happened, not by what was requested.
 \end{itemize}
 \end{remember}
+
+\begin{curiosity}{Saturation in the real world}
+\photo{cruise}{A cruise-control stalk. Up a steep hill at full throttle, a naive cruise controller winds up — and overshoots at the crest.}
+You have probably met windup in a car. Set the cruise control to \SI{100}{km/h} and drive up a long, steep hill in a car with a small engine: the throttle is wide open, the speed still drops, and the controller's integral keeps growing. At the crest the engine suddenly has more than enough power, the enormous integral keeps the throttle open, and the car races down the other side well above the set speed. Modern cruise controllers include anti-windup for exactly this reason.
+
+Saturation has also crashed aircraft. On 25 April 1992 the YF-22 prototype, the forerunner of the F-22, was flying low over the runway at Edwards Air Force Base when the pilot's inputs and the flight control system fell into a growing oscillation; the control surfaces hit their \emph{rate} limits — they could not move as fast as commanded — which added a delay to the loop and made the oscillation worse. The aircraft hit the runway (the pilot was unhurt). The first Swedish Gripen prototype had crashed in 1989 for a similar reason, and so did a production Gripen at a Stockholm air show in 1993. After these accidents, flight-control designers developed rate-limit compensation — anti-windup for rates.
+\end{curiosity}
 
 \begin{exercises}
 \exercise[1] With $f_{max} = \SI{3}{N}$ per motor, what is the heaviest drone that can still hover? What is the largest downward acceleration?

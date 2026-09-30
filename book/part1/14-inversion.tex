@@ -62,13 +62,6 @@ The rule \enquote{inner loops 5–10 times faster} is about \emph{bandwidth} —
 \predict{if you slow down the \emph{velocity} loop to \SI{10}{Hz} instead (and keep the attitude loop at \SI{250}{Hz}), will the drone be in trouble? Why or why not?}
 \end{trythis}
 
-\begin{curiosity}{Your body is a cascade}
-\photo{cheetah}{A cheetah at full speed. Its legs are controlled by fast spinal reflex loops, supervised by slower loops in the brain.}
-Stand on one foot and close your eyes. You wobble, but you do not fall — and most of the corrections you make are not decided by your conscious brain. The fastest loops of human motor control are spinal reflexes: a muscle stretched by a sudden disturbance contracts again within a few tens of milliseconds, through a circuit that only goes to the spinal cord and back. Slower loops in the brainstem and cerebellum coordinate whole limbs, and the slowest, involving vision and conscious decisions, take a fifth of a second or more.
-
-It is the architecture of this lesson: slow outer loops that decide \emph{what} should happen, fast inner loops that make it happen and reject disturbances before the outer loops even notice. A running cheetah relies on the same arrangement, and so does every legged robot that walks over rough ground. When disease slows down the inner loops — as in some neurological conditions that delay reflexes — the result is familiar from \cref{fig:inversion-runs}: tremor and overshoot, exactly the symptoms of a cascade whose time scales are no longer separated.
-\end{curiosity}
-
 \begin{remember}
 \begin{itemize}
   \item An outer loop controls the closed inner loop, not the raw plant; a slow inner loop is an extra lag for it.
@@ -77,6 +70,13 @@ It is the architecture of this lesson: slow outer loops that decide \emph{what} 
   \item Tune from the inside out and keep a bandwidth ratio of about 5–10 between neighbouring loops.
 \end{itemize}
 \end{remember}
+
+\begin{curiosity}{Your body is a cascade}
+\photo{cheetah}{A cheetah at full speed. Its legs are controlled by fast spinal reflex loops, supervised by slower loops in the brain.}
+Stand on one foot and close your eyes. You wobble, but you do not fall — and most of the corrections you make are not decided by your conscious brain. The fastest loops of human motor control are spinal reflexes: a muscle stretched by a sudden disturbance contracts again within a few tens of milliseconds, through a circuit that only goes to the spinal cord and back. Slower loops in the brainstem and cerebellum coordinate whole limbs, and the slowest, involving vision and conscious decisions, take a fifth of a second or more.
+
+It is the architecture of this lesson: slow outer loops that decide \emph{what} should happen, fast inner loops that make it happen and reject disturbances before the outer loops even notice. A running cheetah relies on the same arrangement, and so does every legged robot that walks over rough ground. When disease slows down the inner loops — as in some neurological conditions that delay reflexes — the result is familiar from \cref{fig:inversion-runs}: tremor and overshoot, exactly the symptoms of a cascade whose time scales are no longer separated.
+\end{curiosity}
 
 \begin{exercises}
 \exercise[1] The velocity loop has $K_v = 2.2$ (per second). What attitude time constant gives $\zeta = 0.7$ in \cref{eq:inv-loop}?

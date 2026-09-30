@@ -234,7 +234,9 @@ Model the motors as a first-order lag with $\tau = \SI{30}{ms}$ and find the pol
 \textbf{Step 3 — one equation.} Differentiate Newton's law and insert the motor: $m\dddot x = \dot F = -(F + K_p x)/\tau = -(m\ddot x + K_p x)/\tau$. Multiply by $\tau$:
 \begin{equation*}
   \tau m\,\dddot x + m\,\ddot x + K_p\,x = 0,
-  \qquad\text{characteristic equation}\qquad
+  \qquad\text{with the characteristic equation}
+\end{equation*}
+\begin{equation*}
   \tau m\,s^3 + m\,s^2 + K_p = 0 .
 \end{equation*}
 
@@ -364,15 +366,6 @@ One more hypothesis deserves its name. \Cref{eq:spring-amp} was obtained by aver
 \end{itemize}
 \end{lookahead}
 
-\begin{curiosity}{Galloping Gertie}
-\photo{tacoma}{The Tacoma Narrows Bridge twisting on 7 November 1940, an hour before it fell into Puget Sound.}
-The Tacoma Narrows Bridge in Washington State opened on 1 July 1940. It was elegant and very slender, and from the first day it moved: in moderate wind the deck rose and fell by a metre or more, and drivers came from far away to ride \enquote{Galloping Gertie}. On the morning of 7 November, in a steady wind of about \SI{65}{km/h}, the motion changed into a violent twisting mode. It grew for an hour, and then the main span tore apart.
-
-It is often told as a story of resonance — the wind \enquote{hitting the natural frequency}. The true story is more interesting for us. A steady wind has no frequency to resonate with. What happened is that the air flowing around the twisting deck pushed it in phase with its own velocity: the aerodynamic force acted like a damper with a \emph{negative} coefficient — exactly like the late spring of \cref{eq:spring-lag}. This is called aeroelastic flutter. Instead of removing energy, the air pumped energy in on every cycle.
-
-In the language of this lesson, the poles of the bridge moved from just left of the imaginary axis to just right of it. That is why engineers since then have cared so much about damping, and why wind-tunnel tests of bridge models became standard practice.
-\end{curiosity}
-
 \begin{remember}
 \begin{itemize}
   \item With P alone (and exact feedforward) the closed loop is $m\ddot x + K_p x = 0$: a mass on a spring of stiffness $K_p$.
@@ -384,6 +377,15 @@ In the language of this lesson, the poles of the bridge moved from just left of 
   \item Linear predictions hold only while the actuators stay within their limits.
 \end{itemize}
 \end{remember}
+
+\begin{curiosity}{Galloping Gertie}
+\photo{tacoma}{The Tacoma Narrows Bridge twisting on 7 November 1940, an hour before it fell into Puget Sound.}
+The Tacoma Narrows Bridge in Washington State opened on 1 July 1940. It was elegant and very slender, and from the first day it moved: in moderate wind the deck rose and fell by a metre or more, and drivers came from far away to ride \enquote{Galloping Gertie}. On the morning of 7 November, in a steady wind of about \SI{65}{km/h}, the motion changed into a violent twisting mode. It grew for an hour, and then the main span tore apart.
+
+It is often told as a story of resonance — the wind \enquote{hitting the natural frequency}. The true story is more interesting for us. A steady wind has no frequency to resonate with. What happened is that the air flowing around the twisting deck pushed it in phase with its own velocity: the aerodynamic force acted like a damper with a \emph{negative} coefficient — exactly like the late spring of \cref{eq:spring-lag}. This is called aeroelastic flutter. Instead of removing energy, the air pumped energy in on every cycle.
+
+In the language of this lesson, the poles of the bridge moved from just left of the imaginary axis to just right of it. That is why engineers since then have cared so much about damping, and why wind-tunnel tests of bridge models became standard practice.
+\end{curiosity}
 
 \begin{exercises}
 \exercise[1] Which $K_p$ gives an oscillation period of exactly \SI{1}{s} for the \SI{1}{kg} drone? And for a \SI{1.5}{kg} drone?

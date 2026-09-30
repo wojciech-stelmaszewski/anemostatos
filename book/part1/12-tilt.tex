@@ -40,7 +40,7 @@ The quadrotor has to lean \emph{into} the wind by about eleven degrees and raise
 \subsection{Tilting takes time}
 Changing $\hat b$ means rotating a rigid body, and rotation has its own dynamics: torques come from differences between the motors, and they accelerate the rotation through the moment of inertia. The chain from what the controller commands to where the drone goes is now long:
 \begin{equation}
-  \underbrace{\text{motor thrusts}}_{\text{lag}} \to \text{torque} \to \underbrace{\dot\omega}_{1/I} \to \underbrace{\omega}_{\int} \to \underbrace{\text{tilt}}_{\int} \to \underbrace{\text{horizontal acceleration}}_{\times g} \to \underbrace{v}_{\int} \to \underbrace{x}_{\int} .
+  \underbrace{\text{motor thrusts}}_{\text{lag}} \to \text{torque} \to \underbrace{\dot\omega}_{1/I} \to \underbrace{\omega}_{\int} \to \underbrace{\text{tilt}}_{\int} \to \underbrace{\text{acceleration}}_{\times g} \to \underbrace{v}_{\int} \to \underbrace{x}_{\int} .
 \end{equation}
 Four integrators in a row, plus a lag. A single PID from $x$ to the motors cannot control that; we would need derivatives up to the third order of the position, and the stability limits of \lessonref{les:edge} would be brutal. The answer is to split the chain into pieces and give each its own loop — the \emph{cascade} of the next lesson.
 
@@ -64,13 +64,6 @@ Four integrators in a row, plus a lag. A single PID from $x$ to the motors canno
 \predict{at L3 with an \SI{8}{m/s} wind, how much tilt and how much total thrust are needed to hover?}
 \end{trythis}
 
-\begin{curiosity}{Leaning into the wind — on Mars and in a garden}
-\photopair{ingenuity}{Engineers with NASA's Ingenuity Mars helicopter. It moves by tilting the thrust of its rotors, like every rotorcraft.}{hummingbird}{A hovering hummingbird tilts the plane of its wing strokes to move, just as a quadrotor tilts its body.}{40mm}
-Every hovering machine obeys \cref{eq:tilt-thrust}. A helicopter tilts its rotor disc with the swashplate, a mechanism that changes the pitch of each blade as it goes round; a quadrotor tilts its whole body; a hummingbird tilts the plane in which its wings beat. None of them can push sideways without first changing the direction of their lift.
-
-Ingenuity, the small helicopter that flew on Mars 72 times between April 2021 and January 2024, is an extreme example. The Martian atmosphere has about one percent of the density of Earth's, so its two coaxial rotors, \SI{1.2}{m} across, had to spin at about 2400 revolutions per minute to lift its \SI{1.8}{kg}. To move, it tilted its rotors' thrust with swashplates, and its flight software ran a cascade of loops much like the one in the next lesson, entirely autonomously: a radio command from Earth takes many minutes to arrive. Its first flight, on 19 April 2021, was the first powered, controlled flight on another planet.
-\end{curiosity}
-
 \begin{remember}
 \begin{itemize}
   \item A point mass with a free force vector is controlled by three independent PIDs; the integral holds the steady wind force.
@@ -79,6 +72,13 @@ Ingenuity, the small helicopter that flew on Mars 72 times between April 2021 an
   \item Tilting adds rotational dynamics: from motors to position there is a chain of integrators — the reason for cascaded control.
 \end{itemize}
 \end{remember}
+
+\begin{curiosity}{Leaning into the wind — on Mars and in a garden}
+\photopair{ingenuity}{Engineers with NASA's Ingenuity Mars helicopter. It moves by tilting the thrust of its rotors, like every rotorcraft.}{hummingbird}{A hovering hummingbird tilts the plane of its wing strokes to move, just as a quadrotor tilts its body.}{40mm}
+Every hovering machine obeys \cref{eq:tilt-thrust}. A helicopter tilts its rotor disc with the swashplate, a mechanism that changes the pitch of each blade as it goes round; a quadrotor tilts its whole body; a hummingbird tilts the plane in which its wings beat. None of them can push sideways without first changing the direction of their lift.
+
+Ingenuity, the small helicopter that flew on Mars 72 times between April 2021 and January 2024, is an extreme example. The Martian atmosphere has about one percent of the density of Earth's, so its two coaxial rotors, \SI{1.2}{m} across, had to spin at about 2400 revolutions per minute to lift its \SI{1.8}{kg}. To move, it tilted its rotors' thrust with swashplates, and its flight software ran a cascade of loops much like the one in the next lesson, entirely autonomously: a radio command from Earth takes many minutes to arrive. Its first flight, on 19 April 2021, was the first powered, controlled flight on another planet.
+\end{curiosity}
 
 \begin{exercises}
 \exercise[1] At L2 with a \SI{4}{m/s} wind, the horizontal I term is switched off (the horizontal $K_p$ is 4). How far downwind does the drone settle?

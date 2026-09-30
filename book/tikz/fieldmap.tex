@@ -1,23 +1,23 @@
 % A map of control theory: the workflow (top) and the families of methods (below), with the course's lessons.
 \begin{tikzpicture}[
   every node/.style={font=\sffamily\footnotesize},
-  wfstep/.style={draw=ink, line width=0.6pt, rounded corners=2pt, fill=white, minimum height=10mm, text width=26mm, align=center},
-  fam/.style={draw=#1, line width=0.6pt, rounded corners=2pt, fill=#1!7, text width=37mm, align=left, inner sep=4pt, minimum height=25mm},
-  tag/.style={font=\sffamily\scriptsize\bfseries, text=#1},
+  wfstep/.style={draw=ink, line width=0.6pt, rounded corners=2pt, fill=white, minimum height=12.5mm, text width=33.2mm, align=center, inner sep=3pt},
+  fam/.style={draw=#1, line width=0.6pt, rounded corners=2pt, fill=#1!7, text width=48.9mm, align=left, inner sep=5pt,
+    minimum height=25mm, anchor=north west},
 ]
-  % workflow
-  \node[wfstep] (m) {\textbf{Model}\\{\scriptsize\color{muted}equations of the plant}};
-  \node[wfstep, right=6mm of m] (a) {\textbf{Analyse}\\{\scriptsize\color{muted}stability, speed, margins}};
-  \node[wfstep, right=6mm of a] (d) {\textbf{Design}\\{\scriptsize\color{muted}choose the control law}};
-  \node[wfstep, right=6mm of d] (i) {\textbf{Implement \& test}\\{\scriptsize\color{muted}sample, filter, saturate}};
+  % workflow: four equal steps across the full width
+  \node[wfstep, anchor=north west] (m) at (0,0) {\textbf{Model}\\{\scriptsize\color{muted}equations of the plant}};
+  \node[wfstep, anchor=north west] (a) at (43.5mm,0) {\textbf{Analyse}\\{\scriptsize\color{muted}stability, speed, margins}};
+  \node[wfstep, anchor=north west] (d) at (87mm,0) {\textbf{Design}\\{\scriptsize\color{muted}the control law}};
+  \node[wfstep, anchor=north west] (i) at (130.5mm,0) {\textbf{Implement and test}\\{\scriptsize\color{muted}sample, filter, saturate}};
   \draw[sig] (m) -- (a); \draw[sig] (a) -- (d); \draw[sig] (d) -- (i);
   \draw[sig, faint] (i.north) -- ++(0,4mm) -| node[pos=0.25, above, lab] {not good enough? iterate} (m.north);
-  % families: this volume's lessons, then (fainter) the later parts of the course
-  \node[fam=sigP, below=11mm of m.south west, anchor=north west] (f1) {\textcolor{sigP}{\textbf{Classical}}\\ PID, frequency response, Bode \& Nyquist, root locus\\[1pt]{\color{muted}Part I, Lessons 1–14}\\{\color{faint}later: III.1–III.6}};
-  \node[fam=deepblue, right=3mm of f1] (f2) {\textcolor{deepblue}{\textbf{State space}}\\ state feedback, observers, LQR, Kalman filter\\[1pt]{\color{muted}Lessons II.1–II.4}\\{\color{faint}later: III.9–III.10}};
-  \node[fam=sigI, right=3mm of f2] (f3) {\textcolor{sigI}{\textbf{Nonlinear \& geometric}}\\ Lyapunov, dynamic inversion, INDI, rotations, flatness\\[1pt]{\color{muted}Lessons II.7–II.12}\\{\color{faint}later: III.7–III.8}};
-  \node[fam=sigD, below=3mm of f1] (f4) {\textcolor{sigD}{\textbf{Optimal \& predictive}}\\ Pontryagin, dynamic programming, MPC, sampling-based\\[1pt]{\color{muted}Lessons II.2, II.13–II.17}\\{\color{faint}later: IV.1–IV.6}};
-  \node[fam=sigFF, right=3mm of f4] (f5) {\textcolor{sigFF}{\textbf{Robust \& adaptive}}\\ disturbance observers, ADRC, L1 adaptive, $H_\infty$\\[1pt]{\color{muted}Lessons II.5–II.6, II.18}\\{\color{faint}later: III.11–III.17}};
-  \node[fam=sigerr, right=3mm of f5] (f6) {\textcolor{sigerr}{\textbf{Learning-based}}\\ learned models, reinforcement learning, neural policies\\[1pt]{\color{muted}Lessons II.19–II.21}\\{\color{faint}later: III.29–III.30}};
-  \node[font=\sffamily\scriptsize, text=muted, anchor=south west] at ($(f1.north west)+(0,1mm)$) {families of methods — each answers the design question differently};
+  % families: two rows of three, tops and heights aligned
+  \node[font=\sffamily\scriptsize, text=muted, anchor=south west, inner sep=0pt] at (0,-21mm) {families of methods — each answers the design question differently};
+  \node[fam=sigP]     at (0,-23mm)       {\textcolor{sigP}{\textbf{Classical}}\\ PID, frequency response, Bode and Nyquist, root locus\\[2pt]{\color{muted}Lessons 1–14}\\{\color{faint}later: III.1–III.6}};
+  \node[fam=deepblue] at (56.67mm,-23mm)    {\textcolor{deepblue}{\textbf{State space}}\\ state feedback, observers, LQR, Kalman filter\\[2pt]{\color{muted}Lessons II.1–II.4}\\{\color{faint}later: III.9–III.10}};
+  \node[fam=sigI]     at (113.33mm,-23mm)   {\textcolor{sigI}{\textbf{Nonlinear and geometric}}\\ Lyapunov, dynamic inversion, rotations, flatness\\[2pt]{\color{muted}Lessons II.7–II.12}\\{\color{faint}later: III.7–III.8}};
+  \node[fam=sigD]     at (0,-52mm)       {\textcolor{sigD}{\textbf{Optimal and predictive}}\\ Pontryagin, dynamic programming, MPC\\[2pt]{\color{muted}Lessons II.2, II.13–II.17}\\{\color{faint}later: IV.1–IV.6}};
+  \node[fam=sigFF]    at (56.67mm,-52mm)    {\textcolor{sigFF}{\textbf{Robust and adaptive}}\\ disturbance observers, ADRC, L1 adaptive, $H_\infty$\\[2pt]{\color{muted}Lessons II.5–II.6, II.18}\\{\color{faint}later: III.11–III.17}};
+  \node[fam=sigerr]   at (113.33mm,-52mm)   {\textcolor{sigerr}{\textbf{Learning-based}}\\ learned models, reinforcement learning, neural policies\\[2pt]{\color{muted}Lessons II.19–II.21}\\{\color{faint}later: III.29–III.30}};
 \end{tikzpicture}

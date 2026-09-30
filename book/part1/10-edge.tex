@@ -69,15 +69,6 @@ The Ziegler–Nichols rules were derived for plants that are stable on their own
 \predict{with $\tau_m = \SI{60}{ms}$, is the default tune ($K_p = 10$, $K_d = 7$) still stable? With how much margin?}
 \end{trythis}
 
-\begin{curiosity}{An aircraft that could not fly by itself}
-\photo{x29}{The Grumman X-29 over the Mojave Desert. Its forward-swept wings made it so unstable that no pilot could have flown it unaided.}
-The X-29, flown by NASA and the US Air Force from 1984 to 1992, looks as if it had been assembled backwards: its wings sweep forward and a pair of small canard wings sits in front of them. The design reduced drag and improved agility at high angles of attack, but it had a price. The aircraft was aerodynamically unstable in pitch — a small nose-up disturbance made the nose rise further, faster and faster, like the unstable poles of \lessonref{les:spring}'s exercises.
-
-A pilot cannot correct such an instability: the time to double the disturbance was far shorter than human reaction time. So the X-29 flew with three redundant digital flight-control computers that corrected its attitude about 40 times per second. The whole aircraft relied on a loop running well inside its stability margins; a computer failure would have meant losing the aircraft within a fraction of a second.
-
-What the X-29 made extreme is now routine. Modern fighters are designed slightly unstable for agility and rely on their flight-control computers, and the lesson's rule applies to all of them: the control loop must be fast enough to catch the instability — and its actuators and computers fast enough for the loop.
-\end{curiosity}
-
 \begin{remember}
 \begin{itemize}
   \item The ideal mass–spring–damper is stable for any positive gains; real loops are not.
@@ -86,6 +77,15 @@ What the X-29 made extreme is now routine. Modern fighters are designed slightly
   \item Tuning recipes such as Ziegler–Nichols assume a type of plant; a hovering drone is not that type.
 \end{itemize}
 \end{remember}
+
+\begin{curiosity}{An aircraft that could not fly by itself}
+\photo{x29}{The Grumman X-29 over the Mojave Desert. Its forward-swept wings made it so unstable that no pilot could have flown it unaided.}
+The X-29, flown by NASA and the US Air Force from 1984 to 1992, looks as if it had been assembled backwards: its wings sweep forward and a pair of small canard wings sits in front of them. The design reduced drag and improved agility at high angles of attack, but it had a price. The aircraft was aerodynamically unstable in pitch — a small nose-up disturbance made the nose rise further, faster and faster, like the unstable poles of \lessonref{les:spring}'s exercises.
+
+A pilot cannot correct such an instability: the time to double the disturbance was far shorter than human reaction time. So the X-29 flew with three redundant digital flight-control computers that corrected its attitude about 40 times per second. The whole aircraft relied on a loop running well inside its stability margins; a computer failure would have meant losing the aircraft within a fraction of a second.
+
+What the X-29 made extreme is now routine. Modern fighters are designed slightly unstable for agility and rely on their flight-control computers, and the lesson's rule applies to all of them: the control loop must be fast enough to catch the instability — and its actuators and computers fast enough for the loop.
+\end{curiosity}
 
 \begin{exercises}
 \exercise[1] With $\tau_m = \SI{30}{ms}$, what is the smallest $K_d$ that allows $K_p = 300$?

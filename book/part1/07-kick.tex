@@ -70,15 +70,6 @@ If the setpoint follows a smooth trajectory, $\dot r$ carries useful information
 \predict{with the D filter at \SI{5}{Hz}, how large is the peak of the filtered kick? (A first-order filter with time constant $T_f$ turns a spike of area $A$ into a jump of height $A/T_f$.)}
 \end{trythis}
 
-\begin{curiosity}{The thermostat on the wall}
-\sidephoto{thermostat}{50mm}{Henry Dreyfuss's round thermostat for Honeywell (1953), one of the most produced industrial designs ever.}
-Most control loops in the world have a human who moves the setpoint: a thermostat on the wall, a speed knob, an operator's console in a chemical plant. People move setpoints in steps. They turn the dial from 19 to \SI{22}{\celsius}, they type a new flow rate. A controller that differentiates the error answers every such step with a kick to the boiler, the pump or the valve.
-
-That is why industrial PID controllers from the 1950s on — first pneumatic, then electronic, now digital — have used derivative on the measurement by default. You will find the option in any modern controller's manual under names like \enquote{PV derivative}, \enquote{PI-D} or \enquote{derivative on process variable}.
-
-The round Honeywell thermostat of 1953 is a nice reminder of how long this has been going on. Inside it is a bimetallic coil and a mercury switch — an on–off controller with a little hysteresis, the simplest feedback loop there is. It sold by the millions, and its dial is exactly the kind of setpoint that people turn in steps.
-\end{curiosity}
-
 \begin{remember}
 \begin{itemize}
   \item The derivative of a setpoint step is a spike: $K_d\Delta r/\Delta t$ in discrete time, a delta in continuous time.
@@ -87,6 +78,15 @@ The round Honeywell thermostat of 1953 is a nice reminder of how long this has b
   \item For moving setpoints, supply the reference's velocity as feedforward instead of differentiating it.
 \end{itemize}
 \end{remember}
+
+\begin{curiosity}{The thermostat on the wall}
+\sidephoto{thermostat}{50mm}{Henry Dreyfuss's round thermostat for Honeywell (1953), one of the most produced industrial designs ever.}
+Most control loops in the world have a human who moves the setpoint: a thermostat on the wall, a speed knob, an operator's console in a chemical plant. People move setpoints in steps. They turn the dial from 19 to \SI{22}{\celsius}, they type a new flow rate. A controller that differentiates the error answers every such step with a kick to the boiler, the pump or the valve.
+
+That is why industrial PID controllers from the 1950s on — first pneumatic, then electronic, now digital — have used derivative on the measurement by default. You will find the option in any modern controller's manual under names like \enquote{PV derivative}, \enquote{PI-D} or \enquote{derivative on process variable}.
+
+The round Honeywell thermostat of 1953 is a nice reminder of how long this has been going on. Inside it is a bimetallic coil and a mercury switch — an on–off controller with a little hysteresis, the simplest feedback loop there is. It sold by the millions, and its dial is exactly the kind of setpoint that people turn in steps.
+\end{curiosity}
 
 \begin{exercises}
 \exercise[1] The controller runs at \SI{1}{kHz} instead of \SI{250}{Hz}, D on error, no filter. How big is the kick for the same \SI{1}{m} step?

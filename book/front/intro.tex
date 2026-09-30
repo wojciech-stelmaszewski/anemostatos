@@ -69,9 +69,9 @@ Control theory is a large field, but its structure is simple. It follows the wor
   \item \textbf{Implementation.} Turn the design into something that runs: on a computer, at a finite sampling rate, with real sensors and actuators that are noisy, delayed and limited. Then test it — in simulation first — and go back to step 1 when reality disagrees.
 \end{enumerate}
 
-\begin{figure}[h]
+\begin{figure}[t]
 \begin{fullwidth}
-  \centering\resizebox{\linewidth}{!}{\input{tikz/fieldmap}}
+  \centering\input{tikz/fieldmap}
   \caption{A map of control theory. Top: the workflow that every control design follows. Below: the main families of design methods, roughly in the order they were developed, with the lessons of this book in which they appear. The fainter line names the lessons of Parts~III and~IV, in later volumes, that return to each family.}
   \label{fig:intro-map}
 \end{fullwidth}
@@ -117,23 +117,22 @@ The last row is a reminder that engineers did not invent feedback; they rediscov
 
 \begin{figure}[p]
 \begin{fullwidth}
-  \input{tikz/timeline}
-  \caption{Twenty-three centuries of feedback. The colours mark the eras described in the text.}
+  \centering\input{tikz/timeline}
+  \par\vspace{9mm}
+  % six portraits cropped to one frame, 25 mm by 31 mm
+  \newcommand{\portrait}[2]{\begin{minipage}[t]{25mm}\raggedright
+    \includegraphics[width=25mm]{photos/portrait-#1}\par\vspace{3pt}
+    {\sffamily\scriptsize\color{muted}#2\\\hyperref[credit:#1]{\textsc{credit}}\par}\end{minipage}}
+  \noindent
+  \portrait{ctesibius}{Ktesibios's water clock, as drawn in 1854}\hfill
+  \portrait{maxwell}{James Clerk Maxwell, 1831–1879}\hfill
+  \portrait{bode}{Hendrik Bode, 1905–1982}\hfill
+  \portrait{wiener}{Norbert Wiener, 1894–1964}\hfill
+  \portrait{pontryagin}{Lev Pontryagin, 1908–1988}\hfill
+  \portrait{kalman}{Rudolf Kálmán, 1930–2016}
+  \par\vspace{4pt}
+  \caption{Twenty-three centuries of feedback. The colours mark the eras described in the text; below, six of the people and devices named there.}
   \label{fig:intro-timeline}
-\end{fullwidth}
-\end{figure}
-
-
-\begin{figure}[h]
-\begin{fullwidth}
-\newcommand{\portrait}[2]{\begin{minipage}[t]{27mm}\centering\includegraphics[height=34mm,width=27mm,keepaspectratio]{photos/#1}\par\vspace{2pt}{\sffamily\scriptsize\color{muted}#2 \hyperref[credit:#1]{\textsc{credit}}}\end{minipage}}
-\centering
-\portrait{ctesibius}{Ktesibios's water clock (reconstruction, 1854)}\hfill
-\portrait{maxwell}{James Clerk Maxwell, 1831–1879}\hfill
-\portrait{bode}{Hendrik Bode, 1905–1982}\hfill
-\portrait{wiener}{Norbert Wiener, 1894–1964}\hfill
-\portrait{pontryagin}{Lev Pontryagin, 1908–1988}\hfill
-\portrait{kalman}{Rudolf Kálmán, 1930–2016}
 \end{fullwidth}
 \end{figure}
 The history of control (\cref{fig:intro-timeline}) is a story of practice running ahead of theory, and theory catching up in bursts.

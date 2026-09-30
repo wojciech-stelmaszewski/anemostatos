@@ -9,7 +9,7 @@ Anemostatos begins with the simplest vehicle it can offer: a quadrotor that can 
 
 \subsection{The forces}
 Three kinds of force act on the drone along the vertical axis (\cref{fig:meet-fbd}):
-\marginnote{\input{tikz/freebody}\par\vspace{3pt}\captionsetup{type=figure}\caption{The forces on the L1 drone. We count forces and positions as positive upwards.}\label{fig:meet-fbd}}
+\marginnote{\resizebox{\marginparwidth}{!}{\input{tikz/freebody}}\par\vspace{3pt}\captionsetup{type=figure}\caption{The forces on the L1 drone. We count forces and positions as positive upwards.}\label{fig:meet-fbd}}
 \begin{itemize}
   \item the \textbf{thrust} $T$ of the four propellers, upwards, which we choose;
   \item the \textbf{weight} $mg$, downwards, with $m$ the mass and $g = \SI{9.81}{m/s^2}$;
@@ -69,7 +69,7 @@ Everyday life is full of such loops. When you adjust a shower, you feel the wate
 
 \Cref{fig:meet-loop} is the picture behind every chapter of this book. Its pieces have standard names, and it is worth learning them now, because the simulator uses them everywhere — with the same colours as in this book.
 
-\sidecapfig{\centering\input{tikz/loop}}{The feedback loop. The error (red) is the only thing the controller reacts to; the measurement (blue) is the only thing it knows about the drone. The wind enters the plant, not the controller.}{fig:meet-loop}
+\sidecapfig{\resizebox{\linewidth}{!}{\input{tikz/loop}}}{The feedback loop. The error (red) is the only thing the controller reacts to; the measurement (blue) is the only thing it knows about the drone. The wind enters the plant, not the controller.}{fig:meet-loop}
 
 \begin{definition}{The parts of a control loop}
 \begin{description}[leftmargin=0pt, itemsep=3pt, font=\sffamily\small\bfseries]
@@ -212,8 +212,6 @@ Start it from the lesson panel: \ui{Part I · PID\then 1. Meet the loop\then Sta
 Keys: \key{↑}\,\key{↓} move the setpoint, \key{G} fires a gust, \key{M} switches the controller off, \key{R} resets, \key{Space} pauses.
 \end{inapp}
 
-\marginfig{meet_off}{Switch the controller off (\key{M}) and the drone falls: nothing holds it up anymore.}{fig:meet-off}
-
 \begin{trythis}
 \begin{enumerate}
   \item Press \key{↑} a few times, or drag the setpoint sphere. Watch all four charts react: the error jumps, P reacts at once, I slowly follows.
@@ -226,6 +224,7 @@ Keys: \key{↑}\,\key{↓} move the setpoint, \key{G} fires a gust, \key{M} swit
 
 \section{Testing the two predictions}
 
+\marginfig{meet_off}{Switch the controller off (\key{M}) and the drone falls: nothing holds it up anymore.}{fig:meet-off}%
 Examples~\ref{ex:meet-open} and~\ref{ex:meet-closed} each made a prediction about a drone that is \SI{50}{g} heavier than its controller believes: without feedback it is on the floor in about three seconds; with a proportional correction it rests \SI{4.9}{cm} low. A prediction is worth as much as its test, so we fly both. For the first ten seconds the full PID holds the heavy drone at \SI{2}{m}; its integral has quietly found the missing \SI{0.49}{N}. Then we take the feedback away.
 
 \simfig{meet_predict}{The two predictions of this lesson against the simulator. Left: all three terms are switched off and only the \SI{9.81}{N} feedforward remains. Right: only the integral is switched off, so P and D must carry the unknown \SI{0.49}{N}.}{fig:meet-predict}
@@ -400,15 +399,6 @@ Each idea of this lesson returns later in the course, sharper.
 \end{itemize}
 \end{lookahead}
 
-\begin{curiosity}{The governor that started it all}
-\sidephoto{governor}{52mm}{A centrifugal governor by Boulton \& Watt. As the shaft spins faster, the balls fly outward and close the steam valve.}
-In 1788 James Watt fitted his steam engines with a device borrowed from windmills: two heavy balls on hinged arms, spun by the engine. When the engine ran too fast, the balls swung outward and, through a linkage, closed the steam valve; when it slowed, they fell and opened it. It is a proportional controller made of iron — measure (the ball height), compare (with the linkage geometry), act (on the valve) — and it made the steam engine usable in factories.
-
-Governors had a curious habit, though: some of them \emph{hunted}, oscillating around the desired speed instead of settling. In 1868 James Clerk Maxwell — the same Maxwell of electromagnetism — published \emph{On Governors}, the first mathematical analysis of a feedback loop. He linearised the equations of motion and showed that stability depends on the roots of a characteristic polynomial: if any root has a positive real part, the governor hunts. That is exactly the tool we will use in \lessonref{les:spring} and \lessonref{les:damper}.
-
-Eighty years later Norbert Wiener named his new science \emph{cybernetics} partly in homage to Maxwell's paper. Today the same loop you see in \cref{fig:meet-loop} runs in your car's engine, your phone's camera stabiliser, the thermostat on your wall, and in every one of the hundreds of millions of drones sold so far.
-\end{curiosity}
-
 \begin{remember}
 \begin{itemize}
   \item The L1 drone obeys $m\ddot y = T - mg + d$: a double integrator. A constant force error grows quadratically into a position error.
@@ -421,6 +411,15 @@ Eighty years later Norbert Wiener named his new science \emph{cybernetics} partl
   \item A prediction is tested by flying it. Where model and flight disagree, the shape of the error says what the model left out.
 \end{itemize}
 \end{remember}
+
+\begin{curiosity}{The governor that started it all}
+\sidephoto{governor}{52mm}{A centrifugal governor by Boulton \& Watt. As the shaft spins faster, the balls fly outward and close the steam valve.}
+In 1788 James Watt fitted his steam engines with a device borrowed from windmills: two heavy balls on hinged arms, spun by the engine. When the engine ran too fast, the balls swung outward and, through a linkage, closed the steam valve; when it slowed, they fell and opened it. It is a proportional controller made of iron — measure (the ball height), compare (with the linkage geometry), act (on the valve) — and it made the steam engine usable in factories.
+
+Governors had a curious habit, though: some of them \emph{hunted}, oscillating around the desired speed instead of settling. In 1868 James Clerk Maxwell — the same Maxwell of electromagnetism — published \emph{On Governors}, the first mathematical analysis of a feedback loop. He linearised the equations of motion and showed that stability depends on the roots of a characteristic polynomial: if any root has a positive real part, the governor hunts. That is exactly the tool we will use in \lessonref{les:spring} and \lessonref{les:damper}.
+
+Eighty years later Norbert Wiener named his new science \emph{cybernetics} partly in homage to Maxwell's paper. Today the same loop you see in \cref{fig:meet-loop} runs in your car's engine, your phone's camera stabiliser, the thermostat on your wall, and in every one of the hundreds of millions of drones sold so far.
+\end{curiosity}
 
 \begin{exercises}
 \exercise[1] The feedforward uses $\hat m = \SI{1.00}{kg}$ but the true mass is \SI{0.95}{kg} (a lighter battery). With the open-loop hover of Example~\ref{ex:meet-open}, which way does the drone drift, and how far has it moved after \SI{2}{s}?

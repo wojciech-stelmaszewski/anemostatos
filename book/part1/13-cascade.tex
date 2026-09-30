@@ -94,13 +94,6 @@ A cascade works because each inner loop is much faster than the one around it. T
 \predict{if the maximum tilt were $15^\circ$ instead of $35^\circ$, what would limit a fast sideways move, and could the drone still hold position in a \SI{5}{m/s} wind?}
 \end{trythis}
 
-\begin{curiosity}{Cascades everywhere}
-\sidephoto{distillation}{50mm}{Distillation columns. Their temperatures, pressures and flows are held by hundreds of loops, many of them in cascade.}
-The cascade was not invented for drones. In a chemical reactor the important variable is the temperature of the reaction, but the only thing an operator can move is a valve on the cooling water. Between the valve and the reaction temperature lie the flow, the temperature of the cooling jacket, and the thermal mass of the reactor — a slow chain with disturbances at every stage (the supply pressure of the water changes, the coolant warms up in summer). The standard solution since the 1940s is a cascade: an outer loop on the reactor temperature sets the setpoint of an inner loop on the jacket temperature, which sets the setpoint of a fast loop on the coolant flow. A drop in supply pressure is corrected by the flow loop in seconds, long before it could disturb the reaction.
-
-The same structure appears in electric drives (a position loop around a speed loop around a current loop), in hard-disk heads, in the servo motors of robots, and in the open-source autopilots that fly most of the world's hobby and research drones. PX4's multicopter controller has exactly the blocks of \cref{fig:cascade-diagram} — position P, velocity PID, attitude P on quaternions, rate PID — which is why Anemostatos uses them.
-\end{curiosity}
-
 \begin{remember}
 \begin{itemize}
   \item A cascade cuts the chain of integrators into pieces: position → velocity → thrust vector → attitude → rate → mixer.
@@ -109,6 +102,13 @@ The same structure appears in electric drives (a position loop around a speed lo
   \item Inner loops must be much faster than outer ones; tune from the inside out.
 \end{itemize}
 \end{remember}
+
+\begin{curiosity}{Cascades everywhere}
+\sidephoto{distillation}{50mm}{Distillation columns. Their temperatures, pressures and flows are held by hundreds of loops, many of them in cascade.}
+The cascade was not invented for drones. In a chemical reactor the important variable is the temperature of the reaction, but the only thing an operator can move is a valve on the cooling water. Between the valve and the reaction temperature lie the flow, the temperature of the cooling jacket, and the thermal mass of the reactor — a slow chain with disturbances at every stage (the supply pressure of the water changes, the coolant warms up in summer). The standard solution since the 1940s is a cascade: an outer loop on the reactor temperature sets the setpoint of an inner loop on the jacket temperature, which sets the setpoint of a fast loop on the coolant flow. A drop in supply pressure is corrected by the flow loop in seconds, long before it could disturb the reaction.
+
+The same structure appears in electric drives (a position loop around a speed loop around a current loop), in hard-disk heads, in the servo motors of robots, and in the open-source autopilots that fly most of the world's hobby and research drones. PX4's multicopter controller has exactly the blocks of \cref{fig:cascade-diagram} — position P, velocity PID, attitude P on quaternions, rate PID — which is why Anemostatos uses them.
+\end{curiosity}
 
 \begin{exercises}
 \exercise[1] The velocity loop asks for $\vec a_{sp} = (2, 0, 0)\,\si{m/s^2}$ while hovering. Compute $\vec F_{des}$, the tilt, and the collective thrust for $\hat m = \SI{1}{kg}$.

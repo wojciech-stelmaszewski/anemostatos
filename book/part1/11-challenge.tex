@@ -75,13 +75,6 @@ The orange run in \cref{fig:challenge-runs} uses $K_p = 40$, $K_i = 8$, $K_d = 1
 \predict{is there a tune that brings the RMS error below \SI{5}{cm}? What would limit it?}
 \end{trythis}
 
-\begin{curiosity}{Machines that live in the wind}
-\photo{nwtc}{A blade being fitted at the US National Wind Technology Center in Colorado. Each blade of a modern turbine is turned by its own pitch controller.}
-A large wind turbine is a feedback system fighting gusts all day long. Above its rated wind speed the generator is already delivering full power, and every extra gust would overspeed the rotor and overload the drive train. So a pitch controller — at its core a PI loop on the rotor speed, with gains scheduled on the wind speed — turns the blades about their long axes to spill the excess wind. On modern machines each blade has its own actuator, and the controllers also damp the tower's swaying and reduce the fatigue loads that a lifetime of gusts would cause.
-
-The one-minus-cosine gust of this lesson comes from aviation. Aircraft certification rules (for example EASA CS-25 and the American FAR Part 25) require airliners to be designed for \enquote{discrete gusts} of exactly this shape, with gradient lengths from about 9 to \SI{107}{m} and speeds depending on altitude. Engineers fly the aircraft model through a family of such gusts and check the loads on the wings. Many modern airliners go further: their flight-control computers deflect ailerons and spoilers as a gust arrives to relieve the wing — gust load alleviation, disturbance rejection at the scale of a jet.
-\end{curiosity}
-
 \begin{remember}
 \begin{itemize}
   \item The simulator's wind is mean + Ornstein–Uhlenbeck turbulence + 1−cos gusts, all from one seed: identical wind for fair comparisons.
@@ -90,6 +83,13 @@ The one-minus-cosine gust of this lesson comes from aviation. Aircraft certifica
   \item A faster loop scores better until saturation, noise, delay and lag stop it.
 \end{itemize}
 \end{remember}
+
+\begin{curiosity}{Machines that live in the wind}
+\photo{nwtc}{A blade being fitted at the US National Wind Technology Center in Colorado. Each blade of a modern turbine is turned by its own pitch controller.}
+A large wind turbine is a feedback system fighting gusts all day long. Above its rated wind speed the generator is already delivering full power, and every extra gust would overspeed the rotor and overload the drive train. So a pitch controller — at its core a PI loop on the rotor speed, with gains scheduled on the wind speed — turns the blades about their long axes to spill the excess wind. On modern machines each blade has its own actuator, and the controllers also damp the tower's swaying and reduce the fatigue loads that a lifetime of gusts would cause.
+
+The one-minus-cosine gust of this lesson comes from aviation. Aircraft certification rules (for example EASA CS-25 and the American FAR Part 25) require airliners to be designed for \enquote{discrete gusts} of exactly this shape, with gradient lengths from about 9 to \SI{107}{m} and speeds depending on altitude. Engineers fly the aircraft model through a family of such gusts and check the loads on the wings. Many modern airliners go further: their flight-control computers deflect ailerons and spoilers as a gust arrives to relieve the wing — gust load alleviation, disturbance rejection at the scale of a jet.
+\end{curiosity}
 
 \begin{exercises}
 \exercise[1] Show that the OU recursion keeps the variance at $\sigma_w^2$: if $\operatorname{Var}w_k = \sigma_w^2$, then $\operatorname{Var}w_{k+1} = \sigma_w^2$.

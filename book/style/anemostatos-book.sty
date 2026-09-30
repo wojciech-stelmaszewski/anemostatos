@@ -8,8 +8,10 @@
 % ---------------------------------------------------------------- page ------
 \RequirePackage[
   paperwidth=210mm, paperheight=297mm,
-  left=24mm, textwidth=124mm,
-  marginparsep=7mm, marginparwidth=46mm,
+  % Equal outer margins: 22 + (120 + 7 + 39) + 22 = 210. Full-width elements then sit centred on
+  % the page, and the text column with its margin column fills exactly that width.
+  left=22mm, textwidth=120mm,
+  marginparsep=7mm, marginparwidth=39mm,
   top=27mm, textheight=238mm, headsep=9mm, headheight=14pt, footskip=12mm
 ]{geometry}
 \RequirePackage{calc}
@@ -221,13 +223,13 @@
     % a soft glow where the drone would hover
     \shade[inner color=accent!55!night, outer color=night, opacity=0.35]
       ($(0.72\paperwidth,-46mm)$) circle (30mm);
-    \node[anchor=north west, inner sep=0pt, text=nightmuted] at (24mm,-19mm)
+    \node[anchor=north west, inner sep=0pt, text=nightmuted] at (22mm,-19mm)
       {\sanscaps\footnotesize LESSON\hspace{1.2em}\color{accent}\lessonlevelname{#4}};
     \node[anchor=north west, inner sep=0pt, text=accent] at (22.5mm,-27mm)
       {\sansthin\fontsize{64}{64}\selectfont #1};
-    \node[anchor=south west, inner sep=0pt, text=nighttext, inner sep=0pt] at (24mm,-72mm)
+    \node[anchor=south west, inner sep=0pt, text=nighttext, inner sep=0pt] at (22mm,-72mm)
       {\parbox[b]{150mm}{\raggedright\sansdisplay\fontsize{28}{32}\selectfont #2}};
-    \node[anchor=north west, inner sep=0pt, text=nightmuted, inner sep=0pt] at (24mm,-76mm)
+    \node[anchor=north west, inner sep=0pt, text=nightmuted, inner sep=0pt] at (22mm,-76mm)
       {\parbox[t]{150mm}{\raggedright\displayserif\itshape\fontsize{12.5}{15}\selectfont #3}};
     \node[anchor=north east, inner sep=0pt, text=nightmuted] at ($(\paperwidth-14mm,-19mm)$)
       {\ttfamily\footnotesize\color{nightmuted}lesson id \color{accent}'#5'};
@@ -251,11 +253,11 @@
   \thispagestyle{plain}%
   \begin{tikzpicture}[remember picture, overlay, shift={(current page.north west)}]
     \nightgrid{70mm}{0.66}
-    \node[anchor=south west, inner sep=0pt, text=nighttext, inner sep=0pt] at (24mm,-52mm)
+    \node[anchor=south west, inner sep=0pt, text=nighttext, inner sep=0pt] at (22mm,-52mm)
       {\parbox[b]{160mm}{\raggedright\sansdisplay\fontsize{28}{32}\selectfont #2}};
-    \node[anchor=north west, inner sep=0pt, text=nightmuted, inner sep=0pt] at (24mm,-56mm)
+    \node[anchor=north west, inner sep=0pt, text=nightmuted, inner sep=0pt] at (22mm,-56mm)
       {\parbox[t]{160mm}{\raggedright\displayserif\itshape\fontsize{12.5}{15}\selectfont #3}};
-    \ifstrempty{#1}{}{\node[anchor=north west, inner sep=0pt, text=accent] at (24mm,-17mm)
+    \ifstrempty{#1}{}{\node[anchor=north west, inner sep=0pt, text=accent] at (22mm,-17mm)
       {\sansthin\fontsize{40}{40}\selectfont #1};}
   \end{tikzpicture}%
   \vspace*{55mm}%
@@ -272,14 +274,14 @@
     \nightgrid{\paperheight}{0.52}
     \shade[inner color=accent!60!night, outer color=night, opacity=0.35]
       ($(0.62\paperwidth,-0.47\paperheight)$) circle (45mm);
-    \node[anchor=north west, text=nightmuted, inner sep=0pt] at (24mm,-40mm) {\sanscaps\small PART};
+    \node[anchor=north west, text=nightmuted, inner sep=0pt] at (22mm,-40mm) {\sanscaps\small PART};
     \node[anchor=north west, text=accent, inner sep=0pt] at (21mm,-47mm)
       {\displayserif\fontsize{120}{120}\selectfont #1};
-    \node[anchor=north west, text=nighttext, inner sep=0pt] at (24mm,-100mm)
+    \node[anchor=north west, text=nighttext, inner sep=0pt] at (22mm,-100mm)
       {\parbox[t]{165mm}{\raggedright\sansdisplay\fontsize{38}{44}\selectfont #2}};
-    \node[anchor=north west, text=nightmuted, inner sep=0pt] at (24mm,-128mm)
+    \node[anchor=north west, text=nightmuted, inner sep=0pt] at (22mm,-128mm)
       {\parbox[t]{120mm}{\raggedright\displayserif\itshape\fontsize{13}{17}\selectfont #3}};
-    \node[anchor=south west, text=nighttext, inner sep=0pt] at (24mm,-280mm)
+    \node[anchor=south west, text=nighttext, inner sep=0pt] at (22mm,-280mm)
       {\parbox[b]{150mm}{\raggedright\sffamily\small\color{nightmuted}#4}};
   \end{tikzpicture}%
   \null\clearpage
@@ -295,11 +297,11 @@
     \fill[mist] (0,0) rectangle (\paperwidth,-\paperheight);
     \node[anchor=north west, text=accent!22, inner sep=0pt] at (14mm,-18mm)
       {\sansthin\fontsize{260}{260}\selectfont #1};
-    \node[anchor=north west, text=muted, inner sep=0pt] at (24mm,-112mm) {\sanscaps\small CHAPTER #1 OF PART II};
-    \node[anchor=north west, text=ink, inner sep=0pt] at (24mm,-120mm)
+    \node[anchor=north west, text=muted, inner sep=0pt] at (22mm,-112mm) {\sanscaps\small CHAPTER #1 OF PART II};
+    \node[anchor=north west, text=ink, inner sep=0pt] at (22mm,-120mm)
       {\parbox[t]{160mm}{\raggedright\sansdisplay\fontsize{30}{36}\selectfont #2}};
-    \node[anchor=north west, text=ink, inner sep=0pt] at (24mm,-146mm)
-      {\parbox[t]{124mm}{\normalsize #3}};
+    \node[anchor=north west, text=ink, inner sep=0pt] at (22mm,-146mm)
+      {\parbox[t]{120mm}{\normalsize #3}};
   \end{tikzpicture}%
   \null\clearpage
 }
@@ -389,7 +391,7 @@
   before upper app={\let\src\srcnight\let\param\paramnight\let\ui\uinight\let\key\keynight}}
 
 % Try this — the app's own orange-bordered box
-\newtcolorbox{trythis}[1][]{base, colback=accentsoft!55, colframe=accent, boxrule=0.7pt, arc=3pt,
+\newtcolorbox{trythis}[1][]{base, whole, colback=accentsoft!55, colframe=accent, boxrule=0.7pt, arc=3pt,
   title={\boxlabel{accent}{TRY THIS}\ifstrempty{#1}{}{\hspace{0.8em}{\sffamily\small\bfseries #1}}},
   attach title to upper, flushfirst}
 \newcommand{\predict}[1]{\par\smallskip\noindent{\color{accent}\sffamily\small\bfseries Predict first.}\enspace\textit{#1}\par\smallskip}
@@ -444,8 +446,7 @@
 \BeforeBeginEnvironment{theorem}{\keeptogether{6\baselineskip}}
 \BeforeBeginEnvironment{lookahead}{\keeptogether{6\baselineskip}}
 \BeforeBeginEnvironment{inapp}{\keeptogether{6\baselineskip}}
-\BeforeBeginEnvironment{trythis}{\keeptogether{8\baselineskip}}
-\BeforeBeginEnvironment{remember}{\keeptogether{8\baselineskip}}
+\BeforeBeginEnvironment{remember}{\keeptogether{9\baselineskip}}
 
 \newcommand{\nohyph}{\hyphenpenalty=10000\exhyphenpenalty=10000\relax}
 
@@ -471,7 +472,8 @@
 \newcommand{\term}[1]{\textbf{#1}}
 \newcommand{\lessonref}[1]{\hyperref[#1]{Lesson~\ref*{#1}}}
 \newcommand{\Lessonref}[1]{\hyperref[#1]{Lesson~\ref*{#1}}}
-\newcommand{\aside}[1]{\marginnote{#1}}
+% A marginal paragraph, so that marginfix can move it up when it would run off the foot of the page.
+\newcommand{\aside}[1]{\marginpar{\marginfont #1}}
 \newcommand{\eg}{e.g.\xspace}
 \newcommand{\ie}{i.e.\xspace}
 

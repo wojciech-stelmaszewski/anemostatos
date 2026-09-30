@@ -82,6 +82,15 @@ That is exactly why good controllers let the feedforward carry the known load an
 \predict{if you now remove the payload (\ui{Physics\then Mass} = \SI{1}{kg}) in mid-flight, which way does the drone jump, and what does the integral do?}
 \end{trythis}
 
+\begin{remember}
+\begin{itemize}
+  \item A constant unmodelled load leaves a PD loop with an error $\Delta F/K_p$.
+  \item An integral can only be at rest when the error is zero, so a stable PID loop removes any constant load; the integral ends up equal to the load.
+  \item P, I and D on a mass give a third-order loop; it is stable iff $K_d K_p > m K_i$.
+  \item After a setpoint step with unchanged load, integral action \emph{must} overshoot. Keep $K_i$ small and let feedforward carry the known load.
+\end{itemize}
+\end{remember}
+
 \begin{curiosity}{How a battleship taught PID}
 \photo{newmexico}{USS New Mexico (BB-40) in 1920. In 1923 Nicolas Minorsky's automatic steering was tested on board.}
 \sidephoto{minorsky}{34mm}{Nicolas Minorsky (1885–1970).}
@@ -91,15 +100,6 @@ In his 1922 paper \emph{Directional stability of automatically steered bodies}, 
 
 The Navy did not adopt it then; helmsmen were cheap and the equipment was not. But the paper is generally considered the first theoretical description of the PID controller, and the three habits of a good helmsman are still the three terms on the screen of Anemostatos.
 \end{curiosity}
-
-\begin{remember}
-\begin{itemize}
-  \item A constant unmodelled load leaves a PD loop with an error $\Delta F/K_p$.
-  \item An integral can only be at rest when the error is zero, so a stable PID loop removes any constant load; the integral ends up equal to the load.
-  \item P, I and D on a mass give a third-order loop; it is stable iff $K_d K_p > m K_i$.
-  \item After a setpoint step with unchanged load, integral action \emph{must} overshoot. Keep $K_i$ small and let feedforward carry the known load.
-\end{itemize}
-\end{remember}
 
 \begin{exercises}
 \exercise[1] A constant downward wind adds a drag force of \SI{1.2}{N}. With the default PID, what is the final value of the I term? And of the error?

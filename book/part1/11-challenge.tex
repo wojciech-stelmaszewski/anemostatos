@@ -2,7 +2,7 @@
 \label{les:challenge}
 
 \lead{\setupcard{\setuprow{Level}{L1}\setuprow{Wind}{strong vertical gusts and turbulence, the same for every run}\setuprow{Controller}{the default PID, to be beaten}\setuprow{Goal}{a lower RMS altitude error than the default tune}}%
-Everything you have learned so far comes together in one game. Strong, mostly vertical gusts hit the drone for a minute, always exactly the same gusts, because the random generator starts from a fixed seed. Your score is the root-mean-square altitude error. The default tune scores \SI{21}{cm}; this chapter explains what limits it and how far you can go.}
+Everything you have learned so far comes together in one game. Strong, mostly vertical gusts hit the drone for a minute, always exactly the same gusts, because the random generator starts from a fixed seed. Your score is the root-mean-square altitude error. The default tune scores \SI{21}{cm}. This chapter explains where that number comes from — it can be predicted to the millimetre — what limits it, and how far you can go.}
 
 \section{The wind of Anemostatos}
 
@@ -12,50 +12,133 @@ The simulated air velocity $\vec w(t)$ is the sum of three parts:
 \end{equation}
 
 \subsection{Turbulence: the Ornstein–Uhlenbeck process}
-Turbulence is random but not arbitrary: the wind now is similar to the wind a moment ago. The simulator models each component as an \term{Ornstein–Uhlenbeck process},
-\begin{equation}
+Turbulence is random but not arbitrary: the wind now is similar to the wind a moment ago. White noise (\lessonref{les:noise}) would be a poor model — it forgets everything between one instant and the next. The simulator models each component of the turbulence as a velocity that is constantly pulled back towards zero and constantly kicked by white noise:
+
+\begin{definition}{Ornstein–Uhlenbeck process}
+\begin{equation}\label{eq:challenge-ou}
   \dd w = -\frac{w}{\tau_w}\,\dd t + \sigma_w\sqrt{\frac{2}{\tau_w}}\,\dd W ,
 \end{equation}
-a velocity that is constantly pulled back towards zero (the first term) and constantly kicked by white noise $\dd W$ (the second). Its stationary standard deviation is $\sigma_w$ and its correlation time $\tau_w$: values more than a few $\tau_w$ apart are nearly independent. Over one simulation step $\Delta t$ it can be advanced exactly,
-\begin{equation}
-  w_{k+1} = w_k\,e^{-\Delta t/\tau_w} + \sigma_w\sqrt{1 - e^{-2\Delta t/\tau_w}}\;\xi_k,\qquad \xi_k \sim \mathcal N(0,1),
+where $\dd W$ is the increment of white noise over $\dd t$ (a Gaussian number of variance $\dd t$). The first term is a relaxation with the \term{correlation time} $\tau_w$; the second a random drive, scaled so that in the long run the standard deviation of $w$ is $\sigma_w$.
+\end{definition}
+
+\begin{example}[One step of turbulence]
+\label{ex:challenge-ou}
+Derive the rule that advances \cref{eq:challenge-ou} by one simulation step, and check that it keeps the right size. The lesson uses $\sigma_w = \SI{1.2}{m/s}$, $\tau_w = \SI{1.5}{s}$, $\Delta t = \SI{1}{ms}$.
+
+\textbf{Step 1 — the deterministic part.} Without the noise, $\dot w = -w/\tau_w$ decays exponentially: after $\Delta t$ the value is $w\,e^{-\Delta t/\tau_w}$.
+
+\textbf{Step 2 — the random part.} The kicks received during the step add a Gaussian number; call its standard deviation $q$. So $w_{k+1} = a\,w_k + q\,\xi_k$ with $a = e^{-\Delta t/\tau_w}$ and $\xi_k$ a standard Gaussian.
+
+\textbf{Step 3 — choose $q$ to keep the variance.} $w_k$ and $\xi_k$ are independent, so $\operatorname{Var}w_{k+1} = a^2\operatorname{Var}w_k + q^2$. If the variance is to stay at $\sigma_w^2$: $\sigma_w^2 = a^2\sigma_w^2 + q^2$, hence $q = \sigma_w\sqrt{1 - a^2}$:
+\begin{equation}\label{eq:challenge-ou-step}
+  w_{k+1} = w_k\,e^{-\Delta t/\tau_w} + \sigma_w\sqrt{1 - e^{-2\Delta t/\tau_w}}\;\xi_k .
 \end{equation}
-which is how \src{src/sim/wind.ts} does it.\aside{The OU process is the continuous-time version of the AR(1) model of statistics, and the simplest model of a velocity subject to friction and random forces — Brownian motion of a heavy particle.}
+
+\textbf{Step 4 — numbers.} $a = e^{-0.001/1.5} = 0.99933$ and $q = 1.2\sqrt{1 - 0.99867} = \SI{0.044}{m/s}$. Each millisecond the wind keeps 99.93\,\% of its value and receives a kick of about \SI{4}{cm/s}.
+
+\textbf{Step 5 — memory.} After a time $t$ the wind still \enquote{remembers} the fraction $e^{-t/\tau_w}$ of its value: 51\,\% after one second, 3.6\,\% after five. Values more than a few $\tau_w$ apart are practically independent.
+\end{example}
+
+The recursion \eqref{eq:challenge-ou-step} is exact for any step size, and it is how \src{src/sim/wind.ts} advances the turbulence.\aside{The OU process is the continuous-time version of the AR(1) model of statistics, and the simplest model of a velocity subject to friction and random forces — Brownian motion of a heavy particle.}
 
 \subsection{Gusts: the one-minus-cosine}
-On top of the turbulence come discrete gusts. They arrive at random times (a Poisson process), each with a random direction, peak speed $A$ and duration $T_g$, and each follows the classic shape of aviation engineering:
+On top of the turbulence come discrete gusts. They arrive at random times (a Poisson process, 14 per minute here), each with a random direction, peak speed $A$ (4 to \SI{10}{m/s}) and duration $T_g$ (0.6 to \SI{2.5}{s}), and each follows the classic shape of aviation engineering:
 \begin{equation}
   w_{gust}(t) = \frac{A}{2}\left(1 - \cos\frac{2\pi(t - t_0)}{T_g}\right),\qquad t_0 \le t \le t_0 + T_g .
 \end{equation}
 It starts and ends smoothly, which is what a real gust does and what makes it a fair test: no infinite accelerations, only a shove.
 
 \subsection{From wind to force}
-The drone feels the wind through drag on the velocity \emph{relative to the air}, $\vec v_{rel} = \vec v - \vec w$: vertically $F = -c_v|v_{rel}|v_{rel}$ with $c_v = \SI{0.25}{N.s^2/m^2}$. A hovering drone hit by an \SI{8}{m/s} vertical gust feels $0.25\cdot 64 = \SI{16}{N}$ — more than one and a half times its weight. The challenge's gusts reach \SI{10}{m/s}. These are not small disturbances, and the motors, with \SI{24.4}{N} of total thrust, will saturate when a gust pushes down.
+The drone feels the wind through drag on its velocity \emph{relative to the air}: vertically
+\begin{equation}\label{eq:challenge-drag}
+  d = -c_v\,|v - w|\,(v - w), \qquad c_v = \SI{0.25}{N.s^2/m^2}.
+\end{equation}
+
+\begin{example}[What a gust asks of the motors]
+\label{ex:challenge-force}
+A hovering drone is hit by a vertical gust of \SI{8}{m/s}. What would it take to stay put?
+
+\textbf{Step 1 — the force.} With $v = 0$: $|d| = 0.25 \cdot 8^2 = \SI{16}{N}$ — more than one and a half times the weight.
+
+\textbf{Step 2 — a downward gust.} To hold position the motors must supply $9.81 + 16 = \SI{25.8}{N}$. They have \SI{24.4}{N}. The drone will sink, whatever the controller does.
+
+\textbf{Step 3 — an upward gust.} The motors would have to supply $9.81 - 16 = \SI{-6.2}{N}$: a downward pull. Propellers cannot pull. Even with the motors off, the drone is lifted with $16 - 9.81 = \SI{6.2}{N}$.
+
+\textbf{Step 4 — what saves it.} As the drone starts to move with the air, the relative velocity and with it the force fall quickly (quadratically), and the gust is short. The worst gust of the challenge, \SI{8.7}{m/s} downwards, pushes the default-tuned drone \SI{98}{cm} off its setpoint.
+
+\textbf{Step 5 — the lesson.} For the strongest gusts the limit is the vehicle, not the tuning. No controller can do better than saturate in the right direction at once. For the moderate gusts and the turbulence, the tuning decides.
+\end{example}
 
 \widefig{challenge_runs}{The gust challenge: the altitude error for the default tune (grey) and for a stiffer tune (orange) on exactly the same wind (bottom). The large excursions coincide with the gusts; the stiffer loop halves them.}{fig:challenge-runs}
 
 \section{How a loop rejects a disturbance}
 
-Where does the error come from, and what can the gains do about it? Treat the gust as a disturbance force $d(t)$ acting on the mass. With the PID in the loop, the response of the altitude to that force is — in Laplace terms, with the motor lag $1/(\tau_m s+1)$ —
-\begin{equation}\label{eq:challenge-sens}
-  \frac{Y(s)}{D(s)} = \frac{\dfrac{1}{m s^2}}{1 + C(s)\,\dfrac{1}{m s^2(\tau_m s + 1)}},\qquad C(s) = K_p + \frac{K_i}{s} + \frac{K_d s}{T_f s + 1}.
-\end{equation}
-\Cref{fig:challenge-sens} plots its magnitude over frequency. Three regions are visible.
-\begin{itemize}
-  \item \textbf{Slow disturbances} (left) are crushed by the integral: the response falls towards zero at low frequency — the steady-state result of \lessonref{les:integral}.
-  \item \textbf{Middle frequencies}, where the gusts live, are resisted by the stiffness and damping of the loop: roughly $|Y/D| \approx 1/K_p$. Four times the stiffness, a quarter of the error.
-  \item \textbf{Fast disturbances} (right) are too quick for any controller: there the response is simply that of the free mass, $1/(m\omega^2)$. Only mass — inertia — helps.
-\end{itemize}
+Where does the error come from, and what can the gains do about it? Treat the gust as a force $d(t)$ on the mass. The tools are those of Lessons~8 and~9: ask what the loop does to a \emph{sinusoidal} force of each frequency.
 
-\simfig{challenge_sens}{How much a disturbing force of each frequency moves the drone, \cref{eq:challenge-sens}. The tuned loop is about four times stiffer in the band of the gusts (grey); at high frequency no tune can beat the inertia of the drone.}{fig:challenge-sens}
+Write the closed loop with the full PID ($r$ constant, exact feedforward, and for a moment without the motor lag): $m\ddot y = -K_p y - K_i\!\int\! y\,\dd t - K_d\dot y + d$, measuring $y$ from the setpoint. Differentiating once,
+\begin{equation}
+  m\dddot y + K_d\ddot y + K_p\dot y + K_i y = \dot d .
+\end{equation}
+By \cref{thm:noise-freq}, a force $d = \sin\omega t$ produces a motion of the amplitude $|H_d(j\omega)|$, with the transfer function
+\begin{equation}\label{eq:challenge-sens}
+  H_d(s) = \frac{s}{m s^3 + K_d s^2 + K_p s + K_i} = \frac{1}{m s^2 + K_d s + K_p + K_i/s} .
+\end{equation}
+The second form reads well: the denominator is what resists the force — inertia ($ms^2$), damper, spring, and integral. At each frequency one of them dominates.
+
+\begin{example}[The response to a slow and to a fast force]
+\label{ex:challenge-freq}
+A force of \SI{1}{N} amplitude oscillates at \SI{0.4}{Hz}, the rhythm of the longest gusts. By how much does the drone move, with the default tune and with $K_p = 40$, $K_i = 8$, $K_d = 12$?
+
+\textbf{Step 1 — the frequency.} $\omega = 2\pi \cdot 0.4 = \SI{2.51}{rad/s}$, $s = j\omega$, $s^2 = -6.32$.
+
+\textbf{Step 2 — the denominator, default tune.} $ms^2 = -6.32$; $K_p = 10$; $K_ds = 17.59j$; $K_i/s = -0.32j$. Sum: $3.68 + 17.27j$, with the magnitude $\sqrt{3.68^2 + 17.27^2} = 17.66$.
+
+\textbf{Step 3 — the motion.} $|H_d| = 1/17.66 = \SI{0.057}{m/N}$: \SI{5.7}{cm} per newton. At this frequency the damper does most of the resisting.
+
+\textbf{Step 4 — the stiffer tune.} $-6.32 + 40 + 30.16j - 3.18j = 33.68 + 26.98j$, magnitude 43.2: \SI{2.3}{cm} per newton, two and a half times less.
+
+\textbf{Step 5 — a fast force.} At \SI{3}{Hz}, $\omega = 18.8$ and $ms^2 = -355$: the inertia term dwarfs everything a reasonable gain can add. Both tunes move by about $1/355 = \SI{0.3}{cm}$ per newton — what the free mass would do. The controller is irrelevant there.
+
+\textbf{Step 6 — a constant force.} For $\omega \to 0$ the term $K_i/s$ grows without bound and $|H_d| \to 0$: the integral removes a constant load completely (\lessonref{les:integral}). Without it $|H_d| \to 1/K_p$, the droop of \lessonref{les:droop}.
+\end{example}
+
+\simfig{challenge_sens}{How much a disturbing force of each frequency moves the drone: $|H_d(j\omega)|$ of \cref{eq:challenge-sens}, with the motor lag and the D filter included. The tuned loop is stiffer in the band of the gusts (grey); at high frequency no tune can beat the inertia of the drone (dashed: the free mass).}{fig:challenge-sens}
+
+\Cref{fig:challenge-sens} draws the whole curve. Three regions are visible.
+\begin{itemize}
+  \item \textbf{Slow disturbances} (left) are crushed by the integral.
+  \item \textbf{Middle frequencies}, where the gusts live, are resisted by the stiffness and damping of the loop. This is the region that tuning changes.
+  \item \textbf{Fast disturbances} (right) are too quick for any controller: there the response is that of the free mass, $1/(m\omega^2)$. Only inertia helps.
+\end{itemize}
 
 \begin{keyidea}[Disturbance rejection is bandwidth]
 A feedback loop can only reject disturbances that are slower than itself. To fight faster gusts you need a faster loop: higher $K_p$ with enough $K_d$ to damp it and enough $K_i$ to remove what remains. Every earlier lesson sets a limit on how far you can go: saturation (\lessonref{les:windup}), sensor noise amplified by D (\lessonref{les:noise}), delay (\lessonref{les:slow}) and actuator lag (\lessonref{les:edge}).
 \end{keyidea}
 
-\section{A tune that wins}
+\section{A tune that wins — and a prediction of the score}
 
-The orange run in \cref{fig:challenge-runs} uses $K_p = 40$, $K_i = 8$, $K_d = 12$, with the D filter opened to \SI{30}{Hz}. Check it against the rules: $\zeta = 12/(2\sqrt{40}) = 0.95$; the edge of \cref{eq:edge-limit} is at $K_p = 12/0.03 = 400$, ten times away; the integral is far inside the Routh limit $K_i < K_dK_p/m = 480$. The score falls from \SI{21.0}{cm} to \SI{9.9}{cm}. The price is visible in the motors: the thrust changes about 50\,\% more from sample to sample.
+\begin{example}[Designing the orange run]
+\label{ex:challenge-tune}
+Choose gains that at least halve the error of the default tune, and check them against every limit of Part~I.
+
+\textbf{Step 1 — stiffness.} \Cref{fig:challenge-sens}: in the gust band the response is roughly $1/\sqrt{K_p^2 + (K_d\omega)^2}$. Take $K_p = 40$, four times the default.
+
+\textbf{Step 2 — damping} (\lessonref{les:damper}). Critical damping for $K_p = 40$ is $K_d = 2\sqrt{40} = 12.6$. Take $K_d = 12$: $\zeta = 0.95$.
+
+\textbf{Step 3 — integral} (\lessonref{les:integral}). The integral time $K_p/K_i$ should stay well above the loop's own time scale $1/\omega_n = \SI{0.16}{s}$ and far below the Routh limit $K_pK_d/m = 480$. $K_i = 8$ gives $K_p/K_i = \SI{5}{s}$.
+
+\textbf{Step 4 — the edge} (\lessonref{les:edge}). $K_d/\tau_m = 12/0.03 = 400$: $K_p = 40$ is a factor of ten inside.
+
+\textbf{Step 5 — delay} (\lessonref{les:slow}). The crossover moves up to about \SI{12}{rad/s}; the motor lag then costs $\arctan(0.03 \cdot 12) = 20^\circ$. With the D filter opened to \SI{30}{Hz} the phase margin is $50^\circ$, and the delay margin $0.87/11.9 = \SI{73}{ms}$ — half of the default's.
+
+\textbf{Step 6 — noise} (\lessonref{les:noise}). No sensor noise in this lesson. With \SI{1}{cm} of it, \cref{eq:noise-simple} gives $2\pi \cdot 30 \cdot 12 \cdot 0.01 = \SI{23}{N}$ in the D term — far too much: on a real drone this tune would need a better altimeter.
+
+\textbf{Step 7 — fly.} RMS error \SI{9.9}{cm} against \SI{21.0}{cm}. The thrust changes about 50\,\% more from sample to sample, and the motors are at a limit 4.6\,\% of the time instead of 2.0\,\%.
+\end{example}
+
+The score itself can be predicted. Take everything Part~I has built — the mass, the drag on the relative wind \eqref{eq:challenge-drag}, the motor lag, the sampled PID with its filter, the saturation and the anti-windup — as a model of some thirty lines, and drive it with the recorded wind. \Cref{fig:challenge-predict} lays the result over the simulator's flight: \SI{20.9}{cm} predicted against \SI{21.0}{cm} flown for the default tune, \SI{9.9}{cm} against \SI{9.9}{cm} for the stiffer one. There is nothing in the challenge that the first ten lessons have not explained.
+
+\simfig{challenge_predict}{The challenge, predicted. Colour: the altitude error flown by the simulator. Dashed: the model of Part~I (Lessons 1–10 in thirty lines of code), driven by the same wind.}{fig:challenge-predict}
 
 \begin{inapp}[The challenge]
 \begin{itemize}[leftmargin=1.2em]
@@ -71,17 +154,101 @@ The orange run in \cref{fig:challenge-runs} uses $K_p = 40$, $K_i = 8$, $K_d = 1
   \item Fly the default tune once and press \ui{Snapshot}.
   \item Raise $K_p$ and $K_d$ together, keeping $\zeta$ near 1. Where do you start seeing the motors saturate?
   \item Increase $K_i$: which part of \cref{fig:challenge-sens} does it improve?
-  \item Try the D filter: does opening it to \SI{50}{Hz} help or hurt without sensor noise?
+  \item Add \SI{1}{cm} of altimeter noise (\ui{Sensors}) to your best tune. Does it still win?
 \end{enumerate}
-\predict{is there a tune that brings the RMS error below \SI{5}{cm}? What would limit it?}
+\predict{is there a tune that brings the RMS error below \SI{5}{cm}? What would limit it? (Example~\ref{ex:challenge-force}.)}
 \end{trythis}
+
+\section{The engineer's view: sensitivity}
+
+\subsection{One function for all disturbances}
+Compare the drone with and without feedback. A force $d$ moves the free mass according to $P(s) = 1/(ms^2)$. With the controller $C(s) = K_p + K_i/s + K_ds$ in the loop, \cref{eq:challenge-sens} can be rewritten as
+\begin{equation}\label{eq:challenge-S}
+  H_d(s) = \frac{1}{ms^2 + C(s)} = \underbrace{\frac{1}{ms^2}}_{P(s)}\cdot\underbrace{\frac{1}{1 + L(s)}}_{S(s)}, \qquad L(s) = \frac{C(s)}{ms^2} .
+\end{equation}
+$L$ is the loop transfer function of \lessonref{les:slow}. The factor $S = 1/(1 + L)$ is called the \term{sensitivity function}: at each frequency it says by how much feedback has reduced the effect of a disturbance, compared with no feedback at all.
+
+\begin{itemize}
+  \item Where the loop gain is large, $|L| \gg 1$: $|S| \approx 1/|L|$. The disturbance is divided by the loop gain. This is Black's amplifier of Chapter~0 again.
+  \item Where the loop gain is small, $|L| \ll 1$: $|S| \approx 1$. Feedback does nothing.
+  \item Near the crossover, $|L| \approx 1$, the two add as complex numbers, and if the phase margin is small $1 + L$ is nearly zero: $|S| > 1$. There feedback makes disturbances \emph{worse}. In \cref{fig:challenge-sens} the tuned curve rises slightly above the free mass near \SI{2}{Hz}.
+\end{itemize}
+The crossover frequency is therefore the \term{bandwidth} of disturbance rejection, and the last point is the beginning of a deep fact: the improvement at low frequency must be paid for with a deterioration somewhere else (\cref{thm:challenge-bode}).
+
+\subsection{From a spectrum to an RMS}
+The score of the challenge is an RMS value under random wind. For a linear loop and a random disturbance with a known \emph{power spectral density} $\Phi_d(\omega)$ — its power per unit of frequency — the variance of the output is
+\begin{equation}\label{eq:challenge-rms}
+  \sigma_y^2 = \frac{1}{2\pi}\int_{-\infty}^{\infty} |H_d(j\omega)|^2\,\Phi_d(\omega)\,\dd\omega ,
+\end{equation}
+the continuous counterpart of \cref{thm:noise-variance}. For the turbulence \eqref{eq:challenge-ou}, $\Phi_w(\omega) = 2\sigma_w^2\tau_w/(1 + \omega^2\tau_w^2)$: flat up to $1/\tau_w$, then falling. The integral says what \cref{fig:challenge-sens} shows: the error comes from the band where the disturbance still has power \emph{and} the loop no longer rejects it. Aircraft designers compute gust loads this way, from standard turbulence spectra.
+
+\begin{example}[An airliner meets a gust]
+\label{ex:challenge-aircraft}
+An airliner cruises at $V = \SI{230}{m/s}$ where the air density is $\rho = \SI{0.38}{kg/m^3}$. Its wing loading is $W/S = \SI{6000}{N/m^2}$, and its lift grows with the angle of attack at the rate $a = 5$ per radian. It flies into an upward gust of $U = \SI{10}{m/s}$. How hard are the passengers pushed into their seats?
+
+\textbf{Step 1 — the mechanism.} A wing feels the wind through its angle of attack, not through drag. An upward gust tilts the oncoming air by $\Delta\alpha \approx U/V = 10/230 = \SI{0.043}{rad}$ ($2.5^\circ$).
+
+\textbf{Step 2 — the extra lift.} Lift per unit of wing area is $\tfrac12\rho V^2 a\,\alpha$, so the increment is $\tfrac12\rho V^2 a\,U/V = \tfrac12\rho V a U$.
+
+\textbf{Step 3 — in units of weight.} The \emph{load factor} increment is that lift divided by the wing loading:
+\begin{equation*}
+  \Delta n = \frac{\rho\,V\,a\,U}{2\,(W/S)} = \frac{0.38 \cdot 230 \cdot 5 \cdot 10}{2 \cdot 6000} = 0.36 .
+\end{equation*}
+
+\textbf{Step 4 — read it.} The gust adds \SI{0.36}{g}. The force is \emph{linear} in the gust speed and in the flight speed, where the drone's was quadratic in the gust alone — a different plant, the same question. No autopilot loop can remove it: the gust is over in a fraction of a second. Airliners that alleviate gusts do it by feedforward, deflecting spoilers and ailerons when accelerometers near the nose feel the gust arrive.
+\end{example}
+
+\subsection{In formal terms}
+
+\begin{theorem}[The Ornstein–Uhlenbeck process]
+\label{thm:challenge-ou}
+Let $w_0$ be Gaussian with mean zero and variance $\sigma_w^2$, and let $w_{k+1}$ follow \cref{eq:challenge-ou-step} with independent standard Gaussian $\xi_k$. Then every $w_k$ is Gaussian with mean zero and variance $\sigma_w^2$, and
+\begin{equation*}
+  \mathbb{E}[w_k\,w_{k+n}] = \sigma_w^2\,e^{-n\Delta t/\tau_w} .
+\end{equation*}
+\end{theorem}
+\begin{proof}
+A sum of independent Gaussians is Gaussian. The variance is preserved by Step~3 of Example~\ref{ex:challenge-ou}. For the correlation, $w_{k+n} = a^n w_k$ plus kicks that are independent of $w_k$, so $\mathbb{E}[w_kw_{k+n}] = a^n\sigma_w^2$.
+\end{proof}
+
+The theorem does not depend on the step size: a simulation at \SI{1}{kHz} and one at \SI{100}{Hz} produce turbulence with the same statistics. A naive Euler step of \cref{eq:challenge-ou} would not have this property.
+
+\begin{theorem}[Disturbance response of the closed loop]
+\label{thm:challenge-dist}
+Let the loop \eqref{eq:challenge-S} be asymptotically stable. For a force $d = d_0\sin\omega t$ the altitude tends to a sinusoid of the same frequency with the amplitude $d_0\,|P(j\omega)|\,|S(j\omega)|$. In particular the amplitude tends to zero for $\omega \to 0$ if $K_i > 0$, to $d_0/K_p$ if $K_i = 0$, and is asymptotically $d_0/(m\omega^2)$ for $\omega \to \infty$.
+\end{theorem}
+\begin{proof}
+\Cref{thm:noise-freq} applied to \cref{eq:challenge-sens}; the limits by inspection of its second form.
+\end{proof}
+
+\begin{theorem}[Bode's sensitivity integral]
+\label{thm:challenge-bode}
+Let $L(s)$ be a loop transfer function with at least two more poles than zeros and no poles in the open right half-plane, and let the closed loop be stable. Then
+\begin{equation*}
+  \int_0^\infty \ln|S(j\omega)|\,\dd\omega = 0 .
+\end{equation*}
+(Bode, 1945; Åström and Murray, 2021, ch.~12.)
+\end{theorem}
+
+The logarithm of $|S|$ is negative where feedback helps and positive where it hurts, and the two areas are equal. Pushing the sensitivity down in one band makes it bulge up in another, like a waterbed. For the ideal P–D loop the excess of poles is only one and the theorem does not apply; the motor lag makes it apply to every real loop. The tuning of this lesson did not escape it: it moved the bulge to higher frequencies, where the wind has little power.
+
+\begin{lookahead}
+\begin{itemize}[leftmargin=1.2em]
+  \item Lesson~III.5 measures $|S|$ on the flying drone and shows the waterbed of \cref{thm:challenge-bode}; III.6 shapes the loop deliberately, band by band.
+  \item A disturbance observer estimates the gust's force from the drone's motion and cancels it, instead of waiting for the error: ADRC (Lesson~II.5) and, with an accelerometer that feels the push at once, INDI (II.8), which beats the cascade on this very wind by 73\,\%.
+  \item One flight proves nothing. Lesson~III.29 flies a tune three hundred times on different seeds and dispersed parameters, and reports the distribution of the score — how requirements are verified in industry (Lesson~V.2).
+  \item Model predictive control plans with the motor limits of Example~\ref{ex:challenge-force} instead of running into them (Lesson~II.13).
+  \item Aircraft meet gusts through the angle of attack (Example~\ref{ex:challenge-aircraft}); their fast and slow responses are the modes of Lesson~IV.11.
+\end{itemize}
+\end{lookahead}
 
 \begin{remember}
 \begin{itemize}
   \item The simulator's wind is mean + Ornstein–Uhlenbeck turbulence + 1−cos gusts, all from one seed: identical wind for fair comparisons.
-  \item Wind acts through drag on the relative velocity; strong gusts produce forces larger than the weight.
-  \item A loop rejects slow disturbances with its integral, medium ones with its stiffness, and cannot reject disturbances faster than itself.
-  \item A faster loop scores better until saturation, noise, delay and lag stop it.
+  \item Wind acts through drag on the relative velocity, $c_v|v - w|(v - w)$; strong gusts produce forces larger than the weight, which no tuning can hold.
+  \item The loop's response to a force is $H_d = 1/(ms^2 + K_ds + K_p + K_i/s)$: the integral crushes slow disturbances, stiffness and damping resist medium ones, and nothing but inertia resists fast ones.
+  \item $H_d = P \cdot S$ with the sensitivity $S = 1/(1 + L)$: feedback divides a disturbance by the loop gain where the gain is large.
+  \item A faster loop scores better until saturation, noise, delay and lag stop it. Check a tune against all four.
 \end{itemize}
 \end{remember}
 
@@ -93,12 +260,22 @@ The one-minus-cosine gust of this lesson comes from aviation. Aircraft certifica
 \end{curiosity}
 
 \begin{exercises}
-\exercise[1] Show that the OU recursion keeps the variance at $\sigma_w^2$: if $\operatorname{Var}w_k = \sigma_w^2$, then $\operatorname{Var}w_{k+1} = \sigma_w^2$.
-\answer{$\operatorname{Var}w_{k+1} = e^{-2\Delta t/\tau_w}\sigma_w^2 + \sigma_w^2(1 - e^{-2\Delta t/\tau_w}) = \sigma_w^2$.}
-\exercise[1] A \SI{6}{m/s} upward gust hits the hovering drone. Estimate the initial acceleration if nothing else changed.
-\answer{$F = c_v w^2 = 0.25\cdot36 = \SI{9}{N}$ upward: $a = \SI{9}{m/s^2}$ — almost $g$.}
-\exercise[2] From \cref{eq:challenge-sens} with $\tau_m = 0$, $T_f = 0$, show that $Y/D \to 0$ as $s \to 0$ when $K_i > 0$, and $\to 1/K_p$ when $K_i = 0$. Relate this to Lessons 3 and 5.
-\answer{$Y/D = 1/(ms^2 + K_d s + K_p + K_i/s) = s/(ms^3 + K_ds^2 + K_ps + K_i)$. At $s = 0$: $0$ if $K_i>0$ (no steady error), $1/K_p$ if $K_i = 0$ (the droop $F/K_p$ of Lesson 3).}
-\exercise[2] The mean of the 1−cos gust over its duration is $A/2$ and its peak $A$. Compute the impulse (force × time) that a gust of peak \SI{8}{m/s} and duration \SI{1.5}{s} delivers to a hovering drone, and the velocity it would give it without control.
-\answer{$F = c_v w^2$, and the mean of $(\tfrac A2(1-\cos))^2$ is $\tfrac{A^2}{4}\cdot\tfrac32 = \tfrac38 A^2$. Impulse $= 0.25\cdot\tfrac38\cdot64\cdot1.5 = \SI{9}{N.s}$, i.e.\ \SI{9}{m/s} for a \SI{1}{kg} drone (in reality less, because the drone starts moving with the air).}
+\exercise[1] A \SI{6}{m/s} upward gust hits the hovering drone. Estimate the initial acceleration if the thrust did not change. Can the motors cancel the force?
+\answer{$F = 0.25 \cdot 36 = \SI{9}{N}$ upward, $a = \SI{9}{m/s^2}$. Cancelling needs a thrust of $9.81 - 9 = \SI{0.8}{N}$: just possible.}
+\exercise[1] With $\tau_w = \SI{1.5}{s}$, after how long has the turbulence forgotten 90\,\% of its present value? How many simulation steps is that?
+\answer{$e^{-t/\tau_w} = 0.1$: $t = 1.5\ln10 = \SI{3.45}{s}$, 3450 steps.}
+\exercise[1] Repeat Steps 1–3 of Example~\ref{ex:challenge-freq} for a force at \SI{1}{Hz} with the default tune.
+\answer{$\omega = 6.28$, $ms^2 = -39.5$; $-39.5 + 10 + 44.0j - 0.13j = -29.5 + 43.9j$, magnitude 52.9: \SI{1.9}{cm/N} (the full model, with the motor lag: 2.2).}
+\exercise[2]\exkind{derive} From \cref{eq:challenge-sens} show that $|H_d|$ has its largest value near the frequency where $ms^2 + K_p$ vanishes, $\omega = \sqrt{K_p/m}$, if $K_i$ is small, and that the value there is $1/(K_d\omega_n)$. Evaluate it for both tunes and compare with \cref{fig:challenge-sens}.
+\answer{At $\omega_n$ the real part of the denominator is zero and the imaginary part is $K_d\omega_n - K_i/\omega_n \approx K_d\omega_n$. Default: $1/(7 \cdot 3.16) = \SI{4.5}{cm/N}$; tuned: $1/(12 \cdot 6.32) = \SI{1.3}{cm/N}$. For these well-damped loops the true maximum lies at a lower frequency and is larger (about 10 and \SI{2.5}{cm/N}): the curve is flat, not peaked.}
+\exercise[2]\exkind{derive} The impulse of a gust. Show that the mean of $\big(\tfrac{A}{2}(1 - \cos)\big)^2$ over one period is $\tfrac38A^2$, and compute the impulse that a gust of peak \SI{8}{m/s} and duration \SI{1.5}{s} delivers to a drone that stays in place. What velocity would it give the drone without control?
+\answer{$\tfrac{A^2}{4}\overline{(1 - 2\cos + \cos^2)} = \tfrac{A^2}{4}\cdot\tfrac32$. Impulse $0.25 \cdot \tfrac38 \cdot 64 \cdot 1.5 = \SI{9}{N.s}$, i.e.\ \SI{9}{m/s} — in reality less, because the drone starts moving with the air.}
+\exercise[2]\exkind{derive} Show that the naive Euler step of \cref{eq:challenge-ou}, $w_{k+1} = w_k(1 - \Delta t/\tau_w) + \sigma_w\sqrt{2\Delta t/\tau_w}\,\xi_k$, has the stationary variance $\sigma_w^2/(1 - \Delta t/(2\tau_w))$. How wrong is it at \SI{1}{kHz}? At \SI{10}{Hz}?
+\answer{$v = (1 - h)^2v + 2h\sigma_w^2$ with $h = \Delta t/\tau_w$: $v = \sigma_w^2/(1 - h/2)$. 0.03\,\% too large at \SI{1}{kHz}, 3.4\,\% at \SI{10}{Hz}.}
+\exercise[2]\exkind{fly} Beat the orange run. Record your gains, your score, and the fraction of time the thrust chart is shaded red. Then add \SI{1}{cm} of altimeter noise and fly the same gains again.
+\answer{Scores near \SI{8}{cm} are reachable with $K_p \approx 60$, $K_d \approx 15$, $K_i \approx 15$; with noise the D term then fluctuates by tens of newtons and the score collapses unless the D filter is lowered again.}
+\exercise[2]\exkind{code} The function \texttt{altitude\_model} in \src{book/tools/figs\_predict.py} is the thirty-line model behind \cref{fig:challenge-predict}. Remove one ingredient at a time — the motor lag, the saturation, the drag's dependence on the drone's own velocity — and record the predicted RMS for the default tune. Which ingredient matters most for this score?
+\answer{Replacing $|v - w|(v - w)$ by $|w|w$ doubles the predicted score, from \SI{20.9}{cm} to \SI{42.6}{cm}: moving with the gust is what limits its force. Removing the motor lag changes the score by \SI{0.3}{cm}, removing the saturation not at all for the default tune (and by \SI{0.6}{cm} for the stiffer one).}
+\exercise[3]\exkind{derive} Use \cref{eq:challenge-rms} for a rough prediction. Linearise the drag for small wind, $d \approx 2c_v\bar w\,w$ around a typical speed $\bar w = \sigma_w$, take the turbulence spectrum of the text, and approximate $|H_d|$ by the constant $1/(K_d\omega_n)$ up to $\omega_n$ and zero above. Estimate the RMS error due to turbulence alone for the default tune, and compare it with the quiet stretches of \cref{fig:challenge-runs}.
+\answer{$\sigma_d \approx 2 \cdot 0.25 \cdot 1.2 \cdot 1.2 = \SI{0.72}{N}$ in total; the fraction of its power below $\omega_n = 3.16$ is $\tfrac2\pi\arctan(\omega_n\tau_w) = 0.87$. $\sigma_y \approx 0.72\sqrt{0.87}/(7 \cdot 3.16) \approx \SI{3}{cm}$ — the right size for the stretches between gusts (a few centimetres). The score of \SI{21}{cm} is set by the gusts.}
 \end{exercises}

@@ -606,3 +606,56 @@ def edge_predict():
     a.set_ylabel("deviation from the setpoint  [cm]")
     xlab_time(a, "time after the step  [s]")
     save(f, "edge_predict")
+
+
+# ─── Lesson 11 ─────────────────────────────────────────────────────────────
+def altitude_model(t_w, w, kp=10.0, ki=0.8, kd=7.0, fc=20.0, m=1.0, tau=0.03, cv=0.25, tmax=24.4, rate=250):
+    """The altitude loop of Part I as a model, driven by a recorded vertical wind: drag on the
+    relative velocity, motor lag, the sampled PID with its D filter, saturation and clamping."""
+    dt = 0.001
+    n = int((t_w[-1] - t_w[0]) / dt)
+    every = int(round(1 / (rate * dt)))
+    tf = 1 / (2 * np.pi * fc)
+    al = tf / (tf + every * dt)
+    y = v = integ = dfil = 0.0
+    thrust, yprev, u = G * m, 0.0, G * m
+    out = np.zeros((n, 3))
+    ok = np.isfinite(w)
+    wi = np.interp(t_w[0] + dt * np.arange(n), t_w[ok], w[ok])
+    for k in range(n):
+        if k % every == 0:
+            e = -y
+            draw = -(y - yprev) / (every * dt)
+            yprev = y
+            dfil = al * dfil + (1 - al) * draw
+            nxt = integ + ki * e * every * dt
+            uraw = G * m + kp * e + nxt + kd * dfil
+            if not ((uraw > tmax and e > 0) or (uraw < 0 and e < 0)):
+                integ = nxt
+            u = min(max(G * m + kp * e + integ + kd * dfil, 0.0), tmax)
+        thrust += (u - thrust) * (1 - np.exp(-dt / tau))
+        rel = v - wi[k]
+        v += (thrust - G * m - cv * abs(rel) * rel) / m * dt
+        y += v * dt
+        out[k] = (t_w[0] + k * dt, -y, thrust)
+    return out.T
+
+
+@fig
+def challenge_predict():
+    d = load("challenge")
+    f, ax = plt.subplots(2, 1, figsize=(TEXT_W, 72 * MM), sharex=True, gridspec_kw=dict(hspace=0.4))
+    for a, name, gains, col, lab in [(ax[0], "challenge", dict(), C["faint"], "default tune"),
+                                     (ax[1], "challenge-tuned", dict(kp=40, ki=8, kd=12, fc=30), C["accent"],
+                                      "$K_p = 40$, $K_i = 8$, $K_d = 12$")]:
+        s = load(name)
+        t, e, _ = altitude_model(d.t.values, d["wind.y"].values, **gains)
+        a.plot(s.t, 100 * s["alt.err"], color=col, lw=1.6)
+        a.plot(t, 100 * e, color=C["ink"], lw=0.6, ls=DASH)
+        rs, rm = 100 * np.sqrt((s["alt.err"] ** 2).mean()), 100 * np.sqrt((e**2).mean())
+        a.set_title(f"{lab}:  RMS {rs:.1f} cm flown, {rm:.1f} cm predicted")
+        a.set_ylabel("error  [cm]")
+        a.axhline(0, color=C["faint"], lw=0.5)
+    xlab_time(ax[1])
+    ax[1].set_xlim(5, 65)
+    save(f, "challenge_predict")

@@ -221,3 +221,54 @@ def tb_zplane():
     a.set_xlabel("Re $z$", loc="right")
     a.set_ylabel("Im $z$")
     save(f, "tb_zplane")
+
+
+@fig
+def tb_ou():
+    """The Ornstein-Uhlenbeck turbulence: a realisation, its autocorrelation and its spectrum."""
+    sig, tau, dt = 1.2, 1.5, 0.01
+    rng = np.random.default_rng(4242)
+    n = int(600 / dt)
+    a, q = np.exp(-dt / tau), sig * np.sqrt(1 - np.exp(-2 * dt / tau))
+    w = np.empty(n)
+    w[0] = sig * rng.standard_normal()
+    xi = rng.standard_normal(n)
+    for k in range(1, n):
+        w[k] = a * w[k - 1] + q * xi[k]
+    f = plt.figure(figsize=(TEXT_W, 88 * MM))
+    gs = f.add_gridspec(2, 2, hspace=0.62, wspace=0.3, height_ratios=[1, 1.1])
+    ax = f.add_subplot(gs[0, :])
+    m = int(40 / dt)
+    ax.plot(np.arange(m) * dt, w[:m], color=C["wind"], lw=0.9)
+    ax.axhline(0, color=C["faint"], lw=0.5)
+    for s in (1, -1):
+        ax.axhline(s * sig, color=C["faint"], lw=0.6, ls=(0, (4, 3)))
+    ax.text(40.3, sig, "$+\\sigma_w$", fontsize=6.4, color=C["muted"], va="center")
+    ax.text(40.3, -sig, "$-\\sigma_w$", fontsize=6.4, color=C["muted"], va="center")
+    ax.set_xlim(0, 40)
+    ax.set_title("One realisation")
+    ax.set_xlabel("time  [s]", loc="right")
+    ax.set_ylabel("$w$  [m/s]")
+    ax = f.add_subplot(gs[1, 0])
+    lags = np.arange(0, 8.01, 0.4)
+    R = [np.mean(w[: n - int(l / dt)] * w[int(l / dt):]) for l in lags]
+    tt = np.linspace(0, 8, 200)
+    ax.plot(tt, sig**2 * np.exp(-tt / tau), color=C["ink"], lw=1.0, ls=(0, (4, 2.5)))
+    ax.plot(lags, R, "o", color=C["wind"], ms=2.6)
+    ax.axvline(tau, color=C["hair"], lw=0.7, zorder=0)
+    ax.text(tau + 0.15, 1.25, "$\\tau_w$", fontsize=6.6, color=C["muted"])
+    ax.set_title("Autocorrelation")
+    ax.set_xlabel("lag $\\tau$  [s]", loc="right")
+    ax.set_ylabel("$R(\\tau)$  [m²/s²]")
+    ax.set_xlim(0, 8)
+    ax = f.add_subplot(gs[1, 1])
+    om = np.geomspace(0.02, 100, 300)
+    ax.loglog(om, 2 * sig**2 * tau / (1 + om**2 * tau**2), color=C["wind"], lw=1.2)
+    ax.axvline(1 / tau, color=C["hair"], lw=0.7, zorder=0)
+    ax.text(1 / tau * 1.2, 6, "$1/\\tau_w$", fontsize=6.6, color=C["muted"])
+    ax.set_title("Power spectral density")
+    ax.set_xlabel("$\\omega$  [rad/s]", loc="right")
+    ax.set_ylabel("$\\Phi(\\omega)$")
+    ax.set_xlim(0.02, 100)
+    ax.grid(True, which="major", axis="both")
+    save(f, "tb_ou")

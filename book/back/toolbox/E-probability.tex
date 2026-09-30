@@ -1,0 +1,281 @@
+\toolchapter{E}{Probability and random signals}{Noise and wind cannot be predicted, but they can be described — by a spread, by a memory, by a spectrum. And a description is enough to design against them.}
+\label{app:prob}
+
+\lead{\usedcard{\setuprow{Lesson 8}{variance of a difference, noise through a filter, clipped noise}\setuprow{Lesson 11}{turbulence, its memory and its spectrum; an RMS score}\setuprow{Lessons 2, 10}{fitting a decay rate}\setuprow{Part II}{the Kalman filter (II.4) is covariance propagation}\setuprow{Part III}{Monte Carlo verification (III.29), identification (III.25)}}%
+A control loop lives with two kinds of randomness: the errors of its sensors and the disturbances of its environment. This appendix gives the vocabulary for both. It starts with a single random number and its spread, moves to several numbers that vary together — the covariance matrix, which is the central object of estimation — then to random signals in time and their spectra, and ends with two ways of extracting knowledge from noisy data: least squares and the Monte Carlo method.}
+
+\section{One random number}
+
+A \term{random variable} $X$ is a number whose value is not known in advance but whose \emph{distribution} is: for a continuous variable, a density $p(x)$ with $\int p\,\dd x = 1$, such that the probability of finding $X$ between $a$ and $b$ is $\int_a^b p\,\dd x$.
+
+\begin{definition}{Mean, variance, standard deviation}
+The \term{mean} (or expectation) of $X$ is $\mathbb{E}[X] = \int x\,p(x)\,\dd x$, written $\mu$. Its \term{variance} is the mean squared distance from the mean, $\operatorname{Var}X = \mathbb{E}[(X - \mu)^2] = \mathbb{E}[X^2] - \mu^2$, and the \term{standard deviation} is its square root, $\sigma$. The standard deviation has the units of $X$.
+\end{definition}
+
+Two facts about how these behave under arithmetic carry most of \lessonref{les:noise}.
+
+\begin{theorem}[Mean and variance of a linear combination]
+\label{thm:E-linear}
+For random variables $X$, $Y$ and constants $a$, $b$, $c$:
+\begin{enumerate}[label=(\roman*)]
+  \item $\mathbb{E}[aX + bY + c] = a\,\mathbb{E}[X] + b\,\mathbb{E}[Y] + c$, always;
+  \item $\operatorname{Var}(aX + bY + c) = a^2\operatorname{Var}X + b^2\operatorname{Var}Y + 2ab\operatorname{Cov}(X, Y)$, where the \term{covariance} is $\operatorname{Cov}(X, Y) = \mathbb{E}[(X - \mu_X)(Y - \mu_Y)]$;
+  \item if $X$ and $Y$ are independent, $\operatorname{Cov}(X, Y) = 0$ and the variances simply add, with the weights $a^2$ and $b^2$.
+\end{enumerate}
+\end{theorem}
+\begin{proof}
+(i)~The integral is linear. (ii)~Subtract the means and expand the square $\big(a(X - \mu_X) + b(Y - \mu_Y)\big)^2$. (iii)~For independent variables the expectation of a product is the product of the expectations, and each factor $\mathbb{E}[X - \mu_X]$ is zero.
+\end{proof}
+
+\emph{Variances add; standard deviations do not.} Two independent errors of \SI{3}{cm} and \SI{4}{cm} combine to $\sqrt{9 + 16} = \SI{5}{cm}$, not to seven. And the squares $a^2$, $b^2$ mean that a difference is as noisy as a sum: $\operatorname{Var}(X - Y) = \operatorname{Var}X + \operatorname{Var}Y$, the starting point of Example~\ref{ex:noise-raw}.
+
+The covariance, divided by the two standard deviations, is the \term{correlation coefficient} $\rho = \operatorname{Cov}(X, Y)/(\sigma_X\sigma_Y)$, a number between $-1$ and $1$. Independent variables have $\rho = 0$.\pitfall{The converse is false. $\rho = 0$ says only that there is no \emph{linear} relation. If $X$ is symmetric about zero, $X$ and $X^2$ are uncorrelated — and as dependent as two variables can be.}
+
+\subsection{Two distributions}
+
+\begin{definition}{Gaussian and uniform distributions}
+A \term{Gaussian} (normal) variable with mean $\mu$ and standard deviation $\sigma$ has the density
+\begin{equation}
+  p(x) = \frac{1}{\sigma\sqrt{2\pi}}\,\exp\!\Big({-\frac{(x - \mu)^2}{2\sigma^2}}\Big) .
+\end{equation}
+With $\mu = 0$, $\sigma = 1$ the density is written $\varphi(z)$ and its integral from $-\infty$ to $z$ is $\Phi(z)$. A variable \term{uniform} on an interval of width $\Delta$ has the constant density $1/\Delta$ there, and the variance $\Delta^2/12$.
+\end{definition}
+
+A Gaussian variable lies within $\pm1\sigma$ of its mean with probability 68.3\,\%, within $\pm2\sigma$ with 95.4\,\% and within $\pm3\sigma$ with 99.7\,\%. The Gaussian earns its place in engineering through two properties: any linear combination of independent Gaussian variables is again Gaussian, so that a linear system driven by Gaussian noise has Gaussian signals everywhere; and the sum of many small independent errors of \emph{any} distribution is nearly Gaussian (the central limit theorem; Papoulis and Pillai, 2002, ch.~7).
+
+The uniform distribution is the model of \emph{rounding}. A sensor that reports the altitude in steps of \SI{1}{cm} makes an error spread evenly over $\pm\SI{0.5}{cm}$, with the standard deviation $1/\sqrt{12} = \SI{0.29}{cm}$: quantisation acts like a noise of that size (Lesson~III.19).
+
+\begin{example}[The mean of a clipped Gaussian]
+\label{ex:E-clip}
+Derive the formula of Example~\ref{ex:noise-rect}: $u$ is Gaussian with mean $\mu$ and standard deviation $s$, and it is clipped to $[0, u_{max}]$. Find $\mathbb{E}[\sat(u)]$.
+
+\textbf{Step 1 — standardise.} Write $u = \mu + s z$ with $z$ standard Gaussian. The limits become $a = (0 - \mu)/s$ and $b = (u_{max} - \mu)/s$.
+
+\textbf{Step 2 — three regions.} Below $a$ the output is 0; above $b$ it is $u_{max}$; in between it is $\mu + sz$:
+\begin{equation*}
+  \mathbb{E}[\sat(u)] = 0 \cdot \Phi(a) + \int_a^b(\mu + sz)\,\varphi(z)\,\dd z + u_{max}\big(1 - \Phi(b)\big) .
+\end{equation*}
+
+\textbf{Step 3 — the middle integral.} Its first part is $\mu\,(\Phi(b) - \Phi(a))$. For the second, note that $\varphi'(z) = -z\,\varphi(z)$, so $\int_a^b z\varphi\,\dd z = \varphi(a) - \varphi(b)$.
+
+\textbf{Step 4 — together.} $\mathbb{E}[\sat(u)] = u_{max}\big(1 - \Phi(b)\big) + \mu\big(\Phi(b) - \Phi(a)\big) + s\big(\varphi(a) - \varphi(b)\big)$.
+
+\textbf{Step 5 — a check.} Without clipping ($a \to -\infty$, $b \to \infty$) only $\mu$ remains. With symmetric limits about $\mu$, $\varphi(a) = \varphi(b)$ and the two clipped tails cancel: the mean is again $\mu$. A bias appears only when the limits are \emph{asymmetric} — which, for a drone hovering at 40\,\% of its thrust range, they are.
+\end{example}
+
+\section{Averaging, and what it costs}
+
+Take $N$ independent readings $X_1, \dots, X_N$ of the same quantity, each with the standard deviation $\sigma$, and form their mean $\bar X = \frac1N\sum X_i$. By \cref{thm:E-linear}, with all weights $1/N$:
+\begin{equation}\label{eq:E-sqrtN}
+  \operatorname{Var}\bar X = N \cdot \frac{\sigma^2}{N^2} = \frac{\sigma^2}{N}, \qquad \sigma_{\bar X} = \frac{\sigma}{\sqrt N} .
+\end{equation}
+Averaging reduces noise with the \emph{square root} of the number of samples: four times the samples for half the noise, a hundred times for a tenth.
+
+\begin{example}[Ten samples of the altimeter]
+\label{ex:E-average}
+The altimeter has $\sigma = \SI{1}{cm}$ and is read at \SI{250}{Hz}. What does averaging the last ten readings buy, and what does it cost?
+
+\textbf{Step 1 — the noise.} $\sigma/\sqrt{10} = \SI{0.32}{cm}$.
+
+\textbf{Step 2 — the delay.} The ten readings are $0, 4, 8, \dots, \SI{36}{ms}$ old; their average age is \SI{18}{ms}. The averaged altitude describes the drone as it was \SI{18}{ms} ago.
+
+\textbf{Step 3 — the price in phase.} At the crossover of the altitude loop, $\omega_c = \SI{7}{rad/s}$: $7 \cdot 0.018 = \SI{0.126}{rad} = 7.2^\circ$ of phase margin (\lessonref{les:slow}).
+
+\textbf{Step 4 — the hidden assumption.} \Cref{eq:E-sqrtN} needs \emph{independent} errors. A bias, or an error that drifts slowly, is the same in all ten readings and is not reduced at all.
+\end{example}
+
+\section{Several random numbers: the covariance matrix}
+
+An estimator does not deal with one uncertain number but with a whole uncertain state. For a random vector $\vx = (X_1, \dots, X_n)^\T$ with the mean $\symbf\mu$, all the variances and covariances are collected in one matrix.
+
+\begin{definition}{Covariance matrix}
+The \term{covariance matrix} of a random vector $\vx$ is
+\begin{equation}
+  P = \operatorname{Cov}(\vx) = \mathbb{E}\big[(\vx - \symbf\mu)(\vx - \symbf\mu)^\T\big] .
+\end{equation}
+Its diagonal entries are the variances of the components, its off-diagonal entries their covariances. It is symmetric, and $\symbf a^\T P\,\symbf a = \operatorname{Var}(\symbf a^\T\vx) \ge 0$ for every vector $\symbf a$: it is \emph{positive semidefinite}.
+\end{definition}
+
+\begin{theorem}[Covariance under a linear map]
+\label{thm:E-APA}
+If $\symbf y = A\vx + \symbf b$ with a constant matrix $A$ and vector $\symbf b$, then
+\begin{equation}\label{eq:E-APA}
+  \mathbb{E}[\symbf y] = A\,\symbf\mu + \symbf b, \qquad \operatorname{Cov}(\symbf y) = A\,P\,A^\T .
+\end{equation}
+If, in addition, $\symbf w$ is independent of $\vx$ with covariance $Q$, then $\operatorname{Cov}(A\vx + \symbf w) = APA^\T + Q$.
+\end{theorem}
+\begin{proof}
+$\symbf y - \mathbb{E}[\symbf y] = A(\vx - \symbf\mu)$, so $\operatorname{Cov}(\symbf y) = \mathbb{E}[A(\vx - \symbf\mu)(\vx - \symbf\mu)^\T A^\T] = APA^\T$. For the second claim the cross terms vanish by independence.
+\end{proof}
+
+\Cref{eq:E-APA} is the most used formula of estimation theory. Applied to one step of a linear system, $\vx_{k+1} = F\vx_k + \symbf w_k$, it says how uncertainty moves through time:
+\begin{equation}\label{eq:E-prop}
+  P_{k+1} = F\,P_k\,F^\T + Q .
+\end{equation}
+This line is one half of the Kalman filter (Lesson~II.4).
+
+\begin{example}[Position and velocity from two readings]
+\label{ex:E-posvel}
+The altitude and the vertical speed are estimated from the last two altimeter readings, $y_1$ and $y_2$, taken $\Delta t = \SI{4}{ms}$ apart, with independent errors of $\sigma = \SI{1}{cm}$: $\hat x = y_2$ and $\hat v = (y_2 - y_1)/\Delta t$. How uncertain are the two estimates, and are their errors related?
+
+\textbf{Step 1 — the map.} $\begin{pmatrix}\hat x\\ \hat v\end{pmatrix} = A\begin{pmatrix}y_1\\ y_2\end{pmatrix}$ with $A = \begin{pmatrix}0 & 1\\ -1/\Delta t & 1/\Delta t\end{pmatrix}$, and the readings have $P = \sigma^2\,\Id$.
+
+\textbf{Step 2 — the formula.} $APA^\T = \sigma^2AA^\T = \sigma^2\begin{pmatrix}1 & 1/\Delta t\\ 1/\Delta t & 2/\Delta t^2\end{pmatrix}$.
+
+\textbf{Step 3 — the diagonal.} $\sigma_{\hat x} = \sigma = \SI{1}{cm}$ and $\sigma_{\hat v} = \sqrt2\,\sigma/\Delta t = \SI{3.5}{m/s}$: \cref{eq:noise-gain} again.
+
+\textbf{Step 4 — the off-diagonal.} $\operatorname{Cov}(\hat x, \hat v) = \sigma^2/\Delta t$, so $\rho = (1/\Delta t)\big/\big(1 \cdot \sqrt2/\Delta t\big) = 0.71$. The two errors are strongly correlated: when the last reading is too high, the position is too high \emph{and} the speed is too high. A filter that knows this can use one error to correct the other; one that treats them as independent throws information away.
+\end{example}
+
+\subsection{A random walk}
+Let $F = 1$ in \cref{eq:E-prop}: $x_{k+1} = x_k + w_k$ with independent steps of variance $q^2$. Then $P_k = P_0 + k\,q^2$: the variance grows linearly with time, and the standard deviation with its square root. This is what happens to every quantity obtained by \emph{integrating} a noisy rate. A gyroscope whose readings, taken every $\Delta t$, have a noise $\sigma_\omega$, integrated for a time $t = k\Delta t$, gives an angle with the error
+\begin{equation}
+  \sigma_\theta = \sigma_\omega\,\Delta t\,\sqrt{k} = \sigma_\omega\sqrt{\Delta t\;t} .
+\end{equation}
+With $\sigma_\omega = \SI{0.5}{\degree/s}$ at \SI{1}{kHz}, after a minute: $0.5\sqrt{0.001 \cdot 60} = 0.12^\circ$. Without a second sensor to pull it back, an integrated estimate drifts without bound — the unobservable case of Example~\ref{ex:A-rank}, in numbers.
+
+\subsection{Two measurements of one thing}
+
+\begin{theorem}[The best weighted average]
+\label{thm:E-fuse}
+Let $x_1$ and $x_2$ be independent, unbiased measurements of the same quantity with the variances $\sigma_1^2$ and $\sigma_2^2$. Among all combinations $\hat x = (1 - K)\,x_1 + K\,x_2$, the variance is smallest for
+\begin{equation}\label{eq:E-fuse}
+  K = \frac{\sigma_1^2}{\sigma_1^2 + \sigma_2^2}, \qquad\text{and then}\qquad \frac{1}{\sigma_{\hat x}^2} = \frac{1}{\sigma_1^2} + \frac{1}{\sigma_2^2} .
+\end{equation}
+\end{theorem}
+\begin{proof}
+By \cref{thm:E-linear}, $\operatorname{Var}\hat x = (1 - K)^2\sigma_1^2 + K^2\sigma_2^2$. Its derivative with respect to $K$ vanishes at the stated $K$, and inserting it gives $\sigma_1^2\sigma_2^2/(\sigma_1^2 + \sigma_2^2)$.
+\end{proof}
+
+Each measurement is weighted by the inverse of its variance, and the result is better than either. Written as $\hat x = x_1 + K(x_2 - x_1)$ it reads: \emph{start from what you have, and move towards the new measurement by a fraction $K$ that says how much more you trust it}. With a prediction good to \SI{5}{cm} and a measurement good to \SI{1}{cm}: $K = 25/26 = 0.96$ and $\sigma_{\hat x} = \SI{0.98}{cm}$. That is the other half of the Kalman filter, and $K$ is its gain.
+
+\section{Random signals}
+
+A noise or a wind is not one random number but one for every instant: a \term{random process} $x(t)$. It is \term{stationary} if its statistics do not change with time. A stationary process with zero mean is described by how strongly its values at two instants are related:
+
+\begin{definition}{Autocorrelation, white noise, power spectral density}
+The \term{autocorrelation} of a stationary process with zero mean is $R(\tau) = \mathbb{E}[x(t)\,x(t + \tau)]$. It is even, largest at $\tau = 0$, and $R(0)$ is the variance. The \term{power spectral density} is its Fourier transform,
+\begin{equation}
+  \Phi(\omega) = \int_{-\infty}^{\infty} R(\tau)\,e^{-j\omega\tau}\,\dd\tau, \qquad\text{so that}\qquad \sigma^2 = R(0) = \frac{1}{2\pi}\int_{-\infty}^{\infty}\Phi(\omega)\,\dd\omega .
+\end{equation}
+\term{White noise} is a process with no memory at all. In discrete time: independent samples, $\mathbb{E}[n_k n_{k+j}] = 0$ for $j \ne 0$. In continuous time: $R(\tau) = q\,\delta(\tau)$ and a flat spectrum $\Phi(\omega) = q$; the number $q$ is its \term{intensity}.
+\end{definition}
+
+The spectral density says how the variance — the \enquote{power} — is distributed over frequencies. Continuous white noise is an idealisation: a flat spectrum up to infinite frequency would have infinite variance. It is useful all the same, because it is never seen raw. It is always seen through a system, and the system has a finite bandwidth.
+
+\begin{theorem}[A random signal through a linear system]
+\label{thm:E-psd}
+Let a stable linear system with the frequency response $H(j\omega)$ be driven by a stationary process with the spectral density $\Phi_u$. Then its output is stationary with
+\begin{equation}\label{eq:E-psd}
+  \Phi_y = |H(j\omega)|^2\,\Phi_u, \qquad \sigma_y^2 = \frac{1}{2\pi}\int_{-\infty}^{\infty}|H(j\omega)|^2\,\Phi_u(\omega)\,\dd\omega .
+\end{equation}
+(Papoulis and Pillai, 2002, ch.~9.) In discrete time, for independent input samples of variance $\sigma^2$ and the impulse response $h_j$: $\sigma_y^2 = \sigma^2\sum_j h_j^2$ (\cref{thm:noise-variance}).
+\end{theorem}
+
+\begin{example}[White noise through a first-order lag]
+\label{ex:E-lag}
+White noise of intensity $q$ drives $\tau\dot x + x = u$. Find the variance, the spectrum and the autocorrelation of $x$.
+
+\textbf{Step 1 — the spectrum.} $|H|^2 = 1/(1 + \omega^2\tau^2)$, so $\Phi_x = q/(1 + \omega^2\tau^2)$: flat up to the corner $1/\tau$, falling beyond it.
+
+\textbf{Step 2 — the variance.} $\sigma_x^2 = \dfrac{q}{2\pi}\displaystyle\int_{-\infty}^{\infty}\frac{\dd\omega}{1 + \omega^2\tau^2} = \frac{q}{2\pi} \cdot \frac{\pi}{\tau} = \frac{q}{2\tau}$, using $\int\dd z/(1 + z^2) = \arctan z$.
+
+\textbf{Step 3 — the memory.} The Fourier transform of $e^{-|t|/\tau}$ is $2\tau/(1 + \omega^2\tau^2)$. Comparing with Step~1: $R_x(t) = \dfrac{q}{2\tau}\,e^{-|t|/\tau}$. The output remembers its past for about one time constant.
+
+\textbf{Step 4 — recognise it.} With $\sigma_w^2 = q/(2\tau_w)$ this is the turbulence of \lessonref{les:challenge}: $R = \sigma_w^2e^{-|t|/\tau_w}$ and $\Phi = 2\sigma_w^2\tau_w/(1 + \omega^2\tau_w^2)$. The Ornstein–Uhlenbeck process \emph{is} white noise through a first-order lag (\cref{fig:E-ou}).
+
+\textbf{Step 5 — the same for samples.} Independent samples of variance $\sigma^2$, taken every $\Delta t$, act on anything much slower than the sampling like continuous white noise of intensity $q = \sigma^2\Delta t$. Through the \SI{5}{Hz} filter of \lessonref{les:noise} ($T_f = \SI{32}{ms}$, $\Delta t = \SI{4}{ms}$): $\sigma_x = \sigma\sqrt{\Delta t/(2T_f)} = 0.25\,\sigma$. The exact discrete result, from \cref{thm:noise-variance} with $h_j = (1 - \alpha)\alpha^j$, is $\sigma\sqrt{(1 - \alpha)/(1 + \alpha)} = 0.243\,\sigma$.
+\end{example}
+
+\simfig{tb_ou}{The turbulence of \lessonref{les:challenge} ($\sigma_w = \SI{1.2}{m/s}$, $\tau_w = \SI{1.5}{s}$) in three descriptions. Top: one realisation, generated with \cref{eq:challenge-ou-step} from a fixed seed. Bottom left: its autocorrelation, estimated from ten minutes of the same sequence (dots), and the formula $\sigma_w^2e^{-|\tau|/\tau_w}$. Bottom right: the spectral density of Example~\ref{ex:E-lag}, flat up to $1/\tau_w$ and falling at \SI{20}{dB} per decade beyond.}{fig:E-ou}
+
+\section{Least squares}
+
+Often the parameters of a model are wanted and only noisy measurements are given: a decay rate from a few peaks, a mass and a drag coefficient from a recorded flight. If the model is \emph{linear in the unknown parameters},
+\begin{equation}\label{eq:E-ls-model}
+  \symbf y = X\,\symbf\theta + \symbf e ,
+\end{equation}
+with $N$ measurements $\symbf y$, a known $N \times p$ matrix $X$, $p < N$ unknown parameters $\symbf\theta$ and errors $\symbf e$, the method of \term{least squares} chooses the $\symbf\theta$ that makes $\|\symbf y - X\symbf\theta\|^2$ smallest.
+
+\begin{theorem}[Least squares]
+\label{thm:E-ls}
+If the columns of $X$ are linearly independent, the sum of squares $\|\symbf y - X\symbf\theta\|^2$ has the unique minimiser
+\begin{equation}\label{eq:E-ls}
+  \hat{\symbf\theta} = (X^\T X)^{-1}X^\T\symbf y .
+\end{equation}
+If the errors have zero mean, are independent and have the variance $\sigma^2$, then $\mathbb{E}[\hat{\symbf\theta}] = \symbf\theta$ and $\operatorname{Cov}(\hat{\symbf\theta}) = \sigma^2(X^\T X)^{-1}$; and $\sigma^2$ is estimated without bias by $\|\symbf y - X\hat{\symbf\theta}\|^2/(N - p)$.
+\end{theorem}
+\begin{proof}
+The gradient of $\|\symbf y - X\symbf\theta\|^2$ with respect to $\symbf\theta$ is $-2X^\T(\symbf y - X\symbf\theta)$; setting it to zero gives the \emph{normal equations} $X^\T X\,\symbf\theta = X^\T\symbf y$, and $X^\T X$ is invertible because the columns are independent. It is a minimum because $\|X\symbf d\|^2 > 0$ for $\symbf d \ne 0$. Inserting \cref{eq:E-ls-model}: $\hat{\symbf\theta} = \symbf\theta + (X^\T X)^{-1}X^\T\symbf e$, a linear map of $\symbf e$, and \cref{thm:E-APA} gives the mean and the covariance. For the estimate of $\sigma^2$ see Papoulis and Pillai (2002, ch.~8).
+\end{proof}
+
+The normal equations say that the residual $\symbf y - X\hat{\symbf\theta}$ is perpendicular to every column of $X$: the fitted values are the projection of the data onto what the model can produce.
+
+\begin{example}[A decay rate from four peaks]
+\label{ex:E-fit}
+After the step of \cref{fig:inversion-predict} with $K_{att} = 3$ the position swings about its setpoint. The successive extremes are $1.266$, $0.863$, $1.054$ and \SI{0.968}{m}, half a period (\SI{1.535}{s}) apart. Estimate the decay rate and its uncertainty.
+
+\textbf{Step 1 — the model.} The distances from the setpoint, 0.266, 0.137, 0.054 and \SI{0.032}{m}, should follow $d = d_0e^{-\sigma_dt}$. That is not linear in $\sigma_d$ — but its logarithm is: $\ln d = \ln d_0 - \sigma_d\,t$. With $y = \ln d$ and $\symbf\theta = (\ln d_0, -\sigma_d)^\T$ this is \cref{eq:E-ls-model}.
+
+\textbf{Step 2 — the data.} The times are 0, 1.535, 3.07 and \SI{4.605}{s}; the logarithms are $-1.324$, $-1.988$, $-2.919$ and $-3.442$. The matrix $X$ has a column of ones and the column of times.
+
+\textbf{Step 3 — the normal equations.}
+\begin{equation*}
+  X^\T X = \begin{pmatrix}4 & 9.21\\ 9.21 & 32.99\end{pmatrix}, \qquad X^\T\symbf y = \begin{pmatrix}-9.673\\ -27.86\end{pmatrix}.
+\end{equation*}
+
+\textbf{Step 4 — solve.} The determinant is $4 \cdot 32.99 - 9.21^2 = 47.13$, and by Cramer's rule
+\begin{equation*}
+  \hat\theta_2 = \frac{4 \cdot (-27.86) - 9.21 \cdot (-9.673)}{47.13} = -0.475, \qquad \hat\theta_1 = -1.326 .
+\end{equation*}
+
+\textbf{Step 5 — the uncertainty.} The residuals are $0.001, 0.066, -0.136, 0.069$; their sum of squares is 0.0277, so $\hat\sigma^2 = 0.0277/(4 - 2) = 0.0139$. The variance of the slope is $\hat\sigma^2$ times the lower-right entry of $(X^\T X)^{-1}$, which is $4/47.13 = 0.0849$: a standard deviation of $\sqrt{0.0139 \cdot 0.0849} = 0.034$.
+
+\textbf{Step 6 — read it.} The decay rate is $0.475 \pm \SI{0.034}{s^{-1}}$. The reduced model of Example~\ref{ex:inv-quartic} predicted 0.42: within two standard deviations. Four points do not decide between them, and the theorem has told us so.
+\end{example}
+
+\paragraph{Two warnings.} Least squares weights every measurement equally; if some are noisier than others, divide each row of $X$ and $\symbf y$ by its own $\sigma$ first (weighted least squares — \cref{thm:E-fuse} is the smallest example). And the formula \eqref{eq:E-ls} should not be computed by inverting $X^\T X$, which squares the sensitivity to rounding; numerical libraries solve the problem by an orthogonal factorisation instead (Appendix~F).
+
+\section{The Monte Carlo method}
+
+When a loop is nonlinear, saturates, or depends on many uncertain parameters at once, no formula gives the distribution of its performance. Then one draws the uncertain quantities at random, flies the simulation, and repeats: a \term{Monte Carlo} study.
+
+\begin{theorem}[The accuracy of an estimated probability]
+\label{thm:E-mc}
+Let an event have the unknown probability $p$, and let it occur $k$ times in $N$ independent trials. Then $\hat p = k/N$ has the mean $p$ and the standard deviation $\sqrt{p(1 - p)/N}$. If the event does not occur at all in $N$ trials, then with 95\,\% confidence $p < 3/N$.
+\end{theorem}
+\begin{proof}
+Each trial is a variable that is 1 with probability $p$ and 0 otherwise: mean $p$, variance $p(1 - p)$; apply \cref{eq:E-sqrtN}. For the second claim, the probability of no occurrence in $N$ trials is $(1 - p)^N \approx e^{-pN}$, which is below 5\,\% when $pN > \ln 20 \approx 3$.
+\end{proof}
+
+\begin{example}[How many flights is enough?]
+\label{ex:E-mc}
+A tune is flown 300 times with random wind, mass and sensor errors (Lesson~III.29).
+
+\textbf{Step 1 — six failures.} $\hat p = 6/300 = 2\,\%$, with the standard deviation $\sqrt{0.02 \cdot 0.98/300} = 0.8\,\%$. The true failure rate is somewhere between about 0.5\,\% and 3.5\,\%.
+
+\textbf{Step 2 — no failure.} Then $p < 3/300 = 1\,\%$, with 95\,\% confidence — and nothing better can be said.
+
+\textbf{Step 3 — a requirement of one in a thousand.} To \emph{demonstrate} $p < 10^{-3}$ by flights alone takes $3/10^{-3} = 3000$ runs without a single failure.
+
+\textbf{Step 4 — the general rule.} The error of a Monte Carlo estimate falls as $1/\sqrt N$, whatever the number of uncertain parameters. That is slow, and it is also the method's strength: twelve uncertain parameters cost no more runs than one.
+\end{example}
+
+\begin{result}[Appendix E at a glance]
+\begin{center}\small
+\renewcommand{\arraystretch}{1.4}
+\begin{tabularx}{\linewidth}{@{}l>{\raggedright\arraybackslash}X@{}}
+independent errors & variances add: $\operatorname{Var}(aX \pm bY) = a^2\sigma_X^2 + b^2\sigma_Y^2$\\
+Gaussian & 68\,\% within $1\sigma$, 95\,\% within $2\sigma$, 99.7\,\% within $3\sigma$\\
+rounding to steps $\Delta$ & noise of $\Delta/\sqrt{12}$\\
+mean of $N$ & $\sigma/\sqrt N$, if the errors are independent\\
+linear map & $\operatorname{Cov}(A\vx) = APA^\T$; through time: $P_{k+1} = FP_kF^\T + Q$\\
+random walk & $\sigma$ grows as $\sqrt t$\\
+fusing two & weights $\propto 1/\sigma^2$; $1/\sigma^2 = 1/\sigma_1^2 + 1/\sigma_2^2$\\
+through a system & $\Phi_y = |H|^2\Phi_u$; white noise $q$ through a lag $\tau$: $\sigma^2 = q/(2\tau)$\\
+samples to intensity & $q = \sigma^2\Delta t$\\
+least squares & $\hat{\symbf\theta} = (X^\T X)^{-1}X^\T\symbf y$, $\operatorname{Cov} = \sigma^2(X^\T X)^{-1}$\\
+Monte Carlo & error $\sqrt{p(1 - p)/N}$; no failure in $N$ runs: $p < 3/N$\\
+\end{tabularx}
+\end{center}
+\end{result}

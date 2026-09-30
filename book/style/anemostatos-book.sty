@@ -358,7 +358,9 @@
 % What to remember
 \newtcolorbox{remember}{base, colback=mist, arc=3pt, left=12pt, right=12pt, top=9pt, bottom=9pt,
   title={\boxlabel{ink}{WHAT TO REMEMBER}}, attach title to upper, after title={\par\medskip},
-  before upper app={\setlist[itemize]{label={\color{sigI}\small$\checkmark$}, leftmargin=1.3em}}}
+  before upper app={\setlist[itemize]{label={\tickmark}, leftmargin=1.3em}}}
+% Drawn, because the math font has no U+2713.
+\newcommand{\tickmark}{\tikz[baseline=-0.05em]{\draw[sigI, line width=0.9pt, line cap=round, line join=round] (0,0.22em)--(0.22em,0)--(0.62em,0.52em);}}
 
 % Out in the world — the curiosity pages
 \newtcolorbox{curiosity}[1]{enhanced, breakable, colback=paper, boxrule=0pt, arc=0pt,

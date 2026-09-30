@@ -13,7 +13,8 @@
     {\parbox[t]{130mm}{\raggedright\displayserif\itshape\fontsize{16}{21}\selectfont A course in feedback control,\\from PID to learning}};
   \node[anchor=south west, inner sep=0pt, text=nightmuted, inner sep=0pt] at ($(current page.south west)+(24mm,24mm)$)
     {\parbox[b]{150mm}{\raggedright\sffamily\small with the Anemostatos simulator\\[2pt]
-     {\color{nightmuted!70}\footnotesize 35 lessons · 3 levels of flight · every figure flown in the simulator}}};
+     {\color{nightmuted!70}\footnotesize 35 lessons · 3 levels of flight · every figure flown in the simulator}\\[6pt]
+     {\footnotesize Idea and editing: Wojciech Stelmaszewski · Text, figures and code: Claude Opus 5.5}}};
   \node[anchor=south east, inner sep=0pt, text=nightmuted, align=right] at ($(current page.south east)+(-18mm,24mm)$)
     {\displayserif\itshape\small ánemos + statós\\[1pt]{\sffamily\footnotesize “the one that stands in the wind”}};
 \end{tikzpicture}
@@ -31,8 +32,13 @@ Thirty-five lessons, each one a chapter. Every chapter explains one idea step by
 numbers flown by the simulator, points to the exact place in the application and its source code
 where the idea lives, and ends with a story of the same idea at work in the real world.
 \end{minipage}
+\par\vspace{16mm}
+\noindent\begin{minipage}{118mm}\sffamily\small
+{\color{muted}Idea and editing}\\[1pt]{\large Wojciech Stelmaszewski}\par\vspace{5mm}
+{\color{muted}Text, figures and code}\\[1pt]{\large Claude Opus 5.5}
+\end{minipage}
 \vfill
-\noindent{\sffamily\footnotesize\color{faint}Edition of 28 September 2026 · written for the simulator at commit \texttt{801cb6b} and later}
+\noindent{\sffamily\footnotesize\color{faint}Edition of 30 September 2026 · written for the simulator at commit \texttt{801cb6b} and later}
 \clearpage
 
 % ---------------------------------------------------------------- imprint ---
@@ -40,11 +46,14 @@ where the idea lives, and ends with a story of the same idea at work in the real
 \vspace*{\fill}
 \begin{minipage}{118mm}\sffamily\footnotesize\color{muted}\linespread{1.25}\selectfont
 \textbf{\color{ink}Standing in the Wind} — a course in feedback control with the Anemostatos simulator.\par\medskip
+The idea of the course and the editing of this book are by Wojciech Stelmaszewski. The text, the figures, the
+simulator and its source code were written by Claude Opus 5.5, an AI model made by Anthropic
+(see the \hyperref[ch:colophon]{colophon}).\par\medskip
 The simulator, its lessons and the source code referenced throughout this book live at
 \url{https://github.com/wojciech-stelmaszewski/anemostatos}. Start it with \texttt{make dev}; the lesson panel on the right
 of the screen follows the same numbering as this book.\par\medskip
 Every time series in this book was produced by the simulator itself (\texttt{scripts/book-data.ts}), running the
-same code and the same lesson set-ups as the application; the plots were drawn with \texttt{book/tools/figures}. Screenshots
+same code and the same lesson set-ups as the application; the plots were drawn with \texttt{book/tools/make\_figures.py}. Screenshots
 come from the running application. Photographs are public domain or under Creative Commons licences; their
 authors and licences are listed on page~\pageref{credits}.\par\medskip
 Set in Libertinus Serif, Libertinus Math, Fira Sans and Fira Mono with Lua\LaTeX.\par\medskip

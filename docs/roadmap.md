@@ -1,7 +1,7 @@
 # Roadmap
 
-> **Status (2026-09-28):** M0–M12 are implemented: Part I (PID) and Part II (beyond PID) are complete. What changed against the
-> original plan is noted under each milestone.
+> **Status (2026-09-30):** M0–M12 are implemented: Part I (PID) and Part II (beyond PID) are complete. What changed against the
+> original plan is noted under each milestone. M13–M26 (Parts III–V) are planned.
 
 Built in small milestones; each ends with something runnable and useful.
 The order is chosen so that the **educational core (L1 altitude loop with
@@ -115,31 +115,57 @@ semester of lessons (II.1–II.21). Full research, design and lesson plan:
 
 Analysis rather than design: frequency response, poles and root locus,
 margins, delay and the waterbed effect, Lyapunov and regions of attraction,
-observability, LQG, sliding mode and backstepping, sampling, aliasing and
-notch filters, attitude estimation and an EKF, system identification, and
-flight after losing a rotor. Every analytic prediction is drawn next to the
-same quantity measured on the simulator. Third semester of lessons
-(III.1–III.20). Gap audit, design and lesson plan: [analysis.md](analysis.md).
+describing functions, observability, LQG, uncertainty and the small-gain
+theorem, multivariable margins, H∞, sliding mode, backstepping and MRAC,
+sampling, quantisation, aliasing and notch filters, attitude and navigation
+filters, system identification, fault detection, flight after losing a
+rotor, and Monte Carlo verification. Every analytic prediction is drawn
+next to the same quantity measured on the simulator. Third semester of
+lessons (III.1–III.30). Gap audit, design and lesson plan:
+[analysis.md](analysis.md).
 
-| Milestone | Content                                                                                                |
-| --------- | ------------------------------------------------------------------------------------------------------ |
-| M13       | Foundations: LTI toolbox, linear models, probe points and sweeps, Bode / Nyquist / pole–zero charts    |
-| M14       | Chapter F: poles, margins, delay, sensitivity, loop shaping — lessons III.1–III.6                      |
-| M15       | Chapter G: Lyapunov, observability, LQG — lessons III.7–III.9                                          |
-| M16       | Chapter H: sliding mode, backstepping, (H∞) — lessons III.10–III.12                                    |
-| M17       | Chapter I: sampling, vibration, notch filters, attitude estimation, EKF, sysid — lessons III.13–III.18 |
-| M18       | Chapter J: rotor loss, robustness report card in the arena — lessons III.19–III.20                     |
+| Milestone | Content                                                                                                                 |
+| --------- | ----------------------------------------------------------------------------------------------------------------------- |
+| M13       | Foundations: LTI toolbox, linear models, probe points and sweeps, Bode / Nyquist / pole–zero charts                     |
+| M14       | Chapter F: poles, margins, delay, sensitivity, loop shaping — lessons III.1–III.6                                       |
+| M15       | Chapter G: Lyapunov, describing functions, observability, LQG — lessons III.7–III.10                                    |
+| M16       | Chapter H: uncertainty, small gain, MIMO margins, H∞, μ, sliding mode, backstepping, MRAC — lessons III.11–III.17       |
+| M17       | Chapter I: sampling, quantisation, vibration, notch filters, attitude filters, MEKF, EKF, sysid — lessons III.18–III.26 |
+| M18       | Chapter J: rotor loss, fault detection, Monte Carlo verification, robustness report card — lessons III.27–III.30        |
 
-Build order: M13, then the ten **must** lessons across M14, M15, M17 and
-M18 (III.1–4, 7, 8, 14–16, 20). The remaining lessons, Chapter H (M16) and
-the rotor-loss lesson follow in a second pass. The book gets its Part III
-later.
+Build order: M13, then the thirteen **must** lessons across M14–M18
+(III.1–4, 7, 9, 11, 12, 20–22, 29, 30). The remaining lessons follow in a
+second pass.
+
+## Parts IV and V — Aerospace GNC and engineering practice (planned)
+
+Three more vehicles in the same simulator (a rocket, an aircraft, a
+satellite) and the theory the quadrotor cannot motivate: optimal control
+from first principles, guidance, launch-vehicle control with bending and
+slosh, flight dynamics and gain scheduling, spacecraft attitude control,
+advanced estimation. Part V covers requirements, verification campaigns,
+controller software, redundancy and mode logic. Lessons IV.1–IV.29 and
+V.1–V.6. Plan: [aerospace-gnc.md](aerospace-gnc.md).
+
+| Milestone | Content                                                                                           |
+| --------- | ------------------------------------------------------------------------------------------------- |
+| M19       | Vehicle abstraction; quadrotor moved behind it with an unchanged baseline; `trim` and `linearize` |
+| M20       | Chapter K on L1 and the 1D rocket: Pontryagin, bang-bang, dynamic programming — IV.1–IV.4         |
+| M21       | Cone and nonlinear programs, 3D rocket, powered-descent guidance, collocation — IV.5–IV.6         |
+| M22       | Chapter L: planar rocket, thrust-vector control, bending, slosh — IV.7–IV.10                      |
+| M23       | Chapter M: aircraft, modes, augmentation, gain scheduling, PIO, energy control — IV.11–IV.17      |
+| M24       | Chapter N: satellite, reaction wheels, thrusters, flexible panel — IV.18–IV.23                    |
+| M25       | Chapter O: guidance laws, relative motion, INS, UKF, particle filter, smoother — IV.24–IV.29      |
+| M26       | Part V: budgets, campaigns, fixed-point controller, voter, mode logic, design review — V.1–V.6    |
+
+The whole course, its competence map and the order of work across the app
+and the book: [curriculum.md](curriculum.md).
 
 ## Later / ideas
 
 - Ziegler–Nichols helper (dropped from M4 — the method does not fit a
   double-integrator plant; see pid-primer.md §6.2). Could return for the
-  rate loop, or with a relay auto-tuner (now planned: lesson III.18).
+  rate loop, or with a relay auto-tuner (now planned: lesson III.25).
 - Physics in a Web Worker if fast-forward on slow machines needs it.
 
 - Iterative learning control on repeated figure-8 laps (see analysis.md §1).

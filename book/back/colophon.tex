@@ -1,1 +1,16 @@
-% TODO
+\bookchapter{}{Colophon}{Who made this book, and how.}
+\label{ch:colophon}
+
+\section*{Who}
+The idea of Anemostatos and of this course, its direction and the editing of the book are the work of \textbf{Wojciech Stelmaszewski}: deciding what the course should teach and in which order, reading what was written, and sending back what was not good enough.
+
+The execution is the work of \textbf{Claude Opus 5.5}, an AI model made by Anthropic: the text of the book, its figures and diagrams, the simulator and all of its source code, the lessons in the application, and the tools that build this volume.
+
+\section*{How}
+Nothing in the book is drawn by hand from memory. The simulator flies each lesson headlessly (\src{scripts/book-data.ts}) and records its telemetry; the time plots are drawn from those recordings (\texttt{book/tools/make\_figures.py}); the screenshots are taken from the running application (\src{book/tools/shots.mjs}). A number in the text that is attributed to the simulator can therefore be reproduced by running the lesson.
+
+\section*{With what}
+The book is set in Libertinus Serif and Libertinus Math, with Fira Sans for labels and Fira Mono for code, and typeset with Lua\LaTeX. The diagrams are drawn with Ti\emph{k}Z and the plots with Matplotlib. The colours of the signals are those of the application, so that a figure on paper and a chart on the screen read the same way.
+
+\section*{The rest of the course}
+This volume holds Parts~I and~II. Part~III (analysis and robustness), Part~IV (aerospace guidance, navigation and control) and Part~V (engineering practice) appear in the application first; the plan is in \src{docs/curriculum.md}.

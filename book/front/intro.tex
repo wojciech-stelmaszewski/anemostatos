@@ -72,7 +72,7 @@ Control theory is a large field, but its structure is simple. It follows the wor
 \begin{figure}[h]
 \begin{fullwidth}
   \centering\resizebox{\linewidth}{!}{\input{tikz/fieldmap}}
-  \caption{A map of control theory. Top: the workflow that every control design follows. Below: the main families of design methods, roughly in the order they were developed, with the lessons of this book in which they appear.}
+  \caption{A map of control theory. Top: the workflow that every control design follows. Below: the main families of design methods, roughly in the order they were developed, with the lessons of this book in which they appear. The fainter line names the lessons of Parts~III and~IV, in later volumes, that return to each family.}
   \label{fig:intro-map}
 \end{fullwidth}
 \end{figure}
@@ -86,7 +86,7 @@ The families of design methods in \cref{fig:intro-map} are not rival schools; th
   \item[Robust and adaptive control] designs controllers that keep working when the model is wrong: either by being insensitive to the error (robust) or by learning it during operation (adaptive).
   \item[Learning-based control] uses data and machine learning to build models, or to learn the controller itself.
 \end{description}
-Part~II of this book walks through all of them, on the same drone.
+Part~II of this book walks through all of them, on the same drone. It teaches each family as a way to \emph{design} a controller. The analysis that says in advance whether a design will work — the frequency response, Lyapunov's method, robustness to a wrong model — is the subject of Part~III, and the optimal-control theory of Pontryagin and Bellman, together with vehicles that a drone cannot imitate, of Part~IV. Those parts follow in later volumes.
 
 \section{Where control matters}
 
@@ -179,7 +179,7 @@ Here is a first taste of why a drone needs feedback, with numbers you will meet 
 \end{example}
 
 \subsection{What you will be able to do}
-By the end of Part~I you will be able to explain every term of a PID controller physically, predict its behaviour with a few lines of algebra, diagnose the classic practical problems from a plot, and tune a cascade of loops for a vehicle that moves in three dimensions. By the end of Part~II you will know what the modern alternatives to PID do, what each of them costs, and how to choose between them.
+By the end of Part~I you will be able to explain every term of a PID controller physically, predict its behaviour with a few lines of algebra, diagnose the classic practical problems from a plot, and tune a cascade of loops for a vehicle that moves in three dimensions. By the end of Part~II you will know what the modern alternatives to PID do, what each of them costs, and how to choose between them. The later parts of the course add what an engineer needs before a design may fly: by the end of Part~III, to say how far a loop is from instability and how wrong its model may be; by the end of Parts~IV and~V, to do the same for an aircraft, a rocket and a satellite, and to verify the result.
 
 \subsection{How to study with this book}
 Each lesson is designed to be read with the simulator open. A good rhythm is:

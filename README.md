@@ -156,6 +156,7 @@ make dev        # installs dependencies on first run, opens http://localhost:517
 | `make build` / `make preview` | production build and a local preview of it            |
 | `make bench`                  | run the controller arena and print the table (≈ 30 s) |
 | `make train`                  | retrain the neural policy of lesson II.20 (≈ 2 min)   |
+| `make book`                   | build the course book (needs LuaLaTeX)                |
 | `make`                        | list all targets                                      |
 
 ## Controls
@@ -214,7 +215,15 @@ The [`docs/`](docs/README.md) folder is the project's textbook and design record
 - [**Control architecture**](docs/control-architecture.md): how the loops are wired at each level, including the cascade and the mixer.
 - [**Software architecture**](docs/software-architecture.md): modules, the simulation loop, telemetry, testing.
 - [**UI and visualization**](docs/ui-and-visualization.md): the scene, overlays, charts and lessons.
-- [**Roadmap**](docs/roadmap.md): milestones and ideas for later, such as Bode plots, a relay auto-tuner and twin drones.
+- [**Roadmap**](docs/roadmap.md): milestones, done and planned.
+- [**Curriculum**](docs/curriculum.md): the whole course in five parts and one hundred lessons, what is built, and what is planned — Part III ([analysis and robustness](docs/analysis.md)), Parts IV–V ([aerospace GNC and engineering practice](docs/aerospace-gnc.md)).
+
+The course book, _Standing in the Wind_, lives in [`book/`](book/README.md).
+
+## Credits
+
+Idea and editing: Wojciech Stelmaszewski. Code, lessons, documentation and
+the book's text and figures: Claude Opus 5.5 (Anthropic).
 
 ## License
 

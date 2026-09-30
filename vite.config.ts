@@ -13,5 +13,7 @@ export default defineConfig({
   test: {
     include: ['tests/**/*.test.ts'],
     environment: 'node',
+    // Lesson tests fly tens of simulated seconds of MPC; the 5 s default is too tight when files run in parallel.
+    testTimeout: 30_000,
   },
 });

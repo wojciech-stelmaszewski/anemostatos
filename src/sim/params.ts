@@ -60,6 +60,8 @@ export interface SensorParams {
   posRateHz: number;
   /** Motor-speed telemetry (per-motor thrust) available to the controller. */
   motorFeedback: boolean;
+  /** The position sensor delivers no new fixes (the last one is held). */
+  posDropout: boolean;
 }
 
 /**
@@ -193,6 +195,10 @@ export interface ControlParams {
     posSigma: number;
     /** Accelerometer bias random walk, m/s² per √s. */
     biasSigma: number;
+    /** Carry the altimeter's bias as a fourth state (it cannot be observed: lesson III.9). */
+    altBiasState: boolean;
+    /** Prior uncertainty of that bias, m. */
+    altBiasSigma: number;
   };
   /** Vertical position loop, L1 and L2. */
   alt: PidGains;
@@ -310,6 +316,7 @@ export const defaultParams = (): Params => ({
     accBias: 0,
     posRateHz: 0,
     motorFeedback: true,
+    posDropout: false,
   },
   control: {
     rateHz: 250,
@@ -335,7 +342,13 @@ export const defaultParams = (): Params => ({
     cbf: { gamma: 2.5, margin: 0.3 },
     geometric: { kp: 9, kv: 5, ki: 0.5, feedforward: true },
     indi: { rateKpRP: 20, rateKpYaw: 8, filterHz: 20, accFilterHz: 10, syncFilters: true },
-    kalman: { accSigma: 0.5, posSigma: 0.05, biasSigma: 0.05 },
+    kalman: {
+      accSigma: 0.5,
+      posSigma: 0.05,
+      biasSigma: 0.05,
+      altBiasState: false,
+      altBiasSigma: 0.5,
+    },
     alt: defaultGains({ kp: 10, ki: 0.8, kd: 7, iLimit: 10 }),
     posH: defaultGains({ kp: 4, ki: 0.8, kd: 3, iLimit: 3 }),
     maxHForce: 5,

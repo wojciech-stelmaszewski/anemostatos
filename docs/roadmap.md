@@ -128,7 +128,7 @@ lessons (III.1–III.30). Gap audit, design and lesson plan:
 | --------- | ----------------------------------------------------------------------------------------------------------------------- |
 | M13 ✅    | Foundations: LTI toolbox, linear models, probe points and sweeps, Bode / Nyquist / pole–zero charts                     |
 | M14 ◐     | Chapter F: poles, margins, delay, sensitivity, loop shaping — lessons III.1–III.6                                       |
-| M15       | Chapter G: Lyapunov, describing functions, observability, LQG — lessons III.7–III.10                                    |
+| M15 ◐     | Chapter G: Lyapunov, describing functions, observability, LQG — lessons III.7–III.10                                    |
 | M16       | Chapter H: uncertainty, small gain, MIMO margins, H∞, μ, sliding mode, backstepping, MRAC — lessons III.11–III.17       |
 | M17       | Chapter I: sampling, quantisation, vibration, notch filters, attitude filters, MEKF, EKF, sysid — lessons III.18–III.26 |
 | M18       | Chapter J: rotor loss, fault detection, Monte Carlo verification, robustness report card — lessons III.27–III.30        |

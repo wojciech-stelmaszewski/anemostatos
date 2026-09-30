@@ -97,7 +97,7 @@ export function LessonPanel() {
           className="text-xs font-semibold uppercase tracking-wider text-muted hover:text-fg"
           onClick={() => setOpen(!open)}
         >
-          {lesson ? `Lesson ${prefix}${i + 1}/${prefix}${list.length}` : 'Lessons'}
+          {lesson ? `Lesson ${prefix}${lesson.n ?? i + 1} · ${i + 1} of ${list.length}` : 'Lessons'}
         </button>
         <span className="flex-1" />
         <Button
@@ -149,7 +149,7 @@ export function LessonPanel() {
                   onValueChange={setLesson}
                   options={list.map((l, k) => ({
                     value: l.id,
-                    label: `${prefix}${k + 1}. ${l.title} (L${l.level})`,
+                    label: `${prefix}${l.n ?? k + 1}. ${l.title} (L${l.level})`,
                   }))}
                 />
                 <Button variant="accent" onClick={() => startLesson(lesson)}>

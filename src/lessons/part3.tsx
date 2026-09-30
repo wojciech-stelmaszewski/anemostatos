@@ -1,3 +1,4 @@
+import { criticalDiveSpeed } from '@/analysis/attraction';
 import {
   bandwidthHz,
   closedLoopPoles,
@@ -9,9 +10,11 @@ import {
 import type { Simulation } from '@/engine/simulation';
 import { cabs } from '@/math/complex';
 import { logspace, margins, type Margins } from '@/math/margins';
+import { v3 } from '@/math/vec3';
 import type { Params } from '@/sim/params';
 import { Notice, Try } from './Bits';
 import { M } from './Math';
+import { setAt } from './script';
 import type { Lesson } from './types';
 
 /**
@@ -21,6 +24,7 @@ import type { Lesson } from './types';
  */
 
 const F = 'F · The loop as a filter';
+const G = 'G · Stability and structure';
 const TWO_PI = 2 * Math.PI;
 
 const calm = (p: Params) => {
@@ -60,6 +64,30 @@ const dominantPair = (p: Params) => {
   if (!pair) return { zeta: 1, wn: 0, stable: isLoopStable(m), pair: null };
   const wn = Math.hypot(pair.re, pair.im);
   return { zeta: -pair.re / wn, wn, stable: isLoopStable(m), pair };
+};
+
+/** The fastest dive the drone survives, flown headlessly; cached, because goals poll it. */
+let diveCache: { key: string; v: number } | null = null;
+const criticalDive = (p: Params): number => {
+  const key = JSON.stringify([p.control, p.drone, p.setpoint.y, p.sensors]);
+  if (diveCache?.key !== key) diveCache = { key, v: criticalDiveSpeed(p, 0) };
+  return diveCache.v;
+};
+/** Downward speeds of the scripted dives of lesson III.7, m/s. */
+const DIVES = [0.8, 1.4, 2.0, 2.6];
+
+/** Share of the last `seconds` in which the true altitude lay inside the filter's ±2σ band. */
+const coverage = (sim: Simulation, seconds: number): number => {
+  const { series } = sim.telemetry.window(['pos.y', 'est.y', 'est.sigma.y'], sim.t - seconds);
+  const [y, est, sigma] = series as [number[], number[], number[]];
+  let n = 0;
+  let inside = 0;
+  for (let k = 0; k < y.length; k++) {
+    if (Number.isNaN(est[k]!) || Number.isNaN(sigma[k]!)) continue;
+    n++;
+    if (Math.abs(y[k]! - est[k]!) <= 2 * sigma[k]!) inside++;
+  }
+  return n ? inside / n : 0;
 };
 
 export const PART_THREE: Lesson[] = [
@@ -348,6 +376,145 @@ export const PART_THREE: Lesson[] = [
           contains all frequencies: the slow part is rejected better as you tune, and the part near
           the peak is amplified. A good design puts the hump where the disturbances are weak and
           keeps it low.
+        </Notice>
+      </>
+    ),
+  },
+  {
+    id: 'lyapunov',
+    n: 7,
+    part: 3,
+    chapter: G,
+    title: 'Energy that only goes down',
+    level: 1,
+    chart: 'lyapunov',
+    setup: (p) => {
+      calm(p);
+      p.setpoint.y = 0.6;
+      p.drone.maxMotorThrust = 3.5;
+      p.control.alt = { ...p.control.alt, iOn: false };
+    },
+    events: (sim) => {
+      DIVES.forEach((v, i) =>
+        sim.schedule(8 + 5 * i, (s) => s.applyImpulse(v3(0, -s.params.drone.mass * v, 0))),
+      );
+    },
+    predict: {
+      label: 'Fastest dive survived',
+      unit: 'm/s',
+      truth: criticalDive,
+      tolerance: 0.1,
+    },
+    goal: {
+      text: 'Four dives are coming, each faster than the last. Predict, within 10 %, the downward speed at the setpoint height beyond which the drone touches the floor.',
+      check: ({ sim, prediction }) => {
+        if (prediction == null)
+          return 'work it out from the thrust limit and the height, and enter it';
+        const truth = criticalDive(sim.params);
+        return (
+          Math.abs(prediction - truth) / truth <= 0.1 ||
+          'not within 10 %: how hard can the motors brake, and over what distance?'
+        );
+      },
+    },
+    solution: () => {},
+    body: (
+      <>
+        <p>Lesson 4 proved that a PD loop comes to rest without solving its equation. The energy</p>
+        <M display>
+          {
+            'V = \\tfrac12 K_p e^2 + \\tfrac12 m\\,\\dot e^2, \\qquad \\dot V = -K_d\\,\\dot e^2 \\le 0'
+          }
+        </M>
+        <p>
+          can only fall, so the state sinks through the level sets of <M>V</M>, the grey ellipses,
+          towards the centre. Such a <M>V</M> is a <b>Lyapunov function</b>. But the proof assumed
+          that the motors deliver what the controller asks. These motors are weak: they can brake a
+          fall with at most
+        </p>
+        <M display>{'a_{max} = \\frac{4 f_{max}}{m} - g .'}</M>
+        <p>
+          The <b>blue</b> ellipse is the largest level set in which the command never saturates:
+          inside it the proof holds. The <b>orange</b> line is the truth, flown by the simulator
+          from a grid of starting states: above it the drone touches the floor. The dashed curve is
+          what the motors alone allow, <M>{'\\dot e^2 = 2a_{max}(h - e)'}</M>; the air helps a
+          little, so the flown line can lie above it.
+        </p>
+        <Try>
+          A drone diving through the setpoint height <M>h</M> above the floor at speed <M>v</M>{' '}
+          needs the distance <M>{'v^2/(2a_{max})'}</M> to stop at full thrust. Compute the speed for
+          which that distance is <M>h</M>, enter it, and watch the four dives.
+        </Try>
+        <Notice>
+          The proven region is a small part of the true one: a Lyapunov function gives a{' '}
+          <i>guarantee</i>, not the boundary. Everything between blue and orange works, without a
+          proof. Watch a fast dive cross the grey ellipses <i>outwards</i>: while the thrust is
+          saturated, <M>V</M> rises.
+        </Notice>
+      </>
+    ),
+  },
+  {
+    id: 'observable',
+    n: 9,
+    part: 3,
+    chapter: G,
+    title: "What the filter can't see",
+    level: 1,
+    chart: 'estimate',
+    chart2: 'covariance',
+    setup: (p) => {
+      calm(p);
+      p.sensors.posNoise = 0.05;
+      p.sensors.posRateHz = 50;
+      p.sensors.accNoise = 0.3;
+      p.sensors.accBias = 0.2;
+      p.sensors.altBias = 0.3;
+      p.control.l1.estimator = 'kalman';
+    },
+    events: (sim) => {
+      setAt(sim, 20, 'sensors.posDropout', true);
+      setAt(sim, 25, 'sensors.posDropout', false);
+    },
+    goal: {
+      text: 'Make the filter honest: from t = 12 s on, the true altitude must lie inside its ±2σ band at least 95 % of the time.',
+      check: ({ sim }) => {
+        if (sim.t < 27) return 'wait for the dropout at 20 s to pass…';
+        const c = coverage(sim, 15);
+        return c >= 0.95 || `the truth was inside the band ${(100 * c).toFixed(0)} % of the time`;
+      },
+    },
+    solution: (p) => {
+      p.control.kalman.altBiasState = true;
+    },
+    body: (
+      <>
+        <p>
+          The altimeter of this drone reads 30 cm too high. The Kalman filter of lesson II.4
+          averages the noise away, reports the altitude to within a centimetre or two, and is wrong
+          by thirty. It is <i>confident and wrong</i>: the true altitude is far outside its ±2σ
+          band.
+        </p>
+        <p>
+          Can the filter estimate the altimeter's bias, as it estimates the accelerometer's? Give it
+          the bias as a state and ask what the measurements reveal. The altimeter reads
+        </p>
+        <M display>{'z = y + b_y ,'}</M>
+        <p>
+          only ever the sum. Raise <M>y</M> and lower <M>{'b_y'}</M> by the same amount and no
+          measurement changes. The state is <b>not observable</b>: the info card shows the rank of
+          the observability matrix, 3 for 4 states.
+        </p>
+        <Try>
+          Switch on <b>Kalman filter → Altimeter-bias state</b>. The bias cannot be estimated, and
+          the chart below shows it: its σ never falls. But the band around the estimate is now wide
+          enough to contain the truth. At 20 s the altimeter drops out for five seconds: watch every
+          σ grow while the filter coasts on the accelerometer.
+        </Try>
+        <Notice>
+          An unobservable state cannot be fixed by tuning or by more data of the same kind. It needs
+          a sensor that sees the states differently. What the fourth state buys is honesty: a filter
+          that knows what it does not know. Navigation systems are full of such states.
         </Notice>
       </>
     ),

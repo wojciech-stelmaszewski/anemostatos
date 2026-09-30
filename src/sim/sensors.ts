@@ -40,6 +40,8 @@ export class Sensors {
   /** Last position sample and when the next one is due (for posRateHz). */
   private heldPos: Vec3 | null = null;
   private nextPosT = 0;
+  /** The last fix delivered, held through a dropout. */
+  private lastPos: Vec3 | null = null;
 
   constructor(seed: number) {
     this.rng = new Rng(seed ^ 0x27d4eb2f);
@@ -63,7 +65,10 @@ export class Sensors {
     const gyro = (p.gyroNoise * Math.PI) / 180;
     let pos: Vec3;
     let posFresh = true;
-    if (p.posRateHz > 0 && this.heldPos && t < this.nextPosT - 1e-9) {
+    if (p.posDropout && this.lastPos) {
+      pos = clone(this.lastPos);
+      posFresh = false;
+    } else if (p.posRateHz > 0 && this.heldPos && t < this.nextPosT - 1e-9) {
       pos = clone(this.heldPos); // sample-and-hold between position fixes
       posFresh = false;
     } else {
@@ -74,6 +79,7 @@ export class Sensors {
         this.nextPosT = (Math.floor(t * p.posRateHz + 1e-6) + 1) / p.posRateHz;
       }
     }
+    if (posFresh) this.lastPos = clone(pos);
     let q = truth.q;
     if (gyro > 0) {
       // Small attitude jitter consistent with the gyro noise level.
@@ -94,5 +100,6 @@ export class Sensors {
     this.head = 0;
     this.heldPos = null;
     this.nextPosT = 0;
+    this.lastPos = null;
   }
 }

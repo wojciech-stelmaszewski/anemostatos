@@ -571,6 +571,23 @@ export const SCHEMA: Group[] = [
         step: 0.001,
         help: 'How fast the filter lets its accelerometer-bias estimate move. 0 = the bias is assumed constant (and never learnt).',
       },
+      {
+        kind: 'bool',
+        path: 'control.kalman.altBiasState',
+        label: 'Altimeter-bias state',
+        help: "Adds the altimeter's own offset as a fourth state. The altimeter reads altitude plus offset, so the two cannot be told apart: the filter cannot estimate it, but it stops pretending to know the altitude better than it does.",
+      },
+      {
+        kind: 'number',
+        path: 'control.kalman.altBiasSigma',
+        label: 'Altimeter-bias prior σ',
+        unit: 'm',
+        min: 0.01,
+        max: 2,
+        step: 0.01,
+        when: (p) => p.control.kalman.altBiasState,
+        help: 'How large the altimeter offset might be, before any measurement. Since no measurement can reduce it, this is also what the filter believes about it for ever.',
+      },
     ],
   },
   {
@@ -1504,6 +1521,13 @@ export const SCHEMA: Group[] = [
         step: 0.01,
         levels: [1, 3],
         help: 'A constant accelerometer offset. Integrated twice it would drift away — unless the filter estimates it.',
+      },
+      {
+        kind: 'bool',
+        path: 'sensors.posDropout',
+        label: 'Altimeter dropout',
+        levels: [1],
+        help: 'The altimeter stops delivering fixes and the last one is held. A filter must then coast on the accelerometer alone.',
       },
       {
         kind: 'bool',

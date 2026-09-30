@@ -167,6 +167,40 @@ export function eigenvalues(a: Mat): Complex[] {
   return eigQr(a);
 }
 
+/**
+ * Rank by Gaussian elimination with full pivoting. A pivot counts if it exceeds `tol` times the
+ * largest entry of the matrix: fine for the small, well-scaled matrices of structural tests.
+ */
+export function rank(a: Mat, tol = 1e-9): number {
+  const m = clone(a);
+  const nr = rows(m);
+  const nc = cols(m);
+  const big = maxAbs(m);
+  if (big === 0) return 0;
+  let r = 0;
+  const used = new Array<boolean>(nc).fill(false);
+  for (; r < Math.min(nr, nc); r++) {
+    let pi = -1;
+    let pj = -1;
+    let best = tol * big;
+    for (let i = r; i < nr; i++)
+      for (let j = 0; j < nc; j++)
+        if (!used[j] && Math.abs(m[i]![j]!) > best) {
+          best = Math.abs(m[i]![j]!);
+          pi = i;
+          pj = j;
+        }
+    if (pi < 0) break;
+    [m[r], m[pi]] = [m[pi]!, m[r]!];
+    used[pj] = true;
+    for (let i = r + 1; i < nr; i++) {
+      const f = m[i]![pj]! / m[r]![pj]!;
+      if (f !== 0) for (let j = 0; j < nc; j++) m[i]![j] = m[i]![j]! - f * m[r]![j]!;
+    }
+  }
+  return r;
+}
+
 /** Continuous-time equivalent s = ln(z)/dt of a discrete pole. */
 export const toContinuous = (z: Complex, dt: number): Complex => ({
   re: Math.log(Math.hypot(z.re, z.im)) / dt,

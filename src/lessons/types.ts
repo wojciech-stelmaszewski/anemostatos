@@ -30,6 +30,11 @@ export interface Lesson {
   level: Level;
   /** Defaults to Part I. Numbering restarts in each part. */
   part?: Part;
+  /**
+   * The lesson's number within its part, when it differs from its position in the list: Part III
+   * is built in two passes, and the numbers of the plan are kept while some lessons are missing.
+   */
+  n?: number;
   /** Chapter heading within the part (Part II). */
   chapter?: string;
   /** Modify a fresh copy of the default parameters. */

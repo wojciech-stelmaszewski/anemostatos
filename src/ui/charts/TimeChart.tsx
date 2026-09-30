@@ -27,6 +27,8 @@ export interface TimeChartProps {
   vlines?: () => number[];
   /** Always include zero in the y range. */
   includeZero?: boolean;
+  /** Logarithmic value axis (positive data only). */
+  logY?: boolean;
 }
 
 const INK = '#8b94a5';
@@ -52,6 +54,7 @@ export function TimeChart({
   hlines,
   vlines,
   includeZero,
+  logY,
 }: TimeChartProps) {
   const host = useRef<HTMLDivElement>(null);
   const valueEls = useRef<(HTMLSpanElement | null)[]>([]);
@@ -78,6 +81,7 @@ export function TimeChart({
       scales: {
         x: { time: false },
         y: {
+          distr: logY ? 3 : 1,
           range: (u) => {
             // Own min/max over the drawn series: uPlot's auto range breaks on all-NaN
             // series (e.g. the ghost trace when there is no ghost).
@@ -91,6 +95,11 @@ export function TimeChart({
                 if (v > max) max = v;
               }
             });
+            if (logY) {
+              // Whole decades around the positive data.
+              if (!(min > 0) || !Number.isFinite(max)) return [0.001, 1];
+              return [10 ** Math.floor(Math.log10(min)), 10 ** Math.ceil(Math.log10(max) + 1e-9)];
+            }
             if (!Number.isFinite(min) || !Number.isFinite(max)) return [-1, 1];
             if (includeZero) {
               min = Math.min(min, 0);

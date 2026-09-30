@@ -22,6 +22,8 @@ const EXTRA: { value: ExtraChart; label: string }[] = [
   { value: 'bode', label: 'Bode plot' },
   { value: 'nyquist', label: 'Nyquist plot' },
   { value: 'poles', label: 'pole map' },
+  { value: 'lyapunov', label: 'phase portrait + Lyapunov' },
+  { value: 'covariance', label: 'filter uncertainty' },
 ];
 /** What can stand in the motor chart's place. */
 const SECOND: { value: AnalysisChart | 'motors'; label: string }[] = [
@@ -29,6 +31,14 @@ const SECOND: { value: AnalysisChart | 'motors'; label: string }[] = [
   { value: 'bode', label: 'Bode plot' },
   { value: 'nyquist', label: 'Nyquist plot' },
   { value: 'poles', label: 'pole map' },
+  { value: 'covariance', label: 'filter uncertainty' },
+];
+/** 1σ of each state of the altitude filter, from its own covariance matrix. */
+const COVARIANCE: SeriesSpec[] = [
+  { key: 'est.sigma.y', label: 'altitude [m]', color: SIGNAL.motors[0], width: 2 },
+  { key: 'est.sigma.by', label: 'altimeter bias [m]', color: SIGNAL.motors[1], width: 2 },
+  { key: 'est.sigma.v', label: 'velocity [m/s]', color: SIGNAL.motors[2], width: 2 },
+  { key: 'est.sigma.ba', label: 'acc. bias [m/s²]', color: SIGNAL.motors[3], width: 2 },
 ];
 const analysisChart = (kind: string) =>
   kind === 'bode' ? (
@@ -37,6 +47,8 @@ const analysisChart = (kind: string) =>
     <NyquistChart />
   ) : kind === 'poles' ? (
     <PoleMap />
+  ) : kind === 'covariance' ? (
+    <TimeChart title="Filter uncertainty: 1σ of each state (log scale)" series={COVARIANCE} logY />
   ) : null;
 
 const ESTIMATE: SeriesSpec[] = [
@@ -72,7 +84,7 @@ export function ChartsPanel() {
   const setExtra = useUi((s) => s.setExtraChart);
   const second = useUi((s) => s.secondChart);
   const setSecond = useUi((s) => s.setSecondChart);
-  const tall = extra === 'bode' || extra === 'nyquist' || extra === 'poles';
+  const tall = extra === 'bode' || extra === 'nyquist' || extra === 'poles' || extra === 'lyapunov';
   const ctrlKey = useParams((s) => controllerKey(s.params));
   const loopOptions = useMemo(
     () => loopsFor(useParams.getState().params).map((l) => ({ value: l.id, label: l.name })),
@@ -199,7 +211,9 @@ export function ChartsPanel() {
         />
         {/* An analysis view needs height: it takes the whole right column, both rows. */}
         {tall ? (
-          <div className="row-span-2 min-h-0">{analysisChart(extra)}</div>
+          <div className="row-span-2 min-h-0">
+            {extra === 'lyapunov' ? <PhasePortrait meta={meta} lyapunov /> : analysisChart(extra)}
+          </div>
         ) : (
           <InfoCard meta={meta} />
         )}
@@ -223,7 +237,9 @@ export function ChartsPanel() {
             hlines={() => [{ value: sim.params.drone.maxMotorThrust, label: 'max' }]}
           />
         )}
-        {tall ? null : extra === 'phase' ? (
+        {tall ? null : extra === 'covariance' ? (
+          analysisChart(extra)
+        ) : extra === 'phase' ? (
           <PhasePortrait meta={meta} />
         ) : extra === 'estimate' ? (
           <TimeChart title="Altitude: estimate vs truth" unit="m" series={ESTIMATE} />

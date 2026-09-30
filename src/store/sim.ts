@@ -8,9 +8,17 @@ useParams.subscribe((s) => sim.setParams(s.params));
 
 /** What the bottom-right chart slot shows. */
 export type ExtraChart =
-  'wind' | 'disturbance' | 'phase' | 'estimate' | 'bode' | 'nyquist' | 'poles';
+  | 'wind'
+  | 'disturbance'
+  | 'phase'
+  | 'estimate'
+  | 'bode'
+  | 'nyquist'
+  | 'poles'
+  | 'lyapunov'
+  | 'covariance';
 /** The analysis views of Part III, which can also take the place of the motor chart. */
-export type AnalysisChart = 'bode' | 'nyquist' | 'poles';
+export type AnalysisChart = 'bode' | 'nyquist' | 'poles' | 'covariance';
 /**
  * What the Bode chart draws: the open loop L, the closed loop from setpoint to altitude Y/R, the
  * sensitivity S, or ln|S| on a linear frequency axis (the waterbed view).

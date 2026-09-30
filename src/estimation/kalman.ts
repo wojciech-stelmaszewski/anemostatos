@@ -38,14 +38,27 @@ export class KalmanFilter {
   }
 }
 
+export interface AltitudeNoise {
+  accSigma: number;
+  posSigma: number;
+  biasSigma: number;
+  /** Carry the altimeter's bias as a fourth state. */
+  altBiasState?: boolean;
+  /** Prior σ of that bias, m. */
+  altBiasSigma?: number;
+}
+
 /**
  * Vertical position/velocity/accelerometer-bias filter for L1. The accelerometer drives the
  * prediction; position fixes correct it.
  *   state x = (y, v, b), a_true = a_meas − b − g
+ * With `altBiasState` a fourth state b_y joins, and the altimeter is modelled as y + b_y. That
+ * pair is unobservable (the fixes only ever show the sum), which is the point of lesson III.9.
  */
 export class AltitudeKalman {
   private kf = new KalmanFilter([[0], [0], [0]], eye(3));
   private started = false;
+  private dim = 3;
 
   reset(): void {
     this.started = false;
@@ -60,49 +73,67 @@ export class AltitudeKalman {
   get bias(): number {
     return this.kf.x[2]![0]!;
   }
-  sigma(i: 0 | 1 | 2): number {
-    return this.kf.sigma(i);
+  /** Estimated altimeter bias (0 without that state). */
+  get altBias(): number {
+    return this.dim === 4 ? this.kf.x[3]![0]! : 0;
+  }
+  /** 1σ of state i: 0 altitude, 1 velocity, 2 accelerometer bias, 3 altimeter bias. */
+  sigma(i: 0 | 1 | 2 | 3): number {
+    return i < this.dim ? this.kf.sigma(i) : NaN;
+  }
+  /** Number of states: 3, or 4 with the altimeter bias. */
+  get states(): number {
+    return this.dim;
   }
 
   /**
    * One filter step of length dt. `accY` is the measured specific force (vertical), `pos` the
    * position fix or null when no new fix arrived.
    */
-  step(
-    dt: number,
-    accY: number,
-    pos: number | null,
-    noise: { accSigma: number; posSigma: number; biasSigma: number },
-    gravity: number,
-  ): void {
+  step(dt: number, accY: number, pos: number | null, noise: AltitudeNoise, gravity: number): void {
+    const n = noise.altBiasState ? 4 : 3;
+    if (n !== this.dim) {
+      this.dim = n;
+      this.started = false;
+    }
+    const pad = (row: number[]) => (n === 4 ? [...row, 0] : row);
     if (!this.started) {
       if (pos === null) return;
-      this.kf = new KalmanFilter(
-        [[pos], [0], [0]],
-        [
-          [noise.posSigma ** 2 + 1e-6, 0, 0],
-          [0, 1, 0],
-          [0, 0, 0.25],
-        ],
-      );
+      const p0 = [pad([noise.posSigma ** 2 + 1e-6, 0, 0]), pad([0, 1, 0]), pad([0, 0, 0.25])];
+      const x0 = [[pos], [0], [0]];
+      if (n === 4) {
+        // The fix is y + b_y: what is uncertain about the bias is uncertain about the altitude.
+        const vb = (noise.altBiasSigma ?? 0.5) ** 2;
+        p0[0]![0] = p0[0]![0]! + vb;
+        p0[0]![3] = -vb;
+        p0.push([-vb, 0, 0, vb]);
+        x0.push([0]);
+      }
+      this.kf = new KalmanFilter(x0, p0);
       this.started = true;
       return;
     }
-    const f = [
-      [1, dt, -0.5 * dt * dt],
-      [0, 1, -dt],
-      [0, 0, 1],
-    ];
+    const f = [pad([1, dt, -0.5 * dt * dt]), pad([0, 1, -dt]), pad([0, 0, 1])];
     const g = [[0.5 * dt * dt], [dt], [0]];
     // Accelerometer noise enters like an acceleration input; the bias wanders slowly.
     const qa = noise.accSigma ** 2;
     const qb = noise.biasSigma ** 2 * dt;
     const q = [
-      [(qa * dt ** 4) / 4, (qa * dt ** 3) / 2, 0],
-      [(qa * dt ** 3) / 2, qa * dt * dt, 0],
-      [0, 0, qb],
+      pad([(qa * dt ** 4) / 4, (qa * dt ** 3) / 2, 0]),
+      pad([(qa * dt ** 3) / 2, qa * dt * dt, 0]),
+      pad([0, 0, qb]),
     ];
+    if (n === 4) {
+      f.push([0, 0, 0, 1]);
+      g.push([0]);
+      q.push([0, 0, 0, 0]);
+    }
     this.kf.predict(f, q, g, [[accY - gravity]]);
-    if (pos !== null) this.kf.update([[1, 0, 0]], [[Math.max(noise.posSigma, 1e-4) ** 2]], [[pos]]);
+    if (pos !== null)
+      this.kf.update(
+        [n === 4 ? [1, 0, 0, 1] : [1, 0, 0]],
+        [[Math.max(noise.posSigma, 1e-4) ** 2]],
+        [[pos]],
+      );
   }
 }

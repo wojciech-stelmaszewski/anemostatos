@@ -1,7 +1,7 @@
 # Part III — Why It Works
 
 > **Status (2026-09-30):** M13 (the foundations) and the first pass of M14
-> (lessons III.1–III.5) are implemented; §5 lists what was built and where it
+> (lessons III.1–III.5) and of M15 (III.7, III.9) are implemented; §5 lists what was built and where it
 > differs from this plan. The rest of M14 and M15–M18 are planned.
 > Milestones in [roadmap.md](roadmap.md) point here.
 > Extended on 2026-09-30 from 20 to 30 lessons, so that Parts I–III together
@@ -605,6 +605,35 @@ Root-locus trail, delay margin, the `predict` field (first used by III.4),
 $S$/$T$ measurement, `shaping.ts` (lead/lag, notch on L1), spectrum chart.
 
 ### M15 — Chapter G (III.7–III.10)
+
+**First pass built (2026-09-30): III.7 and III.9.**
+
+- `analysis/attraction.ts`: the Lyapunov estimate (the largest level set of
+  $V$ in which a PD command never saturates), the braking limit of the
+  motors, and the true boundary, found by flying the simulator from a grid
+  of initial states with bisection on the dive speed.
+- The phase portrait has a Lyapunov mode that draws all three, with the
+  level sets of $V$ behind them. In III.7 the proven region reaches
+  0.55 m/s; the drone survives dives of 2.17 m/s.
+- III.7 asks for the fastest dive survived. The hand formula
+  $\sqrt{2 a_{max} h}$ gives 2.14 m/s against 2.17 m/s flown. The lesson
+  flies low (0.6 m) on purpose: from higher up, air drag makes the formula
+  pessimistic by more than the 10 % allowed.
+- `analysis/structure.ts`: controllability and observability matrices and
+  their rank. The Kalman info card shows "observable states: 3 of 4".
+- The altitude filter takes an optional fourth state, the altimeter bias
+  (`control.kalman.altBiasState`). Its σ stays at its prior for ever.
+- `sensors.posDropout` holds the last altimeter fix; III.9 scripts five
+  seconds of it.
+- III.9 has a goal the plan did not: make the filter **consistent** (the
+  truth inside its ±2σ band 95 % of the time). With an altimeter that
+  reads 0.3 m high, the three-state filter is confident and wrong; the
+  four-state filter cannot estimate the bias either, but says so.
+- A chart of the filter's σ per state on a logarithmic axis (`covariance`).
+- Lessons carry their plan number (`n`), so the panel shows III.7 and
+  III.9 although III.6 and III.8 do not exist yet.
+
+**Still to build:** III.8 (describing functions) and III.10 (LQG margins).
 
 Lyapunov overlay and region-of-attraction grid; `describing.ts` and the
 $-1/N(A)$ overlay; altimeter-bias state and altimeter-dropout event for

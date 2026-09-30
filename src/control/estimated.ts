@@ -1,3 +1,4 @@
+import { altitudeFilterModel, observabilityRank } from '@/analysis/structure';
 import { AltitudeKalman } from '@/estimation/kalman';
 import { v3 } from '@/math/vec3';
 import type { Actuation } from '@/sim/dynamics';
@@ -59,6 +60,10 @@ export class WithAltitudeKalman implements Controller {
       'est.v': this.kf.v,
       'est.bias': this.kf.bias,
       'est.sigma.y': s,
+      'est.sigma.v': this.kf.sigma(1),
+      'est.sigma.ba': this.kf.sigma(2),
+      'est.sigma.by': this.kf.sigma(3),
+      'est.altBias': this.kf.altBias,
     };
   }
 
@@ -74,6 +79,22 @@ export class WithAltitudeKalman implements Controller {
         label: 'estimated accel. bias',
         value: `${this.kf.bias.toFixed(3)} m/s²`,
       },
+      observability(p.control.kalman.altBiasState),
     ];
   }
+}
+
+/** How much of the filter's state the altimeter can reveal (docs/analysis.md §4). */
+function observability(withAltimeterBias: boolean): InfoRow {
+  const { a, c } = altitudeFilterModel(withAltimeterBias);
+  const r = observabilityRank(a, c);
+  const n = a.length;
+  return {
+    label: 'observable states',
+    value: `${r} of ${n}`,
+    hint:
+      r === n
+        ? 'The rank of the observability matrix equals the number of states: every state leaves a trace in the altimeter reading, so the filter can estimate all of them.'
+        : 'The observability matrix has rank 3 for 4 states. Altitude and altimeter bias only ever appear as their sum: no amount of data separates them, and their uncertainty never shrinks.',
+  };
 }

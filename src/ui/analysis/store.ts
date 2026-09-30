@@ -38,7 +38,7 @@ export interface LoopData {
 
 /** The parameters the loop depends on. The probe, the wind and the setpoint do not change it. */
 export const loopKey = (p: Params): string =>
-  JSON.stringify([p.sim.level, p.control, p.drone, p.sensors]);
+  JSON.stringify([p.sim.level, p.control, p.drone, p.sensors, p.vibration.hoverHz]);
 
 export const F_MIN = 0.05;
 

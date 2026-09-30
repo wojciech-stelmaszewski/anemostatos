@@ -18,6 +18,8 @@ import {
 import { evalAt } from '@/math/lti';
 import { logspace, margins, type Margins } from '@/math/margins';
 import type { Params } from '@/sim/params';
+import { gyroFilterSections } from '@/control/gyrofilter';
+import { biquadAt, lowpassCoefs } from '@/estimation/filters';
 import { CTRL_IN, pidLti } from './controllers';
 import { Sweep, type SweepOptions } from './sweep';
 
@@ -69,6 +71,21 @@ function hold(w: number, n: number): Complex {
 const steps = (hz: number) => Math.max(1, Math.round(1 / (Math.max(hz, 0.1) * PHYS_DT)));
 
 /**
+ * What the gyro signal passes through on its way to the rate loop, at hover: the anti-alias
+ * filter, the IMU's sample-and-hold, and the controller's low-pass and notches.
+ */
+export function gyroChain(p: Params, w: number): Complex {
+  let g: Complex = C_ONE;
+  const mul = (v: { re: number; im: number }) => (g = cmul(g, cx(v.re, v.im)));
+  if (p.sensors.aaFilterHz > 0)
+    mul(biquadAt(lowpassCoefs(p.sensors.aaFilterHz, PHYS_DT), w * PHYS_DT));
+  if (p.sensors.imuRateHz > 0) g = cmul(g, hold(w, steps(p.sensors.imuRateHz)));
+  const dtRate = steps(p.control.l3.hzRate) * PHYS_DT;
+  for (const c of gyroFilterSections(p, dtRate, null)) mul(biquadAt(c, w * dtRate));
+  return g;
+}
+
+/**
  * The loop at the torque input, L = a·R(θ) + b·1, as its two coefficients: `a` is the rate-gyro
  * path (turned by the uncorrected mounting angle θ), `b` the attitude path with the velocity and
  * position loops behind it (not turned: the attitude is known in the true body axes).
@@ -109,7 +126,7 @@ function paths(p: Params, w: number): { a: Complex; b: Complex; theta: number } 
       cmul(cmul(vel[CTRL_IN.r]!, cscale(hPos, c.posKpH)), xOverTilt),
     ),
   );
-  const a = cneg(cmul(cscale(cmul(cy, delay), Jm), plant));
+  const a = cneg(cmul(cscale(cmul(cmul(cy, gyroChain(p, w)), delay), Jm), plant));
   const b = cmul(
     cscale(cmul(cmul(cr, cscale(hAtt, c.attKpRP)), cmul(delay, cadd(C_ONE, outer))), Jm),
     cmul(angle, plant),

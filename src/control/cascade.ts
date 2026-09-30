@@ -7,6 +7,7 @@ import { GRAVITY, type Params } from '@/sim/params';
 import type { Measurement } from '@/sim/sensors';
 import { rotateAboutUp } from '@/sim/sensors';
 import { attitudeRates, flatnessRates, GeometricOuter } from './geometric';
+import { GyroFilter } from './gyrofilter';
 import { safetyFilter } from './cbf';
 import { L1Compensation } from './l1ac';
 import { mix } from './mixer';
@@ -98,6 +99,9 @@ export class CascadeController implements Controller {
   private jerk: Vec3 | undefined;
   private held: Actuation = idleActuation();
   private mixerSaturated = false;
+  private gyroFilter = new GyroFilter();
+  /** The body rates the rate loop last acted on, after mounting correction and filters, rad/s. */
+  gyroUsed = v3();
 
   constructor(p?: Params) {
     this.rate = p?.control.l3.inner === 'indi' ? new RateIndi() : new PidRateStage();
@@ -138,6 +142,8 @@ export class CascadeController implements Controller {
     this.wSp = v3();
     this.held = idleActuation();
     this.mixerSaturated = false;
+    this.gyroFilter.reset();
+    this.gyroUsed = v3();
   }
 
   resetIntegrators(): void {
@@ -263,8 +269,11 @@ export class CascadeController implements Controller {
       // The gyro's assumed mounting angle is taken out before the rate loop sees its reading.
       const yaw = P.control.model.imuYawDeg;
       const raw = sense();
-      const s =
-        yaw === 0 ? raw : { ...raw, omega: rotateAboutUp(raw.omega, (-yaw * Math.PI) / 180) };
+      let omega = yaw === 0 ? raw.omega : rotateAboutUp(raw.omega, (-yaw * Math.PI) / 180);
+      const dtRate = dtOf(c.hzRate);
+      omega = this.gyroFilter.update(omega, P, dtRate, raw.motors ?? this.held.motorCmd);
+      this.gyroUsed = omega;
+      const s = omega === raw.omega ? raw : { ...raw, omega };
       const tau = this.rate.torque(this.wSp, s, dtOf(c.hzRate), P);
       const r = mix(this.thrust, tau.x, tau.y, tau.z, P.drone.torqueCoeff, fmax);
       this.mixerSaturated = r.saturated;

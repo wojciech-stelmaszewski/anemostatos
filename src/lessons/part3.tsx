@@ -1,5 +1,6 @@
 import { criticalDiveSpeed } from '@/analysis/attraction';
 import { analyseRateLoop, type RateLoopAnalysis } from '@/analysis/mimo';
+import { aliasHz, ghostRate, motorJitter } from '@/analysis/spectrum';
 import {
   bandwidthHz,
   closedLoopPoles,
@@ -28,6 +29,7 @@ import type { Lesson } from './types';
 const F = 'F · The loop as a filter';
 const G = 'G · Stability and structure';
 const H = 'H · Robust by construction';
+const I = 'I · The real loop';
 const TWO_PI = 2 * Math.PI;
 
 const calm = (p: Params) => {
@@ -53,7 +55,7 @@ const marginsOf = (p: Params): Margins | null => {
 /** The roll–pitch loop of these parameters, kept until the loop changes. */
 let rateLoopMemo: { key: string; value: RateLoopAnalysis | null } | null = null;
 const rateLoopOf = (p: Params): RateLoopAnalysis | null => {
-  const key = JSON.stringify([p.sim.level, p.control, p.drone, p.sensors]);
+  const key = JSON.stringify([p.sim.level, p.control, p.drone, p.sensors, p.vibration.hoverHz]);
   if (rateLoopMemo?.key !== key) rateLoopMemo = { key, value: analyseRateLoop(p, 300) };
   return rateLoopMemo.value;
 };
@@ -64,6 +66,9 @@ const criticalGyroDelay = (p: Params): number => {
   q.control.model.imuYawDeg = 0;
   return (analyseRateLoop(q, 300)?.both.delayMargin ?? NaN) * 1000;
 };
+
+/** The IMU rate lesson III.20 starts with, Hz: too slow for rotors at 110 Hz. */
+const SLOW_IMU_HZ = 100;
 
 /** Half the peak-to-peak swing of the altitude over the last `seconds`. */
 const swing = (sim: Simulation, seconds: number): number => {
@@ -707,6 +712,161 @@ export const PART_THREE: Lesson[] = [
           above the dashed curve, a loop-at-a-time test is reporting margins that the vehicle does
           not have. This is why flight-control clearance asks for multi-loop margins, and why the
           alignment of an inertial unit is calibrated rather than assumed.
+        </Notice>
+      </>
+    ),
+  },
+  {
+    id: 'alias',
+    n: 20,
+    part: 3,
+    chapter: I,
+    title: 'Ghost frequencies',
+    level: 3,
+    chart: 'spectrum',
+    loop: 'rate.roll',
+    setup: (p) => {
+      calm(p);
+      p.vibration = { gyroDeg: 5, acc: 0, hoverHz: 110 };
+      p.sensors.imuRateHz = SLOW_IMU_HZ;
+    },
+    predict: {
+      label: 'Ghost frequency',
+      unit: 'Hz',
+      truth: (p) => aliasHz(p.vibration.hoverHz, SLOW_IMU_HZ),
+      tolerance: 0.05,
+    },
+    goal: {
+      text: 'Predict the frequency of the wobble the gyro reports. Then get rid of it: less than 0.1 °/s of ghost below 60 Hz, with at least 40° of phase margin left.',
+      check: ({ sim, prediction }) => {
+        const p = sim.params;
+        if (prediction == null)
+          return 'first the prediction: where does a rotor tone land after sampling?';
+        const truth = aliasHz(p.vibration.hoverHz, SLOW_IMU_HZ);
+        if (Math.abs(prediction - truth) / truth > 0.05)
+          return 'not it: the distance from the rotor frequency to the nearest multiple of the sample rate';
+        const a = rateLoopOf(p);
+        if (!a) return 'this lesson needs the PID cascade';
+        if (sim.t < 9) return 'flying…';
+        const ghost = ghostRate(sim);
+        return (
+          (ghost < 0.1 && a.stable && a.both.pmDeg >= 40) ||
+          `ghost ${ghost.toFixed(2)} °/s · PM ${a.stable ? a.both.pmDeg.toFixed(0) + '°' : 'none'}`
+        );
+      },
+    },
+    solution: (p) => {
+      p.sensors.imuRateHz = 250;
+    },
+    body: (
+      <>
+        <p>
+          The rotors of this drone turn 110 times a second at hover, and each turn shakes the gyro a
+          little. The airframe hardly moves at that frequency. The flight computer reads the gyro
+          100 times a second.
+        </p>
+        <p>
+          A sampler sees a signal only at its sampling instants. Between two samples the 110 Hz tone
+          completes one turn and a tenth, so the samples advance by a tenth of a turn each: a slow
+          wave that was never there. In general a tone at <M>{'f'}</M> sampled at <M>{'f_s'}</M>{' '}
+          appears at
+        </p>
+        <M display>
+          {
+            'f_{alias} = \\left|\\,f - k\\,f_s\\,\\right| \\quad\\text{for the } k \\text{ that brings it below } f_s/2 .'
+          }
+        </M>
+        <p>
+          The chart shows the spectrum of the roll rate: what the body really does, and what the
+          gyro reports. Everything right of the <b>IMU Nyquist</b> line is folded back to the left
+          of it.
+        </p>
+        <Try>
+          Compute where the rotor tone lands and enter it. Then look for it in the gyro curve, and
+          watch the rate loop answer it with the motors. Try to remove it with{' '}
+          <b>Gyro filter → Low-pass</b> or a notch on the ghost: both act after the sampler, where
+          the ghost already looks like motion. Then use what works: <b>IMU sample rate</b> above
+          twice the rotor frequency, or the <b>Anti-alias filter</b> in front of the sampler.
+        </Try>
+        <Notice>
+          Once sampled, a ghost cannot be told from real motion at the same frequency: a filter that
+          removes one removes the other, and takes phase with it. The anti-alias filter must be
+          analog, before the sampler, and it costs phase too: read the margin in the chart. This is
+          why flight controllers sample their gyros at several kilohertz although their loops need
+          far less.
+        </Notice>
+      </>
+    ),
+  },
+  {
+    id: 'notch',
+    n: 21,
+    part: 3,
+    chapter: I,
+    title: 'Notch the noise',
+    level: 3,
+    chart: 'spectrum',
+    loop: 'rate.roll',
+    setup: (p) => {
+      calm(p);
+      p.vibration = { gyroDeg: 15, acc: 0, hoverHz: 110 };
+      p.setpoint.profile = 'sine';
+      p.setpoint.profileAxis = 'y';
+      p.setpoint.profileAmplitude = 1.5;
+      p.setpoint.profilePeriod = 4;
+    },
+    goal: {
+      text: 'Keep the vibration out of the motors while the drone climbs and descends: motor jitter of at most 0.007 N (what it is with no vibration, plus 10 %), and at least 43° of phase margin.',
+      check: ({ sim }) => {
+        const a = rateLoopOf(sim.params);
+        if (!a) return 'this lesson needs the PID cascade';
+        if (sim.t < 12) return 'flying…';
+        const jitter = motorJitter(sim);
+        return (
+          (jitter <= 0.007 && a.stable && a.both.pmDeg >= 43) ||
+          `motor jitter ${jitter.toFixed(4)} N · PM ${a.stable ? a.both.pmDeg.toFixed(0) + '°' : 'none'}`
+        );
+      },
+    },
+    solution: (p) => {
+      p.control.gyroFilter.notch = 'rpm';
+    },
+    body: (
+      <>
+        <p>
+          The gyro is now sampled fast enough, so the rotor vibration appears where it is: near 110
+          Hz. The rate loop differentiates its input, and a derivative multiplies a tone by its
+          frequency. The motors are told to shake at 110 Hz. They cannot follow, so the drone flies
+          on, but the commands cost current, heat and bearings.
+        </p>
+        <p>There are three ways to keep the tone out of the loop:</p>
+        <ul>
+          <li>
+            a <b>low-pass</b>, which removes everything above its cutoff and delays everything below
+            it;
+          </li>
+          <li>
+            a <b>notch</b>, which removes one narrow band and leaves the rest nearly untouched: the
+            phase it costs at a frequency <M>{'f'}</M> far below its centre <M>{'f_0'}</M> is about{' '}
+            <M>{'f/(Q f_0)'}</M> radians;
+          </li>
+          <li>
+            a notch per motor that <b>follows the rotor speed</b>, because thrust goes with the
+            square of the speed and the tone moves as <M>{'f = f_{hover}\\sqrt{T/T_{hover}}'}</M>.
+          </li>
+        </ul>
+        <Try>
+          The drone flies a slow sine in altitude. Switch the chart to <b>motor command</b> and
+          back. Try a <b>Low-pass</b> low enough to reach the goal and read what it does to PM. Then
+          a <b>fixed notch</b> at 110 Hz: pause at the top and at the bottom of the sine and see
+          where the tone is. Then the notch that follows each motor.
+        </Try>
+        <Notice>
+          At hover the fixed notch is perfect. In the climb the rotors speed up to about 130 Hz and
+          in the descent they drop below 90 Hz, and the tone walks out of the notch. Widening it
+          (lower Q) costs phase, like the low-pass. The RPM filter needs one thing the others do
+          not: a measurement of each rotor's speed. With it, the notch can be narrow, and the phase
+          it costs at crossover is about one degree.
         </Notice>
       </>
     ),

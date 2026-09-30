@@ -52,6 +52,7 @@ export function sweepParams(p: Params): Params {
   const q = structuredClone(p);
   q.wind.enabled = false;
   q.sensors = { ...q.sensors, posNoise: 0, velNoise: 0, accNoise: 0, gyroNoise: 0 };
+  q.vibration = { ...q.vibration, gyroDeg: 0, acc: 0 };
   q.setpoint = { ...q.setpoint, profile: 'none', rateLimit: 0 };
   q.probe = { ...q.probe, point: 'none' };
   return q;

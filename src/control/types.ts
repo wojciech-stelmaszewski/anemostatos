@@ -94,6 +94,8 @@ export interface Plan {
 }
 
 export interface Controller {
+  /** The body rates the rate loop last acted on, after its filters, rad/s (L3 cascade only). */
+  gyroUsed?: Vec3;
   reset(): void;
   /** Zero all integrators — flight controllers do this while the drone sits on the ground. */
   resetIntegrators(): void;

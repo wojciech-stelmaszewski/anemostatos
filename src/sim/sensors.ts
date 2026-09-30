@@ -1,8 +1,10 @@
 import { Rng } from '@/math/prng';
 import { qConj, qFromAxisAngle, qMul, qRotate, type Quat } from '@/math/quat';
 import { add, clone, v3, type Vec3 } from '@/math/vec3';
+import { LowPass2 } from '@/estimation/filters';
 import type { DroneState } from './dynamics';
-import { GRAVITY, type SensorParams } from './params';
+import { GRAVITY, type DroneParams, type SensorParams, type VibrationParams } from './params';
+import { Vibration } from './vibration';
 
 /** What the controller gets to see. An idealised state estimate plus optional imperfections. */
 export interface Measurement {
@@ -40,7 +42,21 @@ export const rotateAboutUp = (v: Vec3, angle: number): Vec3 => {
   return v3(c * v.x + s * v.z, v.y, -s * v.x + c * v.z);
 };
 
+/** What the IMU's front end needs to know: its own settings, the vibration and the airframe. */
+export interface ImuContext {
+  sensors: SensorParams;
+  vibration: VibrationParams;
+  drone: DroneParams;
+  dt: number;
+}
+
 export class Sensors {
+  private vib = new Vibration();
+  /** Anti-alias filters: gyro x, y, z and accelerometer x, y, z. */
+  private aa = Array.from({ length: 6 }, () => new LowPass2(100, 0.001));
+  /** The IMU's last sample and the physics steps since it was taken. */
+  private imuHeld: { omega: Vec3; acc: Vec3 } | null = null;
+  private imuAge = 0;
   private history: Measurement[] = [];
   private head = 0;
   private rng: Rng;
@@ -55,11 +71,51 @@ export class Sensors {
   }
 
   /** Store the true state; call once per physics step. */
-  record(s: DroneState): void {
+  record(s: DroneState, ctx?: ImuContext): void {
     const m = measurementOf(s);
+    if (ctx) this.imuFrontEnd(m, s, ctx);
     if (this.history.length < HISTORY) this.history.push(m);
     else this.history[this.head] = m;
     this.head = (this.head + 1) % HISTORY;
+  }
+
+  /**
+   * The IMU's front end, at the physics rate (docs/analysis.md §3.4): truth plus vibration,
+   * through the anti-alias filter, then sample-and-hold. Does nothing while all three are off.
+   */
+  private imuFrontEnd(m: Measurement, s: DroneState, c: ImuContext): void {
+    const shaking = c.vibration.gyroDeg > 0 || c.vibration.acc > 0;
+    const { imuRateHz, aaFilterHz } = c.sensors;
+    if (!shaking && imuRateHz <= 0 && aaFilterHz <= 0) return;
+    let omega = m.omega;
+    let acc = m.acc;
+    if (shaking) {
+      const v = this.vib.step(s.rotors, c.drone, c.vibration, c.dt);
+      omega = add(omega, v.gyro);
+      acc = add(acc, v.acc);
+    }
+    if (aaFilterHz > 0) {
+      const f = (i: number, x: number) => {
+        const lp = this.aa[i]!;
+        lp.cutoffHz = aaFilterHz;
+        lp.dt = c.dt;
+        return lp.update(x);
+      };
+      omega = v3(f(0, omega.x), f(1, omega.y), f(2, omega.z));
+      acc = v3(f(3, acc.x), f(4, acc.y), f(5, acc.z));
+    }
+    if (imuRateHz > 0) {
+      const every = Math.max(1, Math.round(1 / (imuRateHz * c.dt)));
+      if (!this.imuHeld || this.imuAge >= every) {
+        this.imuHeld = { omega, acc };
+        this.imuAge = 0;
+      }
+      this.imuAge++;
+      omega = this.imuHeld.omega;
+      acc = this.imuHeld.acc;
+    }
+    m.omega = clone(omega);
+    m.acc = clone(acc);
   }
 
   /** Delayed, biased, noisy reading of the recorded state at simulation time t. */
@@ -109,5 +165,9 @@ export class Sensors {
     this.heldPos = null;
     this.nextPosT = 0;
     this.lastPos = null;
+    this.vib.reset();
+    for (const f of this.aa) f.reset();
+    this.imuHeld = null;
+    this.imuAge = 0;
   }
 }

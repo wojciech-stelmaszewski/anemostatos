@@ -64,6 +64,31 @@ export interface SensorParams {
   posDropout: boolean;
   /** The gyro is mounted rotated about the body's up-axis by this angle, degrees (L3). */
   imuYawDeg: number;
+  /** Sample rate of the gyro and accelerometer, Hz; readings are held in between. 0 = every step. */
+  imuRateHz: number;
+  /** Analog anti-alias filter in front of the IMU's sampler (two poles), Hz. 0 = none. */
+  aaFilterHz: number;
+}
+
+/** Rotor vibration on the IMU (docs/analysis.md §3.4). Off while both amplitudes are zero. */
+export interface VibrationParams {
+  /** Gyro amplitude per rotor at hover thrust, deg/s. */
+  gyroDeg: number;
+  /** Accelerometer amplitude per rotor at hover thrust, m/s². */
+  acc: number;
+  /** Rotor frequency at hover, Hz. It follows the thrust: f = hoverHz·√(T/T_hover). */
+  hoverHz: number;
+}
+
+/** Filters on the gyro before the rate loop (L3). */
+export interface GyroFilterParams {
+  /** Second-order low-pass, Hz. 0 = off. */
+  lpfHz: number;
+  /** A notch at a fixed frequency, or one per motor that follows its rotor speed. */
+  notch: 'off' | 'fixed' | 'rpm';
+  notchHz: number;
+  /** Centre frequency over the width of the notch. */
+  notchQ: number;
 }
 
 /**
@@ -116,6 +141,7 @@ export interface ControlParams {
   rateHz: number;
   feedforward: boolean;
   model: ModelParams;
+  gyroFilter: GyroFilterParams;
   l1: { kind: L1Kind; estimator: L1Estimator };
   /** L1 LQR / LQI (docs/beyond-pid.md §4). Cost weights of J = Σ (q·x² + r·u²)·dt. */
   lqr: {
@@ -278,6 +304,7 @@ export interface Params {
   drone: DroneParams;
   wind: WindParams;
   sensors: SensorParams;
+  vibration: VibrationParams;
   control: ControlParams;
   probe: ProbeParams;
   uncertainty: UncertaintyParams;
@@ -337,11 +364,15 @@ export const defaultParams = (): Params => ({
     motorFeedback: true,
     posDropout: false,
     imuYawDeg: 0,
+    imuRateHz: 0,
+    aaFilterHz: 0,
   },
+  vibration: { gyroDeg: 0, acc: 0, hoverHz: 110 },
   control: {
     rateHz: 250,
     feedforward: true,
     model: { mass: 1.0, inertiaScale: 1, motorTau: 0.03, imuYawDeg: 0 },
+    gyroFilter: { lpfHz: 0, notch: 'off', notchHz: 110, notchQ: 4 },
     l1: { kind: 'pid', estimator: 'none' },
     lqr: { qPos: 100, qVel: 10, qInt: 5, r: 1, integral: false, lagState: false },
     adrc: { wc: 3, wo: 15 },

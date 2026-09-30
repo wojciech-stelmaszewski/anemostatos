@@ -18,6 +18,7 @@ import { zoneDistance } from '@/sim/world';
 import { Wind } from '@/sim/wind';
 import { probeSignal } from './probe';
 import { profileOffset, zeroReference, type Reference } from './reference';
+import { Tap } from './tap';
 import { Telemetry } from './telemetry';
 
 export const PHYS_DT = 0.001;
@@ -66,6 +67,8 @@ export class Simulation {
   forces: Forces = { thrust: v3(), gravity: v3(), drag: v3(), external: v3(), net: v3() };
   measurement: Measurement | null = null;
   telemetry = new Telemetry(HISTORY_SECONDS * TELEMETRY_HZ);
+  /** The last eight seconds of the gyro and one motor command at the physics rate, for spectra. */
+  tap = new Tap();
   /** A frozen earlier run, overlaid on the charts for comparison. */
   ghost: { telemetry: Telemetry; label: string } | null = null;
   /** A lesson's script: run after every reset to (re)schedule its events. */
@@ -177,6 +180,7 @@ export class Simulation {
     this.poke = null;
     this.armed = true;
     this.measurement = null;
+    this.tap.reset();
     this.script?.(this);
     for (const fn of this.resetListeners) fn();
   }
@@ -305,7 +309,12 @@ export class Simulation {
     }
 
     const wind = this.wind.step(this.t, dt, p.wind);
-    this.sensors.record(this.state);
+    this.sensors.record(this.state, {
+      sensors: p.sensors,
+      vibration: p.vibration,
+      drone: p.drone,
+      dt,
+    });
 
     const probing = p.probe.point !== 'none' && this.armed && !this.state.crashed;
     const probeIn = probing ? probeSignal(p.probe, this.t - this.probeT0) : 0;
@@ -338,6 +347,16 @@ export class Simulation {
       this.actuation = idleActuation();
     }
     if (probing) this.injectProbe(probeIn);
+    if (this.level === 3) {
+      const deg = 180 / Math.PI;
+      const seen = this.measurement?.omega.x ?? 0;
+      this.tap.push(
+        this.state.omega.x * deg,
+        seen * deg,
+        (this.controller.gyroUsed?.x ?? seen) * deg,
+        this.actuation.motorCmd[0],
+      );
+    }
 
     const ext = this.poke && this.t < this.poke.until ? this.poke.force : v3();
     if (this.poke && this.t >= this.poke.until) this.poke = null;

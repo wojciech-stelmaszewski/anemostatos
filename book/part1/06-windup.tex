@@ -1,7 +1,8 @@
 \lesson{6}{Windup}{When the motors are at their limit, the integral keeps counting — and pays it all back later.}{1}{windup}{Part I · PID}
 \label{les:windup}
 
-\lead{The integral's memory is its strength. This lesson shows when it becomes a weakness. The motors are made weak — together they can lift only a little more than the drone's weight — and the setpoint jumps four metres up. The controller asks for far more than the motors can give, the integral keeps accumulating the error of the long slow climb, and when the drone finally arrives it cannot stop.}
+\lead{\setupcard{\setuprow{Level}{L1}\setuprow{Motors}{weak: \SI{3}{N} each, \SI{12}{N} in all}\setuprow{Controller}{full PID with $K_i = 3$ and no anti-windup}\setuprow{Event}{at $t = \SI{8}{s}$ the setpoint jumps to \SI{6}{m}}}%
+The integral's memory is its strength. This lesson shows when it becomes a weakness. The motors are made weak — together they can lift only a little more than the drone's weight — and the setpoint jumps four metres up. The controller asks for far more than the motors can give, the integral keeps accumulating the error of the long slow climb, and when the drone finally arrives it cannot stop.}
 
 \section{Actuators have limits}
 

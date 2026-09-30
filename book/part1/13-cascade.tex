@@ -1,7 +1,8 @@
 \lesson{13}{The cascade}{Four loops, each one's output the next one's setpoint — and each much faster than the one around it.}{3}{cascade}{Part I · PID}
 \label{les:cascade}
 
-\lead{Level L3 is a real quadrotor: a rigid body with four motors, six degrees of freedom and a chain of four integrators between the motors and the position. It is flown the way PX4, ArduPilot and Betaflight fly real drones — by a cascade of simple controllers. This lesson takes the cascade apart, one loop at a time.}
+\lead{\setupcard{\setuprow{Level}{L3: the full quadrotor}\setuprow{Controller}{the cascade of four loops}\setuprow{Wind}{a steady \SI{5}{m/s} with light turbulence}\setuprow{Chart}{the horizontal velocity loop}}%
+Level L3 is a real quadrotor: a rigid body with four motors, six degrees of freedom and a chain of four integrators between the motors and the position. It is flown the way PX4, ArduPilot and Betaflight fly real drones — by a cascade of simple controllers. This lesson takes the cascade apart, one loop at a time.}
 
 \section{Divide and conquer}
 

@@ -1,7 +1,8 @@
 \lesson{2}{Just a spring}{A proportional controller pulls like a spring — and a spring alone never comes to rest.}{1}{spring}{Part I · PID}
 \label{les:spring}
 
-\lead{Switch off everything except the proportional term and the gravity feedforward, and ask the drone to climb one metre. It overshoots, comes back, overshoots again — and keeps doing so for as long as you care to watch. This lesson explains why, with nothing more than Newton's law and a second-order differential equation, which we solve here completely, step by step.}
+\lead{\setupcard{\setuprow{Level}{L1}\setuprow{Controller}{P and feedforward only; I and D are off}\setuprow{Event}{at $t = \SI{6}{s}$ the setpoint jumps from \SI{2}{m} to \SI{3}{m}}\setuprow{Wind}{off}}%
+Switch off everything except the proportional term and the gravity feedforward, and ask the drone to climb one metre. It overshoots, comes back, overshoots again — and keeps doing so for as long as you care to watch. This lesson explains why, with nothing more than Newton's law and a second-order differential equation, which we solve here completely, step by step.}
 
 \section{The closed loop is a differential equation}
 

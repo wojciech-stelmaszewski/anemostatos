@@ -1,7 +1,8 @@
 \lesson{10}{Find the edge}{Stiffer is faster — until the lags in the loop decide otherwise.}{1}{edge}{Part I · PID}
 \label{les:edge}
 
-\lead{Lesson 3 said that a stiffer spring sags less, and Lesson 4 that a damper can tame any spring. So why not use $K_p = 1000$? This lesson raises the proportional gain step by step, with the damper fixed, until the drone starts to shake by itself. Then it computes, from the motor lag alone, where that edge must be — and finds that a classic tuning recipe does not apply to drones at all.}
+\lead{\setupcard{\setuprow{Level}{L1}\setuprow{Controller}{P, D and feedforward; I is off}\setuprow{Setpoint}{a square wave of $\pm\SI{0.3}{m}$, a step every \SI{3}{s}}\setuprow{To change}{$K_p$, from 30 to 400}}%
+Lesson 3 said that a stiffer spring sags less, and Lesson 4 that a damper can tame any spring. So why not use $K_p = 1000$? This lesson raises the proportional gain step by step, with the damper fixed, until the drone starts to shake by itself. Then it computes, from the motor lag alone, where that edge must be — and finds that a classic tuning recipe does not apply to drones at all.}
 
 \section{The experiment}
 

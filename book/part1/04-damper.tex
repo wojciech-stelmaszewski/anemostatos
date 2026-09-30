@@ -1,7 +1,8 @@
 \lesson{4}{Add a damper}{A force against velocity drains the energy the spring cannot — and one number, ζ, says how much.}{1}{damper}{Part I · PID}
 \label{les:damper}
 
-\lead{Lesson 2 left us with a drone that bounced forever. The cure is the third letter of PID. The derivative term looks at how fast the error is changing and pushes against it — the shock absorber to the proportional spring. In this lesson we solve the damped equation completely, derive the formulas that engineers use to tune it, and check every one of them against the simulator.}
+\lead{\setupcard{\setuprow{Level}{L1}\setuprow{Controller}{P, D and feedforward; I is off; $K_d$ starts at 0.8}\setuprow{Setpoint}{a square wave between \SI{1.5}{m} and \SI{2.5}{m}, a step every \SI{4}{s}}\setuprow{Goal}{overshoot below 2\,\%, settling within \SI{2.5}{s}}}%
+Lesson 2 left us with a drone that bounced forever. The cure is the third letter of PID. The derivative term looks at how fast the error is changing and pushes against it — the shock absorber to the proportional spring. In this lesson we solve the damped equation completely, derive the formulas that engineers use to tune it, and check every one of them against the simulator.}
 
 \section{The derivative term is a damper}
 

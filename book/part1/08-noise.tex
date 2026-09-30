@@ -1,7 +1,8 @@
 \lesson{8}{Noisy sensor}{A derivative is a magnifying glass for fast things — and noise is the fastest thing there is.}{1}{noise}{Part I · PID}
 \label{les:noise}
 
-\lead{Give the altimeter one centimetre of random noise. That is less than the width of a finger, and the P term hardly notices. But the D term, which reacts to the rate of change, sees two readings four milliseconds apart that differ by a centimetre and concludes that the drone is moving at two and a half metres per second. This lesson is about that trade-off, and about the low-pass filter that every real derivative needs.}
+\lead{\setupcard{\setuprow{Level}{L1}\setuprow{Sensor}{altimeter noise of \SI{1}{cm}}\setuprow{Controller}{full PID with no D filter}}%
+Give the altimeter one centimetre of random noise. That is less than the width of a finger, and the P term hardly notices. But the D term, which reacts to the rate of change, sees two readings four milliseconds apart that differ by a centimetre and concludes that the drone is moving at two and a half metres per second. This lesson is about that trade-off, and about the low-pass filter that every real derivative needs.}
 
 \section{How much a derivative amplifies}
 

@@ -1,7 +1,8 @@
 \lesson{14}{Cascade inversion}{An outer loop that outruns its inner loop asks for things that have not happened yet — and the drone wobbles, then flips.}{3}{inversion}{Part I · PID}
 \label{les:inversion}
 
-\lead{The cascade rests on one assumption: when the velocity loop asks for a tilt, the tilt is there almost at once. This last lesson of Part~I breaks the assumption on purpose. Slow the attitude loop down until the loops around it are faster than it is, and watch the whole structure come apart.}
+\lead{\setupcard{\setuprow{Level}{L3}\setuprow{Controller}{the cascade, default tune}\setuprow{Setpoint}{a square wave of $\pm\SI{1.5}{m}$ sideways, a step every \SI{4}{s}}\setuprow{Chart}{the pitch attitude loop}}%
+The cascade rests on one assumption: when the velocity loop asks for a tilt, the tilt is there almost at once. This last lesson of Part~I breaks the assumption on purpose. Slow the attitude loop down until the loops around it are faster than it is, and watch the whole structure come apart.}
 
 \section{What the outer loop believes}
 

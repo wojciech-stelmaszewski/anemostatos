@@ -1,7 +1,8 @@
 \lesson{3}{The gravity droop}{A proportional controller can only push when there is an error — so it keeps one.}{1}{droop}{Part I · PID}
 \label{les:droop}
 
-\lead{Take the feedforward away. The controller no longer knows that the drone has weight; it only has its error and its gains, and the integral is switched off. The drone takes off, climbs — and stops a metre short of the setpoint, hovering there perfectly calm, perfectly wrong. This lesson finds out exactly how wrong, and why, and then fixes it in two different ways.}
+\lead{\setupcard{\setuprow{Level}{L1}\setuprow{Controller}{P and D; the feedforward and I are off}\setuprow{Setpoint}{\SI{2}{m}}\setuprow{Wind}{off}}%
+Take the feedforward away. The controller no longer knows that the drone has weight; it only has its error and its gains, and the integral is switched off. The drone takes off, climbs — and stops a metre short of the setpoint, hovering there perfectly calm, perfectly wrong. This lesson finds out exactly how wrong, and why, and then fixes it in two different ways.}
 
 \section{The loop without feedforward}
 

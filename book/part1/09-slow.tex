@@ -1,7 +1,8 @@
 \lesson{9}{Too slow to react}{A digital controller looks at the world in snapshots. Between them it is blind — and blindness is delay.}{1}{slow}{Part I · PID}
 \label{les:slow}
 
-\lead{Every lesson so far quietly assumed that the controller reacts instantly. It does not. It samples the altimeter every few milliseconds and holds its command in between, and real sensors add their own delays. In this lesson we slow the controller down until the drone can no longer keep up, and we learn the tool that predicts where that happens: the phase margin.}
+\lead{\setupcard{\setuprow{Level}{L1}\setuprow{Controller}{the default PID at \SI{250}{Hz}}\setuprow{Setpoint}{a square wave of $\pm\SI{0.5}{m}$, a step every \SI{4}{s}}\setuprow{To change}{the controller rate and the sensor delay}}%
+Every lesson so far quietly assumed that the controller reacts instantly. It does not. It samples the altimeter every few milliseconds and holds its command in between, and real sensors add their own delays. In this lesson we slow the controller down until the drone can no longer keep up, and we learn the tool that predicts where that happens: the phase margin.}
 
 \section{Sample and hold}
 

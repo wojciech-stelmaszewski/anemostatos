@@ -1,7 +1,8 @@
 \lesson{7}{Derivative kick}{Differentiate the error and every setpoint step becomes an infinite spike. Differentiate the drone instead.}{1}{kick}{Part I · PID}
 \label{les:kick}
 
-\lead{The D term was introduced as a damper: a force against the drone's velocity. But the formula says something slightly different — it differentiates the \emph{error}, and the error contains the setpoint. Whenever a human (or a planner) moves the setpoint abruptly, the derivative of the error is enormous. This lesson measures that spike and removes it with a one-line change.}
+\lead{\setupcard{\setuprow{Level}{L1}\setuprow{Controller}{full PID with D on the error and no D filter}\setuprow{Setpoint}{a square wave of $\pm\SI{0.5}{m}$, a step every \SI{3}{s}}}%
+The D term was introduced as a damper: a force against the drone's velocity. But the formula says something slightly different — it differentiates the \emph{error}, and the error contains the setpoint. Whenever a human (or a planner) moves the setpoint abruptly, the derivative of the error is enormous. This lesson measures that spike and removes it with a one-line change.}
 
 \section{The derivative of a step}
 

@@ -384,7 +384,7 @@
 
 % In Anemostatos — styled like the app itself
 \newcommand{\appmark}{\tikz[baseline=-0.1em]{\draw[accent, line width=1.2pt, line cap=round] (0,0)--(0.62em,0.62em) (0,0.62em)--(0.62em,0);}}
-\newtcolorbox{inapp}[1][]{base, colback=night, colupper=nighttext, coltitle=nighttext, arc=3pt,
+\newtcolorbox{inapp}[1][]{base, whole, colback=night, colupper=nighttext, coltitle=nighttext, arc=3pt,
   fontupper={\sffamily\small\linespread{1.18}\selectfont\raggedright},
   title={\appmark\hspace{0.5em}\boxlabel{nightmuted}{IN ANEMOSTATOS}\ifstrempty{#1}{}{\hspace{0.8em}{\color{nighttext}\sffamily\small\bfseries #1}}},
   attach title to upper, after title={\par\smallskip},
@@ -411,11 +411,11 @@
   \begin{figure}[tp]\noindent\makebox[\textwidth][l]{\begin{minipage}{\fullwidthlen}%
     \begin{curiositybox}{#1}#2\end{curiositybox}\end{minipage}}\end{figure}}{}
 \newtcolorbox{curiositybox}[1]{enhanced, colback=paper, boxrule=0pt, arc=0pt,
-  before upper app={\setlength{\parindent}{0pt}\setlength{\parskip}{4.5pt plus 1pt}},
   left=14pt, right=14pt, top=12pt, bottom=12pt, before skip=0pt, after skip=0pt,
   fontupper={\normalsize},
   title={\boxlabel{sepia}{OUT IN THE WORLD}\par\smallskip{\displayserif\fontsize{19}{23}\selectfont\color{ink}#1}},
   attach title to upper, after title={\par\medskip},
+  before upper app={\setlength{\parindent}{0pt}\setlength{\parskip}{5pt plus 1pt}},
   borderline north={0.6pt}{0pt}{sepia!60}}
 \newcommand{\photo}[3][]{% [options] {key} {caption}
   \par\medskip\noindent\begin{minipage}{\linewidth}
@@ -445,7 +445,6 @@
 \BeforeBeginEnvironment{example}{\keeptogether{6\baselineskip}}
 \BeforeBeginEnvironment{theorem}{\keeptogether{6\baselineskip}}
 \BeforeBeginEnvironment{lookahead}{\keeptogether{6\baselineskip}}
-\BeforeBeginEnvironment{inapp}{\keeptogether{6\baselineskip}}
 \BeforeBeginEnvironment{remember}{\keeptogether{9\baselineskip}}
 
 \newcommand{\nohyph}{\hyphenpenalty=10000\exhyphenpenalty=10000\relax}
@@ -529,7 +528,8 @@
   \marginpar{\adjincludegraphics[width=\marginparwidth, trim={#1}, clip, valign=t]{screens/#2}\par\vspace{2pt}%
   \captionsetup{type=figure}\caption{#3}\label{#4}}}
 % A small figure in the margin, top-aligned with the line where it is called.
-\newcommand{\marginfig}[3]{\marginpar{\includegraphics[width=\marginparwidth,valign=t]{#1}\par\vspace{2pt}%
+\newcommand{\marginfig}[3]{\suppressfloats[t]% a later figure must not overtake this one on its page
+  \marginpar{\includegraphics[width=\marginparwidth,valign=t]{#1}\par\vspace{2pt}%
   \captionsetup{type=figure}\caption{#2}\label{#3}}}
 \newcommand{\marginphoto}[2]{\marginnote{\includegraphics[width=\marginparwidth,valign=t]{photos/#1}\par\vspace{2pt}%
   {\sffamily\scriptsize\color{sepia}#2 \hyperref[credit:#1]{\textsc{credit}}}}}
@@ -562,7 +562,13 @@
 \newcommand{\exercise}[1][1]{\refstepcounter{exercise}\item[{\sffamily\small\color{accent}\theexercise}\,%
   {\color{faint}\ifcase#1\or\raisebox{0.2ex}{\tiny$\bullet$}\or\raisebox{0.2ex}{\tiny$\bullet\bullet$}\or\raisebox{0.2ex}{\tiny$\bullet\bullet\bullet$}\fi}]}
 % The kind of an exercise: derive (pencil and paper), fly (in the simulator), code (against the source)
-\newcommand{\exkind}[1]{{\sanscaps\scriptsize\color{deepblue}#1}\enspace}
+% In the exercises the label stands in the margin, level with the first line.
+% (\marginnote, not \marginpar: a one-word label must stay on its own line and never be deferred.)
+\newcommand{\exkind}[1]{\leavevmode\marginnote{\sanscaps\scriptsize\color{deepblue}#1}\ignorespaces}
+\newcommand{\exkindinline}[1]{{\sanscaps\scriptsize\color{deepblue}#1}}
+% The set-up of a lesson, in the margin beside its lead: \setupcard{\setuprow{Level}{…}…}
+\newcommand{\setupcard}[1]{\marginpar{\marginfont{\sanscaps\scriptsize\color{accent}THE SET-UP}\par\vspace{4pt}#1}}
+\newcommand{\setuprow}[2]{{\color{ink}#1}\\#2\par\vspace{3.5pt}}
 % answers collected for the appendix
 \newwrite\answersfile
 \immediate\openout\answersfile=\jobname.ans

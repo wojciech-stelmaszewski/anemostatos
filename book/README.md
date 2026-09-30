@@ -74,6 +74,10 @@ book/
   (`\simfig`, `\sidecapfig`); the _Out in the World_ story is a float that takes
   the head of a page; short boxes and single exercises are never split.
   After a change, look at the pages: `make book` and check for short pages.
+- The margin column is used on purpose: every lesson opens with a `\setupcard` beside
+  its lead (what is switched on, what happens when), exercise kinds stand there
+  (`\exkind`), and so do figure captions, small figures and notes. `Try this` and
+  `In Anemostatos` boxes are never split; the story (`curiosity`) follows the summary box.
 - Exercises use `\exercise`, and their solutions go into `\answer{...}`
   right after them. The build collects the answers into
   `build/main.ans` for the companion volume; they are not printed here.

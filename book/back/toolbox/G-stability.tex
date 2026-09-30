@@ -1,0 +1,233 @@
+\toolchapter{G}{Stability of nonlinear systems}{Poles belong to linear models. When drag is quadratic, motors saturate and bodies rotate, stability needs a tool that does not solve the equation: a function that can only go down.}
+\label{app:stab}
+
+\lead{\usedcard{\setuprow{Lesson 2}{stability defined; linearisation; a limit cycle}\setuprow{Lesson 4}{energy as a Lyapunov function, the invariance principle}\setuprow{Lessons 3, 13, 14}{time scales, what separation promises}\setuprow{Lesson 6}{a loop that switches}\setuprow{Parts II, III}{Lyapunov designs (II.10, II.18, III.7, III.15–III.17)}}%
+The drone is not linear. Its drag grows with the square of the speed, its motors have limits, its attitude is a rotation. The lessons deal with this in two ways: they linearise, and where that is not enough they argue with energy. This appendix gives both arguments their exact form — when a linearisation may be trusted, how a Lyapunov function proves stability and how to find one, what to do when it only \emph{almost} proves it, and how far from the equilibrium the proof reaches.}
+
+\section{Equilibria and linearisation}
+
+Write the system as $\dot{\vx} = f(\vx)$. A point $\vx^*$ with $f(\vx^*) = 0$ is an \term{equilibrium}: started there, the system stays there. A nonlinear system can have several equilibria, or none; a linear one, $\dot{\vx} = A\vx$ with invertible $A$, has exactly one.
+
+Near an equilibrium a smooth $f$ is well approximated by its first-order Taylor expansion. With the deviation $\symbf z = \vx - \vx^*$,
+\begin{equation}\label{eq:G-lin}
+  \dot{\symbf z} = A\,\symbf z + (\text{terms of second order in } \symbf z), \qquad
+  A = \frac{\partial f}{\partial\vx}\Big|_{\vx^*} = \begin{pmatrix}\dfrac{\partial f_1}{\partial x_1} & \cdots & \dfrac{\partial f_1}{\partial x_n}\\ \vdots & & \vdots\\ \dfrac{\partial f_n}{\partial x_1} & \cdots & \dfrac{\partial f_n}{\partial x_n}\end{pmatrix}_{\vx^*} .
+\end{equation}
+The matrix $A$ is the \term{Jacobian} of $f$, and $\dot{\symbf z} = A\symbf z$ is the \term{linearisation} at $\vx^*$. With an input, $\dot{\vx} = f(\vx, \symbf u)$, the same expansion about an equilibrium pair $(\vx^*, \symbf u^*)$ gives $\dot{\symbf z} = A\symbf z + B\symbf v$ with $B = \partial f/\partial\symbf u$ and $\symbf v = \symbf u - \symbf u^*$.
+
+\Cref{thm:spring-indirect} says what the linearisation is worth: if all eigenvalues of $A$ have negative real parts, the equilibrium of the \emph{nonlinear} system is asymptotically stable; if one has a positive real part, it is unstable; if the rightmost ones sit on the imaginary axis, the linearisation decides nothing.
+
+\begin{example}[Linearising the drag]
+\label{ex:G-drag}
+Vertically the drone obeys $m\dot v = T - mg - c_v|v|v$. Linearise it about a steady climb at the speed $v_0 > 0$, and about hover.
+
+\textbf{Step 1 — the equilibrium.} A steady climb needs $T_0 = mg + c_vv_0^2$.
+
+\textbf{Step 2 — the derivatives.} $f(v, T) = (T - mg - c_v|v|v)/m$. For $v > 0$, $|v|v = v^2$, so $\partial f/\partial v = -2c_vv_0/m$, and $\partial f/\partial T = 1/m$.
+
+\textbf{Step 3 — the linear model.} With $\delta v = v - v_0$ and $\delta T = T - T_0$: $\;\delta\dot v = -\dfrac{2c_vv_0}{m}\,\delta v + \dfrac{1}{m}\,\delta T$. The drag acts like a linear damper of strength $2c_vv_0$.
+
+\textbf{Step 4 — numbers.} In the full-thrust climb of \lessonref{les:windup}, $v_0 = \SI{2.96}{m/s}$ and $c_v = 0.25$: a damping of \SI{1.48}{N.s/m} and a time constant of $m/(2c_vv_0) = \SI{0.68}{s}$.
+
+\textbf{Step 5 — at hover.} $v_0 = 0$: the derivative $2c_v|v|$ vanishes. To first order there is no drag at all. This is why the linear models of Part~I leave it out — and why the linearisation of the P-only loop cannot see that the drag will, in the end, bring the drone to rest (Example~\ref{ex:G-algebraic}).
+\end{example}
+
+\paragraph{How far is \enquote{near}?} A linearisation comes without a range of validity; that must be checked for each use. The horizontal axis of the quadrotor replaces $g\tan\theta$ by $g\,\theta$ (\cref{thm:tilt-chain}). At $10^\circ$ the error is 1\,\%, at $35^\circ$, the tilt limit, 15\,\%: tolerable for feedback, which corrects it, and too much for a feedforward that should be exact.
+
+\section{What stability means}
+
+The definitions are those of \lessonref{les:spring}: an equilibrium is \emph{stable} if solutions that start close stay close, \emph{asymptotically stable} if they also converge to it, \emph{globally} so if they do from every initial state. Two more notions are needed.
+
+\begin{definition}{Exponential stability, region of attraction}
+An equilibrium $\vx^*$ is \term{exponentially stable} if there are $c, \alpha > 0$ such that $\|\vx(t) - \vx^*\| \le c\,e^{-\alpha t}\|\vx(0) - \vx^*\|$ for all initial states near it. Its \term{region of attraction} is the set of all initial states from which the solution converges to it.
+\end{definition}
+
+For linear systems asymptotic and exponential stability are the same thing, and the region of attraction is everything (\cref{thm:spring-linear}). For nonlinear systems neither is true, and both differences matter in practice: convergence can be slower than any exponential, and it can be lost by starting too far away.
+
+\section{Lyapunov functions}
+
+Aleksandr Lyapunov's idea of 1892 is to avoid solving the equation. Find a function of the state that is positive everywhere except at the equilibrium and that decreases along every solution. A quantity that is bounded below and always decreasing must come to rest, and if it can rest only at the equilibrium, the state must go there.
+
+Take the equilibrium at the origin. For a function $V(\vx)$ the rate of change along a solution follows from the chain rule, without knowing the solution:
+\begin{equation}\label{eq:G-vdot}
+  \dot V(\vx) = \frac{\partial V}{\partial\vx}\,f(\vx) = \sum_i \frac{\partial V}{\partial x_i}\,f_i(\vx) .
+\end{equation}
+
+\begin{theorem}[Lyapunov's direct method, with a rate]
+\label{thm:G-lyap}
+Let $V$ be continuously differentiable with $V(0) = 0$.
+\begin{enumerate}[label=(\roman*)]
+  \item If $V(\vx) > 0$ and $\dot V(\vx) \le 0$ for all $\vx \ne 0$ near the origin, the origin is stable.
+  \item If moreover $\dot V(\vx) < 0$ for all $\vx \ne 0$ near the origin, it is asymptotically stable.
+  \item If there are positive constants with $c_1\|\vx\|^2 \le V(\vx) \le c_2\|\vx\|^2$ and $\dot V(\vx) \le -c_3\|\vx\|^2$, it is exponentially stable, and $\|\vx(t)\| \le \sqrt{c_2/c_1}\;e^{-(c_3/2c_2)\,t}\,\|\vx(0)\|$.
+  \item If the conditions hold for all $\vx$ and $V(\vx) \to \infty$ as $\|\vx\| \to \infty$, the conclusions hold globally.
+\end{enumerate}
+(Khalil, 2002, ch.~4.)
+\end{theorem}
+
+The rate in (iii) takes two lines and shows how such proofs work: $\dot V \le -c_3\|\vx\|^2 \le -(c_3/c_2)V$, so $V(t) \le V(0)\,e^{-(c_3/c_2)t}$; then $c_1\|\vx\|^2 \le V$ on the left and $V(0) \le c_2\|\vx(0)\|^2$ on the right, and a square root.
+
+A function that satisfies (i) is a \term{Lyapunov function}. The theorem does not say how to find one. For mechanical systems the energy is the first candidate (\lessonref{les:damper}). For linear systems there is a recipe.
+
+\subsection{Quadratic forms}
+The simplest positive functions of a vector are quadratic: $V(\vx) = \vx^\T P\vx$ with a symmetric matrix $P$.
+
+\begin{definition}{Positive definite matrix}
+A symmetric matrix $P$ is \term{positive definite}, written $P \succ 0$, if $\vx^\T P\vx > 0$ for every $\vx \ne 0$. Equivalently: all its eigenvalues are positive; or all its leading principal minors (the determinants of its upper-left blocks) are positive. For every $\vx$,
+\begin{equation}\label{eq:G-rayleigh}
+  \lambda_{min}(P)\,\|\vx\|^2 \le \vx^\T P\vx \le \lambda_{max}(P)\,\|\vx\|^2 .
+\end{equation}
+\end{definition}
+
+The level sets $\vx^\T P\vx = c$ of a positive definite form are ellipses (ellipsoids), with their axes along the eigenvectors of $P$ and half-lengths $\sqrt{c/\lambda_i}$.
+
+\begin{theorem}[The Lyapunov equation]
+\label{thm:G-lyapeq}
+All eigenvalues of $A$ have negative real parts if and only if for some (and then for every) symmetric $Q \succ 0$ the equation
+\begin{equation}\label{eq:G-lyapeq}
+  A^\T P + P A = -Q
+\end{equation}
+has a symmetric solution $P \succ 0$. The solution is then unique, and $V = \vx^\T P\vx$ satisfies $\dot V = -\vx^\T Q\vx$ along $\dot{\vx} = A\vx$. (Khalil, 2002, ch.~4.)
+\end{theorem}
+
+The last claim is a one-line calculation: $\dot V = \dot{\vx}^\T P\vx + \vx^\T P\dot{\vx} = \vx^\T(A^\T P + PA)\vx$. So for a stable linear system a Lyapunov function with a strictly negative derivative always exists, and it is found by solving \emph{linear} equations for the entries of $P$.
+
+\begin{example}[A Lyapunov function for the P–D loop]
+\label{ex:G-P}
+Solve \cref{eq:G-lyapeq} for the default altitude loop, $A = \begin{psmallmatrix}0 & 1\\ -10 & -7\end{psmallmatrix}$, with $Q = \Id$.
+
+\textbf{Step 1 — unknowns.} $P = \begin{psmallmatrix}p_{11} & p_{12}\\ p_{12} & p_{22}\end{psmallmatrix}$: three numbers.
+
+\textbf{Step 2 — multiply out.} $A^\T P = \begin{pmatrix}-10\,p_{12} & -10\,p_{22}\\ p_{11} - 7p_{12} & p_{12} - 7p_{22}\end{pmatrix}$, and $PA$ is its transpose.
+
+\textbf{Step 3 — three equations.} Entry $(1,1)$: $-20\,p_{12} = -1$. Entry $(2,2)$: $2\,(p_{12} - 7p_{22}) = -1$. Entry $(1,2)$: $p_{11} - 7p_{12} - 10\,p_{22} = 0$.
+
+\textbf{Step 4 — solve.} $p_{12} = 0.05$; $p_{22} = (0.05 + 0.5)/7 = 0.0786$; $p_{11} = 0.35 + 0.786 = 1.136$.
+
+\textbf{Step 5 — is it positive definite?} Leading minors: $1.136 > 0$ and $1.136 \cdot 0.0786 - 0.05^2 = 0.0867 > 0$. Yes — as it must be, since the poles are $-2$ and $-5$.
+
+\textbf{Step 6 — the rate it proves.} The eigenvalues of $P$ are $0.0762$ and $1.138$. \Cref{thm:G-lyap}\,(iii) with $c_1 = 0.0762$, $c_2 = 1.138$, $c_3 = 1$ gives $\|\vx(t)\| \le 3.9\,e^{-0.44t}\|\vx(0)\|$. True, and pessimistic: the slowest pole decays as $e^{-2t}$. A Lyapunov function proves stability; the rates it yields are bounds, and other choices of $Q$ give other bounds.
+\end{example}
+
+Compare with the energy $V = \tfrac12m\dot x^2 + \tfrac12K_px^2$ of \lessonref{les:damper}. It is also a quadratic form, with $P = \tfrac12\diag(K_p, m)$, but its derivative $-K_d\dot x^2$ is zero on the whole line $\dot x = 0$: case (i) of the theorem, not (ii). The energy is the \emph{natural} Lyapunov function and the $P$ of Example~\ref{ex:G-P} the \emph{sufficient} one. \Cref{fig:G-lyap} shows both.
+
+\simfig{tb_lyap}{Left: a trajectory of the default P–D loop (blue) crossing the level sets of two Lyapunov functions. The ellipses of $\vx^\T P\vx$ from Example~\ref{ex:G-P} (solid) are crossed inwards everywhere. The ellipses of the energy (dashed) are touched tangentially wherever the velocity is zero. Right: the swing of the drone with air drag and no damper. Dots: peaks of a numerical solution of $\ddot x + 0.25|\dot x|\dot x + 10x = 0$; line: the algebraic decay of Example~\ref{ex:G-algebraic}; dashed: an exponential for comparison.}{fig:G-lyap}
+
+\section{When the derivative is only non-positive}
+
+Energy-like functions usually give $\dot V \le 0$ and no more: dissipation acts on velocities, not on positions. Two theorems close the gap.
+
+\subsection{The invariance principle}
+\Cref{thm:damper-lasalle}: if $\dot V \le 0$ everywhere and the only solution that can stay for ever in the set where $\dot V = 0$ is the equilibrium itself, the equilibrium is asymptotically stable. The recipe is always the same: assume $\dot V = 0$ for all time, insert that into the equations of motion, and see what is left.
+
+\begin{example}[Stable, but not exponentially]
+\label{ex:G-algebraic}
+The ideal P-only loop with air drag and no D term: $m\ddot x + c_v|\dot x|\dot x + K_px = 0$. Its linearisation at rest is the undamped oscillator, which decides nothing (Example~\ref{ex:G-drag}). Does the drone come to rest, and how fast?
+
+\textbf{Step 1 — the candidate.} $V = \tfrac12m\dot x^2 + \tfrac12K_px^2$, positive definite and unbounded at infinity.
+
+\textbf{Step 2 — its derivative.} $\dot V = \dot x\,(m\ddot x + K_px) = -c_v|\dot x|^3 \le 0$.
+
+\textbf{Step 3 — invariance.} $\dot V = 0$ means $\dot x = 0$. A solution that keeps $\dot x = 0$ has $\ddot x = 0$, and the equation leaves $K_px = 0$. Only the origin stays. By \cref{thm:damper-lasalle} it is globally asymptotically stable.
+
+\textbf{Step 4 — how fast.} Use the energy balance of Example~\ref{ex:spring-limit}, now without the motor lag: an oscillation of amplitude $A$ loses $\tfrac83c_vA^3\omega^2$ per period, and $E = \tfrac12K_pA^2$. Dividing by the period as in \cref{eq:spring-amp}:
+\begin{equation*}
+  \dot A = -\kappa\,A^2, \qquad \kappa = \frac{4\,c_v\,\omega}{3\pi\,m} = \frac{4 \cdot 0.25 \cdot 3.16}{3\pi} = \SI{0.336}{m^{-1}s^{-1}} .
+\end{equation*}
+
+\textbf{Step 5 — solve.} Separating variables, $-\dd A/A^2 = \kappa\,\dd t$, gives $1/A - 1/A_0 = \kappa t$:
+\begin{equation}\label{eq:G-algebraic}
+  A(t) = \frac{A_0}{1 + \kappa A_0\,t} .
+\end{equation}
+
+\textbf{Step 6 — read it.} From $A_0 = \SI{1}{m}$: \SI{0.23}{m} after ten seconds, \SI{0.029}{m} after a hundred. The decay is like $1/t$: slower than every exponential, because the smaller the swing, the weaker the drag. A numerical solution of the full equation has peaks of $0.1427$ at \SI{17.9}{s} and $0.0297$ at \SI{97.4}{s}; \cref{eq:G-algebraic} gives the same four digits (\cref{fig:G-lyap}, right).
+\end{example}
+
+The example is worth remembering as a counterexample to a common belief: asymptotic stability does \emph{not} imply that errors shrink by a fixed percentage per second. Only exponential stability does, and only exponential stability survives small unmodelled effects — here the motor lag, which turns this slowly converging loop into the limit cycle of \lessonref{les:spring}.
+
+\subsection{Barbalat's lemma}
+The invariance principle needs a system that does not depend on time explicitly. An adaptive controller, whose estimates change as it flies, or a loop that tracks a moving reference, is not of that kind. There the tool is a lemma from analysis.
+
+\begin{theorem}[Barbalat's lemma, in the form used for Lyapunov arguments]
+\label{thm:G-barbalat}
+Let $V(t) \ge 0$ be differentiable with $\dot V(t) \le 0$, and let $\dot V$ be uniformly continuous — which holds, in particular, if $\ddot V$ is bounded. Then $\dot V(t) \to 0$ as $t \to \infty$. (Khalil, 2002, ch.~8.)
+\end{theorem}
+
+The use is this. One finds $V \ge 0$ with $\dot V = -(\text{something})^2 \le 0$; then $V$ is bounded, hence so are the signals it contains; from that one checks that $\ddot V$ is bounded; and the lemma yields $(\text{something}) \to 0$. Typically the \enquote{something} is the tracking error, while the parameter estimates inside $V$ are only shown to stay bounded — which is exactly the guarantee an adaptive law gives (Lessons~II.18 and~III.17).\pitfall{A function can have a limit while its derivative does not go to zero: $\sin(t^2)/t$ tends to zero and its derivative keeps oscillating with amplitude 2. The boundedness of $\ddot V$ is what excludes this.}
+
+\section{How far does stability reach?}
+
+Linearisation and the theorems above are local: they hold \enquote{near} the equilibrium. For a loop with limits the engineering question is how large a disturbance it survives. Lyapunov functions answer that too.
+
+\begin{theorem}[An estimate of the region of attraction]
+\label{thm:G-roa}
+Let $V$ be positive definite and let the set $\Omega_c = \{\vx : V(\vx) \le c\}$ be bounded. If $\dot V(\vx) < 0$ for all $\vx \ne 0$ in $\Omega_c$, then every solution that starts in $\Omega_c$ stays in it and converges to the origin. (Khalil, 2002, ch.~8.)
+\end{theorem}
+
+The reasoning is simple: $V$ cannot increase, so a solution cannot cross the boundary $V = c$ outwards; inside, $V$ keeps falling until the state is at the origin. The estimate is the largest level set of $V$ that fits into the region where $\dot V$ is negative. It is always conservative, and a better $V$ gives a larger set.
+
+\begin{example}[A vehicle that is unstable on its own]
+\label{ex:G-roa}
+A rocket balancing on its engine falls over, when uncontrolled, as $\dot x = a\,x$ with $a = \SI{2}{s^{-1}}$ ($x$ is its tilt, in suitable units). The controller commands $u = -k\,x$ with $k = 6$, and the actuator delivers $\sat(u)$ between $-1$ and $1$. From which tilts can it recover?
+
+\textbf{Step 1 — the loop.} $\dot x = a\,x + \sat(-kx)$. For $|x| \le 1/k = 0.167$ it is linear, $\dot x = -(k - a)x = -4x$: stable.
+
+\textbf{Step 2 — a Lyapunov function.} $V = \tfrac12x^2$, $\dot V = x\,\dot x$.
+
+\textbf{Step 3 — beyond the limit.} For $x > 1/k$ the actuator gives $-1$: $\dot x = ax - 1$, negative only while $x < 1/a = 0.5$. So $\dot V < 0$ for $0 < |x| < 0.5$.
+
+\textbf{Step 4 — the region.} $\Omega_c$ with $c = \tfrac12 \cdot 0.5^2$ is the interval $|x| < 0.5$. From there the rocket recovers. At $|x| > 0.5$ even full actuator authority cannot hold it: $\dot x = ax - 1 > 0$. The estimate is exact here.
+
+\textbf{Step 5 — read it.} The region does not depend on the gain $k$ at all. It is set by the ratio of the actuator's limit to the instability of the plant, $u_{max}/a$. No controller can enlarge it: beyond that tilt the vehicle is lost, and the only defence is never to get there. The drone is kinder: left alone it does not run away exponentially, and a saturated thrust still steers it (\lessonref{les:windup}).
+\end{example}
+
+\subsection{Disturbances that never stop}
+A loop under turbulence never reaches its equilibrium. What it can promise is to stay close. If a Lyapunov function satisfies
+\begin{equation}\label{eq:G-iss}
+  \dot V \le -\alpha\,V + \beta\,d^2
+\end{equation}
+for a disturbance of size $d$, then $V$ decreases whenever $V > \beta d^2/\alpha$: the state enters the set $V \le \beta d_{max}^2/\alpha$ and stays there. It is \term{ultimately bounded}, with a bound proportional to the disturbance. A system with this property for every bounded disturbance is called \emph{input-to-state stable}. Exponentially stable linear systems always are; for nonlinear ones it is a separate property to be proved, and the form \eqref{eq:G-iss} is how (Lesson~III.7).
+
+\section{Limit cycles and averaging}
+
+Not every motion of a nonlinear system ends at an equilibrium. A \term{limit cycle} is an isolated periodic solution; it is stable if neighbouring solutions spiral onto it from both sides. \Lessonref{les:spring} found one by a calculation that deserves its name.
+
+\begin{result}[Averaging a weakly damped oscillator]
+For $\ddot x + \omega^2x = \varepsilon\,g(x, \dot x)$ with a small $\varepsilon$, write $x = A\cos(\omega t + \varphi)$ with slowly varying $A$. To first order in $\varepsilon$ the amplitude obeys
+\begin{equation}
+  \dot A = -\frac{\varepsilon}{2\pi\omega}\int_0^{2\pi} g\big(A\cos\theta,\ -A\omega\sin\theta\big)\,\sin\theta\;\dd\theta ,
+\end{equation}
+the power of the perturbing force averaged over one period and divided by $\omega^2A$. Equilibria of this scalar equation are limit cycles of the oscillator, and they are stable where the right-hand side decreases through zero. (Khalil, 2002, ch.~10.)
+\end{result}
+
+\Cref{eq:spring-amp}, with the motor lag pumping and the drag braking, and \cref{eq:G-algebraic}, with the drag alone, are both instances. The method is justified when the amplitude changes little within one period. Its cousin for loops with a hard nonlinearity — a saturation, a relay — is the describing function of Lesson~III.8, which keeps only the fundamental of the nonlinearity's output (Appendix~C).
+
+\section{Two time scales}
+
+When part of a system is much faster than the rest, the fast part can be replaced by its equilibrium. \Cref{thm:cascade-tikhonov} is the exact statement: for $\dot{\vx} = f(\vx, \symbf z)$, $\varepsilon\dot{\symbf z} = g(\vx, \symbf z)$ with an exponentially stable fast subsystem, the solution of the full system stays within $O(\varepsilon)$ of the solution of the reduced one. The lessons used it three times:
+\begin{itemize}
+  \item the slow integral and the fast P–D loop (\lessonref{les:droop}), $\varepsilon \approx 0.06$;
+  \item the outer and inner loops of the cascade (\lessonref{les:cascade}), $\varepsilon \approx 0.3$;
+  \item the amplitude of an oscillation and its phase (the averaging above), $\varepsilon \approx 0.05$.
+\end{itemize}
+and \lessonref{les:inversion} showed what happens at $\varepsilon \approx 0.8$: the theorem is silent, and the cascade is unstable.
+
+The first correction in $\varepsilon$ can often be computed. For the slow pole of \lessonref{les:droop} it is the second form of \cref{eq:B-slow}: $-\tfrac{K_i}{K_p}\big(1 + \tfrac{K_iK_d}{K_p^2}\big) = -0.0845$, against the quasi-static $-0.080$ and the exact $-0.0850$.
+
+\begin{result}[Appendix G at a glance]
+\begin{center}\small
+\renewcommand{\arraystretch}{1.4}
+\begin{tabularx}{\linewidth}{@{}l>{\raggedright\arraybackslash}X@{}}
+linearisation & $A = \partial f/\partial\vx$ at the equilibrium; decides unless eigenvalues sit on the imaginary axis\\
+Lyapunov function & $V > 0$, $\dot V = (\partial V/\partial\vx)\,f \le 0$: stable; $\dot V < 0$: asymptotically stable\\
+exponential rate & $c_1\|\vx\|^2 \le V \le c_2\|\vx\|^2$, $\dot V \le -c_3\|\vx\|^2$: rate $c_3/(2c_2)$\\
+linear systems & solve $A^\T P + PA = -Q$; $V = \vx^\T P\vx$\\
+$\dot V \le 0$ only & invariance principle: what can stay where $\dot V = 0$? With time dependence: Barbalat\\
+region of attraction & the largest bounded level set of $V$ inside $\{\dot V < 0\}$\\
+unstable plant, limited actuator & recoverable region of size $u_{max}/a$, whatever the gain\\
+persistent disturbance & $\dot V \le -\alpha V + \beta d^2$: ultimately $V \le \beta d^2/\alpha$\\
+weak nonlinearity & average over a period: an equation for the amplitude\\
+two time scales & replace the fast part by its equilibrium; error of the order of the ratio\\
+\end{tabularx}
+\end{center}
+\end{result}

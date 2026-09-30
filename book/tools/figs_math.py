@@ -320,3 +320,61 @@ def tb_energy():
     b.set_xlim(0, 20)
     b.set_ylim(0.9, 1.11)
     save(f_, "tb_energy")
+
+
+@fig
+def tb_lyap():
+    """Level sets of two Lyapunov functions of the P-D loop; algebraic decay with drag only."""
+    from scipy.integrate import solve_ivp
+
+    A = np.array([[0.0, 1.0], [-10.0, -7.0]])
+    P = np.array([[1.13571429, 0.05], [0.05, 0.07857143]])
+    Pe = 0.5 * np.diag([10.0, 1.0])
+    f, (a, b) = plt.subplots(1, 2, figsize=(TEXT_W, 66 * MM), gridspec_kw=dict(wspace=0.32))
+    th = np.linspace(0, 2 * np.pi, 300)
+    circ = np.vstack([np.cos(th), np.sin(th)])
+
+    def ellipse(M, c):
+        lam, V = np.linalg.eigh(M)
+        return V @ (np.sqrt(c / lam)[:, None] * circ)
+
+    x0 = np.array([1.0, 0.0])
+    t = np.linspace(0, 4, 600)
+    X = np.array([expm(A * ti) @ x0 for ti in t])
+    for k in (0, 60, 130, 230):
+        e = ellipse(P, X[k] @ P @ X[k])
+        a.plot(e[0], e[1], color=C["I"], lw=0.8)
+        e = ellipse(Pe, X[k] @ Pe @ X[k])
+        a.plot(e[0], e[1], color=C["D"], lw=0.8, ls=(0, (4, 2.5)))
+    a.plot(X[:, 0], X[:, 1], color=C["meas"], lw=1.4, zorder=5)
+    a.annotate("", xy=X[62], xytext=X[58], arrowprops=dict(arrowstyle="-|>", color=C["meas"], lw=1.2, mutation_scale=8), zorder=6)
+    a.plot(0, 0, "o", color=C["accent"], ms=3, zorder=6)
+    a.plot([], [], color=C["I"], lw=0.8, label="$\\mathbf{x}^T P\\,\\mathbf{x}$")
+    a.plot([], [], color=C["D"], lw=0.8, ls=(0, (4, 2.5)), label="energy")
+    a.legend(loc="upper right")
+    a.axhline(0, color=C["faint"], lw=0.4, zorder=0)
+    a.axvline(0, color=C["faint"], lw=0.4, zorder=0)
+    a.set_xlim(-1.15, 1.15)
+    a.set_ylim(-3.8, 3.8)
+    a.grid(False)
+    a.set_title("Two Lyapunov functions")
+    a.set_xlabel("position $x$", loc="right")
+    a.set_ylabel("velocity $\\dot x$")
+
+    c = 0.25
+    sol = solve_ivp(lambda _, y: [y[1], -10 * y[0] - c * abs(y[1]) * y[1]], [0, 100], [1, 0], max_step=0.005, rtol=1e-9)
+    x, ts = sol.y[0], sol.t
+    pk = [i for i in range(1, len(x) - 1) if x[i] > x[i - 1] and x[i] >= x[i + 1]]
+    kap = 4 * c * np.sqrt(10) / (3 * np.pi)
+    tt = np.linspace(0, 100, 400)
+    b.semilogy(tt, 1 / (1 + kap * tt), color=C["ink"], lw=1.0, label="$A_0/(1 + \\kappa A_0 t)$")
+    b.semilogy(tt, np.exp(-kap * tt), color=C["faint"], lw=0.9, ls=(0, (4, 2.5)), label="$e^{-\\kappa t}$")
+    b.semilogy(ts[pk][::3], x[pk][::3], "o", color=C["meas"], ms=2.2, label="peaks, numerical")
+    b.set_ylim(0.01, 1.3)
+    b.set_xlim(0, 100)
+    b.legend(loc="upper right")
+    b.set_title("Drag alone: decay like $1/t$")
+    b.set_xlabel("time  [s]", loc="right")
+    b.set_ylabel("amplitude  [m]")
+    b.grid(True, which="major", axis="both")
+    save(f, "tb_lyap")

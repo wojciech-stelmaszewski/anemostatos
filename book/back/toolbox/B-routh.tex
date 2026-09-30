@@ -1,0 +1,265 @@
+\toolchapter{B}{Polynomials and stability}{Whether the roots lie in the left half-plane can be read from the coefficients. Where they go when a gain changes can be sketched without solving anything.}
+\label{app:routh}
+
+\lead{\usedcard{\setuprow{Lesson 2}{a missing coefficient means instability}\setuprow{Lessons 5, 10}{the largest stable $K_i$ and $K_p$}\setuprow{Lesson 14}{the edge of a fourth-order chain}\setuprow{Lessons 4, 5, 10}{paths of the poles}\setuprow{Part III}{the root locus as a live chart (III.2)}}%
+A linear loop is stable exactly when all roots of its characteristic polynomial have negative real parts (\cref{thm:spring-linear}). Computing the roots of a cubic or a quartic by hand is tedious, and with a gain left as a symbol it is hopeless. The two tools of this appendix avoid it. The Routh–Hurwitz criterion decides stability from the coefficients, with symbols allowed. The root locus shows how the roots move as one gain grows.}
+
+\section{Roots and coefficients}
+
+Write a polynomial with its leading coefficient one and factor it over its roots $s_1, \dots, s_n$:
+\begin{equation}
+  p(s) = s^n + a_{n-1}s^{n-1} + \dots + a_1 s + a_0 = (s - s_1)(s - s_2)\cdots(s - s_n) .
+\end{equation}
+Multiplying out the right-hand side and comparing coefficients gives \term{Vieta's formulas}. The two that are used most:
+\begin{equation}\label{eq:B-vieta}
+  s_1 + s_2 + \dots + s_n = -a_{n-1}, \qquad s_1 s_2 \cdots s_n = (-1)^n a_0 .
+\end{equation}
+The sum of the poles of a loop is fixed by one coefficient. In the loop with the motor lag, $\tau_m m s^3 + m s^2 + K_ds + K_p$, that coefficient is $1/\tau_m$ whatever the gains: \emph{the sum of the three poles is always $-1/\tau_m$}. If a gain pushes one pole to the left, the others must move to the right. This is the algebra behind \enquote{every lag sets a speed limit}.
+
+Two more facts hold for every real polynomial.
+\begin{itemize}
+  \item Complex roots come in conjugate pairs $\sigma \pm j\omega$, and a pair contributes the real quadratic factor $(s - \sigma)^2 + \omega^2 = s^2 - 2\sigma s + \sigma^2 + \omega^2$.
+  \item If all roots have negative real parts, the polynomial is a product of factors $(s + a)$ and $(s^2 + bs + c)$ with positive $a$, $b$, $c$, so \emph{all its coefficients are positive}. A missing or negative coefficient proves instability at a glance (Step~4 of Example~\ref{ex:spring-cubic}).
+\end{itemize}
+The converse of the second fact holds up to degree two and fails from degree three on: $s^3 + s^2 + s + 6 = (s + 2)(s^2 - s + 3)$ has positive coefficients and two roots at $+0.5 \pm 1.66j$.
+
+\subsection{A slow root, quickly}
+When one root is much closer to the origin than the others, it can be estimated from the last two coefficients. Near $s = 0$ the high powers are negligible and $p(s) \approx a_1 s + a_0$, so
+\begin{equation}\label{eq:B-slow}
+  s_{slow} \approx -\frac{a_0}{a_1}, \qquad\text{and, one step better,}\qquad s_{slow} \approx -\frac{a_0}{a_1}\Big(1 + \frac{a_0\,a_2}{a_1^2}\Big) .
+\end{equation}
+The second form keeps the $s^2$ term and inserts the first estimate into it. For the loop of \lessonref{les:droop}, $s^3 + 7s^2 + 10s + 0.8$: $-a_0/a_1 = -0.080$, which is the quasi-static $-K_i/K_p$, and the refined value is $-0.080\,(1 + 0.8 \cdot 7/100) = -0.0845$. The exact root is $-0.0850$.
+
+\section{The Routh–Hurwitz criterion}
+
+\begin{definition}{Hurwitz polynomial}
+A real polynomial is called \term{Hurwitz} (or \emph{stable}) if all its roots have negative real parts.
+\end{definition}
+
+\begin{theorem}[Routh–Hurwitz, degrees two to four]
+\label{thm:B-low}
+Let the leading coefficient be positive. The polynomial is Hurwitz if and only if all its coefficients are positive and, in addition,
+\begin{center}
+\renewcommand{\arraystretch}{1.35}
+\begin{tabular}{@{}ll@{}}
+degree 2, \ $a_2s^2 + a_1s + a_0$: & nothing more;\\
+degree 3, \ $a_3s^3 + a_2s^2 + a_1s + a_0$: & $a_2a_1 > a_3a_0$;\\
+degree 4, \ $a_4s^4 + a_3s^3 + a_2s^2 + a_1s + a_0$: & $a_1\,(a_3a_2 - a_4a_1) > a_3^2\,a_0$.
+\end{tabular}
+\end{center}
+\end{theorem}
+\begin{proof}
+Degrees two and three are \cref{thm:spring-routh}. For degree four, divide by $a_4$ and let the polynomial be $s^4 + a_3s^3 + a_2s^2 + a_1s + a_0$. Its roots move continuously with the coefficients, so a root can pass from the left half-plane to the right only through the imaginary axis. At $s = j\omega$ the real part is $\omega^4 - a_2\omega^2 + a_0$ and the imaginary part $\omega\,(a_1 - a_3\omega^2)$. Both vanish for some $\omega \ne 0$ exactly when $\omega^2 = a_1/a_3$ and $a_1^2 - a_1a_2a_3 + a_0a_3^2 = 0$, that is, when $a_1(a_3a_2 - a_1) = a_3^2a_0$; a root at $s = 0$ needs $a_0 = 0$. So within the set of positive coefficients the number of right-half-plane roots can change only across the surface $a_1(a_3a_2 - a_1) = a_3^2a_0$. On the side where the inequality holds lies $(s + 1)^4 = s^4 + 4s^3 + 6s^2 + 4s + 1$, with $4 \cdot (24 - 4) = 80 > 16$ and all roots at $-1$; on the other side lies $s^4 + s^3 + s^2 + s + 1$, whose roots are four of the fifth roots of unity, two of them in the right half-plane. Each side is connected, so the count is constant on it.
+\end{proof}
+
+The proof shows something useful in itself: \emph{at the edge of stability the roots on the imaginary axis are at $\omega^2 = a_1/a_3$} (degrees three and four). The lessons use this to find the frequency at which a loop oscillates at its limit (Examples~\ref{ex:integral-limit}, \ref{ex:edge-cubic} and~\ref{ex:inv-quartic}).
+
+\subsection{Any degree: the Routh array}
+For higher degrees the conditions are organised in a table. Write the coefficients in two rows, alternating, and build each further row from the two above it:
+\begin{equation}\label{eq:B-array}
+\begin{array}{c|cccc}
+  s^n & a_n & a_{n-2} & a_{n-4} & \cdots\\
+  s^{n-1} & a_{n-1} & a_{n-3} & a_{n-5} & \cdots\\
+  s^{n-2} & b_1 & b_2 & b_3 & \cdots\\
+  s^{n-3} & c_1 & c_2 & \cdots & \\
+  \vdots & \vdots & & &
+\end{array}
+\qquad\quad
+\begin{aligned}
+  b_1 &= \frac{a_{n-1}a_{n-2} - a_n a_{n-3}}{a_{n-1}},\\[2pt]
+  b_2 &= \frac{a_{n-1}a_{n-4} - a_n a_{n-5}}{a_{n-1}},\\[2pt]
+  c_1 &= \frac{b_1 a_{n-3} - a_{n-1} b_2}{b_1}, \quad\dots
+\end{aligned}
+\end{equation}
+Each entry is a $2 \times 2$ cross product of the first column of the two rows above with the column to its right, divided by the first entry of the row directly above. Missing entries count as zero. The table has $n + 1$ rows.
+
+\begin{theorem}[Routh]
+\label{thm:B-routh}
+If no entry of the first column of the array \eqref{eq:B-array} is zero, the number of roots with positive real parts equals the number of changes of sign down the first column. In particular the polynomial is Hurwitz if and only if all entries of the first column have the same sign. (Routh, 1877; Gantmacher, 1959, ch.~XV.)
+\end{theorem}
+
+\begin{example}[The cascade of Lesson 14, by the array]
+\label{ex:B-array}
+The chain of three loops with the velocity integral has the characteristic polynomial $s^4 + K s^3 + 2.2K s^2 + 3.24K s + 0.72K$ (\cref{eq:inv-quartic}, $K = K_{att}$). Test it for $K = 3$ and $K = 1.5$.
+
+\textbf{Step 1 — $K = 3$: the first two rows.} The coefficients are $1,\ 3,\ 6.6,\ 9.72,\ 2.16$:
+\begin{equation*}
+\begin{array}{c|ccc}
+  s^4 & 1 & 6.6 & 2.16\\
+  s^3 & 3 & 9.72 & \\
+\end{array}
+\end{equation*}
+
+\textbf{Step 2 — the $s^2$ row.} $b_1 = (3 \cdot 6.6 - 1 \cdot 9.72)/3 = 3.36$ and $b_2 = (3 \cdot 2.16 - 1 \cdot 0)/3 = 2.16$.
+
+\textbf{Step 3 — the $s^1$ row.} $c_1 = (3.36 \cdot 9.72 - 3 \cdot 2.16)/3.36 = 7.79$.
+
+\textbf{Step 4 — the $s^0$ row.} $d_1 = (7.79 \cdot 2.16 - 3.36 \cdot 0)/7.79 = 2.16$. The last entry of the first column is always $a_0$.
+
+\textbf{Step 5 — read the column.} $1,\ 3,\ 3.36,\ 7.79,\ 2.16$: no change of sign. Stable. (The roots are $-0.42 \pm 2.03j$, $-1.90$, $-0.26$.)
+
+\textbf{Step 6 — $K = 1.5$.} Coefficients $1,\ 1.5,\ 3.3,\ 4.86,\ 1.08$. Then $b_1 = (1.5 \cdot 3.3 - 4.86)/1.5 = 0.06$, $b_2 = 1.08$, and $c_1 = (0.06 \cdot 4.86 - 1.5 \cdot 1.08)/0.06 = -22.1$. The column is $1,\ 1.5,\ 0.06,\ -22.1,\ 1.08$: two changes of sign, from $+$ to $-$ and back. Two roots in the right half-plane — the pair $+0.043 \pm 1.76j$ that makes the drone of \cref{fig:inversion-predict} swing for ever.
+\end{example}
+
+\subsection{When a whole row vanishes}
+At the edge of stability the array breaks down in a telling way: a row becomes zero. The row above it then holds the coefficients of a polynomial in $s^2$ — the \term{auxiliary polynomial} — whose roots are the roots of $p$ that lie symmetrically about the origin, and in particular the pair on the imaginary axis.
+
+In Example~\ref{ex:B-array} with $K$ as a symbol the $s^2$ row is $b_1 = 2.2K - 3.24$, $b_2 = 0.72K$, and the $s^1$ entry vanishes when $b_1 \cdot 3.24K = K \cdot 0.72K$, i.e.\ $K = 1.638$. The auxiliary polynomial is $b_1 s^2 + b_2 = 0.364\,s^2 + 1.179$, with the roots $\pm j\sqrt{1.179/0.364} = \pm 1.80j$: the edge and its frequency, as in Example~\ref{ex:inv-quartic}.\tip{With a gain as a symbol, do not compute the whole array. Write the entries of the first column as functions of the gain and ask where each changes sign. The smallest such gain is the edge.}
+
+\subsection{The same test as determinants}
+Hurwitz found the criterion independently in 1895 in another form, which is the one to use in a proof or in a program. For $p(s) = a_ns^n + \dots + a_0$ with $a_n > 0$ build the $n \times n$ \term{Hurwitz matrix}
+\begin{equation}
+  H = \begin{pmatrix}
+    a_{n-1} & a_{n-3} & a_{n-5} & \cdots\\
+    a_n & a_{n-2} & a_{n-4} & \cdots\\
+    0 & a_{n-1} & a_{n-3} & \cdots\\
+    0 & a_n & a_{n-2} & \cdots\\
+    \vdots & & & \ddots
+  \end{pmatrix}.
+\end{equation}
+The polynomial is Hurwitz if and only if the determinants of the upper-left $1 \times 1$, $2 \times 2$, \dots, $n \times n$ blocks of $H$ are all positive. For $n = 3$ they are $a_2$, $a_2a_1 - a_3a_0$ and $a_0$ times the second: the conditions of \cref{thm:B-low}. The entries of Routh's first column are the ratios of successive determinants, which is why the two tests agree.
+
+\section{Stability with a margin}
+
+\enquote{All roots in the left half-plane} is the least one can ask. Often one wants more: all roots to the left of the line $\operatorname{Re}s = -\sigma$, so that every motion decays at least as fast as $e^{-\sigma t}$. The Routh–Hurwitz test answers that too, after a shift of the variable.
+
+\begin{result}[Testing a decay rate]
+All roots of $p(s)$ satisfy $\operatorname{Re}s < -\sigma$ if and only if the polynomial $q(w) = p(w - \sigma)$ is Hurwitz.
+\end{result}
+
+The reason: $s = w - \sigma$ moves every root to the right by $\sigma$, so $\operatorname{Re}w < 0$ means $\operatorname{Re}s < -\sigma$.
+
+\begin{example}[Does the default loop decay faster than $e^{-t}$?]
+\label{ex:B-shift}
+The P–D loop has $p(s) = s^2 + 7s + 10$. Test $\sigma = 1$ and $\sigma = 2.5$.
+
+\textbf{Step 1 — shift by 1.} $q(w) = (w - 1)^2 + 7(w - 1) + 10 = w^2 + 5w + 4$. All coefficients positive: Hurwitz. Every motion of the loop decays faster than $e^{-t}$.
+
+\textbf{Step 2 — shift by 2.5.} $q(w) = (w - 2.5)^2 + 7(w - 2.5) + 10 = w^2 + 2w - 1.25$. A negative coefficient: not Hurwitz. Some motion decays more slowly than $e^{-2.5t}$.
+
+\textbf{Step 3 — compare.} The roots are $-2$ and $-5$. The slowest, $-2$, lies between the two lines, as the test says.
+\end{example}
+
+\section{The root locus}
+
+The Routh test says \emph{whether} a loop is stable for a given gain. The root locus shows \emph{how} the poles move as the gain grows, and it can be sketched by rules.
+
+Let the characteristic equation depend on one gain $k \ge 0$ in the form
+\begin{equation}\label{eq:B-locus}
+  D(s) + k\,N(s) = 0 ,
+\end{equation}
+with polynomials $D$ of degree $n_p$ and $N$ of degree $n_z \le n_p$, both with leading coefficient one. The roots of $D$ are called the (open-loop) \emph{poles} $p_i$, the roots of $N$ the \emph{zeros} $z_i$. Every characteristic equation of this book can be brought into this form for any one of its gains: collect the terms with the gain in $kN$ and the rest in $D$.
+
+\begin{definition}{Root locus}
+The \term{root locus} of \cref{eq:B-locus} is the set of all points $s$ of the complex plane that are roots for some $k \ge 0$. It consists of $n_p$ curves, the \emph{branches}, each traced by one root as $k$ runs from $0$ to $\infty$.
+\end{definition}
+
+Rewrite \cref{eq:B-locus} as $N(s)/D(s) = -1/k$. A complex number equals a negative real number when its angle is $180^\circ$ (up to full turns) and its magnitude fits. With the factored forms this gives two conditions:
+\begin{align}
+  \text{angle:} \quad & \sum_i \angle(s - z_i) - \sum_i \angle(s - p_i) = 180^\circ + \ell \cdot 360^\circ, \label{eq:B-angle}\\
+  \text{magnitude:} \quad & k = \frac{\prod_i |s - p_i|}{\prod_i |s - z_i|} . \label{eq:B-mag}
+\end{align}
+The angle condition alone decides whether a point is on the locus; the magnitude condition then tells for which gain. All the rules below are consequences of \cref{eq:B-angle}.
+
+\begin{theorem}[Rules for sketching a root locus]
+\label{thm:B-locus}
+For \cref{eq:B-locus} with $k$ from $0$ to $\infty$:
+\begin{enumerate}[label=(\roman*)]
+  \item \emph{Start and end.} The branches start at the poles ($k = 0$). As $k \to \infty$, $n_z$ of them end at the zeros and $n_p - n_z$ go to infinity.
+  \item \emph{Symmetry.} The locus is symmetric about the real axis.
+  \item \emph{Real axis.} A point of the real axis is on the locus exactly when the number of real poles and zeros to its right is odd.
+  \item \emph{Asymptotes.} The branches that go to infinity approach straight lines through the point
+  \begin{equation*}
+    \sigma_a = \frac{\sum p_i - \sum z_i}{n_p - n_z}
+    \qquad\text{at the angles}\qquad \frac{(2\ell + 1)\,180^\circ}{n_p - n_z},
+  \end{equation*}
+  with $\ell = 0, 1, \dots, n_p - n_z - 1$.
+  \item \emph{Meeting points.} Branches meet and part (on the real axis: break away or break in) at roots of $N\,D' - N'D = 0$ that lie on the locus.
+  \item \emph{Crossing the imaginary axis.} The gain and the frequency of a crossing follow from the Routh–Hurwitz edge condition.
+\end{enumerate}
+(Evans, 1948; Franklin, Powell and Emami-Naeini, 2019, ch.~5.)
+\end{theorem}
+\begin{proof}[Why]
+(i)~For $k = 0$ the equation is $D = 0$; dividing by $k$ and letting $k \to \infty$ it becomes $N = 0$. (ii)~Real coefficients. (iii)~For a real point $s$, a real pole or zero to its right contributes the angle $180^\circ$, one to its left $0^\circ$, and a complex pair contributes angles that cancel; \cref{eq:B-angle} then needs an odd count. (iv)~Far away all poles and zeros are seen under nearly the same angle $\theta$, so \cref{eq:B-angle} reads $(n_z - n_p)\,\theta = 180^\circ + \ell\,360^\circ$; the centre follows from the two highest coefficients of $D + kN$ by \cref{eq:B-vieta}. (v)~Where branches meet, \cref{eq:B-locus} has a double root, so its derivative $D' + kN' = 0$ vanishes as well; eliminate $k$. (vi)~\Cref{thm:B-low}.
+\end{proof}
+
+\begin{example}[Raising $K_p$ with a lagging motor]
+\label{ex:B-locus-kp}
+Sketch the path of the poles of \lessonref{les:edge} as $K_p$ grows, with $K_d = 7$, $m = 1$, $\tau_m = 0.03$.
+
+\textbf{Step 1 — the form.} $\tau_m m s^3 + m s^2 + K_d s + K_p = 0$. Divide by $\tau_m m$: $D(s) = s^3 + 33.3\,s^2 + 233.3\,s$, $N(s) = 1$ and $k = K_p/(\tau_m m) = 33.3\,K_p$.
+
+\textbf{Step 2 — poles and zeros.} $D = s\,(s^2 + 33.3s + 233.3) = s\,(s + 10)(s + 23.3)$: poles at $0$, $-10$, $-23.3$. No zeros: $n_p - n_z = 3$.
+
+\textbf{Step 3 — the real axis.} On the locus: the segment between $0$ and $-10$ (one pole to the right) and everything left of $-23.3$ (three).
+
+\textbf{Step 4 — asymptotes.} Centre $\sigma_a = (0 - 10 - 23.3)/3 = -11.1$; angles $60^\circ$, $180^\circ$, $300^\circ$. One branch runs left along the real axis. Two go up and down to the right, and must cross the imaginary axis.
+
+\textbf{Step 5 — the breakaway.} With $N = 1$ rule (v) is $D'(s) = 3s^2 + 66.7s + 233.3 = 0$: $s = -4.35$ or $-17.9$. Only $-4.35$ is on the locus. The gain there, from \cref{eq:B-mag}: $k = 4.35 \cdot 5.65 \cdot 18.98 = 466$, i.e.\ $K_p = 14.0$.
+
+\textbf{Step 6 — the crossing.} \Cref{thm:B-low}: $a_2a_1 = a_3a_0$ at $33.3 \cdot 233.3 = k$, so $k = 7778$, $K_p = 233$, at $\omega = \sqrt{a_1/a_3} = \sqrt{233.3} = \SI{15.3}{rad/s}$.
+
+\textbf{Step 7 — read the sketch} (\cref{fig:B-locus}, left). Up to $K_p = 14$ the two slow poles are real and approach each other: the loop is overdamped. At 14 they meet — critical damping, a little above the $K_d^2/4m = 12.25$ of the ideal loop. Beyond it they leave the axis and bend to the right, slowly at first, and cross into the right half-plane at $K_p = 233$. Meanwhile the third pole, the motor, moves left: the sum of the three stays at $-33.3$.
+\end{example}
+
+\simfig{tb_locus}{Two root loci of the altitude loop with a motor lag of \SI{30}{ms}, computed from the characteristic polynomial. Left: $K_p$ grows while $K_d = 7$ stays (Example~\ref{ex:B-locus-kp}). Right: $K_p$ and $K_d$ grow together in the ratio $10 : 7$ (Example~\ref{ex:B-locus-ratio}). Crosses: open-loop poles; circle: the zero; dots: the default tune; dashed: the asymptotes.}{fig:B-locus}
+
+\begin{example}[Raising $K_p$ and $K_d$ together]
+\label{ex:B-locus-ratio}
+Now keep the ratio $K_p/K_d = 10/7$ and scale both gains. How does the picture change?
+
+\textbf{Step 1 — the form.} $\tau_m m s^3 + m s^2 + K_d\,(s + K_p/K_d) = 0$: $D = s^3 + 33.3\,s^2 = s^2(s + 33.3)$, $N = s + 1.43$, $k = K_d/(\tau_m m) = 33.3\,K_d$.
+
+\textbf{Step 2 — poles and zeros.} A double pole at $0$ (the drone) and one at $-33.3$ (the motor). One zero at $-1.43$. $n_p - n_z = 2$.
+
+\textbf{Step 3 — the real axis.} Between $-33.3$ and $-1.43$ (three poles and zeros to the right). Not between $-1.43$ and $0$, where the count is two.
+
+\textbf{Step 4 — asymptotes.} Centre $\sigma_a = (0 + 0 - 33.3 + 1.43)/2 = -15.9$, angles $\pm 90^\circ$: two vertical lines, \emph{in the left half-plane}.
+
+\textbf{Step 5 — meeting points.} $N D' - N' D = (s + 1.43)(3s^2 + 66.7s) - (s^3 + 33.3s^2) = 0$ has the roots $0$, $-3.01$ and $-15.8$. The two poles from the origin circle round the zero and land on the real axis at $-3.01$, for $K_d = 5.2$; a pair leaves it again at $-15.8$, for $K_d = 9.1$.
+
+\textbf{Step 6 — read the sketch} (\cref{fig:B-locus}, right). For $K_d$ between 5.2 and 9.1 all three poles are real; the default $K_d = 7$ lies in this window, with poles at $-1.93$, $-7.11$ and $-24.3$. For larger gains a pair climbs the asymptote at $-15.9$: it oscillates faster and faster and keeps its decay rate. No gain makes this loop unstable. The edge of \lessonref{les:edge} exists because $K_p$ was raised \emph{alone}, which moves the zero $-K_p/K_d$ to the left and with it the asymptotes to the right.
+\end{example}
+
+\begin{keyidea}[Zeros attract, and the excess decides]
+Poles move towards zeros as the gain grows. The poles that find no zero leave along the asymptotes, and their number $n_p - n_z$ decides the fate of the loop at high gain: one or two can stay in the left half-plane for ever; three or more cannot (\cref{thm:edge-asymptotes}). A controller improves a loop by adding zeros in good places — which is what the D term does.
+\end{keyidea}
+
+\section{The same question for sampled loops}
+
+A sampled loop is stable when the roots of its characteristic polynomial in $z$ lie \emph{inside the unit circle} (\cref{thm:slow-sampled}). The Routh–Hurwitz test does not apply directly, but a change of variable makes it apply: the map
+\begin{equation}\label{eq:B-bilinear}
+  z = \frac{1 + w}{1 - w}, \qquad w = \frac{z - 1}{z + 1}
+\end{equation}
+sends the inside of the unit circle in the $z$-plane to the left half of the $w$-plane. (For $w = j v$ on the imaginary axis, $|1 + jv| = |1 - jv|$, so $|z| = 1$; and $w = -1$ gives $z = 0$.)
+
+\begin{theorem}[Stability of a second-order recursion]
+\label{thm:B-jury}
+Both roots of $z^2 + a_1 z + a_0$ lie inside the unit circle if and only if
+\begin{equation*}
+  |a_0| < 1, \qquad 1 + a_1 + a_0 > 0, \qquad 1 - a_1 + a_0 > 0 .
+\end{equation*}
+\end{theorem}
+\begin{proof}
+Insert \cref{eq:B-bilinear} and multiply by $(1 - w)^2$: $(1 + w)^2 + a_1(1 + w)(1 - w) + a_0(1 - w)^2 = (1 - a_1 + a_0)\,w^2 + 2\,(1 - a_0)\,w + (1 + a_1 + a_0)$. By \cref{thm:B-low} this is Hurwitz exactly when its three coefficients have the same sign. They cannot all be negative, because the first and the last add up to $2 + 2a_0$ while the middle one is $2 - 2a_0$, and the two cannot both be negative. So all three are positive; the first and last give the two inequalities, and with them the middle one gives $a_0 < 1$ while their sum gives $a_0 > -1$.
+\end{proof}
+
+The three conditions are three lines in the plane of $(a_1, a_0)$, and they enclose a triangle: the stability region of every second-order digital filter and loop. Appendix~D uses it to find the slowest sample rate of a P–D controller.
+
+\begin{result}[Appendix B at a glance]
+\begin{center}\small
+\renewcommand{\arraystretch}{1.4}
+\begin{tabularx}{\linewidth}{@{}l>{\raggedright\arraybackslash}X@{}}
+necessary & all coefficients present and of one sign\\
+degree 2 & that is also sufficient\\
+degree 3 & $a_2a_1 > a_3a_0$; at the edge $\omega^2 = a_1/a_3$\\
+degree 4 & $a_1(a_3a_2 - a_4a_1) > a_3^2a_0$; at the edge $\omega^2 = a_1/a_3$\\
+any degree & Routh array: sign changes in the first column $=$ roots in the right half-plane\\
+decay rate $\sigma$ & test $p(w - \sigma)$\\
+slow root & $s \approx -a_0/a_1$\\
+sum of roots & $-a_{n-1}/a_n$\\
+root locus & $D + kN = 0$: from the poles to the zeros and to $n_p - n_z$ asymptotes at $(2\ell + 1)180^\circ/(n_p - n_z)$ through $(\sum p_i - \sum z_i)/(n_p - n_z)$\\
+sampled loop & $z^2 + a_1z + a_0$ stable iff $|a_0| < 1$ and $1 \pm a_1 + a_0 > 0$\\
+\end{tabularx}
+\end{center}
+\end{result}

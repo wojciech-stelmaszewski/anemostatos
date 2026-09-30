@@ -356,11 +356,15 @@
   attach title to upper, flushfirst}
 
 % Worked example
-\newtcolorbox{example}[1][]{base, colback=white, arc=0pt, outer arc=0pt, frame hidden,
+% Numbered within the lesson, so that \ref to an example gives its own number, not the section's.
+\newcounter{example}[chapter]
+\renewcommand{\theexample}{\lessonlabel.\arabic{example}}
+\newtcolorbox{examplebox}[1]{base, colback=white, arc=0pt, outer arc=0pt, frame hidden,
   borderline west={1pt}{0pt}{faint!55},
   left=13pt, right=0pt, top=1pt, bottom=1pt, before skip=13pt, after skip=13pt,
-  title={\boxlabel{muted}{WORKED EXAMPLE}\ifstrempty{#1}{}{\hspace{0.8em}{\sffamily\small\bfseries #1}}},
+  title={\boxlabel{muted}{WORKED EXAMPLE \theexample}\ifstrempty{#1}{}{\hspace{0.8em}{\sffamily\small\bfseries #1}}},
   attach title to upper, flushfirst}
+\NewDocumentEnvironment{example}{O{}}{\refstepcounter{example}\begin{examplebox}{#1}}{\end{examplebox}}
 
 % Watch out
 \newtcolorbox{watchout}[1][]{base, whole, colback=warnsoft, borderline west={2.2pt}{0pt}{warn},

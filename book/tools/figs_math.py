@@ -52,3 +52,53 @@ def tb_phase():
         a.set_xlabel("position $x$", loc="right")
         a.set_ylabel("velocity $\\dot x$")
     save(f, "tb_phase")
+
+
+@fig
+def tb_locus():
+    """Root loci of the altitude loop with the motor lag: Kp alone, and Kp with Kd in a fixed ratio."""
+    tau, m, kd0, kp0 = 0.03, 1.0, 7.0, 10.0
+    f, axs = plt.subplots(1, 2, figsize=(TEXT_W, 66 * MM), gridspec_kw=dict(wspace=0.2))
+
+    def draw(a, polys, gains, mark, asym, title):
+        R = np.array([np.sort_complex(np.roots(p)) for p in polys])
+        # follow each root continuously from one gain to the next
+        tr = [R[0]]
+        for r in R[1:]:
+            prev, left, new = tr[-1], list(r), []
+            for q in prev:
+                j = int(np.argmin([abs(q - x) for x in left]))
+                new.append(left.pop(j))
+            tr.append(np.array(new))
+        tr = np.array(tr)
+        for i in range(tr.shape[1]):
+            a.plot(tr[:, i].real, tr[:, i].imag, color=C["meas"], lw=1.1)
+        for c, ang in asym:
+            for s in (1, -1):
+                th = np.radians(ang) * s
+                a.plot([c, c + 80 * np.cos(th)], [0, 80 * np.sin(th)], color=C["faint"], lw=0.6, ls=(0, (4, 3)), zorder=0)
+        a.plot(tr[0].real, tr[0].imag, "x", color=C["ink"], ms=5, mew=1.2, zorder=4)
+        k = int(np.argmin(abs(gains - mark)))
+        a.plot(tr[k].real, tr[k].imag, "o", color=C["accent"], ms=3.2, zorder=5)
+        a.axhline(0, color=C["faint"], lw=0.4, zorder=0)
+        a.axvline(0, color=C["ink"], lw=0.5, zorder=0)
+        a.axvspan(0, 8, color=C["sat"], alpha=0.5, lw=0, zorder=0)
+        a.set_xlim(-40, 8)
+        a.set_ylim(-24, 24)
+        a.grid(False)
+        a.set_title(title, fontsize=7.6)
+        a.set_xlabel("Re $s$", loc="right")
+
+    g1 = np.concatenate([np.linspace(0, 20, 400), np.geomspace(20, 900, 500)])
+    draw(axs[0], [[tau * m, m, kd0, kp] for kp in g1], g1, kp0, [(-11.1, 60)], "$K_p$ grows, $K_d = 7$")
+    axs[0].set_ylabel("Im $s$")
+    axs[0].annotate("$K_p = 233$", xy=(0, 15.3), xytext=(-17, 20.5), fontsize=6.4, color=C["muted"],
+                    arrowprops=dict(arrowstyle="-", color=C["faint"], lw=0.5))
+    axs[0].annotate("$K_p = 14$", xy=(-4.35, 0), xytext=(-16, -9), fontsize=6.4, color=C["muted"],
+                    arrowprops=dict(arrowstyle="-", color=C["faint"], lw=0.5))
+    g2 = np.concatenate([np.linspace(0, 12, 900), np.geomspace(12, 60, 300)])
+    draw(axs[1], [[tau * m, m, kd, kd * kp0 / kd0] for kd in g2], g2, kd0, [(-15.9, 90)], "$K_p$ and $K_d$ grow, ratio $10:7$")
+    axs[1].plot(-kp0 / kd0, 0, "o", mfc="white", mec=C["ink"], ms=4.5, mew=1.0, zorder=4)
+    axs[1].set_yticklabels([])
+    axs[1].text(4, -22, "unstable", rotation=90, fontsize=6.2, color=C["err"], ha="center", va="bottom")
+    save(f, "tb_locus")

@@ -662,7 +662,7 @@ Decisions (confirmed 2026-09-30):
 4. **Scope** — M13 and the **must** lessons first, the rest in a second
    pass (§5, build order).
 5. **The book** — Part III is built in the app first. Its chapters belong
-   to the second volume of _Standing in the Wind_
+   to the second volume of the book
    ([curriculum.md](curriculum.md) §5).
 
 ## 8. References

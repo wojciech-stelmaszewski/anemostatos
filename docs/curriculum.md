@@ -4,8 +4,8 @@
 > is written in the book. Parts III–V are planned. This document is the
 > map of the whole programme; the part plans hold the detail.
 
-Anemostatos (the simulator) and _Standing in the Wind_ (the book) are one
-course. This page says what the course is meant to teach, what it covers
+Anemostatos is one course in two forms: the simulator, and the book
+_Anemostatos: Riding on the wind_. This page says what the course is meant to teach, what it covers
 today, what is still missing, and in which order the missing pieces get
 built.
 
@@ -136,7 +136,7 @@ Solutions are published in a companion volume, not in the book.
 
 | Volume | Parts | Title                                                    | State                                   |
 | ------ | ----- | -------------------------------------------------------- | --------------------------------------- |
-| 1      | I–II  | _Standing in the Wind_ — from PID to learning            | Part I written, Part II not yet         |
+| 1      | I–II  | _Anemostatos: Riding on the wind_ — from PID to learning | Part I written, Part II not yet         |
 | 2      | III   | analysis, robustness and the real loop                   | after the app's Part III                |
 | 3      | IV–V  | aerospace guidance, navigation and control, and practice | after the app's Parts IV–V              |
 | —      | all   | solutions to the exercises                               | collected by `\answer` during the build |

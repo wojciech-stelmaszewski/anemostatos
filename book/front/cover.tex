@@ -6,13 +6,15 @@
   \fill[night, path fading=south, opacity=0.92] (current page.north west) rectangle ($(current page.north east)+(0,-120mm)$);
   \fill[night, path fading=north, opacity=0.85] ($(current page.south west)+(0,70mm)$) rectangle (current page.south east);
   \node[anchor=north west, inner sep=0pt, text=accent] at ($(current page.north west)+(24mm,-26mm)$)
-    {\appmark\hspace{0.6em}\sanscaps\small ANEMOSTATOS};
+    {\appmark\hspace{0.6em}\sanscaps\small A COURSE IN FEEDBACK CONTROL};
   \node[anchor=north west, inner sep=0pt, text=white, inner sep=0pt] at ($(current page.north west)+(23mm,-38mm)$)
-    {\parbox[t]{170mm}{\raggedright\nohyph\sansdisplay\fontsize{54}{58}\selectfont Standing\\in the Wind}};
-  \node[anchor=north west, inner sep=0pt, text=nighttext, inner sep=0pt] at ($(current page.north west)+(24mm,-88mm)$)
-    {\parbox[t]{130mm}{\raggedright\displayserif\itshape\fontsize{16}{21}\selectfont A course in feedback control,\\from PID to learning}};
+    {\parbox[t]{170mm}{\raggedright\nohyph\sansdisplay\fontsize{54}{58}\selectfont Anemostatos}};
+  \node[anchor=north west, inner sep=0pt, text=nighttext, inner sep=0pt] at ($(current page.north west)+(24mm,-64mm)$)
+    {\parbox[t]{130mm}{\raggedright\displayserif\itshape\fontsize{22}{27}\selectfont Riding on the wind}};
+  \node[anchor=north west, inner sep=0pt, text=nightmuted, inner sep=0pt] at ($(current page.north west)+(24mm,-78mm)$)
+    {\parbox[t]{130mm}{\raggedright\sffamily\small From PID to learning, with the simulator of the same name}};
   \node[anchor=south west, inner sep=0pt, text=nightmuted, inner sep=0pt] at ($(current page.south west)+(24mm,24mm)$)
-    {\parbox[b]{150mm}{\raggedright\sffamily\small with the Anemostatos simulator\\[2pt]
+    {\parbox[b]{150mm}{\raggedright\sffamily\small The course book of the Anemostatos simulator\\[2pt]
      {\color{nightmuted!70}\footnotesize 35 lessons · 3 levels of flight · every figure flown in the simulator}\\[6pt]
      {\footnotesize Idea and editing: Wojciech Stelmaszewski · Text, figures and code: Claude Opus 5.5}}};
   \node[anchor=south east, inner sep=0pt, text=nightmuted, align=right] at ($(current page.south east)+(-18mm,24mm)$)
@@ -23,9 +25,10 @@
 % ---------------------------------------------------------------- title page
 \thispagestyle{empty}
 \vspace*{50mm}
-\noindent{\sanscaps\small\color{accent}ANEMOSTATOS}\par\vspace{8mm}
-\noindent{\sansdisplay\fontsize{36}{42}\selectfont Standing in the Wind}\par\vspace{6mm}
-\noindent{\displayserif\itshape\fontsize{16}{21}\selectfont A course in feedback control, from PID to learning,\\with the Anemostatos simulator}\par
+\noindent{\sanscaps\small\color{accent}A COURSE IN FEEDBACK CONTROL}\par\vspace{8mm}
+\noindent{\sansdisplay\fontsize{36}{42}\selectfont Anemostatos}\par\vspace{5mm}
+\noindent{\displayserif\itshape\fontsize{20}{25}\selectfont Riding on the wind}\par\vspace{7mm}
+\noindent{\displayserif\itshape\fontsize{13}{18}\selectfont From PID to learning, with the simulator of the same name}\par
 \vspace{24mm}
 \noindent\begin{minipage}{118mm}\sffamily\small\color{muted}
 Thirty-five lessons, each one a chapter. Every chapter explains one idea step by step, shows it in
@@ -45,7 +48,7 @@ where the idea lives, and ends with a story of the same idea at work in the real
 \thispagestyle{empty}
 \vspace*{\fill}
 \begin{minipage}{118mm}\sffamily\footnotesize\color{muted}\linespread{1.25}\selectfont
-\textbf{\color{ink}Standing in the Wind} — a course in feedback control with the Anemostatos simulator.\par\medskip
+\textbf{\color{ink}Anemostatos: Riding on the wind} — a course in feedback control, with the simulator of the same name.\par\medskip
 The idea of the course and the editing of this book are by Wojciech Stelmaszewski. The text, the figures, the
 simulator and its source code were written by Claude Opus 5.5, an AI model made by Anthropic
 (see the \hyperref[ch:colophon]{colophon}).\par\medskip

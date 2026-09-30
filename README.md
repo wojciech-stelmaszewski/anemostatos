@@ -218,7 +218,7 @@ The [`docs/`](docs/README.md) folder is the project's textbook and design record
 - [**Roadmap**](docs/roadmap.md): milestones, done and planned.
 - [**Curriculum**](docs/curriculum.md): the whole course in five parts and one hundred lessons, what is built, and what is planned — Part III ([analysis and robustness](docs/analysis.md)), Parts IV–V ([aerospace GNC and engineering practice](docs/aerospace-gnc.md)).
 
-The course book, _Standing in the Wind_, lives in [`book/`](book/README.md).
+The course book, _Anemostatos: Riding on the wind_, lives in [`book/`](book/README.md).
 
 ## Credits
 

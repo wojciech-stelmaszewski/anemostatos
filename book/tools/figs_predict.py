@@ -553,3 +553,56 @@ def slow_predict():
     a.set_ylabel("largest $|$eigenvalue$|$ per sample")
     a.set_title("Sampling: the exact discrete loop")
     save(f, "slow_predict")
+
+
+# ─── Lesson 10 ─────────────────────────────────────────────────────────────
+def edge_poles(kp, kd=7.0, m=1.0, tau=0.03, fc=20.0, zoh=0.002):
+    """Poles of the P–D altitude loop with motor lag, D filter and the hold (first-order Padé)."""
+    P = np.polymul
+    tf = 1 / (2 * np.pi * fc)
+    lhs = P(P(P([m, 0, 0], [tau, 1]), [tf, 1]), [zoh / 2, 1])
+    rhs = P(np.polyadd(P([kp], [tf, 1]), [kd, 0]), [-zoh / 2, 1])
+    r = np.roots(np.polyadd(lhs, rhs))
+    return r[np.argsort(-r.real)]
+
+
+@fig
+def edge_predict():
+    f, ax = plt.subplots(1, 2, figsize=(TEXT_W, 56 * MM), gridspec_kw=dict(wspace=0.36))
+    a = ax[0]
+    kps = np.linspace(40, 320, 150)
+    full = [[x for x in edge_poles(k) if x.imag > 1][0].real for k in kps]
+    lag = [[x for x in np.roots([0.03, 1, 7, k]) if x.imag > 1][0].real for k in kps]
+    a.axhspan(0, 2, color="#FBEDEA", lw=0)
+    a.plot(kps, lag, color=C["faint"], lw=0.9, ls=DOT)
+    a.plot(kps, full, color=C["ink"], lw=0.9, ls=DASH)
+    meas = {100: -1.93, 150: -0.90, 180: -0.42, 200: -0.08}
+    a.plot(list(meas), list(meas.values()), "o", color=C["meas"], ms=4)
+    a.axhline(0, color=C["err"], lw=0.6)
+    a.text(45, 0.55, "unstable", color=C["err"], fontsize=6.4)
+    a.text(205, -1.75, "motor lag only", color=C["faint"], fontsize=6.3)
+    a.text(60, -1.0, "full model", color=C["ink"], fontsize=6.3)
+    a.text(118, -2.35, "simulator", color=C["meas"], fontsize=6.3)
+    a.set_xlim(40, 320)
+    a.set_ylim(-3.6, 1.5)
+    a.set_xlabel("$K_p$", loc="right")
+    a.set_ylabel("decay rate of the ringing  [1/s]")
+    a.set_title("How fast the ringing dies")
+
+    a = ax[1]
+    for kp, col, off in [(150, C["meas"], 0.0), (220, C["err"], 0.0)]:
+        d = win(load(f"edge-small-kp{kp}"), 5.9, 9.5)
+        a.plot(d.t - 6, 100 * (d["pos.y"] - 2.05), color=col, lw=1.0)
+    c = [x for x in edge_poles(150) if x.imag > 1][0]
+    t = np.linspace(0.05, 3.5, 100)
+    a.plot(t, 5.3 * np.exp(c.real * t), color=C["ink"], lw=0.8, ls=DASH)
+    a.plot(t, -5.3 * np.exp(c.real * t), color=C["ink"], lw=0.8, ls=DASH)
+    a.axhline(0, color=C["faint"], lw=0.5)
+    a.text(1.7, 2.4, "$K_p = 150$: envelope $e^{-0.85t}$", color=C["meas"], fontsize=6.3)
+    a.text(1.9, -9.5, "$K_p = 220$: grows", color=C["err"], fontsize=6.3)
+    a.set_xlim(-0.1, 3.5)
+    a.set_ylim(-12, 12)
+    a.set_title("A 5 cm step, either side of the edge")
+    a.set_ylabel("deviation from the setpoint  [cm]")
+    xlab_time(a, "time after the step  [s]")
+    save(f, "edge_predict")

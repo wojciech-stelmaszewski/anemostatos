@@ -1,0 +1,275 @@
+\toolchapter{D}{Sampling and the z-transform}{A computer sees the world as a list of numbers. The same ideas — poles, transfer functions, stability — with $z$ in place of $s$ and a circle in place of a half-plane.}
+\label{app:sampling}
+
+\lead{\usedcard{\setuprow{Lesson 1}{the PID as a recursion}\setuprow{Lessons 7, 8}{the D filter, sample by sample}\setuprow{Lesson 9}{sample and hold, the sampled loop}\setuprow{Lesson 11}{the exact step of the turbulence}\setuprow{Part III}{the z-plane (III.18), aliasing and notch filters (III.20, III.21)}}%
+Every controller in this book is a program that runs at fixed instants. Between them it holds its output and sees nothing. This appendix collects what that changes: what sampling does to a signal, how the recursions of a digital controller are solved and tested for stability, how a continuous plant looks from one sample to the next, and what the hold costs.}
+
+\section{Sampling a signal}
+
+A sampler reads a continuous signal $x(t)$ at the instants $t_k = k\,\Delta t$ and produces the sequence $x_k = x(t_k)$. The \term{sample rate} is $f_s = 1/\Delta t$, and half of it, $f_s/2$, is the \term{Nyquist frequency}. The controller of the altitude loop has $\Delta t = \SI{4}{ms}$, $f_s = \SI{250}{Hz}$ and a Nyquist frequency of \SI{125}{Hz}.
+
+Sampling loses information, and it loses it in a specific way. Sample $\cos 2\pi f t$ at the rate $f_s$:
+\begin{equation}
+  x_k = \cos(2\pi f\,k\,\Delta t) = \cos\!\big(2\pi\,(f + n f_s)\,k\,\Delta t\big) \quad\text{for every integer } n ,
+\end{equation}
+because the extra term is $2\pi n k$, a whole number of turns. \emph{The samples of a sinusoid at $f$ and of one at $f + nf_s$ are identical.} Since also $\cos$ is even, every frequency has an impostor in the band from 0 to $f_s/2$:
+
+\begin{result}[The alias of a frequency]
+A sinusoid of frequency $f$, sampled at the rate $f_s$, is indistinguishable from one at
+\begin{equation}\label{eq:D-alias}
+  f_a = |f - n f_s|, \qquad n \text{ the integer nearest to } f/f_s ,
+\end{equation}
+which lies between 0 and $f_s/2$.
+\end{result}
+
+This is the content of the sampling theorem (\cref{thm:noise-sampling}): below the Nyquist frequency nothing is lost; above it, signals \emph{fold} down and masquerade as slow ones.
+
+\begin{example}[A propeller in the altimeter]
+\label{ex:D-alias}
+A rotor of the drone turns at 7\,800 revolutions per minute and shakes the frame once per turn. The altitude controller samples at \SI{250}{Hz}. What does it see? And at 14\,400 rpm?
+
+\textbf{Step 1 — the frequency.} $7800/60 = \SI{130}{Hz}$, just above the Nyquist frequency of \SI{125}{Hz}.
+
+\textbf{Step 2 — the alias.} $130/250 = 0.52$, nearest integer 1: $f_a = |130 - 250| = \SI{120}{Hz}$. A vibration at \SI{120}{Hz}: still fast, and the D filter of \lessonref{les:noise} removes most of it.
+
+\textbf{Step 3 — the faster rotor.} $14\,400/60 = \SI{240}{Hz}$; $f_a = |240 - 250| = \SI{10}{Hz}$. Now the vibration appears as a slow wobble, below the \SI{20}{Hz} cutoff of the D filter and not far above the loop's own frequencies. No digital filter can remove it: in the samples it \emph{is} a \SI{10}{Hz} signal.
+
+\textbf{Step 4 — the cure.} Remove the vibration before the sampler, with an analogue low-pass filter in the sensor (an \term{anti-aliasing filter}) or by sampling the sensor much faster than the controller runs and averaging. Flight controllers do both (Lesson~III.20).
+\end{example}
+
+\section{Difference equations}
+
+A digital controller computes each new value from old ones. The D filter of \lessonref{les:noise} is the simplest case:
+\begin{equation}\label{eq:D-first}
+  y_k = a\,y_{k-1} + b\,u_k .
+\end{equation}
+An equation of this kind is a \term{difference equation}, the discrete counterpart of a differential equation. It is solved the same way, with one change: the guess is a \emph{power} instead of an exponential.
+
+\paragraph{No input.} With $u = 0$: $y_1 = a y_0$, $y_2 = a^2y_0$, and in general $y_k = a^k y_0$. The sequence decays if $|a| < 1$, grows if $|a| > 1$, and for negative $a$ it alternates in sign from sample to sample — a behaviour with no continuous counterpart. Writing $a^k = e^{k\ln a}$ shows that a positive $a$ behaves like $e^{-t/\tau}$ with the time constant
+\begin{equation}\label{eq:D-tau}
+  \tau = -\frac{\Delta t}{\ln a} .
+\end{equation}
+
+\paragraph{A constant input.} If $y$ settles, then $y_k = y_{k-1} = y_\infty$ and \cref{eq:D-first} gives $y_\infty = b\,u/(1 - a)$. The filter of \lessonref{les:noise} has $b = 1 - a$, so that a constant passes unchanged.
+
+\paragraph{Any input.} Unrolling the recursion from $y_0 = 0$:
+\begin{equation}
+  y_k = b\,u_k + a\,b\,u_{k-1} + a^2b\,u_{k-2} + \dots = \sum_{j=0}^{k} h_j\,u_{k-j}, \qquad h_j = b\,a^j .
+\end{equation}
+The sequence $h_j$ is the response to a single unit sample, the \term{impulse response}, and the sum is a discrete convolution — \cref{eq:A-conv} with a sum for the integral.
+
+For higher orders the same guess, $y_k = z^k$, turns a recursion $y_k + a_{n-1}y_{k-1} + \dots + a_0\,y_{k-n} = 0$ into the characteristic equation $z^n + a_{n-1}z^{n-1} + \dots + a_0 = 0$.
+
+\begin{theorem}[Stability of a recursion]
+\label{thm:D-stable}
+All solutions of a linear recursion with constant coefficients tend to zero if and only if all roots of its characteristic polynomial satisfy $|z| < 1$. For a recursion in vector form, $\symbf z_{k+1} = F\symbf z_k$, the roots are the eigenvalues of $F$.
+\end{theorem}
+\begin{proof}
+The vector form is \cref{thm:slow-sampled}. A scalar recursion of order $n$ is brought to vector form with the state $(y_{k-1}, \dots, y_{k-n})$, as in Appendix~A, and $F$ is then a companion matrix.
+\end{proof}
+
+\begin{keyidea}[The dictionary between continuous and discrete]
+\begin{center}\small
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{}lll@{}}
+ & continuous time & discrete time\\
+\midrule
+basic solution & $e^{st}$ & $z^k$\\
+stable region & $\operatorname{Re}s < 0$ & $|z| < 1$\\
+boundary & the imaginary axis & the unit circle\\
+a constant & $s = 0$ & $z = 1$\\
+fastest oscillation & none & $z = -1$: alternating signs\\
+integrator & pole at $s = 0$ & pole at $z = 1$\\
+\end{tabular}
+\end{center}
+\end{keyidea}
+
+\section{The z-transform}
+
+\begin{definition}{z-transform}
+The \term{z-transform} of a sequence $x_0, x_1, x_2, \dots$ is
+\begin{equation}
+  X(z) = \sum_{k=0}^{\infty} x_k\,z^{-k} ,
+\end{equation}
+for those complex $z$ for which the series converges.
+\end{definition}
+
+It does for sequences what the Laplace transform does for functions, and its most important rule is the counterpart of \enquote{differentiation is multiplication by $s$}:
+
+\begin{theorem}[Rules of the z-transform]
+\label{thm:D-rules}
+Let $X$ be the transform of $x_k$, with $x_k = 0$ for $k < 0$.
+\begin{center}
+\renewcommand{\arraystretch}{1.4}
+\begin{tabular}{@{}lll@{}}
+(i) & delay by one sample & $x_{k-1} \ \to\ z^{-1}X(z)$\\
+(ii) & delay by $n$ samples & $x_{k-n} \ \to\ z^{-n}X(z)$\\
+(iii) & convolution & $\sum_j h_j\,x_{k-j} \ \to\ H(z)\,X(z)$\\
+(iv) & final value & $\lim_{k \to \infty}x_k = \lim_{z \to 1}(1 - z^{-1})X(z)$\\
+\end{tabular}
+\end{center}
+Rule (iv) holds if $x_k$ converges. The transforms of the basic sequences are: unit sample $(1, 0, 0, \dots) \to 1$; unit step $\to 1/(1 - z^{-1})$; $a^k \to 1/(1 - a z^{-1})$; $k\,a^k \to a z^{-1}/(1 - az^{-1})^2$.
+\end{theorem}
+\begin{proof}
+(i)~$\sum_k x_{k-1}z^{-k} = z^{-1}\sum_k x_{k-1}z^{-(k-1)}$. (ii)~Repeat. (iii)~Exchange the order of summation and use (ii). (iv)~$(1 - z^{-1})X(z)$ is the transform of the differences $x_k - x_{k-1}$, whose sum up to $k$ is $x_k$. The table: $\sum_k a^kz^{-k}$ is a geometric series with the ratio $a/z$; differentiate it with respect to $a$ for the last entry.
+\end{proof}
+
+So \emph{$z^{-1}$ means \enquote{one sample ago}}. A recursion is transformed by writing $z^{-1}$ for every delay, and the ratio of output to input is its \term{pulse transfer function}. For \cref{eq:D-first}: $Y = a z^{-1}Y + bU$, hence
+\begin{equation}\label{eq:D-H}
+  H(z) = \frac{b}{1 - a\,z^{-1}} = \frac{b\,z}{z - a},
+\end{equation}
+with a pole at $z = a$. Poles inside the unit circle mean stability, as \cref{thm:D-stable} says.
+
+\subsection{The frequency response of a digital filter}
+Feed the recursion with a sampled sinusoid, $u_k = e^{j\omega k\Delta t} = \big(e^{j\omega\Delta t}\big)^k$. This is a sequence $z^k$ with $z = e^{j\omega\Delta t}$, a point on the unit circle, and the steady output is $H(z)\,z^k$. So the frequency response of a digital filter is its transfer function on the unit circle:
+\begin{equation}\label{eq:D-freq}
+  H\big(e^{j\omega\Delta t}\big), \qquad 0 \le \omega \le \pi/\Delta t .
+\end{equation}
+As $\omega$ runs from 0 to the Nyquist frequency, $z$ runs along the upper half of the circle from $1$ to $-1$. Beyond that the response repeats, which is aliasing seen from the filter's side.
+
+\begin{example}[The D filter, measured against its analogue original]
+\label{ex:D-filter}
+The \SI{20}{Hz} filter of \lessonref{les:noise} has $a = \alpha = 0.666$, $b = 1 - \alpha$, $\Delta t = \SI{4}{ms}$. Compare it with the continuous filter $1/(T_fs + 1)$, $T_f = \SI{7.96}{ms}$, that it imitates.
+
+\textbf{Step 1 — the pole.} $z = 0.666$: inside the circle, stable. By \cref{eq:D-tau} its time constant is $-4/\ln 0.666 = \SI{9.8}{ms}$, a little longer than $T_f$.
+
+\textbf{Step 2 — a constant.} $H(1) = (1 - \alpha)/(1 - \alpha) = 1$: a constant passes unchanged, like $1/(T_f \cdot 0 + 1) = 1$.
+
+\textbf{Step 3 — at the cutoff, \SI{20}{Hz}.} $\omega\Delta t = 2\pi \cdot 20 \cdot 0.004 = \SI{0.503}{rad}$, $z = e^{0.503j}$. Then $1 - \alpha z^{-1} = 1 - 0.666\,(\cos 0.503 - j\sin 0.503) = 0.417 + 0.321j$, of magnitude 0.526 and angle $37.6^\circ$. So $|H| = 0.334/0.526 = 0.636$ with a phase of $-37.6^\circ$. The analogue filter has $0.707$ and $-45^\circ$.
+
+\textbf{Step 4 — at the Nyquist frequency.} $z = -1$: $H = (1 - \alpha)/(1 + \alpha) = 0.20$. The analogue filter has $0.158$ at \SI{125}{Hz}, and keeps falling beyond it; the digital one cannot do better than 0.20 anywhere.
+
+\textbf{Step 5 — read it.} At low frequencies the two agree to a fraction of a percent (at \SI{1}{Hz}: 0.9981 against 0.9988). Near the Nyquist frequency they differ, because there are only a few samples per period left. A digital filter is a good copy of an analogue one only well below $f_s/2$.
+\end{example}
+
+\section{A continuous plant, seen at the samples}
+
+The controller is discrete, the drone is not. Between two samples the drone obeys its differential equation with a constant input, and \cref{thm:slow-sampled} gives its state at the next sample exactly:
+\begin{equation}\label{eq:D-zoh}
+  \vx_{k+1} = A_d\,\vx_k + B_d\,u_k, \qquad A_d = e^{A\Delta t}, \qquad B_d = \int_0^{\Delta t} e^{A\sigma}\,\dd\sigma\;B .
+\end{equation}
+Two cases appear throughout the book.
+
+\paragraph{A first-order lag.} For $\tau\dot x + x = u$, $A = -1/\tau$ and $B = 1/\tau$, so
+\begin{equation}\label{eq:D-lag}
+  x_{k+1} = a\,x_k + (1 - a)\,u_k, \qquad a = e^{-\Delta t/\tau} .
+\end{equation}
+This is how the simulator advances its motors: with $\tau_m = \SI{30}{ms}$ and the physics step of \SI{1}{ms}, $a = e^{-1/30} = 0.9672$. The formula is exact for any step, and stable for any step. \Cref{eq:challenge-ou-step} is the same formula for the turbulence.
+
+\paragraph{The double integrator.} For the drone, $A = \begin{psmallmatrix}0 & 1\\ 0 & 0\end{psmallmatrix}$ and $e^{A\sigma} = \begin{psmallmatrix}1 & \sigma\\ 0 & 1\end{psmallmatrix}$ (Appendix~A), so
+\begin{equation}\label{eq:D-di}
+  A_d = \begin{pmatrix}1 & \Delta t\\ 0 & 1\end{pmatrix}, \qquad
+  B_d = \int_0^{\Delta t}\begin{pmatrix}\sigma/m\\ 1/m\end{pmatrix}\dd\sigma = \frac1m\begin{pmatrix}\tfrac12\Delta t^2\\ \Delta t\end{pmatrix} .
+\end{equation}
+In words: $y_{k+1} = y_k + v_k\Delta t + \tfrac12(u_k/m)\Delta t^2$ and $v_{k+1} = v_k + (u_k/m)\Delta t$ — the formulas for constant acceleration.
+
+\subsection{Where the poles go}
+The eigenvalues of $A_d = e^{A\Delta t}$ are $e^{\lambda\Delta t}$ for the eigenvalues $\lambda$ of $A$ (\cref{thm:A-expm}\,(iii)). Hence:
+
+\begin{result}[The map from the s-plane to the z-plane]
+A continuous pole $s = \sigma + j\omega$ becomes the discrete pole
+\begin{equation}\label{eq:D-map}
+  z = e^{s\Delta t} = e^{\sigma\Delta t}\,e^{j\omega\Delta t}, \qquad |z| = e^{\sigma\Delta t}, \quad \angle z = \omega\,\Delta t .
+\end{equation}
+The decay rate sets the distance from the origin, the frequency sets the angle. The left half-plane maps to the inside of the unit circle, and the imaginary axis onto the circle itself — wrapping round it again for every multiple of the sample rate.
+\end{result}
+
+\simfig{tb_zplane}{The z-plane, drawn from \cref{eq:D-map}. Blue: where poles of a given damping ratio $\zeta$ land; grey: where poles of a given $\omega_n\Delta t$ land. The crosses are the poles $-2$ and $-5$ of the default altitude loop at three sample rates: at \SI{250}{Hz} they sit close to $z = 1$ ($0.992$ and $0.980$), at \SI{10}{Hz} well apart, at \SI{2}{Hz} near the origin.}{fig:D-zplane}
+
+\Cref{fig:D-zplane} is the map. Two things are worth reading from it. A well-sampled loop has all its poles crowded near $z = 1$, where tiny differences in position mean large differences in behaviour: designing directly in the z-plane needs many digits. And a pole's position is meaningless without the sample rate: $z = 0.98$ is a time constant of \SI{0.2}{s} at \SI{250}{Hz} and of \SI{5}{s} at \SI{10}{Hz}.
+
+\subsection{Turning a continuous controller into code}
+A controller designed in continuous time — a filter, an integrator, a whole PID — must be replaced by a recursion. Three substitutions are in use, each an approximation of the derivative:
+\begin{center}\small
+\renewcommand{\arraystretch}{1.5}
+\begin{tabular}{@{}llll@{}}
+\toprule
+method & $\dot x(t_k)$ is replaced by & write for $s$ & a stable pole becomes\\
+\midrule
+forward Euler & $(x_{k+1} - x_k)/\Delta t$ & $\dfrac{z - 1}{\Delta t}$ & unstable if $\Delta t$ is too long\\
+backward Euler & $(x_k - x_{k-1})/\Delta t$ & $\dfrac{1 - z^{-1}}{\Delta t}$ & always stable\\
+Tustin (trapezoid) & the mean of the two & $\dfrac{2}{\Delta t}\,\dfrac{z - 1}{z + 1}$ & always stable\\
+\bottomrule
+\end{tabular}
+\end{center}
+The PID of this book uses the second: its integral adds $K_ie_k\Delta t$ and its derivative is $(e_k - e_{k-1})/\Delta t$ (\cref{eq:meet-discrete}), and so does its D filter (\cref{eq:noise-filter}).
+
+\begin{example}[One pole, four recursions]
+\label{ex:D-methods}
+Discretise the motor lag, a pole at $s = -1/\tau_m = -33.3$, with each method, for $\Delta t = \SI{4}{ms}$ and for $\Delta t = \SI{100}{ms}$.
+
+\textbf{Step 1 — the formulas.} Insert $s = -1/\tau$ into each substitution and solve for $z$. Exact: $z = e^{-\Delta t/\tau}$. Forward Euler: $z = 1 - \Delta t/\tau$. Backward Euler: $z = 1/(1 + \Delta t/\tau)$. Tustin: $z = (1 - \Delta t/2\tau)/(1 + \Delta t/2\tau)$.
+
+\textbf{Step 2 — at \SI{4}{ms}} ($\Delta t/\tau = 0.133$). Exact 0.8752; forward 0.8667; backward 0.8824; Tustin 0.8750. All close; Tustin is right to four digits.
+
+\textbf{Step 3 — at \SI{100}{ms}} ($\Delta t/\tau = 3.33$). Exact 0.036; forward $-2.33$; backward 0.231; Tustin $-0.25$.
+
+\textbf{Step 4 — read it.} With the long step, forward Euler has put a stable pole at $-2.33$, outside the circle: the recursion more than doubles its value every step, with alternating sign. It is stable only for $\Delta t < 2\tau$. Backward Euler stays stable and sluggish. Tustin stays stable but rings (a negative pole). Only the exact formula \eqref{eq:D-lag} is right at every step — which is why the simulator uses it wherever a closed form exists.
+\end{example}
+
+\section{The cost of the hold}
+
+Between samples the controller's output is held. \Lessonref{les:slow} argued that this acts like a delay of half a sample. The claim is exact in the following sense.
+
+\begin{theorem}[The zero-order hold]
+\label{thm:D-hold}
+A hold that turns the samples of a sinusoid of frequency $\omega$ into a staircase passes its fundamental with the frequency response
+\begin{equation*}
+  H_{hold}(j\omega) = \frac{1 - e^{-j\omega\Delta t}}{j\omega\,\Delta t} = \frac{\sin(\omega\Delta t/2)}{\omega\Delta t/2}\;e^{-j\omega\Delta t/2} :
+\end{equation*}
+a gain slightly below one and a phase of exactly $-\omega\Delta t/2$, that of a delay of half a sample.
+\end{theorem}
+\begin{proof}
+The hold answers a unit impulse at $t = 0$ with a pulse of height $1/\Delta t$ (normalised to unit area) lasting from 0 to $\Delta t$. The Laplace transform of that pulse is $(1 - e^{-s\Delta t})/(s\Delta t)$ (Appendix~C, the step minus the delayed step). Put $s = j\omega$ and take out the factor $e^{-j\omega\Delta t/2}$; what remains is $\big(e^{j\omega\Delta t/2} - e^{-j\omega\Delta t/2}\big)/(j\omega\Delta t) = \sin(\omega\Delta t/2)/(\omega\Delta t/2)$.
+\end{proof}
+
+At the crossover of the altitude loop, $\omega_c = \SI{7}{rad/s}$, and \SI{250}{Hz}: $\omega_c\Delta t/2 = \SI{0.014}{rad} = 0.8^\circ$ of phase and a gain of 0.99997 — the last line of the phase budget of \lessonref{les:slow}. At \SI{5}{Hz} the same hold costs $40^\circ$.
+
+\subsection{A delay is finite in discrete time}
+A transport delay $e^{-sT}$ is not a ratio of polynomials, and a continuous loop with a delay has infinitely many poles (\cref{thm:slow-delay}). In discrete time a delay of $n$ samples is simply $z^{-n}$: $n$ poles at the origin. A sampled loop with a delay is an ordinary recursion of higher order, and \cref{thm:D-stable} applies to it without any approximation. This is one reason why delays are analysed, and compensated, in discrete time.
+
+\section{A sampled loop from start to finish}
+
+\begin{example}[How slowly may a P–D controller sample?]
+\label{ex:D-loop}
+The drone (no motor lag) is controlled by $u_k = -K_p\,x_k - K_d\,v_k$, computed from the exact position and velocity at each sample and held. Find the longest sample period that keeps the loop stable, for $K_p = 10$, $K_d = 7$, $m = 1$.
+
+\textbf{Step 1 — the plant at the samples.} \Cref{eq:D-di}: $x_{k+1} = x_k + \Delta t\,v_k + \tfrac12\Delta t^2u_k$, $v_{k+1} = v_k + \Delta t\,u_k$.
+
+\textbf{Step 2 — close the loop.} Insert $u_k$:
+\begin{equation*}
+  \begin{pmatrix}x_{k+1}\\ v_{k+1}\end{pmatrix} = \underbrace{\begin{pmatrix}1 - \tfrac12K_p\Delta t^2 & \Delta t - \tfrac12K_d\Delta t^2\\ -K_p\Delta t & 1 - K_d\Delta t\end{pmatrix}}_{F}\begin{pmatrix}x_k\\ v_k\end{pmatrix} .
+\end{equation*}
+
+\textbf{Step 3 — the characteristic polynomial.} For a $2 \times 2$ matrix, $z^2 - (\operatorname{tr}F)\,z + \det F$. Here $\operatorname{tr}F = 2 - K_d\Delta t - \tfrac12K_p\Delta t^2$, and multiplying out, $\det F = 1 - K_d\Delta t + \tfrac12K_p\Delta t^2$. So $a_1 = -2 + K_d\Delta t + \tfrac12K_p\Delta t^2$ and $a_0 = 1 - K_d\Delta t + \tfrac12K_p\Delta t^2$.
+
+\textbf{Step 4 — the three conditions} of \cref{thm:B-jury}:
+\begin{align*}
+  1 + a_1 + a_0 &= K_p\,\Delta t^2 > 0 && \text{always;}\\
+  1 - a_1 + a_0 &= 4 - 2K_d\,\Delta t > 0 && \Longleftrightarrow\ \Delta t < 2/K_d ;\\
+  |a_0| &< 1 && \Longleftrightarrow\ \Delta t < 2K_d/K_p ,\ \ 5\Delta t^2 - 7\Delta t + 2 > 0 .
+\end{align*}
+
+\textbf{Step 5 — numbers.} $2/K_d = \SI{0.286}{s}$; $2K_d/K_p = \SI{1.4}{s}$; the quadratic is positive for $\Delta t < \SI{0.4}{s}$. The second condition binds: $\Delta t < \SI{0.286}{s}$, a rate above \SI{3.5}{Hz}.
+
+\textbf{Step 6 — what happens at the edge.} The condition that fails is $p(-1) = 1 - a_1 + a_0 > 0$: a root leaves the circle through $z = -1$. The loop does not ring at its natural frequency; it flips sign at every sample, an oscillation at exactly half the sample rate, driven by the damper: over one long step $K_d$ reverses the velocity instead of reducing it.
+
+\textbf{Step 7 — compare.} The edge does not depend on $K_p$ at all. And it is lower than the \SI{5.9}{Hz} of Example~\ref{ex:slow-discrete}, because this idealised loop has no motor lag and measures the velocity instead of differencing the position — each of which costs the real loop another half sample or more.
+\end{example}
+
+\begin{result}[Appendix D at a glance]
+\begin{center}\small
+\renewcommand{\arraystretch}{1.4}
+\begin{tabularx}{\linewidth}{@{}l>{\raggedright\arraybackslash}X@{}}
+alias & $f_a = |f - nf_s|$, in $[0, f_s/2]$; filter before sampling\\
+recursion & try $z^k$; stable iff all roots satisfy $|z| < 1$\\
+first order & $y_k = ay_{k-1} + bu_k$: time constant $-\Delta t/\ln a$, final value $bu/(1 - a)$\\
+z-transform & $z^{-1}$ is a delay of one sample; $H(z)$ on the unit circle is the frequency response\\
+exact sampling & $A_d = e^{A\Delta t}$; a lag becomes $a = e^{-\Delta t/\tau}$; poles map as $z = e^{s\Delta t}$\\
+double integrator & $A_d = \begin{psmallmatrix}1 & \Delta t\\ 0 & 1\end{psmallmatrix}$, $B_d = \tfrac1m\big(\tfrac12\Delta t^2,\ \Delta t\big)^\T$\\
+backward Euler & $s \to (1 - z^{-1})/\Delta t$: always stable; forward Euler needs $\Delta t < 2\tau$\\
+hold & gain $\approx 1$, phase $-\omega\Delta t/2$: half a sample of delay\\
+delay of $n$ samples & $z^{-n}$: $n$ poles at the origin\\
+\end{tabularx}
+\end{center}
+\end{result}

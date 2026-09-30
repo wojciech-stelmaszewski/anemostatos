@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.linalg import expm
 
-from figlib import C, MM, TEXT_W, fig, save
+from figlib import C, MM, TEXT_W, fig, ramp, save
 
 
 @fig
@@ -125,9 +125,9 @@ def tb_bode():
         a.text(wc_ * 1.12, 300, lab, fontsize=6.2, color=C["muted"], va="top")
     a.plot(7.0, 1, "o", color=C["accent"], ms=3.5, zorder=5)
     a.text(8.5, 1.7, "crossover, $\\omega_c = 7$", fontsize=6.4, color=C["accent"])
-    a.text(0.13, 40, "$-40$ dB/decade", fontsize=6.2, color=C["muted"], rotation=-33)
-    a.text(3.2, 0.62, "$-20$", fontsize=6.2, color=C["muted"])
-    a.text(120, 0.0045, "$-40$", fontsize=6.2, color=C["muted"])
+    a.text(0.16, 12, "slope $-40$ dB/decade", fontsize=6.2, color=C["muted"])
+    a.text(2.6, 0.22, "$-20$ dB/decade", fontsize=6.2, color=C["muted"])
+    a.text(45, 0.0009, "$-40$ dB/decade", fontsize=6.2, color=C["muted"])
     a.set_ylim(1e-4, 1e3)
     a.set_yticks([1e-4, 1e-2, 1, 1e2])
     a.set_yticklabels(["$-80$", "$-40$", "0", "40"])
@@ -161,7 +161,7 @@ def tb_nyquist():
         a.annotate("", xy=(Lw[k + 40].real, Lw[k + 40].imag), xytext=(Lw[k].real, Lw[k].imag),
                    arrowprops=dict(arrowstyle="-|>", color=col, lw=1.0, mutation_scale=7))
     a.plot(-1, 0, "+", color=C["ink"], ms=8, mew=1.3, zorder=6)
-    a.text(-1.0, 0.14, "$-1$", fontsize=7, ha="center", color=C["ink"])
+    a.text(-0.93, -0.2, "$-1$", fontsize=7, ha="left", color=C["ink"])
     a.plot(-1.228, 0, "o", color=C["err"], ms=3.2, zorder=6)
     a.annotate("$-1.23$ at $\\omega = 5.78$", xy=(-1.228, 0), xytext=(-2.75, 0.55), fontsize=6.4, color=C["err"],
                arrowprops=dict(arrowstyle="-", color=C["err"], lw=0.5))
@@ -181,3 +181,43 @@ def tb_nyquist():
     a.set_xlabel("Re $L(j\\omega)$", loc="right")
     a.set_ylabel("Im $L(j\\omega)$")
     save(f, "tb_nyquist")
+
+
+@fig
+def tb_zplane():
+    """The map z = exp(s dt): lines of constant damping and of constant natural frequency."""
+    f, a = plt.subplots(figsize=(TEXT_W, 88 * MM))
+    th = np.linspace(0, 2 * np.pi, 400)
+    a.plot(np.cos(th), np.sin(th), color=C["ink"], lw=0.9)
+    # constant damping ratio: s = wn(-zeta + j sqrt(1-zeta^2)), wn*dt from 0 to pi/sqrt(1-zeta^2)
+    for z_, col in zip((0.2, 0.4, 0.6, 0.8), ramp(4, "blue")):
+        wd = np.linspace(0, np.pi, 300)
+        wn = wd / np.sqrt(1 - z_**2)
+        zz = np.exp(-z_ * wn + 1j * wd)
+        for sg in (1, -1):
+            a.plot(zz.real, sg * zz.imag, color=col, lw=0.9)
+        k = 120
+        a.text(zz[k].real, zz[k].imag + 0.035, f"$\\zeta = {z_}$", fontsize=6.0, color=col, ha="center")
+    # constant wn*dt
+    for wn in np.pi * np.array([0.1, 0.2, 0.4, 0.6, 0.8]):
+        zt = np.linspace(0, 1, 100)
+        zz = np.exp(wn * (-zt + 1j * np.sqrt(1 - zt**2)))
+        for sg in (1, -1):
+            a.plot(zz.real, sg * zz.imag, color=C["hair"], lw=0.8, zorder=0)
+        a.text(zz[0].real * 1.09, zz[0].imag * 1.09, f"{wn / np.pi:.1f}$\\pi$", fontsize=6.0, color=C["muted"], ha="center", va="center")
+    a.text(-1.13, 0.0, "$\\pi$", fontsize=6.0, color=C["muted"], ha="center", va="center")
+    a.text(0.93, 0.62, "$\\omega_n\\Delta t$", fontsize=6.4, color=C["muted"])
+    # the poles -2, -5 of the default loop at three sample rates
+    for hz, col, dy in ((250, C["accent"], 0.07), (10, C["I"], 0.07), (2, C["err"], 0.07)):
+        p = np.exp(np.array([-2.0, -5.0]) / hz)
+        a.plot(p, [0, 0], "x", color=col, ms=5, mew=1.3, zorder=5)
+        a.text(p.mean(), dy, f"{hz} Hz", fontsize=6.2, color=col, ha="center")
+    a.axhline(0, color=C["faint"], lw=0.4, zorder=0)
+    a.axvline(0, color=C["faint"], lw=0.4, zorder=0)
+    a.set_xlim(-1.3, 1.3)
+    a.set_ylim(-1.12, 1.12)
+    a.set_aspect("equal")
+    a.grid(False)
+    a.set_xlabel("Re $z$", loc="right")
+    a.set_ylabel("Im $z$")
+    save(f, "tb_zplane")

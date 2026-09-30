@@ -56,6 +56,11 @@ PHOTOS = {
     "knife": "File:Swiss army knife open 20050612 (cropped).jpg",
     "hubble": "File:Hubble Released 2009.jpg",
     "minorsky": "File:Portrait of Nicolas Minorsky.jpg",
+    "ctesibius": "File:ARAGO Francois Astronomie Populaire T1 page 0067 Fig16-17.jpg",
+    "maxwell": "File:James Clerk Maxwell, G.J. Stodart, 1890.jpg",
+    "wiener": "File:Norbert Wiener.png",
+    "bode": "File:Hendrik Wade Bode.png",
+    "pontryagin": "File:Понтрягин Лев Семёнович.jpg",
 }
 
 # Fractions to trim (left, top, right, bottom): scan borders and printed captions.

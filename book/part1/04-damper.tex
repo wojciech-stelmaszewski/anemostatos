@@ -1,7 +1,7 @@
 \lesson{4}{Add a damper}{A force against velocity drains the energy the spring cannot — and one number, ζ, says how much.}{1}{damper}{Part I · PID}
 \label{les:damper}
 
-\lead{Lesson 2 left us with a drone that bounced forever. The cure is the third letter of PID. The derivative term looks at how fast the error is changing and pushes against it — the shock absorber to the proportional spring. In this lesson we tune it by the book and meet the most useful single number in classical control.}
+\lead{Lesson 2 left us with a drone that bounced forever. The cure is the third letter of PID. The derivative term looks at how fast the error is changing and pushes against it — the shock absorber to the proportional spring. In this lesson we solve the damped equation completely, derive the formulas that engineers use to tune it, and check every one of them against the simulator.}
 
 \section{The derivative term is a damper}
 
@@ -9,41 +9,63 @@ With a constant setpoint, the error changes only because the drone moves: $\dot 
 \begin{equation}
   D = K_d\,\dot e = -K_d\,\dot y ,
 \end{equation}
-a force proportional to the vertical velocity and opposing it. With exact feedforward, P and D together give the closed loop (with $x = y - r$ as before)
+a force proportional to the vertical velocity and opposing it — exactly what a shock absorber does. With exact feedforward, P and D together give the closed loop (with $x = y - r$, as in \lessonref{les:spring})
 \begin{equation}\label{eq:damper-msd}
   m\,\ddot x + K_d\,\dot x + K_p\,x = 0 ,
 \end{equation}
-the equation of a \term{mass–spring–damper}. The energy argument of \lessonref{les:spring} now gives
+the equation of a \term{mass–spring–damper}.
+
+\subsection{The damper removes energy}
+Repeat the energy calculation of \lessonref{les:spring}: multiply \cref{eq:damper-msd} by $\dot x$ and use the chain rule,
 \begin{equation}
   \frac{\dd}{\dd t}\Big(\tfrac12 m\dot x^2 + \tfrac12 K_p x^2\Big) = \dot x\,(m\ddot x + K_p x) = -K_d\,\dot x^2 \;\le\; 0 .
 \end{equation}
-Whenever the drone moves, the D term removes energy at the rate $K_d\dot x^2$. The oscillation must die out.
+Whenever the drone moves, the D term removes energy at the rate $K_d\dot x^2$ — the power dissipated by a damper. The energy can only decrease, and it stops decreasing only when the drone stops moving; since a spring that is stretched does not let the drone stay still, the only final state is $x = 0$, $\dot x = 0$. The oscillation must die out. The remaining questions are \emph{how fast} and \emph{in what manner}.
 
-\section{Natural frequency and damping ratio}
+\section{Solving the damped equation}
 
-The characteristic equation of \cref{eq:damper-msd} is $m s^2 + K_d s + K_p = 0$. Dividing by $m$ and writing it in the standard form
+We follow the recipe of \lessonref{les:spring} step by step.
+
+\paragraph{The characteristic equation.} Substituting $x = e^{st}$ into \cref{eq:damper-msd} gives $m s^2 + K_d s + K_p = 0$. Divide by $m$ and introduce two new parameters:
 \begin{equation}\label{eq:damper-std}
   s^2 + 2\zeta\omega_n\,s + \omega_n^2 = 0,\qquad
   \omega_n = \sqrt{\frac{K_p}{m}},\qquad
-  \zeta = \frac{K_d}{2\sqrt{K_p\,m}}
+  \zeta = \frac{K_d}{2\sqrt{K_p\,m}} .
 \end{equation}
-separates two questions. The \term{natural frequency} $\omega_n$ sets the time scale: how fast the loop wants to move. The \term{damping ratio} $\zeta$ (zeta) sets the shape: how the motion approaches the target. The poles are
+(Check: $2\zeta\omega_n = 2\cdot\frac{K_d}{2\sqrt{K_pm}}\cdot\sqrt{\frac{K_p}{m}} = \frac{K_d}{m}$ and $\omega_n^2 = \frac{K_p}{m}$, as required.) This \emph{standard form} separates two questions. The \term{natural frequency} $\omega_n$ sets the time scale: how fast the loop wants to move. The \term{damping ratio} $\zeta$ (zeta) is dimensionless and sets the shape: how the motion approaches the target.
+
+\paragraph{The roots.} The quadratic formula gives
 \begin{equation}\label{eq:damper-poles}
-  s_{1,2} = -\zeta\omega_n \pm \omega_n\sqrt{\zeta^2 - 1} ,
+  s_{1,2} = -\zeta\omega_n \pm \omega_n\sqrt{\zeta^2 - 1} .
 \end{equation}
-and three cases follow.
+The sign of $\zeta^2 - 1$ decides everything: three cases follow.
 
 \begin{definition}{The three kinds of damping}
 \begin{description}[leftmargin=0pt, itemsep=3pt, font=\sffamily\small\bfseries]
-  \item[Underdamped, $0<\zeta<1$.] Complex poles $-\zeta\omega_n \pm j\omega_d$ with $\omega_d = \omega_n\sqrt{1-\zeta^2}$: a decaying oscillation. The response overshoots.
-  \item[Critically damped, $\zeta = 1$.] A double real pole at $-\omega_n$: the fastest approach that never overshoots.
-  \item[Overdamped, $\zeta > 1$.] Two real poles. The one closer to the origin, near $-\omega_n/(2\zeta)$ for large $\zeta$, makes the response slow: the damper is so strong that it resists the motion towards the target too.
+  \item[Underdamped, $0<\zeta<1$.] The square root is imaginary: complex poles $-\zeta\omega_n \pm j\omega_d$ with the \emph{damped frequency} $\omega_d = \omega_n\sqrt{1-\zeta^2}$. The motion is a decaying oscillation, $x(t) = e^{-\zeta\omega_n t}(A\cos\omega_d t + B\sin\omega_d t)$. The response overshoots.
+  \item[Critically damped, $\zeta = 1$.] The root is zero: a double real pole at $-\omega_n$, and $x(t) = (A + Bt)\,e^{-\omega_n t}$. The fastest approach that never overshoots.
+  \item[Overdamped, $\zeta > 1$.] Two distinct real poles, $x(t) = A e^{s_1 t} + B e^{s_2 t}$. The one closer to the origin makes the response slow: the damper is so strong that it resists the motion towards the target too.
 \end{description}
 \end{definition}
 
 \widefig{zeta_family}{The damping ratio in two pictures. Left: the poles of \cref{eq:damper-std}, scaled by $\omega_n$. For $\zeta<1$ they lie on the unit circle (their distance from the origin is $\omega_n$) and move towards the real axis as $\zeta$ grows; at $\zeta=1$ they meet; beyond it they split along the axis and one of them crawls towards the origin. Right: the corresponding step responses. The grey band is the $\pm2\,\%$ tolerance used for the settling time.}{fig:zeta-family}
 
-\Cref{fig:zeta-family} is worth a long look. It shows that the pole plane is a map of behaviour: the height of a pole above the real axis is the frequency of oscillation, its distance to the left of the imaginary axis is the speed of decay, and the angle from the negative real axis tells the damping, $\cos\theta = \zeta$.
+\Cref{fig:zeta-family} is worth a long look. The pole plane is a map of behaviour: the height of a pole above the real axis is the frequency of oscillation, its distance to the left of the imaginary axis is the speed of decay, and — since $|s| = \omega_n$ for complex poles — the angle $\theta$ from the negative real axis tells the damping, $\cos\theta = \zeta$.
+
+\begin{example}[The step response of the underdamped loop]
+\label{ex:damper-under}
+The setpoint jumps by \SI{1}{m} and $K_d = 3$ ($K_p = 10$, $m = 1$). Find the motion.
+
+\textbf{Step 1 — the parameters.} $\omega_n = \sqrt{10} = \SI{3.162}{rad/s}$, $\zeta = 3/(2\sqrt{10}) = 0.474$, $\zeta\omega_n = K_d/(2m) = \SI{1.5}{s^{-1}}$, $\omega_d = 3.162\sqrt{1 - 0.225} = \SI{2.784}{rad/s}$.
+
+\textbf{Step 2 — the general solution.} $x(t) = e^{-1.5t}(A\cos 2.784t + B\sin 2.784t)$.
+
+\textbf{Step 3 — initial conditions.} Just after the step, $x(0) = -1$ (one metre below the new setpoint) and $\dot x(0) = 0$. The first gives $A = -1$. Differentiating, $\dot x(0) = -1.5A + 2.784B = 0$, so $B = 1.5A/2.784 = -0.539$.
+
+\textbf{Step 4 — the result.} $x(t) = -e^{-1.5t}\big(\cos 2.784t + 0.539\sin 2.784t\big)$.
+
+\textbf{Step 5 — interpret.} The oscillation has the period $2\pi/\omega_d = \SI{2.26}{s}$ — slightly longer than the undamped \SI{1.99}{s} — and its envelope shrinks like $e^{-1.5t}$: to half in $\ln 2/1.5 = \SI{0.46}{s}$.
+\end{example}
 
 \section{Reading a step response}
 
@@ -59,13 +81,60 @@ For a step of the setpoint from $y_0$ to $y_1$:
 \end{description}
 \end{definition}
 
-For the underdamped second-order system there are classic formulas:
-\begin{equation}\label{eq:damper-metrics}
-  M_p = e^{-\pi\zeta/\sqrt{1-\zeta^2}},\qquad
-  t_s \approx \frac{4}{\zeta\,\omega_n},\qquad
-  t_{r} \approx \frac{1.8}{\omega_n}\ \ (\zeta \approx 0.5).
+For the second-order loop these metrics follow from the solution. We derive the two most used ones.
+
+\begin{example}[Deriving the overshoot formula]
+\label{ex:damper-mp}
+Show that the overshoot of an underdamped second-order loop after a unit step is $M_p = e^{-\pi\zeta/\sqrt{1-\zeta^2}}$.
+
+\textbf{Step 1 — the unit step response.} Repeating Example~\ref{ex:damper-under} with symbols ($x(0) = -1$, $\dot x(0) = 0$) gives, for $y = 1 + x$,
+\begin{equation*}
+  y(t) = 1 - e^{-\zeta\omega_n t}\Big(\cos\omega_d t + \tfrac{\zeta}{\sqrt{1-\zeta^2}}\sin\omega_d t\Big).
+\end{equation*}
+
+\textbf{Step 2 — the velocity.} Differentiating and simplifying (the cosine terms cancel) leaves $\dot y(t) = \frac{\omega_n}{\sqrt{1-\zeta^2}}\,e^{-\zeta\omega_n t}\sin\omega_d t$.
+
+\textbf{Step 3 — the peak.} The first maximum is where the velocity first returns to zero after $t = 0$: $\sin\omega_d t = 0$, i.e.\ $t_p = \pi/\omega_d$.
+
+\textbf{Step 4 — evaluate.} At $t_p$: $\cos\pi = -1$, $\sin\pi = 0$, so $y(t_p) = 1 + e^{-\zeta\omega_n\pi/\omega_d} = 1 + e^{-\pi\zeta/\sqrt{1-\zeta^2}}$.
+
+\textbf{Step 5 — the result.} The overshoot is the part above 1:
+\begin{equation}\label{eq:damper-mp}
+  M_p = e^{-\pi\zeta/\sqrt{1-\zeta^2}} .
 \end{equation}
-The overshoot depends on $\zeta$ only. The settling time is four time constants of the envelope $e^{-\zeta\omega_n t}$, since $e^{-4} \approx 2\,\%$. For the critically damped case the response is $1 - (1+\omega_n t)e^{-\omega_n t}$, which enters the 2\,\% band at $\omega_n t \approx 5.83$.
+It depends on $\zeta$ only. For $\zeta = 0.474$: $M_p = e^{-\pi\cdot0.474/0.881} = e^{-1.69} = 0.184$, i.e.\ 18.4\,\%, reached at $t_p = \pi/2.784 = \SI{1.13}{s}$.
+\end{example}
+
+\paragraph{The settling time.} The oscillation in Step 1 is multiplied by the envelope $e^{-\zeta\omega_n t}$ (times a factor close to one). The response is inside the 2\,\% band once the envelope has fallen below 0.02, i.e.\ when $\zeta\omega_n t = \ln 50 \approx 3.9$. Rounding up gives the rule
+\begin{equation}\label{eq:damper-ts}
+  t_s \approx \frac{4}{\zeta\,\omega_n}.
+\end{equation}
+For $K_d = 3$: $t_s \approx 4/1.5 = \SI{2.7}{s}$.
+
+\begin{example}[The critically damped loop]
+\label{ex:damper-crit}
+Find the $K_d$ that gives $\zeta = 1$, and the settling time of the resulting step response ($K_p = 10$, $m = 1$).
+
+\textbf{Step 1 — the gain.} $\zeta = 1$ means $K_d = 2\sqrt{K_p m} = 2\sqrt{10} = 6.32$.
+
+\textbf{Step 2 — the response.} With the double pole at $-\omega_n$, the general solution $x = (A + Bt)e^{-\omega_n t}$ with $x(0) = -1$, $\dot x(0) = 0$ gives $A = -1$, $B = -\omega_n$, so
+$y(t) = 1 - (1 + \omega_n t)\,e^{-\omega_n t}$.
+
+\textbf{Step 3 — settling.} We need $(1 + \omega_n t)e^{-\omega_n t} = 0.02$. With $z = \omega_n t$, solve $(1+z)e^{-z} = 0.02$ by iteration, $z \leftarrow \ln\big(50(1+z)\big)$: starting from $z = 4$ gives $5.52$, then $5.77$, $5.81$, $5.83$ — converged: $z = 5.83$.
+
+\textbf{Step 4 — numbers.} $t_s = 5.83/3.162 = \SI{1.84}{s}$. The rise time (solving $y = 0.1$ and $y = 0.9$ the same way: $z = 0.53$ and $3.89$) is $(3.89 - 0.53)/3.162 = \SI{1.06}{s}$.
+\end{example}
+
+\begin{example}[The overdamped loop]
+\label{ex:damper-over}
+With $K_d = 15$ ($\zeta = 2.37$), where are the poles, and why is the response slow?
+
+\textbf{Step 1 — the poles.} From \cref{eq:damper-poles}: $s = -2.37\cdot3.162 \pm 3.162\sqrt{2.37^2 - 1} = -7.50 \pm 6.80$, i.e.\ $s_1 = -0.70$ and $s_2 = -14.3$.
+
+\textbf{Step 2 — who dominates.} Both modes decay, but $e^{-14.3t}$ is gone within \SI{0.3}{s}, while $e^{-0.70t}$ has a time constant of \SI{1.43}{s}. After the first fraction of a second, only the slow pole matters: it is the \term{dominant pole}.
+
+\textbf{Step 3 — settling.} The response enters the 2\,\% band when $e^{-0.70t} \approx 0.02$: $t \approx \ln 50/0.70 = \SI{5.6}{s}$ — three times slower than the critically damped loop, with a damper more than twice as strong.
+\end{example}
 
 \section{The experiment}
 
@@ -79,22 +148,33 @@ The lesson flies a square wave: the setpoint jumps between \SI{1.5}{m} and \SI{2
 \toprule
  & & \multicolumn{2}{c}{overshoot} & \multicolumn{2}{c}{settling time} & rise time\\
 \cmidrule(lr){3-4}\cmidrule(lr){5-6}
-$K_d$ & $\zeta$ & theory & measured & theory & measured & measured\\
+$K_d$ & $\zeta$ & theory & measured & theory & measured & th.\,/\,meas.\\
 \midrule
-3 & 0.47 & 18.4\,\% & 15.8\,\% & \SI{2.7}{s} & \SI{2.5}{s} & \SI{0.50}{s}\\
-6.3 & 1.00 & 0 & 0 & \SI{1.84}{s} & \SI{1.97}{s} & \SI{1.09}{s}\\
-15 & 2.37 & 0 & 0 & \SI{5.7}{s} & $>\SI{4}{s}$ & \SI{3.2}{s}\\
+3 & 0.47 & 18.4\,\% & 15.8\,\% & \SI{2.7}{s} & \SI{2.5}{s} & — / \SI{0.50}{s}\\
+6.3 & 1.00 & 0 & 0 & \SI{1.84}{s} & \SI{1.97}{s} & \SI{1.06}{s} / \SI{1.09}{s}\\
+15 & 2.37 & 0 & 0 & \SI{5.6}{s} & $>\SI{4}{s}$ & — / \SI{3.2}{s}\\
 \bottomrule
 \end{tabular}
-\caption{Theory against the simulator. The small differences come from what \cref{eq:damper-msd} leaves out: the \SI{30}{ms} motor lag, sampling at \SI{250}{Hz}, the low-pass filter on D and the air drag.}
+\caption{Theory (Examples~\ref{ex:damper-mp}–\ref{ex:damper-over}) against the simulator. The small differences come from what \cref{eq:damper-msd} leaves out: the \SI{30}{ms} motor lag, sampling at \SI{250}{Hz}, the low-pass filter on D and the air drag.}
 \label{tab:damper}
 \end{table}
 
-\Cref{tab:damper} puts the formulas next to the measurements. The agreement is good enough to design with — which is the point of a model. The overdamped runs illustrate the other half of the lesson: more damping is not better. At $\zeta = 2.37$ the slow pole sits at $-\omega_n(\zeta - \sqrt{\zeta^2-1}) = \SI{-0.70}{s^{-1}}$, a time constant of \SI{1.4}{s}, and the drone crawls towards the setpoint.
+\Cref{tab:damper} puts the formulas next to the measurements. The agreement is good enough to design with — which is the point of a model. The lesson has a goal: overshoot below 2\,\% and settling below \SI{2.5}{s}. The critically damped $K_d \approx 6.3$ meets it.
 
 \begin{keyidea}[Critical damping]
 For a given stiffness the fastest response without overshoot is the critically damped one, $\zeta = 1$, i.e.\ $K_d = 2\sqrt{K_p m}$. For the default $K_p = 10$ that is $K_d \approx 6.3$. Many practical tunes aim slightly below, $\zeta \approx 0.7$–$0.9$: a few percent of overshoot buys a noticeably faster rise.
 \end{keyidea}
+
+\begin{example}[Designing for a given overshoot]
+\label{ex:damper-design}
+Which $K_d$ gives 5\,\% overshoot with $K_p = 10$, $m = 1$? How long does it take to settle?
+
+\textbf{Step 1 — invert \cref{eq:damper-mp}.} $\ln M_p = -\pi\zeta/\sqrt{1-\zeta^2}$. With $L = -\ln 0.05 = 3.00$: $L^2(1 - \zeta^2) = \pi^2\zeta^2$, so $\zeta = L/\sqrt{\pi^2 + L^2} = 3.00/\sqrt{9.87 + 9.00} = 0.69$.
+
+\textbf{Step 2 — the gain.} $K_d = 2\zeta\sqrt{K_pm} = 2\cdot0.69\cdot3.162 = 4.36$.
+
+\textbf{Step 3 — settling.} $t_s \approx 4/(\zeta\omega_n) = 4/(0.69\cdot3.162) = \SI{1.83}{s}$ — about the same as critical damping, but with a faster rise.
+\end{example}
 
 The default tune of Anemostatos, $K_d = 7$, is $\zeta = 1.11$: slightly overdamped, deliberately, because the integral term — next lesson — adds some overshoot of its own.
 
@@ -102,7 +182,7 @@ The default tune of Anemostatos, $K_d = 7$, is $\zeta = 1.11$: slightly overdamp
 
 \begin{inapp}[Step metrics and the goal]
 \begin{itemize}[leftmargin=1.2em]
-  \item After every setpoint step \src{src/engine/metrics.ts} (\texttt{analyzeLastStep}) measures rise time, overshoot, settling time and steady-state error from the telemetry; \src{src/ui/charts/StepMetrics.tsx} shows them.
+  \item After every setpoint step \src{src/engine/metrics.ts} (\texttt{analyzeLastStep}) measures rise time, overshoot, settling time and steady-state error from the telemetry, with the definitions above; \src{src/ui/charts/StepMetrics.tsx} shows them.
   \item The lesson has a \emph{goal}: overshoot below 2\,\% and settling time below \SI{2.5}{s}. The lesson panel turns green when the last step meets it.
   \item The square wave is \ui{Setpoint\then Automatic motion\then square}, with amplitude and period below it (\param{setpoint.profile}).
 \end{itemize}
@@ -112,9 +192,10 @@ The default tune of Anemostatos, $K_d = 7$, is $\zeta = 1.11$: slightly overdamp
 \begin{enumerate}
   \item Raise $K_d$ step by step from 0.8: 2, 4, 6.3. Watch the overshoot and the settling time in the step metrics, and $\zeta$ in the info card.
   \item Go past critical: 15, then 30. The response gets lazy — and the settling time grows again.
-  \item Set $K_p = 40$ and find the $K_d$ that is critical for it. Is the result faster? By how much?
+  \item Set $K_d = 4.36$ and check the overshoot against Example~\ref{ex:damper-design}.
+  \item Set $K_p = 40$ and find the $K_d$ that is critical for it. How much faster is the response?
 \end{enumerate}
-\predict{which $K_d$ gives about 5\,\% overshoot? (Invert the $M_p$ formula; the answer is close to $\zeta = 0.69$.)}
+\predict{with $K_p = 40$ and critical damping, what settling time do you expect? (Use Example~\ref{ex:damper-crit}.)}
 \end{trythis}
 
 \begin{curiosity}{A 660-tonne pendulum}
@@ -129,21 +210,23 @@ Your car contains four much smaller dampers doing the same job. Car suspensions 
 \begin{remember}
 \begin{itemize}
   \item With a constant setpoint the D term is $-K_d\dot y$: a damper. It removes energy at the rate $K_d\dot y^2$.
-  \item P and D make a mass–spring–damper with $\omega_n = \sqrt{K_p/m}$ and $\zeta = K_d/(2\sqrt{K_p m})$.
-  \item $\zeta<1$ overshoots, $\zeta=1$ is the fastest without overshoot, $\zeta>1$ crawls.
-  \item Overshoot depends only on $\zeta$; the settling time scales as $1/(\zeta\omega_n)$.
+  \item P and D make a mass–spring–damper with $\omega_n = \sqrt{K_p/m}$ and $\zeta = K_d/(2\sqrt{K_p m})$; its poles are $-\zeta\omega_n \pm \omega_n\sqrt{\zeta^2-1}$.
+  \item $\zeta<1$ overshoots by $e^{-\pi\zeta/\sqrt{1-\zeta^2}}$, $\zeta=1$ is the fastest without overshoot, $\zeta>1$ crawls on its dominant pole.
+  \item Settling time $\approx 4/(\zeta\omega_n)$ for $\zeta<1$, $5.83/\omega_n$ for $\zeta=1$.
 \end{itemize}
 \end{remember}
 
 \begin{exercises}
 \exercise[1] The drone carries a payload so that $m = \SI{1.5}{kg}$, with $K_p = 10$. Which $K_d$ is critical? If $K_d$ stays at 6.3, what are $\zeta$ and the overshoot?
-\answer{$K_d = 2\sqrt{15} = 7.75$. With $K_d = 6.3$: $\zeta = 6.3/7.75 = 0.81$, $M_p = e^{-\pi\cdot0.81/0.586} \approx 1.3\,\%$.}
+\answer{$K_d = 2\sqrt{15} = 7.75$. With $K_d = 6.3$: $\zeta = 0.81$, $M_p \approx 1.3\,\%$.}
 \exercise[1] Find $K_p$ and $K_d$ for $m = \SI{1}{kg}$ such that $\zeta = 0.7$ and $t_s \approx \SI{1}{s}$.
-\answer{$\zeta\omega_n = 4/t_s = 4$, so $\omega_n = 5.71$, $K_p = m\omega_n^2 = 32.7$, $K_d = 2\zeta\omega_n m = 8.0$.}
-\exercise[2] Derive the overshoot formula of \cref{eq:damper-metrics}: solve \cref{eq:damper-msd} for a unit step, find the time of the first peak and evaluate the response there.
-\answer{$y(t) = 1 - e^{-\zeta\omega_n t}\big(\cos\omega_d t + \tfrac{\zeta}{\sqrt{1-\zeta^2}}\sin\omega_d t\big)$. $\dot y = \tfrac{\omega_n}{\sqrt{1-\zeta^2}}e^{-\zeta\omega_n t}\sin\omega_d t = 0$ first at $t_p = \pi/\omega_d$, where $y = 1 + e^{-\zeta\omega_n\pi/\omega_d} = 1 + e^{-\pi\zeta/\sqrt{1-\zeta^2}}$.}
+\answer{$\zeta\omega_n = 4$, $\omega_n = 5.71$, $K_p = 32.7$, $K_d = 8.0$.}
+\exercise[1] For $K_d = 3$, compute the time of the first peak and the time of the first undershoot below the setpoint after it.
+\answer{$t_p = \pi/\omega_d = \SI{1.13}{s}$; the next extremum at $2\pi/\omega_d = \SI{2.26}{s}$.}
 \exercise[2] Show that for $\zeta > 1$ the slow pole satisfies $s \approx -\omega_n/(2\zeta)$ when $\zeta \gg 1$. Interpret: the drone then moves as if only the damper and the spring existed, with no mass.
-\answer{$-\zeta\omega_n + \omega_n\sqrt{\zeta^2-1} = -\zeta\omega_n + \zeta\omega_n\sqrt{1 - 1/\zeta^2} \approx -\zeta\omega_n + \zeta\omega_n(1 - \tfrac{1}{2\zeta^2}) = -\tfrac{\omega_n}{2\zeta} = -K_p/K_d$. That is the pole of $K_d\dot x + K_p x = 0$: inertia no longer matters, the damper sets the pace.}
+\answer{$-\zeta\omega_n + \zeta\omega_n\sqrt{1-1/\zeta^2} \approx -\omega_n/(2\zeta) = -K_p/K_d$: the pole of $K_d\dot x + K_p x = 0$.}
+\exercise[2] Using the solution of Example~\ref{ex:damper-mp}, show that the ratio of two successive peaks of the oscillation (measured from the setpoint) is $e^{-2\pi\zeta/\sqrt{1-\zeta^2}}$. How can you use this to measure $\zeta$ from a recorded response?
+\answer{Successive maxima are $2\pi/\omega_d$ apart, so the envelope ratio is $e^{-\zeta\omega_n\cdot2\pi/\omega_d}$. Measuring the ratio $\rho$ of two peaks gives $\delta = -\ln\rho$ (logarithmic decrement) and $\zeta = \delta/\sqrt{4\pi^2 + \delta^2}$.}
 \exercise[3] The pole angle: show that complex poles of \cref{eq:damper-std} make the angle $\theta$ with the negative real axis such that $\cos\theta = \zeta$. What region of the $s$-plane guarantees overshoot below 5\,\% and settling within \SI{2}{s}?
-\answer{$|s| = \omega_n$ and $\operatorname{Re}s = -\zeta\omega_n$, so $\cos\theta = \zeta$. 5\,\% overshoot needs $\zeta \ge 0.69$, i.e.\ $\theta \le 46^\circ$ (a wedge around the negative real axis); $t_s \le 2$ needs $\operatorname{Re} s \le -2$ (left of a vertical line). The intersection of the wedge and the half-plane.}
+\answer{$|s| = \omega_n$, $\operatorname{Re}s = -\zeta\omega_n$, so $\cos\theta = \zeta$. Overshoot $\le 5\,\%$ needs $\zeta \ge 0.69$ ($\theta \le 46^\circ$); $t_s \le 2$ needs $\operatorname{Re}s \le -2$. The intersection of the wedge and the half-plane.}
 \end{exercises}

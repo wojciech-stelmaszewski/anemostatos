@@ -14,7 +14,7 @@ The book follows the lessons of the simulator, one lesson per chapter, with the 
   \item[Part I · PID] (Lessons 1–14) builds the PID controller term by term on a drone that can only move up and down, meets the practical problems of a real digital controller — saturation, windup, derivative kick, noise, sampling, delay, actuator lag — and ends with the cascade of loops that flies a full quadrotor.
   \item[Part II · Beyond PID] (Lessons II.1–II.21) is a second semester in five chapters: optimal state feedback and estimation (LQR, Kalman filter), disturbance observers and incremental control (ADRC, INDI), geometry and trajectories (rotations, differential flatness, minimum-snap planning), optimisation in the loop (MPC, MPPI, control barrier functions), and adaptation and learning (L1 adaptive control, learned models, neural-network policies) — ending with a comparison of all of them on equal terms.
 \end{description}
-The \hyperref[ch:prelude]{Prelude} introduces the simulator and its physics. Read it first, or come back to it when a lesson refers to it.
+Chapter~0, \hyperref[ch:intro]{\emph{Why control?}}, introduces the field itself: what control theory is, how it is organised, where it is used and where it came from. The \hyperref[ch:prelude]{Prelude} then introduces the simulator and its physics. Read both first, or come back to the Prelude when a lesson refers to it.
 
 \section*{The anatomy of a lesson}
 Every chapter has the same parts, set in the same way throughout the book:
@@ -34,7 +34,10 @@ Experiments to run in the simulator, usually with a question to answer \emph{bef
 \begin{watchout}
 Common mistakes and the limits of a result.
 \end{watchout}
-Each chapter ends with a page \emph{Out in the World} — the same idea at work somewhere else, with a photograph — a short summary, and exercises marked by difficulty ({\tiny$\bullet$} to {\tiny$\bullet\bullet\bullet$}). Brief answers to all exercises are collected at the end of the book.
+\begin{example}[a problem solved in full]
+Worked examples take a concrete question with the drone's real numbers and solve it step by step, with nothing left out. They are the backbone of each lesson: read them with a pencil.
+\end{example}
+Each chapter ends with a page \emph{Out in the World} — the same idea at work somewhere else, with a photograph — a short summary, and exercises marked by difficulty ({\tiny$\bullet$} to {\tiny$\bullet\bullet\bullet$}). Complete solutions of the exercises will be published in a companion volume.
 
 \section*{One colour, one meaning}
 The simulator gives every quantity its own colour, in its charts, its 3D view and its parameter panel. This book uses the same colours, so that a figure here and a chart on the screen read the same way:

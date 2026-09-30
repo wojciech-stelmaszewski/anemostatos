@@ -372,5 +372,60 @@
    2200,
    1467
   ]
+ },
+ "ctesibius": {
+  "title": "File:ARAGO Francois Astronomie Populaire T1 page 0067 Fig16-17.jpg",
+  "artist": "François Arago",
+  "credit": "Extrait de \"Astronomie populaire\" Tome 1 de François ARAGO sur Wikisource",
+  "license": "Public domain",
+  "page": "https://commons.wikimedia.org/wiki/File:ARAGO_Francois_Astronomie_Populaire_T1_page_0067_Fig16-17.jpg",
+  "size": [
+   1092,
+   1306
+  ]
+ },
+ "maxwell": {
+  "title": "File:James Clerk Maxwell, G.J. Stodart, 1890.jpg",
+  "artist": "G.J. Stodart",
+  "credit": "https://artsandculture.google.com/asset/portrait-james-clerk-maxwell-g-j-stodart/hAFKTpSxCyr8rg",
+  "license": "Public domain",
+  "page": "https://commons.wikimedia.org/wiki/File:James_Clerk_Maxwell,_G.J._Stodart,_1890.jpg",
+  "size": [
+   1480,
+   1747
+  ]
+ },
+ "wiener": {
+  "title": "File:Norbert Wiener.png",
+  "artist": "Garry Olsh",
+  "credit": "Own work",
+  "license": "CC0",
+  "page": "https://commons.wikimedia.org/wiki/File:Norbert_Wiener.png",
+  "size": [
+   360,
+   450
+  ]
+ },
+ "bode": {
+  "title": "File:Hendrik Wade Bode.png",
+  "artist": "Unknown authorUnknown author",
+  "credit": "Transferred from en.wikipedia to Commons by Dr.K. using CommonsHelper. Found at IEEE History website, Gonville & Caius College,Encyclopedia Astronautica, Forum automatica ,Geocities website and National Academies Press. Encyclopedia Astronautica Encyclopedia Astronautica H.W. Bode website credits NASA for the copyright of this picture. Encyclopedia Astronautica is a website which has been lauded by such sources as National Geographic, Encyclopædia Britannica, CNN, New York Times, Christian Science Monitor and NASA chief historian Roger Launius see: Encyclopedia Astronautica testimonials via the Internet archive",
+  "license": "Public domain",
+  "page": "https://commons.wikimedia.org/wiki/File:Hendrik_Wade_Bode.png",
+  "size": [
+   162,
+   206
+  ]
+ },
+ "pontryagin": {
+  "title": "File:Понтрягин Лев Семёнович.jpg",
+  "artist": "Unknown authorUnknown author",
+  "credit": "http://hm.msu.ru/понтрягин-лев-семёнович",
+  "license": "CC BY 4.0",
+  "page": "https://commons.wikimedia.org/wiki/File:%D0%9F%D0%BE%D0%BD%D1%82%D1%80%D1%8F%D0%B3%D0%B8%D0%BD_%D0%9B%D0%B5%D0%B2_%D0%A1%D0%B5%D0%BC%D1%91%D0%BD%D0%BE%D0%B2%D0%B8%D1%87.jpg",
+  "size": [
+   720,
+   576
+  ]
  }
 }

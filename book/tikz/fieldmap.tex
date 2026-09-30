@@ -1,0 +1,23 @@
+% A map of control theory: the workflow (top) and the families of methods (below), with the book's lessons.
+\begin{tikzpicture}[
+  every node/.style={font=\sffamily\footnotesize},
+  wfstep/.style={draw=ink, line width=0.6pt, rounded corners=2pt, fill=white, minimum height=10mm, text width=26mm, align=center},
+  fam/.style={draw=#1, line width=0.6pt, rounded corners=2pt, fill=#1!7, text width=37mm, align=left, inner sep=4pt, minimum height=21mm},
+  tag/.style={font=\sffamily\scriptsize\bfseries, text=#1},
+]
+  % workflow
+  \node[wfstep] (m) {\textbf{Model}\\{\scriptsize\color{muted}equations of the plant}};
+  \node[wfstep, right=6mm of m] (a) {\textbf{Analyse}\\{\scriptsize\color{muted}stability, speed, margins}};
+  \node[wfstep, right=6mm of a] (d) {\textbf{Design}\\{\scriptsize\color{muted}choose the control law}};
+  \node[wfstep, right=6mm of d] (i) {\textbf{Implement \& test}\\{\scriptsize\color{muted}sample, filter, saturate}};
+  \draw[sig] (m) -- (a); \draw[sig] (a) -- (d); \draw[sig] (d) -- (i);
+  \draw[sig, faint] (i.north) -- ++(0,4mm) -| node[pos=0.25, above, lab] {not good enough? iterate} (m.north);
+  % families
+  \node[fam=sigP, below=11mm of m.south west, anchor=north west] (f1) {\textcolor{sigP}{\textbf{Classical}}\\ PID, frequency response, Bode \& Nyquist, root locus\\[1pt]{\color{muted}Part I, Lessons 1–14}};
+  \node[fam=deepblue, right=3mm of f1] (f2) {\textcolor{deepblue}{\textbf{State space}}\\ state feedback, observers, LQR, Kalman filter\\[1pt]{\color{muted}Lessons II.1–II.4}};
+  \node[fam=sigI, right=3mm of f2] (f3) {\textcolor{sigI}{\textbf{Nonlinear \& geometric}}\\ Lyapunov, dynamic inversion, INDI, rotations, flatness\\[1pt]{\color{muted}Lessons II.7–II.12}};
+  \node[fam=sigD, below=3mm of f1] (f4) {\textcolor{sigD}{\textbf{Optimal \& predictive}}\\ Pontryagin, dynamic programming, MPC, sampling-based\\[1pt]{\color{muted}Lessons II.2, II.13–II.17}};
+  \node[fam=sigFF, right=3mm of f4] (f5) {\textcolor{sigFF}{\textbf{Robust \& adaptive}}\\ disturbance observers, ADRC, L1 adaptive, $H_\infty$\\[1pt]{\color{muted}Lessons II.5–II.6, II.18}};
+  \node[fam=sigerr, right=3mm of f5] (f6) {\textcolor{sigerr}{\textbf{Learning-based}}\\ learned models, reinforcement learning, neural policies\\[1pt]{\color{muted}Lessons II.19–II.21}};
+  \node[font=\sffamily\scriptsize, text=muted, anchor=south west] at ($(f1.north west)+(0,1mm)$) {families of methods — each answers the design question differently};
+\end{tikzpicture}

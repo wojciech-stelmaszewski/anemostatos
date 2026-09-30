@@ -1,0 +1,11 @@
+% Free-body diagram of the L1 drone: thrust, weight, drag.
+\begin{tikzpicture}[every node/.style={font=\sffamily\scriptsize}]
+  \draw[line width=1.6pt, ink!80, line cap=round] (-1.1,0) -- (1.1,0);
+  \fill[accent, rounded corners=1.5pt] (-0.32,-0.14) rectangle (0.32,0.16);
+  \foreach \x in {-1.1,1.1} { \draw[hair, fill=mist] (\x,0.12) ellipse (0.42 and 0.07); }
+  \draw[->, line width=1.1pt, ink] (0,0.25) -- (0,1.55) node[above] {thrust $T$};
+  \draw[->, line width=1.1pt, sigsp] (0,-0.2) -- (0,-1.45) node[below] {weight $mg$};
+  \draw[->, line width=1.1pt, sigwind] (0.55,-0.2) -- (0.55,-0.85) node[right, text width=15mm, align=left] {drag \& wind $d(t)$};
+  \draw[->, faint] (-1.6,-1.2) -- (-1.6,0.9) node[above] {$y$};
+  \draw[faint] (-1.7,-0.02) -- (-1.5,-0.02);
+\end{tikzpicture}

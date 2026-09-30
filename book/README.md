@@ -45,7 +45,8 @@ book/
   front/          cover, title page, contents, preface, Chapter 0, Prelude
   part1/          Part I, one file per lesson
   part2/          Part II, one file per chapter (A–E)
-  back/           mathematical toolbox, app map, reading list, photo credits, colophon
+  back/           mathematical toolbox (math.tex and one file per appendix in toolbox/),
+                  app map, reading list, photo credits, colophon
   tikz/           diagrams
   figures/out/    plots drawn from simulator data
   screens/        screenshots of the app
@@ -87,6 +88,12 @@ book/
   see its neighbours: keep such notes to `example` boxes, and after a build run
   `python3 book/tools/check_margins.py`; a collision is fixed with the optional shift,
   `\tip[-30pt]{...}`, or by moving the anchor.
+- The toolbox is a short course, not a formula sheet (`docs/curriculum.md` §5.2). An
+  appendix opens with `\toolchapter{letter}{title}{subtitle}` and a `\usedcard` that
+  lists the lessons using it; its equations, theorems and worked examples are numbered
+  with its letter; it ends with an _at a glance_ table and has no exercises. Its figures
+  are drawn from formulas in `tools/figs_math.py` (names `tb_*`), and their captions
+  say so.
 - Exercises use `\exercise`, and their solutions go into `\answer{...}`
   right after them. The build collects the answers into
   `build/main.ans` for the companion volume; they are not printed here.

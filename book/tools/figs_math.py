@@ -378,3 +378,58 @@ def tb_lyap():
     b.set_ylabel("amplitude  [m]")
     b.grid(True, which="major", axis="both")
     save(f, "tb_lyap")
+
+
+@fig
+def tb_frames():
+    """Side view of a pitched drone with its thrust decomposed; the attitude error law."""
+    f, (a, b) = plt.subplots(1, 2, figsize=(TEXT_W, 64 * MM), gridspec_kw=dict(wspace=0.3, width_ratios=[1.15, 1]))
+    th = np.radians(-15)
+    bx = np.array([np.cos(th), np.sin(th)])
+    by = np.array([-np.sin(th), np.cos(th)])
+
+    def arrow(p0, p1, col, lw=1.1):
+        a.annotate("", xy=p1, xytext=p0, arrowprops=dict(arrowstyle="-|>", color=col, lw=lw, mutation_scale=8, shrinkA=0, shrinkB=0))
+
+    for v, lab in (((1.35, 0), "$x$"), ((0, 1.35), "$y$")):
+        arrow((0, 0), v, C["faint"], 0.8)
+        a.text(v[0] * 1.08, v[1] * 1.06, lab, color=C["muted"], fontsize=7, ha="center", va="center")
+    for v, lab in ((bx * 1.0, "$\\hat b_x$"), (by * 0.62, "")):
+        arrow((0, 0), v, C["accent"], 0.9)
+        a.text(v[0] * 1.12, v[1] * 1.12 - 0.03, lab, color=C["accent"], fontsize=7, ha="center", va="center")
+    # the drone body: a bar along b_x with two rotors
+    for s_ in (-1, 1):
+        p = bx * 0.55 * s_
+        a.plot([p[0] - bx[0] * 0.16, p[0] + bx[0] * 0.16], [p[1] - bx[1] * 0.16 + 0.05 * by[1], p[1] + bx[1] * 0.16 + 0.05 * by[1]], color=C["ink"], lw=1.2)
+    a.plot([-bx[0] * 0.55, bx[0] * 0.55], [-bx[1] * 0.55, bx[1] * 0.55], color=C["ink"], lw=2.2, solid_capstyle="round")
+    T = 1.036  # in units of the weight
+    tip = by * T * 1.15
+    arrow((0, 0), tip, C["meas"], 1.5)
+    a.text(tip[0] + 0.06, tip[1] + 0.03, "$T\\,\\hat b$", color=C["meas"], fontsize=7.4)
+    a.plot([tip[0], tip[0]], [0, tip[1]], color=C["meas"], lw=0.6, ls=(0, (3, 2)))
+    a.plot([0, tip[0]], [tip[1], tip[1]], color=C["meas"], lw=0.6, ls=(0, (3, 2)))
+    a.text(tip[0] + 0.04, 0.45, "$T\\cos 15° = mg$", color=C["meas"], fontsize=6.4)
+    a.text(0.02, tip[1] + 0.05, "$T\\sin 15°$", color=C["meas"], fontsize=6.4)
+    arrow((0, 0), (0, -0.85), C["err"], 1.3)
+    a.text(0.06, -0.8, "$mg$", color=C["err"], fontsize=7.4)
+    arc = np.linspace(np.pi / 2, np.pi / 2 + th, 30)
+    a.plot(0.42 * np.cos(arc), 0.42 * np.sin(arc), color=C["muted"], lw=0.7)
+    a.text(0.07, 0.47, "15°", color=C["muted"], fontsize=6.4)
+    a.set_xlim(-0.9, 1.6)
+    a.set_ylim(-1.0, 1.5)
+    a.set_aspect("equal")
+    a.axis("off")
+    a.set_title("A pitch of $-15°$")
+
+    ang = np.linspace(0, 180, 200)
+    b.plot(ang, np.radians(ang), color=C["faint"], lw=0.9, ls=(0, (4, 2.5)), label="the angle $\\theta_e$")
+    b.plot(ang, 2 * np.sin(np.radians(ang) / 2), color=C["meas"], lw=1.3, label="$2\\sin(\\theta_e/2)$")
+    b.plot([15, 170], [2 * np.sin(np.radians(7.5)), 2 * np.sin(np.radians(85))], "o", color=C["accent"], ms=3)
+    b.set_xlim(0, 180)
+    b.set_ylim(0, 3.3)
+    b.set_xticks([0, 45, 90, 135, 180])
+    b.legend(loc="upper left")
+    b.set_title("The error vector")
+    b.set_xlabel("error angle  [degrees]", loc="right")
+    b.set_ylabel("length  [rad]")
+    save(f, "tb_frames")

@@ -1,0 +1,269 @@
+\toolchapter{H}{Rotations and quaternions}{Positions add. Rotations do not: they multiply, and the order matters. Three ways to write a rotation down, and why flight computers choose the one with four numbers.}
+\label{app:quat}
+
+\lead{\usedcard{\setuprow{Prelude}{the rigid body: $R(q)$, $\dot q$, Euler's equation}\setuprow{Lesson 12}{the thrust axis $\hat b$, tilt}\setuprow{Lesson 13}{attitude setpoint and attitude error}\setuprow{Part II}{large rotations (II.10), trajectories (II.11)}\setuprow{Parts III, IV}{attitude estimation (III.22, III.23), spacecraft (IV.18–IV.23)}}%
+From Lesson~12 on the drone is a rigid body, and its controller must say in which direction it points, how far that is from where it should point, and how fast it is turning. This appendix builds the three descriptions of orientation in use — the rotation matrix, the axis with its angle, and the unit quaternion — with the conventions of the simulator: the world frame has $y$ up; the body frame has $x$ forward, $y$ up (the thrust axis) and $z$ to the right; roll is about $x$, pitch about $z$, yaw about $y$.}
+
+\section{Rotation matrices}
+
+Attach three perpendicular unit vectors to the body: $\hat b_x$, $\hat b_y$, $\hat b_z$. Write their coordinates in the world frame as the columns of a matrix,
+\begin{equation}
+  R = \begin{pmatrix}\hat b_x & \hat b_y & \hat b_z\end{pmatrix} .
+\end{equation}
+This matrix is the orientation of the body. It also converts coordinates: a vector with the body coordinates $\vec v^{\,b}$ has the world coordinates
+\begin{equation}\label{eq:H-Rv}
+  \vec v^{\,w} = R\,\vec v^{\,b} ,
+\end{equation}
+because $\vec v = v_x\hat b_x + v_y\hat b_y + v_z\hat b_z$. The thrust, which in the body frame always points along $(0, 1, 0)$, points in the world along the middle column of $R$: that is the $\hat b$ of \lessonref{les:tilt}.
+
+\begin{definition}{Rotation matrix, SO(3)}
+A $3 \times 3$ matrix $R$ is a \term{rotation matrix} if $R^\T R = \Id$ and $\det R = +1$. The set of all rotation matrices is called SO(3), the \emph{special orthogonal group}.
+\end{definition}
+
+$R^\T R = \Id$ says that the columns are unit vectors perpendicular to each other; $\det R = +1$ that they form a right-handed frame and not its mirror image. Three consequences:
+\begin{itemize}
+  \item the inverse is the transpose, $R^{-1} = R^\T$, which converts world coordinates to body coordinates;
+  \item lengths and angles are preserved: $\|R\vec v\| = \|\vec v\|$;
+  \item the product of two rotation matrices is a rotation matrix. If $R_1$ describes the body and a further rotation $R_2$ is given \emph{in body coordinates}, the new orientation is $R_1R_2$.
+\end{itemize}
+A rotation matrix has nine entries and six constraints: three numbers are free. Orientation has \emph{three degrees of freedom}, but — this is the difficulty of the whole subject — no set of three numbers describes it without trouble somewhere.
+
+The rotations about the coordinate axes are, with $c = \cos\theta$, $s = \sin\theta$:
+\begin{equation}\label{eq:H-elementary}
+  R_x(\theta) = \begin{pmatrix}1 & 0 & 0\\ 0 & c & -s\\ 0 & s & c\end{pmatrix}, \quad
+  R_y(\theta) = \begin{pmatrix}c & 0 & s\\ 0 & 1 & 0\\ -s & 0 & c\end{pmatrix}, \quad
+  R_z(\theta) = \begin{pmatrix}c & -s & 0\\ s & c & 0\\ 0 & 0 & 1\end{pmatrix} .
+\end{equation}
+A positive angle turns anticlockwise when seen from the tip of the axis (the right-hand rule).
+
+\begin{example}[Which way does the thrust point?]
+\label{ex:H-thrust}
+The drone pitches by $\theta = -15^\circ$ (about $z$). Where does its thrust point, and what does the mass of \SI{1}{kg} do?
+
+\textbf{Step 1 — the matrix.} $R = R_z(-15^\circ)$, with $\cos = 0.966$, $\sin = -0.259$.
+
+\textbf{Step 2 — the thrust axis.} The middle column: $\hat b = R\,(0, 1, 0)^\T = (-s, c, 0) = (0.259,\ 0.966,\ 0)$. A negative pitch leans the thrust towards $+x$: nose down, forward.
+
+\textbf{Step 3 — the forces.} To keep the altitude, the vertical part must carry the weight: $T \cdot 0.966 = 9.81$, $T = \SI{10.16}{N}$. The horizontal part is $10.16 \cdot 0.259 = \SI{2.63}{N}$: an acceleration of \SI{2.63}{m/s^2}, which is $g\tan 15^\circ$ (Example~\ref{ex:tilt-time}).
+\end{example}
+
+\simfig{tb_frames}{Left: the drone of Example~\ref{ex:H-thrust}, seen from the side. The body axes (orange) are the world axes (grey) turned by the pitch of $-15^\circ$; the thrust along the body's $y$-axis splits into a part that carries the weight and a part that accelerates the drone. Right: the length of the attitude error vector of \cref{eq:H-thetae} against the true error angle. For small errors the two agree; at $180^\circ$ the vector has the length 2 where the angle is $\pi$. Both drawn from the formulas.}{fig:H-frames}
+
+\subsection{Rotations do not commute}
+Turn a book by $90^\circ$ about one edge and then by $90^\circ$ about another; then do it in the other order. The book ends up differently. In matrices: $R_z(90^\circ)R_x(90^\circ)$ sends the up-vector $(0, 1, 0)$ to $(0, 0, 1)$, while $R_x(90^\circ)R_z(90^\circ)$ sends it to $(-1, 0, 0)$.
+
+This is why attitude cannot be handled like position. There is no \enquote{attitude vector} whose components can be controlled by three independent loops, except approximately, for small angles, where the products of the small terms are negligible and the order stops mattering. The cascade of \lessonref{les:cascade} lives in that approximation for its error, and uses the exact description for the attitude itself.
+
+\section{Three angles, and where they fail}
+
+The oldest description uses three successive rotations about coordinate axes: \term{Euler angles}. The simulator's display uses yaw $\psi$ about the vertical, then pitch $\theta$, then roll $\varphi$:
+\begin{equation}\label{eq:H-euler}
+  R = R_y(\psi)\,R_z(\theta)\,R_x(\varphi) .
+\end{equation}
+Three numbers, easy to read: \enquote{heading north-east, nose $5^\circ$ down, right wing $10^\circ$ low}. For display they are ideal. For computation they have a defect that no choice of sequence removes.
+
+\begin{theorem}[Euler-angle rates and the singularity]
+\label{thm:H-gimbal}
+For the sequence \eqref{eq:H-euler} the angular velocity in body coordinates is
+\begin{equation*}
+  \omega_x = \dot\varphi + \dot\psi\sin\theta, \quad
+  \omega_y = \dot\theta\sin\varphi + \dot\psi\cos\varphi\cos\theta, \quad
+  \omega_z = \dot\theta\cos\varphi - \dot\psi\sin\varphi\cos\theta ,
+\end{equation*}
+and, solved for the rates of the angles,
+\begin{equation*}
+  \dot\psi = \frac{\omega_y\cos\varphi - \omega_z\sin\varphi}{\cos\theta}, \qquad
+  \dot\theta = \omega_y\sin\varphi + \omega_z\cos\varphi, \qquad
+  \dot\varphi = \omega_x - \dot\psi\sin\theta .
+\end{equation*}
+At $\theta = \pm90^\circ$ the first expression divides by zero.
+\end{theorem}
+\begin{proof}
+The three angle rates are rotations about three different axes: $\dot\varphi$ about the body's $x$-axis; $\dot\theta$ about the $z$-axis of the frame \emph{before} the roll, which in body coordinates is $R_x(\varphi)^\T(0, 0, 1)^\T = (0, \sin\varphi, \cos\varphi)^\T$; and $\dot\psi$ about the vertical, which in body coordinates is $R_x(\varphi)^\T R_z(\theta)^\T(0, 1, 0)^\T = (\sin\theta, \cos\varphi\cos\theta, -\sin\varphi\cos\theta)^\T$. Adding the three gives the first set. Solving its last two equations for $\dot\theta$ and $\dot\psi\cos\theta$ gives the second.
+\end{proof}
+
+At a pitch of $90^\circ$ the yaw axis and the roll axis coincide: two of the three angles describe the same rotation and one direction of rotation cannot be described at all. This is \term{gimbal lock}, named after the mechanical gimbals of gyroscope platforms, which jam in the same configuration. Near it the angle rates become enormous for ordinary body rates, and a controller built on Euler angles fails. Every set of three angles has such a singularity somewhere. A drone that may flip (Lesson~II.10) and a spacecraft that must point anywhere need a description without one.
+
+\section{One axis, one angle}
+
+\begin{theorem}[Euler's rotation theorem and Rodrigues' formula]
+\label{thm:H-rodrigues}
+Every rotation is a rotation by some angle $\theta$ about some unit axis $\hat n$. It turns a vector $\vec v$ into
+\begin{equation}\label{eq:H-rodrigues}
+  \vec v' = \vec v\cos\theta + (\hat n \times \vec v)\sin\theta + \hat n\,(\hat n \cdot \vec v)(1 - \cos\theta) ,
+\end{equation}
+and its matrix is
+\begin{equation}\label{eq:H-rodmat}
+  R = \Id + \sin\theta\,[\hat n]_\times + (1 - \cos\theta)\,[\hat n]_\times^2, \qquad
+  [\hat n]_\times = \begin{pmatrix}0 & -n_z & n_y\\ n_z & 0 & -n_x\\ -n_y & n_x & 0\end{pmatrix} .
+\end{equation}
+The angle follows from the trace, $\operatorname{tr}R = 1 + 2\cos\theta$, and the axis from $R\hat n = \hat n$.
+\end{theorem}
+\begin{proof}
+Split $\vec v$ into its part along the axis, $\hat n(\hat n \cdot \vec v)$, which the rotation leaves alone, and the part perpendicular to it, $\vec v_\perp$. The rotation turns $\vec v_\perp$ within the plane perpendicular to $\hat n$, into $\vec v_\perp\cos\theta + (\hat n \times \vec v_\perp)\sin\theta$; and $\hat n \times \vec v_\perp = \hat n \times \vec v$. Adding the two parts gives \cref{eq:H-rodrigues}. The matrix $[\hat n]_\times$ is defined by $[\hat n]_\times\vec v = \hat n \times \vec v$, and $[\hat n]_\times^2\vec v = \hat n(\hat n \cdot \vec v) - \vec v$. That every rotation matrix has an axis — an eigenvector with the eigenvalue 1 — is Euler's theorem (Markley and Crassidis, 2014, ch.~2).
+\end{proof}
+
+The matrix $[\hat n]_\times$, the \term{cross-product matrix}, is skew-symmetric, and \cref{eq:H-rodmat} is a matrix exponential (Appendix~A): $R = e^{\theta[\hat n]_\times}$. The vector $\theta\hat n$ is the \term{rotation vector}. For small angles it behaves like an ordinary vector — $R \approx \Id + [\theta\hat n]_\times$, and small rotations add — which is what makes it the natural language for attitude \emph{errors}.
+
+The composition of $90^\circ$ about $x$ followed by $90^\circ$ about $z$, from the book example above, has the trace 0, so $\cos\theta = -\tfrac12$: it is a single rotation by $120^\circ$, about the diagonal $(1, 1, 1)/\sqrt3$.
+
+\section{Quaternions}
+
+The axis and the angle are the right idea, and four numbers carry them better than three.
+
+\begin{definition}{Quaternion}
+A \term{quaternion} is a pair $q = (w, \vec v)$ of a number $w$ and a vector $\vec v = (x, y, z)$, with the product
+\begin{equation}\label{eq:H-product}
+  (w_1, \vec v_1) \otimes (w_2, \vec v_2) = \big(w_1w_2 - \vec v_1 \cdot \vec v_2,\ \ w_1\vec v_2 + w_2\vec v_1 + \vec v_1 \times \vec v_2\big) .
+\end{equation}
+Its \term{conjugate} is $q^* = (w, -\vec v)$ and its norm $\|q\| = \sqrt{w^2 + x^2 + y^2 + z^2}$. A \term{unit quaternion} has the norm 1; its inverse is its conjugate.
+\end{definition}
+
+The product is associative but, because of the cross product, not commutative — as it must be, if it is to describe rotations. The norm is multiplicative, $\|q_1 \otimes q_2\| = \|q_1\|\|q_2\|$, so products of unit quaternions are unit quaternions.
+
+\begin{theorem}[Unit quaternions are rotations]
+\label{thm:H-quat}
+The unit quaternion
+\begin{equation}\label{eq:H-q}
+  q = \big(\cos\tfrac\theta2,\ \hat n\,\sin\tfrac\theta2\big)
+\end{equation}
+represents the rotation by $\theta$ about $\hat n$, in the sense that the rotated vector is given by
+\begin{equation}\label{eq:H-sandwich}
+  (0, \vec v') = q \otimes (0, \vec v) \otimes q^* .
+\end{equation}
+The quaternion of two successive rotations is the product of their quaternions; $q$ and $-q$ represent the same rotation; and the rotation matrix is
+\begin{equation}\label{eq:H-Rq}
+  R(q) = \begin{pmatrix}
+    1 - 2(y^2 + z^2) & 2(xy - wz) & 2(xz + wy)\\
+    2(xy + wz) & 1 - 2(x^2 + z^2) & 2(yz - wx)\\
+    2(xz - wy) & 2(yz + wx) & 1 - 2(x^2 + y^2)
+  \end{pmatrix} .
+\end{equation}
+(Markley and Crassidis, 2014, ch.~2.)
+\end{theorem}
+
+Multiplying out \cref{eq:H-sandwich} with \cref{eq:H-product} reproduces Rodrigues' formula, with the half angles combining into whole ones through $\cos^2\tfrac\theta2 - \sin^2\tfrac\theta2 = \cos\theta$ and $2\sin\tfrac\theta2\cos\tfrac\theta2 = \sin\theta$. That is where the half angle comes from: $q$ appears twice in the sandwich.
+
+In the simulator $q$ rotates body coordinates into world coordinates, $\vec v^{\,w} = R(q)\,\vec v^{\,b}$, and a further rotation given in the body frame multiplies \emph{from the right}, exactly like the matrices: $q_{new} = q \otimes q_{step}$. The identity, \enquote{level, facing $+x$}, is $q = (1, 0, 0, 0)$.
+
+\begin{example}[Building an attitude, and using it]
+\label{ex:H-build}
+The drone is yawed by $90^\circ$ and then pitched by $-15^\circ$. Find its quaternion and its thrust direction.
+
+\textbf{Step 1 — the pitch.} Axis $z$, angle $-15^\circ$: $q_\theta = (\cos 7.5^\circ,\ 0,\ 0,\ -\sin 7.5^\circ) = (0.9914,\ 0,\ 0,\ -0.1305)$.
+
+\textbf{Step 2 — the yaw.} Axis $y$, angle $90^\circ$: $q_\psi = (\cos 45^\circ,\ 0,\ \sin 45^\circ,\ 0) = (0.7071,\ 0,\ 0.7071,\ 0)$.
+
+\textbf{Step 3 — compose.} As in \cref{eq:H-euler} the yaw stands on the left: $q = q_\psi \otimes q_\theta$. With \cref{eq:H-product}, $w = 0.7071 \cdot 0.9914 - 0 = 0.7011$, and the vector part is
+\begin{align*}
+  w_1\vec v_2 &= 0.7071\,(0, 0, -0.1305) = (0,\ 0,\ -0.0923),\\
+  w_2\vec v_1 &= 0.9914\,(0, 0.7071, 0) = (0,\ 0.7011,\ 0),\\
+  \vec v_1 \times \vec v_2 &= (0, 0.7071, 0) \times (0, 0, -0.1305) = (-0.0923,\ 0,\ 0),
+\end{align*}
+together $(-0.0923,\ 0.7011,\ -0.0923)$.
+
+\textbf{Step 4 — check the norm.} $0.7011^2 + 0.0923^2 + 0.7011^2 + 0.0923^2 = 1.000$.
+
+\textbf{Step 5 — the thrust axis.} The middle column of \cref{eq:H-Rq}: $\hat b = \big(2(xy - wz),\ 1 - 2(x^2 + z^2),\ 2(yz + wx)\big) = (0.000,\ 0.966,\ -0.259)$.
+
+\textbf{Step 6 — read it.} The same tilt of $15^\circ$ as in Example~\ref{ex:H-thrust}, but the yaw has turned \enquote{forward} from $+x$ to $-z$: the drone accelerates along $-z$.
+\end{example}
+
+\begin{keyidea}[Why four numbers]
+A unit quaternion has no singularity: every orientation has a quaternion, and nearby orientations have nearby quaternions. It is cheap: composing two costs sixteen multiplications, against twenty-seven for matrices, and needs no trigonometric functions. And it is easy to keep valid: rounding errors make it drift away from unit length, and dividing by its norm repairs it — whereas repairing a rotation matrix that is no longer orthogonal is a small computation of its own. The price is a redundancy: $q$ and $-q$ are the same orientation, which the attitude error below has to respect.
+\end{keyidea}
+
+\section{Kinematics: how an attitude changes}
+
+Let $\vec\omega$ be the angular velocity of the body, in body coordinates — what the gyroscopes measure. During a short time $\dd t$ the body turns by the angle $\|\vec\omega\|\dd t$ about the axis $\vec\omega/\|\vec\omega\|$; by \cref{eq:H-q} that small rotation is the quaternion $(1, \tfrac12\vec\omega\,\dd t)$ to first order. Composing it on the right:
+$q(t + \dd t) = q(t) \otimes (1, \tfrac12\vec\omega\,\dd t)$, and therefore
+\begin{equation}\label{eq:H-qdot}
+  \dot q = \tfrac12\,q \otimes (0, \vec\omega) .
+\end{equation}
+The same argument for matrices gives $\dot R = R\,[\vec\omega]_\times$. These are the \emph{kinematic} equations: they involve no masses and no torques, only geometry.
+
+\begin{result}[The attitude step of the simulator]
+For a body rate $\vec\omega$ that is constant over a step $h$, \cref{eq:H-qdot} has the exact solution
+\begin{equation}\label{eq:H-step}
+  q_{k+1} = q_k \otimes \Big(\cos\frac{\|\vec\omega\|h}{2},\ \frac{\vec\omega}{\|\vec\omega\|}\sin\frac{\|\vec\omega\|h}{2}\Big) ,
+\end{equation}
+followed by a division by $\|q_{k+1}\|$ to remove the rounding. This is \texttt{qIntegrate} in \src{src/math/quat.ts}.
+\end{result}
+
+The alternative, an Euler step $q_{k+1} = q_k + \tfrac12h\,q_k \otimes (0, \vec\omega)$, multiplies the norm by $\sqrt{1 + (\|\vec\omega\|h/2)^2}$ at every step: for a body spinning at one turn per second and $h = \SI{1}{ms}$, by 0.5\,\% per second. A quaternion that is not of unit length scales every vector it rotates — the thrust would slowly grow. \Cref{eq:H-step} has no such drift.
+
+\section{The attitude error}
+
+The attitude loop of \lessonref{les:cascade} needs the difference between the attitude $q$ and its setpoint $q_{sp}$. Subtracting quaternions means nothing. The difference of two orientations is the \emph{rotation that leads from one to the other}:
+\begin{equation}\label{eq:H-qe}
+  q_e = q^{-1} \otimes q_{sp} ,
+\end{equation}
+the rotation, expressed in the body frame, that the body still has to make. (Check: $q \otimes q_e = q_{sp}$.) If $q_e = (\cos\tfrac{\theta_e}{2},\ \hat n\sin\tfrac{\theta_e}{2})$, the body must turn by $\theta_e$ about $\hat n$, and a controller wants that as a vector.
+
+\begin{result}[The attitude error vector]
+\begin{equation}\label{eq:H-thetae}
+  \vec\theta_e = 2\,\sign(q_{e,w})\;\vec q_{e,xyz} = 2\sin\tfrac{\theta_e}{2}\;\hat n \ \approx\ \theta_e\,\hat n \quad\text{for small errors,}
+\end{equation}
+and the attitude loop commands the body rate $\vec\omega_{sp} = K_{att}\,\vec\theta_e$.
+\end{result}
+
+The factor $\sign(q_{e,w})$ is the repair for the double cover. $q_e$ and $-q_e$ are the same rotation, one written as \enquote{$\theta_e$ about $\hat n$} and the other as \enquote{$360^\circ - \theta_e$ about $-\hat n$}. Choosing the sign that makes $w$ positive picks the description with the angle below $180^\circ$: the short way round. Without it a drone a few degrees from its setpoint might be told to make an almost complete turn in the other direction, a fault known as \emph{unwinding}.
+
+\begin{example}[The attitude loop's command]
+\label{ex:H-error}
+The drone is level, $q = (1, 0, 0, 0)$, and the thrust-vector block asks for a pitch of $-15^\circ$. What does the attitude loop command, with $K_{att} = \SI{8}{s^{-1}}$?
+
+\textbf{Step 1 — the error quaternion.} $q^{-1}$ is the identity, so $q_e = q_{sp} = (0.9914,\ 0,\ 0,\ -0.1305)$.
+
+\textbf{Step 2 — the error vector.} $w > 0$, so $\vec\theta_e = 2 \cdot (0, 0, -0.1305) = (0, 0, -0.2611)$\,rad: $-14.96^\circ$ about the pitch axis. The exact angle is $-15^\circ = \SI{-0.2618}{rad}$; the formula $2\sin\tfrac\theta2$ is off by 0.3\,\%.
+
+\textbf{Step 3 — the command.} $\vec\omega_{sp} = 8 \cdot (0, 0, -0.2611) = (0, 0, -2.09)$\,rad/s: a pitch rate of $\SI{-120}{\degree/s}$ — the number read from the chart in \lessonref{les:cascade}.
+
+\textbf{Step 4 — a large error.} For an error of $170^\circ$ the vector has the length $2\sin 85^\circ = \SI{1.99}{rad}$, where the angle itself is \SI{2.97}{rad}. The law is no longer proportional to the angle (\cref{fig:H-frames}, right). It still grows with it all the way to $180^\circ$ and points the right way; how this choice compares with others for large rotations is the subject of Lesson~II.10.
+\end{example}
+
+\subsection{From a thrust direction to an attitude}
+The thrust-vector block of \lessonref{les:cascade} knows where the thrust axis should point, $\hat b_{sp}$, and needs an attitude. The rotation that takes a unit vector $\hat a$ onto a unit vector $\hat b$ by the shortest way has the axis $\hat a \times \hat b$ and the angle between them, and its quaternion has a remarkably simple form:
+\begin{equation}\label{eq:H-fromto}
+  q = \frac{\big(1 + \hat a \cdot \hat b,\ \ \hat a \times \hat b\big)}{\big\|\big(1 + \hat a \cdot \hat b,\ \ \hat a \times \hat b\big)\big\|} .
+\end{equation}
+(With $\hat a \cdot \hat b = \cos\theta$ and $\|\hat a \times \hat b\| = \sin\theta$, the pair before normalising is $2\cos\tfrac\theta2$ times $(\cos\tfrac\theta2,\ \hat n\sin\tfrac\theta2)$, which is \cref{eq:H-q}.) The simulator applies it with $\hat a = (0, 1, 0)$ and composes the result with the desired yaw (\texttt{qFromTo}). The formula breaks down only for opposite vectors, where every perpendicular axis is equally short.
+
+\section{Dynamics: what torques do}
+
+Kinematics turned body rates into attitude. \emph{Dynamics} turns torques into body rates. For a rigid body with the inertia matrix $J$ (in body coordinates, where it is constant), the angular momentum is $J\vec\omega$, and Newton's law for rotation, written in the rotating body frame, is \term{Euler's equation}:
+\begin{equation}\label{eq:H-euler-eq}
+  J\,\dot{\vec\omega} = \vec\tau - \vec\omega \times (J\vec\omega) .
+\end{equation}
+The first term is the rotational $F = ma$. The second, the \emph{gyroscopic} term, appears because the equation is written in a frame that itself rotates: the angular momentum vector, fixed in space when no torque acts, moves relative to the body.
+
+\begin{example}[How large is the gyroscopic term?]
+\label{ex:H-gyro}
+The drone has $J = \diag(0.0082,\ 0.0149,\ 0.0082)\,\si{kg.m^2}$ (roll, yaw, pitch). Evaluate $\vec\omega \times (J\vec\omega)$ for two motions.
+
+\textbf{Step 1 — roll and pitch together.} $\vec\omega = (3, 0, 2)$\,rad/s. $J\vec\omega = 0.0082\,(3, 0, 2)$ is parallel to $\vec\omega$, because roll and pitch have the same inertia. The cross product of parallel vectors is zero: no gyroscopic torque.
+
+\textbf{Step 2 — yawing while pitching.} Now $\vec\omega = (0, 6, 2)$\,rad/s and $J\vec\omega = (0,\ 0.0894,\ 0.0164)$. The cross product has only an $x$-component: $6 \cdot 0.0164 - 2 \cdot 0.0894 = \SI{-0.080}{N.m}$.
+
+\textbf{Step 3 — compare.} \SI{0.08}{N.m} about the roll axis would, uncorrected, produce a roll acceleration of $0.080/0.0082 = \SI{9.8}{rad/s^2}$. The rate loop sees it as a disturbance torque and cancels it within its \SI{60}{ms}; the largest torque the motors can give is \SI{1.18}{N.m}, fifteen times more.
+
+\textbf{Step 4 — the general picture.} The term vanishes for a body with three equal moments of inertia and whenever the rotation is about a single principal axis. It matters for fast, combined rotations — and for a satellite with spinning wheels inside, where it is the whole mechanism (Lessons~IV.19 and~IV.23).
+\end{example}
+
+\begin{result}[Appendix H at a glance]
+\begin{center}\small
+\renewcommand{\arraystretch}{1.4}
+\begin{tabularx}{\linewidth}{@{}l>{\raggedright\arraybackslash}X@{}}
+rotation matrix & columns are the body axes in the world; $R^{-1} = R^\T$; $\vec v^{\,w} = R\,\vec v^{\,b}$\\
+thrust axis & $\hat b = R\,(0, 1, 0)^\T$, the middle column\\
+Euler angles & $R = R_y(\psi)R_z(\theta)R_x(\varphi)$; singular at $\theta = \pm90^\circ$\\
+axis and angle & Rodrigues: $\vec v\cos\theta + (\hat n \times \vec v)\sin\theta + \hat n(\hat n \cdot \vec v)(1 - \cos\theta)$; $\operatorname{tr}R = 1 + 2\cos\theta$\\
+quaternion & $q = (\cos\tfrac\theta2,\ \hat n\sin\tfrac\theta2)$; rotate: $q \otimes (0, \vec v) \otimes q^*$; $q \equiv -q$\\
+compose & a rotation in the body frame multiplies on the right\\
+kinematics & $\dot q = \tfrac12q \otimes (0, \vec\omega)$; step with $(\cos\tfrac{\|\vec\omega\|h}{2}, \dots)$, then normalise\\
+error & $q_e = q^{-1} \otimes q_{sp}$; $\vec\theta_e = 2\sign(q_{e,w})\,\vec q_{e,xyz}$\\
+from $\hat a$ to $\hat b$ & $q \propto (1 + \hat a \cdot \hat b,\ \hat a \times \hat b)$\\
+dynamics & $J\dot{\vec\omega} = \vec\tau - \vec\omega \times J\vec\omega$\\
+\end{tabularx}
+\end{center}
+\end{result}

@@ -191,7 +191,7 @@ and completes the subject, and otherwise with the volume that needs it.
 First checked on the build of commit `8e1df9c` (127 pages): the sources,
 the build log and the rendered pages. Lessons 1–4 were then rebuilt to the
 full standard of §4, and lessons 5–14 after them; Part I is complete and
-the book now has 209 pages.
+the book now has 288 pages with the toolbox.
 
 **What is good.** The design system is consistent and carries the app's
 colours. Chapter 0 and the Prelude are complete. Lessons 1–4 meet the
@@ -206,18 +206,18 @@ eleven seconds.
 
 **What is missing or wrong.**
 
-| #   | Finding                                                                                                                                                        | State                                               |
-| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
-| 1   | Lessons 5–14 had no worked example and three to five exercises each, over five to seven pages. They did not meet §4.                                           | fixed (rewritten to the level of 1–4)               |
-| 2   | Part II is a title page followed by nothing; its five chapter files are stubs. The cover promises thirty-five lessons.                                         | open: 21 chapters to write                          |
-| 3   | The mathematical toolbox and the app map are stubs. Ten cross-references print as "??" (four to appendices, six to Part II lessons). The references now exist. | open: appendices A–J for volume 1                   |
-| 4   | The check marks of the _What to remember_ boxes were missing: the math font has no such glyph.                                                                 | fixed (drawn with TikZ)                             |
-| 5   | `main.tex` and `scripts/book-data.ts` referred to `make book`, `make book-data` and `book/README.md`, none of which existed.                                   | fixed (three make targets, the README)              |
-| 6   | The imprint named a script `book/tools/figures` that does not exist.                                                                                           | fixed                                               |
-| 7   | No author, editor or credit anywhere in the book.                                                                                                              | fixed (title page, imprint, colophon)               |
-| 8   | The field map of Chapter 0 listed Bode, Nyquist, root locus, Lyapunov, Pontryagin, dynamic programming and H∞ against Parts I–II, which do not teach them.     | fixed (the map names the part that does)            |
-| 9   | Chapter 0 and the preface described a two-part course.                                                                                                         | fixed (they describe the five parts)                |
-| 10  | Four lines were too wide by 3–11 pt (lessons 2 and 4, the motor figure).                                                                                       | fixed in lessons 1–4; three lines under 3 pt remain |
+| #   | Finding                                                                                                                                                                                                                                     | State                                               |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| 1   | Lessons 5–14 had no worked example and three to five exercises each, over five to seven pages. They did not meet §4.                                                                                                                        | fixed (rewritten to the level of 1–4)               |
+| 2   | Part II is a title page followed by nothing; its five chapter files are stubs. The cover promises thirty-five lessons.                                                                                                                      | open: 21 chapters to write                          |
+| 3   | The mathematical toolbox and the app map were stubs. Appendices A–H are written (about 80 pages, `book/back/toolbox/`); I and J follow with Part II, and the app map is still a stub. The remaining "??" are references to Part II lessons. | open: appendices I, J and the app map               |
+| 4   | The check marks of the _What to remember_ boxes were missing: the math font has no such glyph.                                                                                                                                              | fixed (drawn with TikZ)                             |
+| 5   | `main.tex` and `scripts/book-data.ts` referred to `make book`, `make book-data` and `book/README.md`, none of which existed.                                                                                                                | fixed (three make targets, the README)              |
+| 6   | The imprint named a script `book/tools/figures` that does not exist.                                                                                                                                                                        | fixed                                               |
+| 7   | No author, editor or credit anywhere in the book.                                                                                                                                                                                           | fixed (title page, imprint, colophon)               |
+| 8   | The field map of Chapter 0 listed Bode, Nyquist, root locus, Lyapunov, Pontryagin, dynamic programming and H∞ against Parts I–II, which do not teach them.                                                                                  | fixed (the map names the part that does)            |
+| 9   | Chapter 0 and the preface described a two-part course.                                                                                                                                                                                      | fixed (they describe the five parts)                |
+| 10  | Four lines were too wide by 3–11 pt (lessons 2 and 4, the motor figure).                                                                                                                                                                    | fixed in lessons 1–4; three lines under 3 pt remain |
 
 Findings 1–3 are writing work and belong to the book's own schedule.
 

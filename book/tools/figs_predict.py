@@ -240,3 +240,78 @@ def damper_spec():
     a.set_ylabel("N")
     xlab_time(a, "time after the step  [s]")
     save(f, "damper_spec")
+
+
+# ─── Lesson 5 ──────────────────────────────────────────────────────────────
+def _pid_matrix(m, kp, ki, kd):
+    """States (x, v, z): deviation, velocity, integral minus the load it must hold."""
+    return [[0, 1, 0], [-kp / m, -kd / m, 1 / m], [-ki, 0, 0]]
+
+
+@fig
+def integral_predict():
+    f, ax = plt.subplots(1, 2, figsize=(TEXT_W, 56 * MM), gridspec_kw=dict(wspace=0.34))
+    m, kp, kd, load_ = 1.4, 10.0, 7.0, 0.4 * G
+    a = ax[0]
+    t = np.linspace(0, 20, 600)
+    for name, ki, col in [("integral-ki0.8", 0.8, C["I"]), ("integral-ki5", 5.0, C["meas"])]:
+        d = win(load(name), 10, 30)
+        a.plot(d.t - 10, 2 - d["pos.y"], color=col, lw=1.4)
+        x = _linear(_pid_matrix(m, kp, ki, kd), [-load_ / kp, 0, -load_], t)
+        a.plot(t, -x[0], color=C["ink"], lw=0.8, ls=DASH)
+        a.plot(t, load_ / kp * np.exp(-ki / kp * t), color=C["accent"], lw=0.8, ls=DOT)
+    a.text(9.5, 0.215, "$K_i = 0.8$", color=C["I"], fontsize=6.6)
+    a.text(4.2, 0.06, "$K_i = 5$", color=C["meas"], fontsize=6.6)
+    a.text(19.8, 0.375, "dashed: the cubic\ndotted: $e^{-K_i t/K_p}$", color=C["muted"], fontsize=6.2, ha="right", va="top")
+    a.set_xlim(0, 20)
+    a.set_title("Paying back the payload")
+    a.set_ylabel("error  [m]")
+    xlab_time(a, "time after I is switched on  [s]")
+
+    a = ax[1]
+    for name, ki, col, sig, w in [("integral-limit-ki45", 45, C["I"], -0.0594, 2.6246),
+                                  ("integral-limit-ki55", 55, C["err"], 0.0658, 2.8407)]:
+        d = win(load(name), 10, 30)
+        a.plot(d.t - 10, 100 * d["alt.err"], color=col, lw=1.0)
+        tp, xp = _peaks(d.t.values - 10, 100 * d["alt.err"].values)
+        k = 1
+        te = np.linspace(tp[k], 20, 100)
+        a.plot(te, xp[k] * np.exp(sig * (te - tp[k])), color=C["ink"], lw=0.8, ls=DASH)
+    a.axhline(0, color=C["faint"], lw=0.5)
+    a.text(0.6, 21, "$K_i = 55$: grows", color=C["err"], fontsize=6.6)
+    a.text(8, -12.5, "$K_i = 45$: decays", color=C["I"], fontsize=6.6)
+    a.set_xlim(0, 20)
+    a.set_title("Either side of $K_i = 50$")
+    a.set_ylabel("error  [cm]")
+    xlab_time(a, "time after a 5 cm step  [s]")
+    save(f, "integral_predict")
+
+
+@fig
+def integral_locus():
+    """Root locus of m s^3 + Kd s^2 + Kp s + Ki in Ki (m = 1.4 kg, default Kp, Kd)."""
+    m, kp, kd = 1.4, 10.0, 7.0
+    kis = np.concatenate([np.linspace(0, 5, 200), np.linspace(5, 90, 500)])
+    roots = np.array([np.sort_complex(np.roots([m, kd, kp, k])) for k in kis])
+    f, a = plt.subplots(figsize=(TEXT_W, 56 * MM))
+    a.axvspan(0, 1.2, color="#FBEDEA", lw=0)
+    a.plot(roots.real, roots.imag, ".", color=C["hair"], ms=1.6)
+    for k, col, lab, dx, dy in [(0.8, C["I"], "0.8", 0.0, 0.32), (5, C["meas"], "5", 0.0, 0.32),
+                                (20, C["FF"], "20", 0.12, 0.2), (50, C["err"], "50", 0.3, 0.12)]:
+        r = np.roots([m, kd, kp, k])
+        a.plot(r.real, r.imag, "x", color=col, ms=5.5, mew=1.4)
+        top = r[np.argmax(r.imag + 1e-3 * r.real)]
+        a.text(top.real + dx, top.imag + dy, f"$K_i = {lab}$", color=col, fontsize=6.5, ha="center")
+    a.plot([np.roots([m, kd, kp])[0].real, np.roots([m, kd, kp])[1].real, 0], [0, 0, 0], "o", mfc="white",
+           color=C["ink"], ms=3.5, mew=0.8)
+    a.axhline(0, color=C["faint"], lw=0.5)
+    a.axvline(0, color=C["faint"], lw=0.5)
+    a.text(0.15, -3.3, "unstable", color=C["err"], fontsize=6.6)
+    a.text(-6.3, -3.3, "circles: $K_i = 0$", color=C["muted"], fontsize=6.4)
+    a.set_xlim(-6.5, 1.2)
+    a.set_ylim(-3.6, 3.6)
+    a.grid(False)
+    a.set_xlabel("Re $s$  [1/s]", loc="right")
+    a.set_ylabel("Im $s$  [rad/s]")
+    a.set_title("Where the three poles go as the integral gain grows ($m = 1.4$ kg)")
+    save(f, "integral_locus")

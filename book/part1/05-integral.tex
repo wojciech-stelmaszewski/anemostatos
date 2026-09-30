@@ -2,21 +2,30 @@
 \label{les:integral}
 
 \lead{\setupcard{\setuprow{Level}{L1}\setuprow{Drone}{\SI{1.4}{kg}, while the controller assumes \SI{1}{kg}}\setuprow{Controller}{P, D and feedforward; I starts off}\setuprow{Goal}{steady-state error below \SI{1}{cm}}}%
-The drone has picked up a \SI{400}{g} payload, and nobody told the controller. The feedforward still holds up one kilogram; the extra weight hangs on the spring of the P term, and the drone settles almost forty centimetres low. We already know one cure from \lessonref{les:droop}. This lesson looks at it closely: why it works, how fast it can be, and what it costs.}
+The drone has picked up a \SI{400}{g} payload, and nobody told the controller. The feedforward still holds up one kilogram; the extra weight hangs on the spring of the P term, and the drone settles almost forty centimetres low. We already know one cure from \lessonref{les:droop}. This lesson looks at it closely: why it works, how fast it can be made, where it becomes unstable, and what it costs even when it is stable.}
 
 \section{A wrong model, a constant error}
 
-The controller believes $\hat m = \SI{1}{kg}$; the drone weighs $m = \SI{1.4}{kg}$. The feedforward $\hat m g$ is short by
-\begin{equation}
-  \Delta F = (m - \hat m)\,g = 0.4 \cdot 9.81 = \SI{3.92}{N},
-\end{equation}
-and by the result of \lessonref{les:droop} the PD loop settles with
-\begin{equation}
-  e_{ss} = \frac{\Delta F}{K_p} = \frac{3.92}{10} \approx \SI{0.39}{m}.
-\end{equation}
-The simulator agrees: in \cref{fig:integral-run} the drone hovers at \SI{1.61}{m} until the integral is switched on at $t = \SI{10}{s}$.
+The controller believes $\hat m = \SI{1}{kg}$; the drone weighs $m = \SI{1.4}{kg}$. The law is the full feedback of \cref{eq:droop-ff} with the integral switched off, $T = \hat m g + K_p e - K_d\dot y$.
 
-This situation is the rule, not the exception. Real models are always a little wrong: the mass changes with the payload, the thrust per unit command falls as the battery drains, a constant wind adds a drag force. Each of these is a constant (or slowly varying) load that the feedforward does not know. We want a controller that removes the resulting error \emph{without} knowing its cause.
+\begin{example}[The payload droop]
+\label{ex:integral-offset}
+Where does the \SI{1.4}{kg} drone hover when asked for \SI{2}{m}, with $K_p = 10$ and the integral off?
+
+\textbf{Step 1 — what the feedforward misses.} It supplies $\hat m g = \SI{9.81}{N}$. The weight is $mg = 1.4 \cdot 9.81 = \SI{13.73}{N}$. The difference is the load that feedback must carry:
+\begin{equation*}
+  \Delta F = (m - \hat m)\,g = 0.4 \cdot 9.81 = \SI{3.92}{N}.
+\end{equation*}
+
+\textbf{Step 2 — the equilibrium.} At rest the D term is zero, so $K_p\,e_{ss} = \Delta F$ and
+\begin{equation*}
+  e_{ss} = \frac{\Delta F}{K_p} = \frac{3.92}{10} = \SI{0.392}{m}, \qquad y_{ss} = 2 - 0.392 = \SI{1.608}{m}.
+\end{equation*}
+
+\textbf{Step 3 — check.} The simulator's drone hovers at \SI{1.608}{m} (\cref{fig:integral-run}, grey curve).
+\end{example}
+
+This situation is the rule, not the exception. Real models are always a little wrong: the mass changes with the payload, the thrust per unit command falls as the battery drains, a constant wind adds a drag force. Each of these is a constant, or slowly varying, load that the feedforward does not know. We want a controller that removes the resulting error \emph{without} knowing its cause.
 
 \section{Why the integral must win}
 
@@ -24,9 +33,11 @@ Add the integral term, $I(t) = K_i\int_0^t e\,\dd\tau$, so that $\dot I = K_i\,e
 \begin{equation}
   K_i\,e_{ss} = 0 \qquad\Longrightarrow\qquad e_{ss} = 0 .
 \end{equation}
-That is the whole argument, and it does not mention the size of the load, the mass, the wind or even the other gains. \emph{If} the loop settles, it settles at zero error, and the integral then holds exactly the missing force: $I_{ss} = \Delta F$. \Cref{fig:integral-run} shows the green curve climbing to \SI{3.92}{N}.
+That is the whole argument (it is \cref{thm:droop-integral}), and it does not mention the size of the load, the mass, the wind or even the other gains. \emph{If} the loop settles, it settles at zero error, and the integral then holds exactly the missing force: $I_{ss} = \Delta F$. \Cref{fig:integral-run} shows the integral climbing to \SI{3.92}{N}.
 
 \simfig{integral_run}{A \SI{1.4}{kg} drone and a controller that believes it weighs \SI{1}{kg}. Top: the altitude; bottom: the integral term. With the integral off the drone hangs \SI{0.39}{m} low; with $K_i = 0.8$ it creeps up over tens of seconds; with $K_i = 5$ it arrives in about four.}{fig:integral-run}
+
+An intuition for the same fact. The P term is a worker who pushes only while being shouted at: no error, no push. The integral is a worker who remembers: each moment of error makes it push a little harder, and it keeps the push when the shouting stops. The first can never quite finish the job; the second stops only when there is nothing left to complain about.
 
 \begin{keyidea}[Integral action]
 An integrator in the loop makes a constant disturbance produce zero steady-state error, whatever its size and origin. It does so by \emph{learning} the missing force: at equilibrium the integral equals it. This is the reason almost every practical controller has an integral term — and, in a more general form (the \emph{internal model principle}), why Part~II's controllers carry integrators, observers or adaptive estimates.
@@ -34,36 +45,98 @@ An integrator in the loop makes a constant disturbance produce zero steady-state
 
 \section{How fast? The third-order loop}
 
-The word \enquote{if} above matters: an integral can also destabilise the loop. With P, I and D, the closed loop for $x = y - r$ and a constant load $\Delta F$ is
-\begin{equation}
-  m\ddot x = -K_p x - K_d\dot x - K_i\!\int\! x\,\dd t - \Delta F .
-\end{equation}
-Differentiate once to remove the integral (and the constant load):
-\begin{equation}\label{eq:integral-cubic}
-  m\dddot x + K_d\ddot x + K_p\dot x + K_i x = 0 ,\qquad
-  m s^3 + K_d s^2 + K_p s + K_i = 0 .
-\end{equation}
-For a cubic $a_3 s^3 + a_2 s^2 + a_1 s + a_0$ with positive coefficients, the Routh–Hurwitz criterion says that all roots have negative real parts if and only if
-\begin{equation}\label{eq:integral-routh}
-  a_2 a_1 > a_3 a_0 \qquad\Longleftrightarrow\qquad K_d K_p > m K_i .
-\end{equation}
-For our \SI{1.4}{kg} drone with $K_p = 10$, $K_d = 7$ the integral gain must stay below $70/1.4 = 50$. That is a generous limit, but the approach to it is not gentle: as $K_i$ grows, a pair of poles moves towards the imaginary axis and the response rings longer and longer. In practice $K_i$ is chosen far below the limit.\aside{The Routh–Hurwitz criterion is proved in the math appendix, \cref{app:routh}. For higher orders it becomes a table, but the idea is the same: stability can be decided from the coefficients without solving for the roots.}
+The word \enquote{if} above matters: an integral can also destabilise the loop. To see when, we need the equation of the closed loop with all three terms.
 
-For small $K_i$ one root of \cref{eq:integral-cubic} is real and close to $-K_i/K_p$ (Exercise~\ref*{les:droop}.3), which is the slow creep of \cref{eq:droop-tau}: with $K_i = 0.8$ a time constant of \SI{12.5}{s}, with $K_i = 5$ only \SI{2}{s}.
+\paragraph{The equation.} With $x = y - r$ (so $e = -x$), the plant $m\ddot y = T - mg$ and the full law give
+\begin{equation}\label{eq:integral-loop}
+  m\ddot x = -K_p\,x - K_d\,\dot x + I - \Delta F, \qquad \dot I = -K_i\,x .
+\end{equation}
+The first equation contains the integral, the second its derivative. Differentiate the first once and insert the second; the constant load disappears:
+\begin{equation}\label{eq:integral-cubic}
+  m\dddot x + K_d\ddot x + K_p\dot x + K_i x = 0 ,
+\end{equation}
+with the characteristic equation $m s^3 + K_d s^2 + K_p s + K_i = 0$.
+The loop is now of third order: it has three poles. A cubic has no tidy formula like $\omega_n$ and $\zeta$, but two tools from \lessonref{les:spring} still work: the Routh–Hurwitz test tells us whether the poles are in the left half-plane, and a few steps of Newton's method tell us where they are.
+
+\begin{example}[The poles of the loop with $K_i = 5$]
+\label{ex:integral-poles}
+Find the three poles for $m = 1.4$, $K_p = 10$, $K_d = 7$, $K_i = 5$, and predict how long the payload error takes to disappear.
+
+\textbf{Step 1 — the polynomial.} $p(s) = 1.4\,s^3 + 7\,s^2 + 10\,s + 5$.
+
+\textbf{Step 2 — is it stable?} \Cref{thm:spring-routh}\,(ii): all coefficients are positive, and $a_2a_1 = 7 \cdot 10 = 70$ exceeds $a_3a_0 = 1.4 \cdot 5 = 7$. Stable.
+
+\textbf{Step 3 — the real root.} A cubic with real coefficients has at least one real root. For a stable one it is negative; try $s = -3$: $p(-3) = -37.8 + 63 - 30 + 5 = 0.2$, close to zero. Improve it with Newton's method, $s \leftarrow s - p(s)/p'(s)$ with $p'(s) = 4.2\,s^2 + 14\,s + 10$: $p'(-3) = 5.8$, so $s = -3 - 0.2/5.8 = -3.034$; one more step gives $s_1 = -3.033$.
+
+\textbf{Step 4 — divide it out.} $p(s) = (s + 3.033)(1.4\,s^2 + b\,s + c)$. Comparing coefficients: $b = 7 - 1.4 \cdot 3.033 = 2.753$ and $c = 5/3.033 = 1.648$.
+
+\textbf{Step 5 — the other two.} $1.4\,s^2 + 2.753\,s + 1.648 = 0$ gives $s_{2,3} = -0.983 \pm 0.459j$: a well-damped pair with $\omega_n = \sqrt{1.648/1.4} = \SI{1.085}{rad/s}$ and $\zeta = 0.983/1.085 = 0.91$.
+
+\textbf{Step 6 — read them.} The pole at $-3.03$ decays in a third of a second. The pair is the \emph{dominant} one (\lessonref{les:damper}): the error settles in about $4/(\zeta\omega_n) = 4/0.983 = \SI{4.1}{s}$. The simulator's error is \SI{0.6}{cm} after \SI{5}{s} and below \SI{0.1}{mm} after ten.
+\end{example}
+
+For small $K_i$ the picture is different: one pole is real and close to $-K_i/K_p$ (Example~\ref{ex:droop-exact}), the slow creep of \lessonref{les:droop}. With $K_i = 0.8$ the three poles are $-0.085$ and $-2.46 \pm 0.83j$: the pair is the P–D loop almost untouched, and the single slow pole is the integral paying back the load with a time constant of \SI{11.8}{s}. \Cref{fig:integral-predict} (left) draws both predictions over the simulator's flight.
+
+\simfig{integral_predict}{Prediction next to measurement. Left: the payload error after the integral is switched on (colour), the solution of \cref{eq:integral-cubic} (dashed) and the quasi-static estimate $e^{-K_it/K_p}$ of \lessonref{les:droop} (dotted), which is good for $K_i = 0.8$ and wrong for $K_i = 5$, where the time scales are no longer apart. Right: a \SI{5}{cm} step on either side of the stability limit, with the envelopes predicted in Example~\ref{ex:integral-limit}.}{fig:integral-predict}
+
+\subsection{The limit}
+
+\begin{example}[How much integral gain is too much]
+\label{ex:integral-limit}
+Find the largest stable $K_i$ for the \SI{1.4}{kg} drone, and what happens there.
+
+\textbf{Step 1 — Routh–Hurwitz.} With positive gains, \cref{thm:spring-routh}\,(ii) requires $a_2a_1 > a_3a_0$:
+\begin{equation}\label{eq:integral-routh}
+  K_d\,K_p > m\,K_i \qquad\Longleftrightarrow\qquad K_i < \frac{K_p K_d}{m} = \frac{70}{1.4} = 50 .
+\end{equation}
+
+\textbf{Step 2 — what happens at the limit.} At $K_i = 50$ a pair of poles sits on the imaginary axis, $s = \pm j\omega$. Insert $s = j\omega$ into the cubic and separate real and imaginary parts: $-K_d\omega^2 + K_i = 0$ and $-m\omega^3 + K_p\omega = 0$. The second gives $\omega = \sqrt{K_p/m} = \SI{2.67}{rad/s}$, a period of \SI{2.35}{s}; the first then reproduces $K_i = K_d\omega^2 = 50$.
+
+\textbf{Step 3 — just inside and just outside.} For $K_i = 45$ the complex pair is at $-0.058 \pm 2.56j$ (ideal loop); for $K_i = 55$ at $+0.054 \pm 2.77j$. With the motor lag, the D filter and the sampling included the numbers become $-0.059 \pm 2.62j$ and $+0.066 \pm 2.84j$, and the limit moves from 50 to 49.6.
+
+\textbf{Step 4 — fly it.} \Cref{fig:integral-predict} (right): at $K_i = 45$ successive peaks shrink by 13\,\% every \SI{2.38}{s}, a decay rate of $\ln 0.87/2.38 = \SI{-0.060}{s^{-1}}$, as predicted. At $K_i = 55$ they grow by 11\,\% every \SI{2.22}{s}: the period is as predicted, the growth ($+0.047$) a little slower than the $+0.066$ of the linear model, because at an amplitude of \SI{15}{cm} the air drag already takes some energy out.
+\end{example}
+
+The limit of 50 is sixty times the default $K_i = 0.8$. That is a generous margin, but the approach to the limit is not gentle: \cref{fig:integral-locus} shows the complex pair bending towards the imaginary axis long before it crosses. In practice $K_i$ is chosen far below the limit.
+
+\simfig{integral_locus}{The root locus of the integral gain. At $K_i = 0$ (circles) the poles are those of the P–D loop and one at the origin — the integrator itself. A small $K_i$ moves that pole slowly to the left: the creep. A larger one makes it meet one of the others and leave the real axis; at $K_i = 50$ the pair crosses into the unstable half-plane.}{fig:integral-locus}
 
 \section{The price: overshoot you cannot avoid}
 
-In the payload experiment, the $K_i = 5$ run arrives at the setpoint without overshooting. So is integral action free? Look instead at a \emph{setpoint} step with an unchanged load (\cref{fig:integral-area}), and you will find a surprising rule.
+In the payload experiment the $K_i = 5$ run arrives at the setpoint without overshooting. So is integral action free, as long as it is stable? Look instead at a \emph{setpoint} step with an unchanged load (\cref{fig:integral-area}), and you will find a surprising rule.
 
 \simfig{integral_area}{A setpoint step with the integral on. The integral must return to the value it had before the step, so the green (positive) area of the error must be cancelled by a red (negative) one — the drone has to go above the setpoint. A larger $K_i$ makes this overshoot larger.}{fig:integral-area}
 
-Before the step the drone is in equilibrium with integral $I_0$ (the load it had learned). After the step, once everything has settled, the load is the same, so the integral must be back at $I_0$. Therefore
-\begin{equation}
+Before the step the drone is in equilibrium with the integral at some value $I_0$, the load it has learned. After the step, once everything has settled, the load is the same, so the integral must be back at $I_0$. But the integral changes only by accumulating error. Therefore
+\begin{equation}\label{eq:integral-area}
   I(\infty) - I(t_0) = K_i\int_{t_0}^{\infty} e(t)\,\dd t = 0 .
 \end{equation}
-During the climb the error is positive. For the integral of the error to vanish, the error must spend some time negative: \textbf{the drone must overshoot}. This is not a tuning mistake; it is arithmetic. A larger $K_i$ makes the integral grow more during the climb and the overshoot larger (\SI{4.9}{cm} with $K_i = 0.8$, \SI{14}{cm} with $K_i = 3$ in \cref{fig:integral-area}).
+During the climb the error is positive. For its integral to vanish, the error must spend some time negative: \textbf{the drone must overshoot}. This is not a tuning mistake; it is arithmetic.
 
-That is exactly why good controllers let the feedforward carry the known load and keep $K_i$ small: the integral then only has to learn the small unknown remainder, and the overshoot it causes stays small. And it explains the difference with the payload experiment: there the integral had to \emph{change} its value, from 0 to \SI{3.92}{N}, so no negative area was needed.
+\begin{example}[Checking the area rule, and predicting the overshoot]
+\label{ex:integral-overshoot}
+The \SI{1}{kg} drone (exact feedforward) makes a \SI{1}{m} setpoint step with $K_i = 3$. Check \cref{eq:integral-area} on the simulator's data and predict the size of the overshoot.
+
+\textbf{Step 1 — the areas in the flight.} Integrating the recorded error from the step to the end of the run gives $+\SI{0.580}{m.s}$ while the drone is below the setpoint and $-\SI{0.584}{m.s}$ while it is above: they cancel to within the accuracy of the recording.
+
+\textbf{Step 2 — the model.} With the derivative on the measurement the error obeys $m\dddot e + K_d\ddot e + K_p\dot e + K_i e = 0$ after the step (the setpoint is constant again), with the poles of $s^3 + 7s^2 + 10s + 3$: $s_1 = -5.182$, $s_2 = -1.406$, $s_3 = -0.412$ (found as in Example~\ref{ex:integral-poles}).
+
+\textbf{Step 3 — initial conditions.} Just after the step the drone has not moved: $e(0) = 1$ and $\dot e(0) = 0$. The acceleration is set by the P term alone, which has jumped to $K_p \cdot 1 = \SI{10}{N}$: $\ddot e(0) = -\ddot y(0) = -10$.
+
+\textbf{Step 4 — the solution.} $e(t) = c_1e^{s_1t} + c_2e^{s_2t} + c_3e^{s_3t}$. The three conditions are three linear equations,
+\begin{equation*}
+  c_1 + c_2 + c_3 = 1, \qquad s_1c_1 + s_2c_2 + s_3c_3 = 0, \qquad s_1^2c_1 + s_2^2c_2 + s_3^2c_3 = -10 ,
+\end{equation*}
+with the solution $c_1 = -0.523$, $c_2 = 2.095$, $c_3 = -0.571$.
+
+\textbf{Step 5 — the overshoot.} The fast terms die first and leave $e \approx -0.571\,e^{-0.412t}$: negative, and returning to zero slowly. The error crosses zero at $t = \SI{1.30}{s}$ and is most negative at $t = \SI{2.54}{s}$, where $e = \SI{-0.142}{m}$.
+
+\textbf{Step 6 — check.} The simulator: zero crossing at \SI{1.35}{s}, largest overshoot \SI{14.2}{cm} at \SI{2.63}{s}. And the area: $\int_0^\infty e\,\dd t = -c_1/s_1 - c_2/s_2 - c_3/s_3 = -0.101 + 1.489 - 1.388 = 0$, as it must be.
+\end{example}
+
+With the default $K_i = 0.8$ the same calculation gives \SI{4.7}{cm} of overshoot (the simulator: \SI{4.9}{cm}), spread over a long tail, because the slow pole is at $-0.085$.
+
+That is why good controllers let the feedforward carry the known load and keep $K_i$ small: the integral then only has to learn the small unknown remainder, and the overshoot it causes stays small. And it explains the difference with the payload experiment: there the load had changed, the integral had to \emph{change} its value from 0 to \SI{3.92}{N}, and no negative area was needed.
 
 \begin{inapp}
 \begin{itemize}[leftmargin=1.2em]
@@ -71,6 +144,7 @@ That is exactly why good controllers let the feedforward carry the known load an
   \item Goal: steady-state error below \SI{1}{cm}.
   \item The integral stores the already-scaled sum $\sum K_i e_k\Delta t$ (\src{src/control/pid.ts}), so changing $K_i$ in flight does not make the output jump — try it.
   \item The integrators are held at zero on the ground and during take-off (\src{src/engine/simulation.ts}); otherwise they would wind up before the drone even leaves the floor. Real autopilots do the same.
+  \item The info card shows the standard-form constants $T_i = K_p/K_i$ and $T_d = K_d/K_p$ next to the gains.
 \end{itemize}
 \end{inapp}
 
@@ -78,17 +152,110 @@ That is exactly why good controllers let the feedforward carry the known load an
 \begin{enumerate}
   \item Switch \It on and watch the green curve climb to about \SI{3.9}{N} in the PID-terms chart.
   \item Try $K_i = 5$: faster. Then give the drone a setpoint step (\key{↑} with \key{Shift} for \SI{1}{m}) and look for the overshoot.
-  \item Push $K_i$ to 30 and then 45, and make steps. Compare with the limit $K_i < K_d K_p/m = 50$.
+  \item Push $K_i$ to 30 and then 45, and make small steps (\key{↑}). Count how many periods the ringing lasts. Then 55.
 \end{enumerate}
 \predict{if you now remove the payload (\ui{Physics\then Mass} = \SI{1}{kg}) in mid-flight, which way does the drone jump, and what does the integral do?}
 \end{trythis}
 
+\section{The engineer's view: one more state, one more pole}
+
+\subsection{The integrator is a state}
+In \lessonref{les:meet} the state of the drone was its altitude and its velocity: the two numbers that, with the future inputs, fix its future. The controller now has a memory of its own, and the state of the \emph{loop} has three entries. With $z = I - \Delta F$, the part of the load the integral has not yet learned, \cref{eq:integral-loop} reads
+\begin{equation}\label{eq:integral-state}
+  \frac{\dd}{\dd t}\begin{pmatrix} x \\ \dot x \\ z \end{pmatrix}
+  = \underbrace{\begin{pmatrix} 0 & 1 & 0 \\ -K_p/m & -K_d/m & 1/m \\ -K_i & 0 & 0 \end{pmatrix}}_{A}
+  \begin{pmatrix} x \\ \dot x \\ z \end{pmatrix},
+\end{equation}
+with $\det(s\Id - A) = s^3 + \frac{K_d}{m}s^2 + \frac{K_p}{m}s + \frac{K_i}{m}$.
+The poles of Example~\ref{ex:integral-poles} are the eigenvalues of this matrix. The unknown load does not appear in $A$: it only shifts the point where $z$ is zero. That is the formal content of \enquote{the integral learns the load}.
+
+\subsection{What each pole is doing}
+\Cref{fig:integral-locus} is the path of the three eigenvalues as $K_i$ grows, and it tells the whole story of tuning an integral.
+\begin{itemize}
+  \item \emph{Small $K_i$.} Two poles are the mass–spring–damper of \lessonref{les:damper}, one is slow and real, near $-K_i/K_p$. The loop behaves like a P–D loop whose target is being corrected slowly.
+  \item \emph{Moderate $K_i$.} The slow pole has moved left and met one of the others; a complex pair forms. The integral is now as fast as the loop itself and takes part in its oscillation.
+  \item \emph{Large $K_i$.} The pair approaches the imaginary axis and crosses it at $K_i = K_pK_d/m$.
+\end{itemize}
+The limit has a physical reading. At the crossing the loop oscillates at $\omega = \sqrt{K_p/m}$, the natural frequency of the spring. There the integral of a sinusoid lags it by a quarter period — it pushes in phase with the velocity, like the late spring of \cref{eq:spring-lag} — and the damper pushes against the velocity. The loop is stable as long as the damper wins: $K_d\,\omega > K_i/\omega$, which is $K_i < K_d\,\omega^2 = K_pK_d/m$ again.
+
+\begin{keyidea}[An integrator costs stability]
+Every integrator in a loop delays its reaction by a quarter of a period at every frequency. One of them, used gently, buys zero steady-state error. Used strongly, or stacked, it destabilises. The practical rule: keep the integral's time scale $K_p/K_i$ several times slower than the loop's own settling time.
+\end{keyidea}
+
+\subsection{The same idea on four wheels}
+
+\begin{example}[Cruise control on a hill]
+\label{ex:integral-cruise}
+A \SI{1500}{kg} car cruises at constant speed when the road starts to climb at 5\,\%. Its speed controller commands a driving force from the speed error $e = v_{sp} - v$. Compare a P controller with $K_p = \SI{800}{N/(m/s)}$ with a PI controller.
+
+\textbf{Step 1 — the plant.} Newton: $m\dot v = u - F$, where $F = mg\sin\alpha \approx 1500 \cdot 9.81 \cdot 0.05 = \SI{736}{N}$ is the extra force of the hill. One integrator, from force to speed, where the drone has two.
+
+\textbf{Step 2 — P alone.} At constant speed $K_p e_{ss} = F$: $e_{ss} = 736/800 = \SI{0.92}{m/s}$, about \SI{3.3}{km/h} too slow for as long as the hill lasts — the droop of \lessonref{les:droop}.
+
+\textbf{Step 3 — PI.} $u = K_p e + K_i\int e$. Differentiating $m\dot v = u - F$ with a constant setpoint: $m\ddot e + K_p\dot e + K_i e = 0$. A second-order loop, with $\omega_n = \sqrt{K_i/m}$ and $\zeta = K_p/(2\sqrt{K_i m})$. It is stable for every positive $K_i$: a first-order plant needs no D term.
+
+\textbf{Step 4 — choose $K_i$.} For critical damping, $K_i = K_p^2/(4m) = 640\,000/6000 = \SI{107}{N/m}$. Then $\omega_n = \SI{0.267}{rad/s}$, and by Example~\ref{ex:damper-crit} the error is gone after $5.83/0.267 = \SI{22}{s}$. The integral ends at \SI{736}{N}: it has learned the hill.
+
+\textbf{Step 5 — and at the crest.} When the road levels out, the integral still holds \SI{736}{N} and the car speeds up until the integral has unlearned it. The area rule \eqref{eq:integral-area} in reverse.
+\end{example}
+
+\subsection{In formal terms}
+Three statements carried this lesson.
+
+\begin{theorem}[Stability of the PID altitude loop]
+\label{thm:integral-stability}
+For $m, K_p, K_d > 0$ the origin of \cref{eq:integral-state} is asymptotically stable if and only if
+\begin{equation*}
+  0 < K_i < \frac{K_p\,K_d}{m} .
+\end{equation*}
+\end{theorem}
+\begin{proof}
+The characteristic polynomial is $m s^3 + K_d s^2 + K_p s + K_i$; apply \cref{thm:spring-routh}\,(ii) and \cref{thm:spring-linear}.
+\end{proof}
+
+The hypothesis is the ideal loop. The motor lag adds a fourth pole and lowers the bound a little (Example~\ref{ex:integral-limit}); saturation removes the equilibrium altogether if the load is too large (\lessonref{les:windup}).
+
+\begin{theorem}[The area rule]
+\label{thm:integral-area}
+Let a loop contain the integrator $\dot I = K_i e$, $K_i \ne 0$, and let it be at an equilibrium with $I = I_0$ before $t_0$. Suppose that after a change of the setpoint at $t_0$ the loop converges to an equilibrium that requires the same actuator command, and that at both equilibria all other terms of the command vanish or are equal. Then
+\begin{equation*}
+  \int_{t_0}^{\infty} e(t)\,\dd t = 0 .
+\end{equation*}
+In particular, if $e$ is continuous and not identically zero, it changes sign: a step response has overshoot.
+\end{theorem}
+\begin{proof}
+At both equilibria the command is $u^* = \hat m g + I$ (P and D are zero at rest), so $I(\infty) = I_0$. And $I(\infty) - I_0 = K_i\int_{t_0}^\infty e\,\dd t$ by the fundamental theorem of calculus; the integral converges because $e \to 0$ exponentially near an asymptotically stable equilibrium.
+\end{proof}
+
+Nothing in the proof is linear: the rule holds with drag, with saturation during the transient, with any other terms in the controller, as long as the loop settles. It does not apply when the load changes, because then $I(\infty) \ne I_0$ — which is why the payload response of \cref{fig:integral-run} has no overshoot.
+
+\begin{theorem}[An integrator is necessary]
+\label{thm:integral-imp}
+Let a linear time-invariant controller $\dot{\vx}_c = A_c\vx_c + B_c e$, $u = C_c\vx_c + D_c e$ keep the altitude loop at an equilibrium with $e = 0$ for \emph{every} constant load $d$. Then $A_c$ has the eigenvalue zero: the controller contains an integrator.
+\end{theorem}
+\begin{proof}
+At such an equilibrium $e = 0$, so $A_c\vx_c = 0$ and $u = C_c\vx_c$. The plant at rest needs $u = mg - d$, which is non-zero for almost every $d$; hence $\vx_c \ne 0$ with $A_c\vx_c = 0$, and $A_c$ is singular.
+\end{proof}
+
+This is the simplest case of the internal model principle (Francis and Wonham, 1976): perfect rejection of a class of disturbances requires a model of that class inside the controller. The cure of \lessonref{les:droop} was therefore not one option among several. Every controller in this book that removes a constant load — the PID, the LQI of Part~II, the disturbance observers, the adaptive laws — contains an integrator somewhere, under one name or another.
+
+\begin{lookahead}
+\begin{itemize}[leftmargin=1.2em]
+  \item The integrator as one more state, with a gain chosen together with the others by an optimisation, is Lesson~II.3. A \emph{disturbance observer} does the same job ten times faster by estimating the load from the motion (Lessons~II.5–II.8), and an adaptive law does it with a guarantee on the transient (II.18).
+  \item \Cref{fig:integral-locus} becomes a live chart in Lesson~III.2: drag $K_i$ and watch the three poles move.
+  \item The area rule is a first example of a \emph{conservation law} of feedback: what is gained in one place is paid for in another. Lesson~III.5 proves the most famous one, Bode's sensitivity integral.
+  \item What the integral does while the motors are at their limit is the next lesson.
+  \item A satellite's reaction wheels integrate too: a constant disturbance torque, from sunlight or the thin atmosphere, makes their speed grow steadily until they must be unloaded (Lesson~IV.19). An aircraft holds its altitude against a change of weight with the integral of its autopilot, and its \emph{trim} is that integral moved by hand (IV.11).
+\end{itemize}
+\end{lookahead}
+
 \begin{remember}
 \begin{itemize}
-  \item A constant unmodelled load leaves a PD loop with an error $\Delta F/K_p$.
-  \item An integral can only be at rest when the error is zero, so a stable PID loop removes any constant load; the integral ends up equal to the load.
-  \item P, I and D on a mass give a third-order loop; it is stable iff $K_d K_p > m K_i$.
-  \item After a setpoint step with unchanged load, integral action \emph{must} overshoot. Keep $K_i$ small and let feedforward carry the known load.
+  \item A constant unmodelled load leaves a P–D loop with the error $\Delta F/K_p$.
+  \item An integral can only be at rest when the error is zero; the integral then equals the load. A controller without an integrator cannot do this for every load.
+  \item P, I and D on a mass give a third-order loop, $m s^3 + K_d s^2 + K_p s + K_i$. It is stable iff $0 < K_i < K_pK_d/m$, and at the limit it oscillates at $\sqrt{K_p/m}$.
+  \item For small $K_i$ the integral adds one slow pole near $-K_i/K_p$; for larger $K_i$ it joins the oscillation.
+  \item After a setpoint step with an unchanged load, $\int e\,\dd t = 0$: the response \emph{must} overshoot. Keep $K_i$ small and let the feedforward carry the known load.
 \end{itemize}
 \end{remember}
 
@@ -107,10 +274,20 @@ The Navy did not adopt it then; helmsmen were cheap and the equipment was not. B
 \answer{The error goes to zero and the integral holds the extra load: $I_{ss} = +\SI{1.2}{N}$ (upwards).}
 \exercise[1] Convert the default gains $K_p = 10$, $K_i = 0.8$, $K_d = 7$ to the standard form $K_p(e + \tfrac1{T_i}\int e + T_d\dot e)$.
 \answer{$T_i = K_p/K_i = \SI{12.5}{s}$, $T_d = K_d/K_p = \SI{0.7}{s}$.}
-\exercise[2] Prove the Routh–Hurwitz condition for the cubic $s^3 + a_2 s^2 + a_1 s + a_0$ at the boundary: show that it has a pair of roots $\pm j\omega$ exactly when $a_2 a_1 = a_0$, and find $\omega$.
-\answer{Substitute $s = j\omega$: $-j\omega^3 - a_2\omega^2 + j a_1\omega + a_0 = 0$. Real part: $a_0 = a_2\omega^2$; imaginary part: $\omega^2 = a_1$. Both hold iff $a_0 = a_2 a_1$, with $\omega = \sqrt{a_1}$.}
-\exercise[2] For the \SI{1.4}{kg} drone with $K_p=10$, $K_d=7$, at which $K_i$ does the loop oscillate forever, and with which period?
-\answer{Normalise by $m$: $a_2 = 5$, $a_1 = 7.14$, $a_0 = K_i/1.4$. Boundary $a_0 = a_2a_1$ gives $K_i = 50$; $\omega = \sqrt{7.14} = \SI{2.67}{rad/s}$, period \SI{2.35}{s}.}
-\exercise[3] Show the overshoot rule more generally: for any stable loop with an integrator, a unit setpoint step and no change of load, $\int_{t_0}^\infty e\,\dd t = 0$ — even if the loop is not linear, as long as it settles. Why does the rule not force overshoot when the load changes?
-\answer{The integral state is $I = K_i\int e$; before the step and after settling the plant is in the same equilibrium with the same load, which requires the same thrust and hence (P and D being zero at rest) the same $I$. So $\Delta I = K_i\int e = 0$. If the load changes by $\Delta F$, then $\Delta I = \Delta F$ and $\int e = \Delta F/K_i \neq 0$: a one-signed error is allowed.}
+\exercise[1] For the \SI{1}{kg} drone with the default $K_p$ and $K_d$, what is the largest stable $K_i$, and with which period does the loop oscillate there?
+\answer{$K_i < 70$; $\omega = \sqrt{10} = \SI{3.16}{rad/s}$, period \SI{1.99}{s}.}
+\exercise[2]\exkind{derive} Repeat Example~\ref{ex:integral-poles} for $K_i = 20$: find the real pole by Newton's method from the guess $s = -4$, then the complex pair, its $\zeta$, and the overshoot you would expect from \cref{eq:damper-mp}.
+\answer{$p(-4) = -89.6 + 112 - 40 + 20 = 2.4$, $p'(-4) = 21.2$, $s \to -4.113$, then $-4.108$. Quadratic $1.4s^2 + 1.249s + 4.869$: $s = -0.446 \pm 1.81j$, $\omega_n = 1.865$, $\zeta = 0.24$, overshoot about 46\,\% of the oscillatory part.}
+\exercise[2]\exkind{derive} Show directly, without the Routh–Hurwitz theorem, that the cubic $s^3 + a_2 s^2 + a_1 s + a_0$ has a pair of roots $\pm j\omega$ exactly when $a_2 a_1 = a_0$, and find $\omega$.
+\answer{$s = j\omega$: real part $a_0 = a_2\omega^2$, imaginary part $\omega^2 = a_1$. Both hold iff $a_0 = a_2a_1$, with $\omega = \sqrt{a_1}$.}
+\exercise[2]\exkind{derive} Use the solution of Example~\ref{ex:integral-overshoot} to show that the area under the positive part of the error is $\int_0^{t_1} e\,\dd t$ with $t_1 = \SI{1.30}{s}$, and evaluate it. Compare with the \SI{0.580}{m.s} of the flight.
+\answer{$\int_0^{t_1} e\,\dd t = \sum_i c_i(e^{s_it_1} - 1)/s_i = \SI{0.574}{m.s}$; the flight has \SI{0.580}{m.s}. The negative part is then $-0.574$ by the area rule.}
+\exercise[2]\exkind{derive} In Example~\ref{ex:integral-cruise} the car's speed controller is PI on a first-order plant. Show that it is stable for all positive gains, find $K_i$ for $\zeta = 0.7$ with $K_p = 800$, and the overshoot in speed after a setpoint change of \SI{10}{km/h}, if the P term acts on the error.
+\answer{$ms^2 + K_ps + K_i$: positive coefficients, stable (\cref{thm:spring-routh}\,(i)). $K_i = K_p^2/(4\zeta^2m) = \SI{218}{N/m}$. The closed loop from setpoint has a zero at $-K_i/K_p$, so the overshoot is larger than the 4.6\,\% of \cref{eq:damper-mp}; solving the step response gives about 21\,\%, i.e.\ \SI{2.1}{km/h}.}
+\exercise[2]\exkind{fly} In Lesson~5 switch the integral on with $K_i = 5$, wait until the error is below \SI{1}{cm}, and press \key{Snapshot}. Then set $K_i = 45$ and reset. Read the period of the ringing from the chart and the ratio of two successive peaks, and compare with Example~\ref{ex:integral-limit}. Finally set \ui{Physics\then Mass} to \SI{1}{kg}: where is the limit now?
+\answer{Period about \SI{2.4}{s}, peak ratio about 0.87. With $m = 1$ the limit is 70.}
+\exercise[2]\exkind{code} In \src{src/control/pid.ts} the integral is stored already multiplied by $K_i$ (\texttt{this.integral += g.ki * error * dt}). Rewrite it to store $\int e\,\dd t$ and multiply by $K_i$ when the output is formed. Predict what the thrust does when $K_i$ is changed from 0.8 to 5 in the hover of this lesson (integral at \SI{3.92}{N}), then try it. Which of the tests in \texttt{tests/pid.test.ts} notices?
+\answer{The stored sum is $3.92/0.8 = \SI{4.9}{m.s}$; multiplied by the new gain it gives \SI{24.5}{N} at once — a jump of \SI{20.6}{N} that throws the drone upwards. The test of bumpless gain changes fails.}
+\exercise[3]\exkind{derive} Two integrators. A controller $u = K_p e + K_i\int e + K_{ii}\iint e$ would follow a ramping load without error (\lessonref{les:droop}). Write the characteristic polynomial of the altitude loop with it and D, and show that for $K_{ii} > 0$ the necessary condition of \cref{thm:spring-routh}\,(iii) is met but stability needs more. Using the Routh table for degree four, or the condition $a_1(a_3a_2 - a_4a_1) > a_3^2a_0$, find the range of $K_{ii}$ for the default gains.
+\answer{$m s^4 + K_d s^3 + K_p s^2 + K_i s + K_{ii}$. Degree-four Hurwitz: $a_3a_2 > a_4a_1$ and $a_1(a_3a_2 - a_4a_1) > a_3^2a_0$: $0.8(70 - 0.8) > 49K_{ii}$, so $K_{ii} < 1.13$ with $K_i = 0.8$ — a narrow window; a larger $K_i$ widens it up to a point.}
 \end{exercises}

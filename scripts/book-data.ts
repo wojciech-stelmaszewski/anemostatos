@@ -367,6 +367,120 @@ add({
   },
 });
 
+// ─── Part I, lessons 5–14: experiments behind the predictions of the book ──────────────────────
+// Lesson 5: the integral gain near its Routh limit K_i < K_p K_d / m = 50 (m = 1.4 kg, small step).
+for (const ki of [20, 45, 55])
+  add({
+    name: `integral-limit-ki${ki}`,
+    seconds: 30,
+    setup: (p) => {
+      calm(p);
+      p.drone.mass = 1.4;
+      p.control.model.mass = 1.4;
+      alt(p, { ki, antiWindup: 'none' });
+    },
+    events: (s) => at(s, 10, 'setpoint.y', 2.05),
+  });
+// Lesson 6: back-calculation with a gentle tracking gain, and the hard limit on the integral.
+add({
+  name: 'windup-kb0.3',
+  seconds: 30,
+  setup: (p) => {
+    calm(p);
+    p.drone.maxMotorThrust = 3;
+    alt(p, { ki: 3, antiWindup: 'back-calculation', kb: 0.3 });
+  },
+  events: (s) => at(s, 8, 'setpoint.y', 6),
+});
+add({
+  name: 'windup-ilimit',
+  seconds: 30,
+  setup: (p) => {
+    calm(p);
+    p.drone.maxMotorThrust = 3;
+    alt(p, { ki: 3, antiWindup: 'integral-limit', iLimit: 3 });
+  },
+  events: (s) => at(s, 8, 'setpoint.y', 6),
+});
+// Lesson 7: the kick spread out by the D filter, and removed by a setpoint ramp.
+add({
+  name: 'kick-error-f5',
+  seconds: 20,
+  setup: (p) => {
+    calm(p);
+    alt(p, { derivativeOn: 'error', dFilterHz: 5 });
+    square(0.5, 6)(p);
+  },
+});
+add({
+  name: 'kick-ramp',
+  seconds: 20,
+  setup: (p) => {
+    calm(p);
+    alt(p, { derivativeOn: 'error', dFilterHz: 0 });
+    p.setpoint.rateLimit = 1;
+  },
+  events: (s) => {
+    at(s, 9, 'setpoint.y', 3);
+    at(s, 14, 'setpoint.y', 2);
+  },
+});
+// Lesson 8: more cutoffs, for the curve of D-term noise against the filter.
+for (const hz of [50, 10, 2])
+  add({
+    name: `noise-f${hz}`,
+    seconds: 20,
+    setup: (p) => {
+      calm(p);
+      p.sensors.posNoise = 0.01;
+      alt(p, { dFilterHz: hz });
+    },
+  });
+// Lesson 9: closer to the edge, in rate and in delay.
+for (const hz of [4, 3])
+  add({
+    name: `slow-${hz}hz`,
+    seconds: 30,
+    setup: (p) => {
+      calm(p);
+      square(0.5, 8)(p);
+      p.control.rateHz = hz;
+    },
+  });
+for (const ms of [50, 130, 150, 170])
+  add({
+    name: `slow-delay${ms}`,
+    seconds: 30,
+    setup: (p) => {
+      calm(p);
+      square(0.5, 8)(p);
+      p.sensors.delayMs = ms;
+    },
+  });
+// Lesson 10: small steps (5 cm, no saturation) across the predicted edge K_p ≈ 200 at K_d = 7.
+for (const kp of [50, 100, 150, 180, 200, 220, 250, 300])
+  add({
+    name: `edge-small-kp${kp}`,
+    seconds: 14,
+    setup: (p) => {
+      calm(p);
+      alt(p, { iOn: false, kp });
+    },
+    events: (s) => at(s, 6, 'setpoint.y', 2.05),
+  });
+// Lesson 14: one position step with a fast, a medium and a soft attitude loop.
+for (const k of [3, 1.5])
+  add({
+    name: `inversion-step-att${k}`,
+    seconds: 18,
+    setup: (p) => {
+      l3(p);
+      calm(p);
+      p.control.l3.attKpRP = k;
+    },
+    events: (s) => s.schedule(10, (x) => x.setTarget(v3(1, 2, 0))),
+  });
+
 // ─── Part II · A ───────────────────────────────────────────────────────────
 for (const [kp, kd] of [
   [10, 2],

@@ -14,7 +14,8 @@ const pureCore = [
 ];
 
 export default tseslint.config(
-  { ignores: ['dist', 'node_modules'] },
+  // .claude holds git worktrees of this repository: copies with their own tsconfig.
+  { ignores: ['dist', 'node_modules', '.claude'] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ['**/*.{ts,tsx}'],

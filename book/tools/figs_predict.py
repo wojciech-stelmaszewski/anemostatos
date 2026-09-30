@@ -753,3 +753,44 @@ def cascade_predict():
     a.set_ylabel("degrees")
     xlab_time(a, "time after the step  [s]")
     save(f, "cascade_predict")
+
+
+@fig
+def inversion_predict():
+    f, ax = plt.subplots(1, 2, figsize=(TEXT_W, 58 * MM), gridspec_kw=dict(wspace=0.34, width_ratios=[1.35, 1]))
+    a = ax[0]
+    for k, name, col in [(8, "cascade-step", C["faint"]), (3, "inversion-step-att3", C["meas"]),
+                         (1.5, "inversion-step-att1.5", C["err"])]:
+        d = win(load(name), 9.7, 18)
+        a.plot(d.t - 10, d["pos.x"], color=col, lw=1.4)
+        t, x, *_ = cascade_model(att_kp=k, t_end=8)
+        a.plot(t, x, color=C["ink"], lw=0.7, ls=DASH)
+    a.axhline(1, color=C["sp"], lw=0.8, ls=DASH)
+    a.text(6.1, 1.72, "$K_{att} = 1.5$", color=C["err"], fontsize=6.4)
+    a.text(1.6, 1.33, "3", color=C["meas"], fontsize=6.4)
+    a.text(0.25, 1.12, "8", color=C["muted"], fontsize=6.4)
+    a.set_xlim(-0.3, 8)
+    a.set_ylim(-0.05, 1.9)
+    a.set_title("A 1 m step with softer attitude loops")
+    a.set_ylabel("$x$  [m]")
+    xlab_time(a, "time after the step  [s]")
+
+    a = ax[1]
+    kv, ki = 2.2, 0.6
+    kx = np.linspace(0.2, 3.2, 200)
+    c = kv * kx + ki
+    edge = c**2 / (c * kv - ki * kx)
+    a.fill_between(kx, edge, 12, color="#E8F4EE", lw=0)
+    a.plot(kx, edge, color=C["I"], lw=1.2)
+    a.plot(kx, 4 * kv * np.ones_like(kx), color=C["faint"], lw=0.7, ls=DOT)
+    for k, col in [(8, C["muted"]), (3, C["meas"]), (1.5, C["err"])]:
+        a.plot(1.2, k, "o", color=col, ms=4)
+    a.text(0.3, 9.1, "four times the velocity gain", color=C["muted"], fontsize=6.0)
+    a.text(1.9, 6.2, "stable", color=C["I"], fontsize=7)
+    a.text(2.05, 1.2, "unstable", color=C["err"], fontsize=6.4)
+    a.set_xlim(0.2, 3.2)
+    a.set_ylim(0, 11)
+    a.set_xlabel("position gain $K_x$  [1/s]", loc="right")
+    a.set_ylabel("attitude gain $K_{att}$  [1/s]")
+    a.set_title("The edge of Example 14.2")
+    save(f, "inversion_predict")

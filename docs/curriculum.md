@@ -179,8 +179,8 @@ collected at the end. The appendix (`book/back/math.tex`) is planned as:
 
 First checked on the build of commit `8e1df9c` (127 pages): the sources,
 the build log and the rendered pages. Lessons 1–4 were then rebuilt to the
-full standard of §4; the book now has 146 pages after the layout pass
-(no half-empty pages inside lessons 1–4).
+full standard of §4, and lessons 5–14 after them; Part I is complete and
+the book now has 209 pages.
 
 **What is good.** The design system is consistent and carries the app's
 colours. Chapter 0 and the Prelude are complete. Lessons 1–4 meet the
@@ -197,7 +197,7 @@ eleven seconds.
 
 | #   | Finding                                                                                                                                                        | State                                               |
 | --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
-| 1   | Lessons 5–14 have no worked example and three to five exercises each, over five to seven pages. They do not meet §4.                                           | open: bring them to the level of 1–4                |
+| 1   | Lessons 5–14 had no worked example and three to five exercises each, over five to seven pages. They did not meet §4.                                           | fixed (rewritten to the level of 1–4)               |
 | 2   | Part II is a title page followed by nothing; its five chapter files are stubs. The cover promises thirty-five lessons.                                         | open: 21 chapters to write                          |
 | 3   | The mathematical toolbox and the app map are stubs. Ten cross-references print as "??" (four to appendices, six to Part II lessons). The references now exist. | open: appendices A–H for volume 1                   |
 | 4   | The check marks of the _What to remember_ boxes were missing: the math font has no such glyph.                                                                 | fixed (drawn with TikZ)                             |

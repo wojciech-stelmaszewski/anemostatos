@@ -2,46 +2,119 @@
 \label{les:inversion}
 
 \lead{\setupcard{\setuprow{Level}{L3}\setuprow{Controller}{the cascade, default tune}\setuprow{Setpoint}{a square wave of $\pm\SI{1.5}{m}$ sideways, a step every \SI{4}{s}}\setuprow{Chart}{the pitch attitude loop}}%
-The cascade rests on one assumption: when the velocity loop asks for a tilt, the tilt is there almost at once. This last lesson of Part~I breaks the assumption on purpose. Slow the attitude loop down until the loops around it are faster than it is, and watch the whole structure come apart.}
+The cascade rests on one assumption: when the velocity loop asks for a tilt, the tilt is there almost at once. This last lesson of Part~I breaks the assumption on purpose, in two different ways. Slow the attitude loop down until the loops around it are faster than it is, and watch the whole structure come apart — at a point that the tools of Lessons~5, 9 and~10 predict.}
 
 \section{What the outer loop believes}
 
-The velocity loop of \lessonref{les:cascade} computes a desired acceleration and hands it on as a tilt. It never checks how long the tilt takes. Implicitly it assumes that its command is executed instantly — that it drives an ideal actuator. Let us make that assumption explicit and then relax it.
+The velocity loop of \lessonref{les:cascade} computes a desired acceleration and hands it on as a tilt. It never checks how long the tilt takes. It behaves as if it drove an ideal actuator. Let us make that belief explicit, and then see what happens as it becomes false.
 
-Model the closed attitude loop as a first-order lag with time constant $\tau_{att}$: the tilt $\theta$ follows its setpoint as $\tau_{att}\dot\theta + \theta = \theta_{sp}$. Horizontally, for small angles, the acceleration is $g\theta$. The velocity loop with a proportional gain $K_v$ then sees
-\begin{equation}
-  \dot v = g\,\theta,\qquad \tau_{att}\dot\theta + \theta = \frac{K_v}{g}\,(v_{sp} - v),
+Model the closed attitude loop, as in Example~\ref{ex:cascade-scales}, as a first-order lag: the horizontal acceleration $a$ follows its setpoint with the time constant $1/K_{att}$,
+\begin{equation}\label{eq:inv-lag}
+  \dot a = K_{att}\,(a_{sp} - a).
 \end{equation}
-and eliminating $\theta$ gives
-\begin{equation}\label{eq:inv-loop}
-  \tau_{att}\,\ddot v + \dot v + K_v\,v = K_v\,v_{sp} .
+Around it are the two outer loops of the cascade. To begin with, take both as pure P loops: $a_{sp} = K_v(v_{sp} - v)$ and $v_{sp} = K_x(x_{sp} - x)$.
+
+\begin{example}[Three loops, one polynomial]
+\label{ex:inv-cubic}
+Find the condition on $K_{att}$ for the chain to be stable.
+
+\textbf{Step 1 — the chain.} $\dot x = v$, $\dot v = a$, and \cref{eq:inv-lag}.
+
+\textbf{Step 2 — one equation.} Insert the setpoints: $\dot a = K_{att}\big(K_v(K_x(x_{sp} - x) - v) - a\big)$. With $v = \dot x$, $a = \ddot x$ and $\dot a = \dddot x$:
+\begin{equation}\label{eq:inv-cubic}
+  \dddot x + K_{att}\,\ddot x + K_{att}K_v\,\dot x + K_{att}K_vK_x\,x = K_{att}K_vK_x\,x_{sp} .
 \end{equation}
-With an ideal inner loop ($\tau_{att} = 0$) this is a first-order system with the pole $-K_v$: perfectly well behaved at any gain. With a lagging inner loop it is second order, with
-\begin{equation}
-  \omega_n = \sqrt{K_v/\tau_{att}},\qquad \zeta = \frac{1}{2\sqrt{K_v\,\tau_{att}}} .
-\end{equation}
-The damping depends only on the product of the outer gain and the inner time constant. Good damping, $\zeta \ge 0.7$, requires
+
+\textbf{Step 3 — Routh–Hurwitz.} \Cref{thm:spring-routh}\,(ii) with $a_3 = 1$, $a_2 = K_{att}$, $a_1 = K_{att}K_v$, $a_0 = K_{att}K_vK_x$: the condition $a_2a_1 > a_3a_0$ is $K_{att}^2K_v > K_{att}K_vK_x$, i.e.
 \begin{equation}\label{eq:inv-rule}
-  K_v\,\tau_{att} \le 0.5 ,\qquad\text{i.e.}\qquad \tau_{att} \le \frac{1}{2K_v}.
+  K_{att} > K_x .
 \end{equation}
-Roughly: the inner loop must be at least twice as fast as the outer loop's own time constant $1/K_v$ — and in practice, with all the other lags and the position loop around the velocity loop, five to ten times.
+
+\textbf{Step 4 — read it.} The velocity gain has dropped out. The innermost loop of the three must be faster than the \emph{outermost}: a time constant $1/K_{att}$ shorter than $1/K_x = \SI{0.83}{s}$. At equality the chain oscillates at $\omega = \sqrt{a_1/a_3} = \sqrt{K_{att}K_v}$.
+
+\textbf{Step 5 — and for good damping.} Stability is the least one can ask. \Cref{thm:cascade-nested} asked for a factor of four between neighbours to avoid overshoot; here that would be $K_{att} \ge 4K_v \ge 16K_x$.
+\end{example}
 
 \begin{keyidea}[The inner loop is part of the outer loop's plant]
 An outer loop does not control the physical plant; it controls the \emph{closed inner loop}. If the inner loop is slow, the outer loop's plant has an extra lag, and all the results of \lessonref{les:slow} and \lessonref{les:edge} apply: lag costs phase, phase costs stability. Time-scale separation is the condition under which the inner loop may be ignored.
 \end{keyidea}
 
-\section{Two ways to break it}
+\section{First way to break it: a soft attitude loop}
 
-The lesson flies a square wave of $\pm\SI{1.5}{m}$ in $x$, and offers two experiments (\cref{fig:inversion-runs}).
+Keep every rate as it is and lower the attitude gain from 8 to 1.5. The attitude loop still runs 250 times per second, but it now needs $1/1.5 = \SI{0.67}{s}$ to reach a tilt it has been asked for — almost as long as the position loop's \SI{0.83}{s}.
 
-\paragraph{Slow sampling of the attitude loop.} Lower the attitude loop's rate from \SI{250}{Hz} to 10, 5, \SI{3}{Hz}. The attitude P law itself is unchanged, but its commands now arrive in a staircase with delays of a hundred milliseconds and more. At \SI{10}{Hz} the flight is still recognisable; at \SI{5}{Hz} the pitch swings through $\pm50^\circ$; at \SI{3}{Hz} it reaches $80^\circ$ and the position wobbles around its setpoint. A little further, at \SI{2}{Hz}, the drone flips.
+By \cref{eq:inv-rule} the chain should still be stable: $1.5 > 1.2$. But the real velocity loop has an integral, and an integral, as \lessonref{les:integral} showed, costs stability.
 
-\paragraph{A soft attitude gain.} Keep \SI{250}{Hz}, but lower the attitude gain from 8 to 1.5. The attitude loop is now slow in the sense of \cref{eq:inv-rule} — a time constant of roughly $1/K_{att} \approx \SI{0.7}{s}$. Nothing is unstable, but the position overshoots on every step (violet curve): the velocity loop keeps asking for more tilt because the tilt it asked for has not arrived yet.
+\begin{example}[The edge with the velocity integral]
+\label{ex:inv-quartic}
+Include the velocity loop's integral, $a_{sp} = K_v(v_{sp} - v) + K_i\!\int(v_{sp} - v)\,\dd t$ with $K_i = \SI{0.6}{s^{-2}}$, and find the smallest stable $K_{att}$.
 
-\widefig{inversion_runs}{Breaking the time-scale separation. Top: the position response to a square wave in $x$. Bottom: the pitch angle. As the attitude loop slows from \SI{250}{Hz} to \SI{3}{Hz} its sampling delay approaches the time scale of the velocity loop; the pitch swings up to $80^\circ$ and the position wobbles. A soft attitude gain (violet) causes overshoot instead of wobble.}{fig:inversion-runs}
+\textbf{Step 1 — the polynomial.} Differentiating once to remove the integral raises the order to four:
+\begin{equation}\label{eq:inv-quartic}
+  s^4 + K_{att}\,s^3 + K_{att}K_v\,s^2 + K_{att}\,c\;s + K_{att}K_iK_x = 0, \qquad c = K_vK_x + K_i .
+\end{equation}
+(The term in $s$ collects $\dot x$ from both the P path, $K_vK_x$, and the I path, $K_i$.) With the default gains $c = 2.2 \cdot 1.2 + 0.6 = 3.24$.
+
+\textbf{Step 2 — the test for degree four.} All coefficients positive, $a_3a_2 > a_4a_1$, and $a_1(a_3a_2 - a_4a_1) > a_3^2a_0$ (the last exercise of \lessonref{les:integral}). The last one decides:
+\begin{equation*}
+  K_{att}c\,\big(K_{att}^2K_v - K_{att}c\big) > K_{att}^3K_iK_x
+  \quad\Longleftrightarrow\quad
+  K_{att} > \frac{c^2}{c\,K_v - K_iK_x} .
+\end{equation*}
+
+\textbf{Step 3 — numbers.} $c^2 = 10.50$, $cK_v - K_iK_x = 7.13 - 0.72 = 6.41$: the chain is stable only for $K_{att} > 1.64$.
+
+\textbf{Step 4 — at the edge.} As in Example~\ref{ex:integral-limit}, the poles on the imaginary axis are at $\omega^2 = a_1/a_3 = c = 3.24$: $\omega = \SI{1.8}{rad/s}$, a period of \SI{3.49}{s}.
+
+\textbf{Step 5 — the three runs.} Solving \cref{eq:inv-quartic}:
+\begin{center}\small\sffamily
+\begin{tabular}{rlrr}
+\toprule
+$K_{att}$ & oscillating poles & period & change per period\\
+\midrule
+8 & $-1.03 \pm 1.67j$ & \SI{3.8}{s} & $\times\,0.02$\\
+3 & $-0.42 \pm 2.03j$ & \SI{3.1}{s} & $\times\,0.28$\\
+1.5 & $+0.04 \pm 1.76j$ & \SI{3.6}{s} & $\times\,1.17$\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{Step 6 — check} (\cref{fig:inversion-predict}). With $K_{att} = 3$ the simulator's step response rings with a period of \SI{3.07}{s} and settles. With $K_{att} = 1.5$ it swings between \SI{0.3}{m} and \SI{1.7}{m} around a setpoint of \SI{1}{m}, with a period of \SI{3.57}{s}, each swing about 10\,\% larger than the last. The drone never arrives.
+\end{example}
+
+\simfig{inversion_predict}{Prediction next to measurement. Left: a \SI{1}{m} step with the attitude gain at 8, 3 and 1.5 (colour), and the chain-of-loops model of \lessonref{les:cascade} (dashed). Right: the stability edge of Example~\ref{ex:inv-quartic} in the plane of the outermost and innermost gains, with the three runs.}{fig:inversion-predict}
+
+Nothing here is a fault of the attitude loop. On its own, with $K_{att} = 1.5$, it is perfectly stable and perfectly damped: a clean first-order lag. The instability belongs to the \emph{combination}. The outer loops were tuned for an inner loop that no longer exists.
+
+\section{Second way to break it: a rare attitude loop}
+
+Now restore $K_{att} = 8$ and instead let the attitude loop run less often: 30, 10, 5, 3, \SI{2}{Hz}. The gain is unchanged. What changes is the delay: between two runs of the attitude loop the body-rate setpoint is held, and by \lessonref{les:slow} a command held for a period $\Delta t$ is late by $\tfrac12\Delta t$ on average.
+
+\begin{example}[How rarely may the attitude loop run?]
+\label{ex:inv-rate}
+Use the delay margin of \lessonref{les:slow} to predict the lowest rate of the attitude loop.
+
+\textbf{Step 1 — the attitude loop's own loop transfer function.} Around the loop: the P gain $K_{att}$, the closed rate loop, and the integration from rate to angle: $L(s) = K_{att}\,G_{rate}(s)/s$.
+
+\textbf{Step 2 — the crossover.} If the rate loop were ideal ($G_{rate} = 1$), $|L| = K_{att}/\omega$ would be 1 at $\omega_c = K_{att} = \SI{8}{rad/s}$, with the phase $-90^\circ$ of the integrator: a margin of $90^\circ$.
+
+\textbf{Step 3 — the rate loop's lag.} The rate loop is the second-order system of Example~\ref{ex:cascade-scales} ($\omega_n = 24.5$, $\zeta = 0.68$). At \SI{8}{rad/s} its phase lag is
+\begin{equation*}
+  \arctan\frac{2\zeta\,\omega/\omega_n}{1 - (\omega/\omega_n)^2} = \arctan\frac{0.444}{0.893} = 26.4^\circ .
+\end{equation*}
+Phase margin: $90 - 26.4 = 63.6^\circ = \SI{1.11}{rad}$.
+
+\textbf{Step 4 — the delay margin.} $1.11/8 = \SI{0.139}{s}$.
+
+\textbf{Step 5 — the rate.} A hold of $\tfrac12\Delta t = 0.139$ means $\Delta t = \SI{0.28}{s}$: the attitude loop must run at least at \SI{3.6}{Hz}.
+
+\textbf{Step 6 — check} (\cref{fig:inversion-runs}). At \SI{10}{Hz} the flight is hardly different. At \SI{5}{Hz} the pitch swings through $\pm59^\circ$ where it used to need $\pm37^\circ$. At \SI{3}{Hz}, below the predicted edge, it reaches $\pm90^\circ$ — the attitude loop itself is now unstable, held only by the limits on tilt and rate — and the position wobbles around its setpoint. At \SI{2}{Hz} the drone flips.
+\end{example}
+
+\widefig{inversion_runs}{Breaking the time-scale separation. Top: the position response to a square wave in $x$. Bottom: the pitch angle. As the attitude loop slows from \SI{250}{Hz} to \SI{3}{Hz} its sampling delay uses up its own phase margin; the pitch swings up to $90^\circ$. A soft attitude gain (violet) leaves the attitude loop healthy and makes the \emph{outer} loops oscillate instead.}{fig:inversion-runs}
 
 \begin{watchout}[Rate is not bandwidth]
-The rule \enquote{inner loops 5–10 times faster} is about \emph{bandwidth} — how quickly a loop follows its setpoint — not about how often it runs. A loop sampled at \SI{1}{kHz} with low gains can still be too slow for the loop around it (the second experiment), and a fast loop sampled too rarely gets delay instead (the first).
+The rule \enquote{inner loops several times faster} is about \emph{bandwidth} — how quickly a loop follows its setpoint — not about how often it runs. The two experiments fail differently. A loop that runs at \SI{250}{Hz} with a low gain is slow, and the loops around it become unstable (Example~\ref{ex:inv-quartic}). A loop with a high gain that runs too rarely is unstable \emph{itself} (Example~\ref{ex:inv-rate}). A design needs both: enough bandwidth for the loop outside, and a sampling rate well above the loop's own bandwidth.
 \end{watchout}
 
 \screen[0 0 495 998]{inversion}{Lesson 14 with the attitude loop at \SI{5}{Hz}: the attitude chart (loop \texttt{att.pitch}) shows the staircase of the slow loop and the large swings it causes.}{fig:inversion-screen}
@@ -57,20 +130,62 @@ The rule \enquote{inner loops 5–10 times faster} is about \emph{bandwidth} —
 \begin{trythis}
 \begin{enumerate}
   \item Lower the \ui{attitude rate}: 30, 10, 5, 3, \SI{2}{Hz}. Watch the pitch chart and the drone.
-  \item Reset, then lower \ui{Kp roll/pitch} of the attitude loop to 1.5. Watch the position overshoot.
-  \item With the attitude gain at 1.5, lower the velocity loop's $K_p$ from 2.2 to 1. Does the overshoot go away? Check with \cref{eq:inv-rule}.
+  \item Reset, then lower \ui{Kp roll/pitch} of the attitude loop to 3, then to 1.5. Time the oscillation and compare with Example~\ref{ex:inv-quartic}.
+  \item With the attitude gain at 1.5, switch the velocity loop's \It off. Does the oscillation die out (\cref{eq:inv-rule})? Then lower the position gain to 0.6 instead.
 \end{enumerate}
-\predict{if you slow down the \emph{velocity} loop to \SI{10}{Hz} instead (and keep the attitude loop at \SI{250}{Hz}), will the drone be in trouble? Why or why not?}
+\predict{if you slow down the \emph{velocity} loop to \SI{10}{Hz} instead (and keep the attitude loop at \SI{250}{Hz}), will the drone be in trouble? Estimate the velocity loop's delay margin as in Example~\ref{ex:inv-rate}.}
 \end{trythis}
 
-\begin{remember}
-\begin{itemize}
-  \item An outer loop controls the closed inner loop, not the raw plant; a slow inner loop is an extra lag for it.
-  \item For an inner loop modelled as a lag $\tau$ and an outer P gain $K$, damping needs $K\tau \lesssim 0.5$.
-  \item Break the separation by delay (slow sampling) and you get wobble and, finally, a flip; break it by low gain and you get overshoot.
-  \item Tune from the inside out and keep a bandwidth ratio of about 5–10 between neighbouring loops.
-\end{itemize}
-\end{remember}
+\section{The engineer's view: a budget of bandwidth}
+
+\subsection{From the actuator outwards}
+Put Lessons 9, 10, 13 and 14 together and the design of a cascade becomes a chain of inequalities that starts at the hardware.
+\begin{enumerate}
+  \item The \textbf{actuator} sets the speed of the innermost loop: the motor lag $\tau_m = \SI{30}{ms}$ allows a rate loop of about $1/\tau_m = \SI{33}{rad/s}$ at most (\lessonref{les:edge}); the default uses 18.
+  \item Each loop outwards must be slower than the one inside it, by a factor of at least two and preferably four or more (\cref{thm:cascade-nested}): attitude 8, velocity 2.2, position \SI{1.2}{rad/s}.
+  \item Each loop's \textbf{sampling rate} must be high enough that its hold uses only a small part of its phase margin: a rate of ten to twenty times its bandwidth in \si{rad/s}, expressed in hertz, is comfortable. The attitude loop (bandwidth \SI{8}{rad/s}) is unstable below \SI{3.6}{Hz} and runs at 250.
+\end{enumerate}
+Read from the outside in, the same chain is a \emph{requirement}: a position loop that must reject gusts within a second needs a velocity loop several times faster, an attitude loop faster still, and therefore motors with a lag of a few tens of milliseconds. Drones that must be agile have small propellers for this reason: a small rotor changes speed quickly.
+
+\subsection{Where the phase goes}
+In the language of \lessonref{les:slow}, every inner loop is a withdrawal from the phase budget of the loop around it. Seen from the velocity loop, whose crossover is near \SI{2.2}{rad/s}, the attitude loop with $K_{att} = 8$ costs $\arctan(2.2/8) = 15^\circ$; with $K_{att} = 1.5$ it costs $56^\circ$. Seen from the position loop the velocity loop costs its share in turn. The loops are nested, and their lags add up along the chain.
+
+\begin{example}[The pilot is an outer loop]
+\label{ex:inv-pilot}
+A pilot holds the pitch attitude of an aircraft by hand: an outer loop closed through eyes, brain and arm. The pilot reacts with a delay of about $T = \SI{0.25}{s}$ and pushes the stick in proportion to the attitude error, with a gain $K$ (pitch rate commanded per unit of error, in \si{s^{-1}}). The aircraft's pitch rate follows the stick with a lag $\tau$. How aggressively can the pilot fly an agile aircraft ($\tau = \SI{0.2}{s}$) and a sluggish one ($\tau = \SI{1}{s}$)?
+
+\textbf{Step 1 — the loop.} $L(s) = \dfrac{K\,e^{-sT}}{s\,(\tau s + 1)}$: the pilot's gain and delay, the aircraft's lag, and the integration from rate to angle.
+
+\textbf{Step 2 — the margin.} $\mathrm{PM} = 90^\circ - \arctan(\omega_c\tau) - \omega_cT$, with $\omega_c$ from $K = \omega_c\sqrt{1 + \omega_c^2\tau^2}$.
+
+\textbf{Step 3 — the agile aircraft.} For a margin of $45^\circ$: $\omega_c = \SI{1.78}{rad/s}$ ($19.6^\circ$ from the lag, $25.4^\circ$ from the delay), which needs $K = 1.88$. The loop is unstable from $K = 4.6$.
+
+\textbf{Step 4 — the sluggish aircraft.} For the same margin: $\omega_c = \SI{0.70}{rad/s}$ and $K = 0.85$. The pilot must fly with less than half the gain and gets a loop less than half as fast.
+
+\textbf{Step 5 — what goes wrong.} A pilot who is startled, or who is trying to be precise near the ground, raises the gain. In the sluggish aircraft the margin is then gone quickly, and the aircraft and the pilot oscillate against each other: a \emph{pilot-induced oscillation}. The outer loop has outrun the inner one. The cure taught to pilots is the one this lesson suggests: lower the gain — relax the grip.
+\end{example}
+
+\subsection{In formal terms}
+
+\begin{theorem}[Three nested loops]
+\label{thm:inv-three}
+The chain $\dot x = v$, $\dot v = a$, $\dot a = K_{att}\big(K_v(K_x(x_{sp} - x) - v) - a\big)$ with positive gains is asymptotically stable if and only if $K_{att} > K_x$. With the integral $K_i \ge 0$ added to the velocity loop as in \cref{eq:inv-quartic}, and $c = K_vK_x + K_i$, it is asymptotically stable if and only if
+\begin{equation*}
+  K_{att}\,(c\,K_v - K_iK_x) > c^2 .
+\end{equation*}
+\end{theorem}
+\begin{proof}
+The first claim is \cref{thm:spring-routh}\,(ii) on \cref{eq:inv-cubic}. For the second, the Hurwitz conditions for $s^4 + a_3s^3 + a_2s^2 + a_1s + a_0$ with positive coefficients are $a_3a_2 > a_1$ and $a_1(a_3a_2 - a_1) > a_3^2a_0$ (the general criterion: Åström and Murray, 2021, ch.~2; Franklin et al., 2019, ch.~3). The second is the stated inequality after dividing by $K_{att}^2$, and it implies the first.
+\end{proof}
+
+For $K_i = 0$ the condition reduces to $K_{att} > K_x$. It is linear in $K_{att}$ for fixed outer gains: the straight edge of \cref{fig:inversion-predict}.
+
+\begin{theorem}[What time-scale separation promises]
+\label{thm:inv-separation}
+In the setting of \cref{thm:cascade-tikhonov}, stability of the reduced system and of the fast subsystem implies stability of the full system \emph{for all sufficiently small} $\varepsilon$. It implies nothing for a given $\varepsilon$.
+\end{theorem}
+
+The second sentence is this lesson. With $K_{att} = 1.5$ the fast subsystem (the attitude loop) is exponentially stable and the reduced system (the outer loops with an ideal attitude) is exponentially stable, and the cascade is unstable. The ratio of time scales, $\varepsilon = K_x/K_{att}$ or so, is 0.8, which is not small. For a given design the honest test is \cref{thm:inv-three}, or a simulation.
 
 \begin{curiosity}{Your body is a cascade}
 \photo{cheetah}{A cheetah at full speed. Its legs are controlled by fast spinal reflex loops, supervised by slower loops in the brain.}
@@ -79,11 +194,43 @@ Stand on one foot and close your eyes. You wobble, but you do not fall — and m
 It is the architecture of this lesson: slow outer loops that decide \emph{what} should happen, fast inner loops that make it happen and reject disturbances before the outer loops even notice. A running cheetah relies on the same arrangement, and so does every legged robot that walks over rough ground. When disease slows down the inner loops — as in some neurological conditions that delay reflexes — the result is familiar from \cref{fig:inversion-runs}: tremor and overshoot, exactly the symptoms of a cascade whose time scales are no longer separated.
 \end{curiosity}
 
+\begin{lookahead}
+\begin{itemize}[leftmargin=1.2em]
+  \item Part~II keeps the structure of the cascade and asks whether better blocks can relax its rules. An inner loop that measures what it used to model tolerates a much slower outer design (INDI, Lessons~II.7–II.9); a single optimal law for the whole chain needs no separation at all (II.1–II.2), and pays with the limits that the cascade gave for free.
+  \item An optimiser on top and a fast loop below is the architecture of modern agile drones. Lesson~II.15 finds that the inner loop matters more than the choice on top.
+  \item How slow can the rate loop be? Lesson~III.18 answers on the z-plane, exactly as Example~\ref{ex:slow-discrete} did for the altitude loop.
+  \item Loops that are coupled sideways, not nested — roll and pitch of a spinning vehicle — can each have fine margins and be unstable together (Lesson~III.12).
+  \item The pilot of Example~\ref{ex:inv-pilot} returns in Lesson~IV.16, with a rate-limited elevator that makes things worse. In a launcher the \enquote{inner loop} is the engine gimbal, and the outer loops must also stay clear of fuel slosh and bending (IV.8, IV.9).
+\end{itemize}
+\end{lookahead}
+
+\begin{remember}
+\begin{itemize}
+  \item An outer loop controls the closed inner loop, not the raw plant; a slow inner loop is an extra lag for it.
+  \item Three nested P loops are stable iff the innermost gain exceeds the outermost; with the velocity integral the default cascade needs $K_{att} > 1.64$.
+  \item A soft inner loop makes the \emph{outer} loops oscillate. An inner loop that runs too rarely becomes unstable \emph{itself}: the attitude loop needs at least \SI{3.6}{Hz}.
+  \item Design from the actuator outwards: each loop slower than the one inside it, each sampled well above its own bandwidth.
+  \item Time-scale separation is a guarantee only when the ratio of time scales is small. Otherwise, compute.
+\end{itemize}
+\end{remember}
+
 \begin{exercises}
-\exercise[1] The velocity loop has $K_v = 2.2$ (per second). What attitude time constant gives $\zeta = 0.7$ in \cref{eq:inv-loop}?
-\answer{$\zeta = 1/(2\sqrt{K_v\tau}) = 0.7$ gives $K_v\tau = 0.51$, $\tau = \SI{0.23}{s}$. The default attitude loop ($\approx \SI{0.05}{s}$ including the rate loop) is far faster.}
-\exercise[2] Derive \cref{eq:inv-loop} and find its poles for $K_v = 2.2$, $\tau_{att} = \SI{0.5}{s}$.
-\answer{$0.5 s^2 + s + 2.2 = 0$: $s = -1 \pm j\sqrt{3.4} = -1 \pm 1.84j$, $\zeta = 0.48$ — about 18\,\% overshoot.}
-\exercise[3] Replace the lag by a pure delay $T$ (slow sampling): $\dot v(t) = K_v(v_{sp} - v(t - T))$. Show that the loop oscillates when $K_v T = \pi/2$. What delay makes the default velocity loop unstable?
-\answer{Characteristic equation $s + K_v e^{-sT} = 0$. At $s = j\omega$: $|K_v| = \omega$ and $\omega T = \pi/2$, so $K_v T = \pi/2$. For $K_v = 2.2$: $T = \SI{0.71}{s}$ — in a real cascade the position loop and the other lags make it lower, which is why the flip happens at about \SI{2}{Hz}.}
+\exercise[1] With the velocity integral off, which attitude gains make the default cascade stable? At which frequency does it oscillate at the edge?
+\answer{$K_{att} > K_x = 1.2$; $\omega = \sqrt{K_{att}K_v} = \sqrt{1.2 \cdot 2.2} = \SI{1.62}{rad/s}$.}
+\exercise[1] The attitude gain is 3. Use the table of Example~\ref{ex:inv-quartic} to estimate after how many periods the oscillation has fallen below 2\,\% of its first swing.
+\answer{$0.28^n < 0.02$: $n = 3.1$ periods, about \SI{9.5}{s}.}
+\exercise[1] Repeat Steps 4–5 of Example~\ref{ex:inv-rate} for the velocity loop, taking its crossover as \SI{2.2}{rad/s} and its phase margin as $90^\circ$ minus the $15^\circ$ that the attitude loop costs. At which rate would it become unstable?
+\answer{$75^\circ = \SI{1.31}{rad}$; delay margin $1.31/2.2 = \SI{0.6}{s}$; $\Delta t = \SI{1.2}{s}$: below about \SI{0.8}{Hz}. At \SI{10}{Hz} it is safe.}
+\exercise[2]\exkind{derive} Derive \cref{eq:inv-quartic}: write $a_{sp}$ with the integral, insert it into \cref{eq:inv-lag}, differentiate once, and collect the powers of $s$.
+\answer{$\dddot x = K_{att}(a_{sp} - \ddot x)$ with $a_{sp} = K_v(K_x(x_{sp} - x) - \dot x) + K_i\int(K_x(x_{sp} - x) - \dot x)$. Differentiating: $x^{(4)} + K_{att}\dddot x + K_{att}K_v\ddot x + K_{att}(K_vK_x + K_i)\dot x + K_{att}K_iK_x x = \dots$}
+\exercise[2]\exkind{derive} For the chain of Example~\ref{ex:inv-cubic} with $K_v = 2.2$ and $K_x = 1.2$, find the poles for $K_{att} = 2.4$ (use Newton's method for the real one, as in Example~\ref{ex:integral-poles}) and the damping ratio of the oscillating pair.
+\answer{$s^3 + 2.4s^2 + 5.28s + 6.34$: real root $-1.59$; remaining $s^2 + 0.81s + 3.99$: $-0.41 \pm 1.96j$, $\zeta = 0.20$.}
+\exercise[2]\exkind{derive} In Example~\ref{ex:inv-pilot}, verify Step~3: with $\tau = 0.2$ and $T = 0.25$, show that $\omega_c = 1.78$ gives a margin of $45^\circ$ and compute $K$. Then find the margin if a startled pilot doubles the gain.
+\answer{$\arctan(0.356) = 19.6^\circ$, $1.78 \cdot 0.25 = \SI{0.445}{rad} = 25.5^\circ$; $K = 1.78\sqrt{1.127} = 1.89$. With $K = 3.77$: $\omega_c = 3.18$, margin $90 - 32.5 - 45.6 = 11.9^\circ$.}
+\exercise[2]\exkind{fly} In Lesson~14 set \ui{Kp roll/pitch} to 1.5 and time ten swings of the position. Compare the period with Example~\ref{ex:inv-quartic}. Then find the attitude gain at which the swinging just dies out, and compare with 1.64.
+\answer{About \SI{3.6}{s}. The oscillation decays for gains above roughly 1.6–1.7.}
+\exercise[2]\exkind{code} In \src{src/control/cascade.ts} each loop runs every $n$-th physics step. Find where the attitude loop decides whether to run, and what it does with its output between runs. Then change the hold into a linear extrapolation of the last two body-rate setpoints and predict, from Example~\ref{ex:inv-rate}, whether the \SI{3}{Hz} attitude loop becomes stable.
+\answer{The loop recomputes $\vec\omega_{sp}$ when \texttt{due(c.hzAtt)} is true (\texttt{stepIndex \% periodSteps === 0}) and otherwise keeps the stored value (a zero-order hold). Extrapolation (a first-order hold) removes most of the half-period delay for slowly varying commands, so the delay margin is no longer used up by the hold: the attitude loop should recover — at the price of amplifying noise in the setpoint.}
+\exercise[3]\exkind{derive} Add the rate loop to \cref{thm:inv-three} as one more first-order lag with the time constant $1/K_r$ between the attitude command and the acceleration, keep the outer loops as P loops, and write the fourth-order polynomial. Find the condition for stability and evaluate the smallest $K_{att}$ for $K_r = 18$, $K_v = 2.2$, $K_x = 1.2$. How much does the rate loop's lag cost?
+\answer{$s^4 + K_rs^3 + K_rK_{att}s^2 + K_rK_{att}K_vs + K_rK_{att}K_vK_x$. Conditions: $K_r \cdot K_rK_{att} > K_rK_{att}K_v$, i.e.\ $K_r > K_v$; and $K_{att}K_v(K_rK_{att} - K_{att}K_v) > K_r \cdot K_{att}K_vK_x$, i.e.\ $K_{att} > K_rK_x/(K_r - K_v) = 1.37$ instead of 1.2.}
 \end{exercises}

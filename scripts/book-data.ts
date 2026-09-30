@@ -498,6 +498,7 @@ for (const [kp, kd] of [
   [10, 6.3],
   [10, 20],
   [20, 8],
+  [40, 12.65],
 ])
   add({
     name: `state-kp${kp}-kd${kd}`,

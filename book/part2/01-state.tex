@@ -1,0 +1,231 @@
+\lesson{II.1}{State, not error}{A PD controller never looked at the error alone. It looked at where the drone is and how fast it moves — and that pair has a picture.}{1}{state}{Part II · Beyond PID}
+\label{les:state}
+
+\lead{\setupcard{\setuprow{Level}{L1}\setuprow{Controller}{P and D, with $K_p = 10$ and the critical $K_d = 6.3$; I is off}\setuprow{Setpoint}{a square wave of $\pm\SI{0.5}{m}$, a step every \SI{4}{s}}\setuprow{Chart}{the phase portrait}\setuprow{Goal}{overshoot below 1\,\%, settling within \SI{1.5}{s}}}%
+Welcome to the second semester. Part~I built its controllers around the error: how large it is, how long it has lasted, how fast it changes. This lesson changes the point of view. The drone's future depends on two numbers — where it is and how fast it moves — and a PD controller turns out to be a rule that maps those two numbers to a thrust. Drawn as a point in a plane, the pair moves along curves whose shape tells everything about the loop at a glance. Every controller of Part~II starts from this picture.}
+
+\section{From the error to the state}
+
+\Lessonref{les:meet} defined the state of the drone: the smallest set of numbers that, with the inputs from now on, fixes its future. For the L1 drone that is the altitude and the vertical velocity. Measured from the setpoint, with the convention of the Prelude,
+\begin{equation}\label{eq:state-x}
+  \vx = \begin{pmatrix} x\\ v\end{pmatrix} = \begin{pmatrix} y - r\\ \dot y\end{pmatrix} .
+\end{equation}
+Now look again at the PD law with its derivative on the measurement (\lessonref{les:kick}) and exact feedforward. The error is $e = r - y = -x$, so
+\begin{equation}\label{eq:state-pd}
+  T - mg = K_p\,e - K_d\,\dot y = -K_p\,x - K_d\,v = -\begin{pmatrix}K_p & K_d\end{pmatrix}\begin{pmatrix} x\\ v\end{pmatrix} = -K\,\vx .
+\end{equation}
+The controller multiplies the state by a row of two numbers. It has done so since \lessonref{les:damper}; only the name is new.\recall{\Lessonref{les:damper}, \cref{eq:damper-state}: \enquote{The two gains are the two entries of the bottom row: each gain multiplies one state variable.}}
+
+\begin{definition}{State feedback}
+A controller of the form $\symbf u = -K\vx$, where $\vx$ is the full state of the plant and $K$ a constant matrix, is a \term{linear state feedback}. For a plant $\dot{\vx} = A\vx + B\symbf u$ it produces the closed loop
+\begin{equation}\label{eq:state-cl}
+  \dot{\vx} = (A - BK)\,\vx ,
+\end{equation}
+whose poles are the eigenvalues of $A - BK$.
+\end{definition}
+
+For the drone, $A = \begin{psmallmatrix}0 & 1\\ 0 & 0\end{psmallmatrix}$ and $B = \begin{psmallmatrix}0\\ 1/m\end{psmallmatrix}$ (\cref{eq:meet-lti}), and
+\begin{equation}\label{eq:state-acl}
+  A - BK = \begin{pmatrix} 0 & 1\\ -K_p/m & -K_d/m\end{pmatrix} ,
+\end{equation}
+the companion matrix of $m s^2 + K_d s + K_p$ — the mass–spring–damper once more. Nothing has changed in the physics. What has changed is the question one can now ask: not \enquote{which three knobs?}, but \enquote{which matrix $K$?} — a question that has the same form for a drone with two states and for an airliner with forty.\innumbers{A quadrotor as a rigid body has 12 states and 4 inputs: its $K$ has 48 entries. Nobody tunes 48 knobs by hand.}
+
+\section{The phase plane}
+
+A state with two components is a point in a plane. As time runs, the point moves, and its path is called a \term{trajectory}. The app draws it in the coordinates the charts use everywhere, the error $e = r - y$ and its rate $\dot e = -v$ (for a constant setpoint): the \term{phase portrait}.\didyouknow{The name comes from mechanics. Position and momentum together are the \emph{phase} of a system, and the space they span its phase space — the word of Gibbs and Poincaré.}
+
+Three rules make the picture readable.
+\begin{itemize}
+  \item \textbf{The target is the origin.} Zero error, zero speed: the drone at rest on its setpoint.
+  \item \textbf{A setpoint step is a sideways hop.} The setpoint changes, the drone has not moved yet: $e$ jumps by the size of the step, $\dot e$ stays. After an upward step of \SI{1}{m} the point sits at $(1, 0)$.
+  \item \textbf{The motion is always clockwise in the upper and lower halves.} Above the axis $\dot e > 0$, so $e$ grows and the point moves right; below it $e$ shrinks and the point moves left.\tip{Read the vertical axis as \enquote{which way is the error going}. Every trajectory crosses the $e$-axis vertically: there the error has stopped changing, at a turning point.}
+\end{itemize}
+
+What the controller does is to steer the point from wherever the step put it back to the origin. The \emph{shape} of the way home is the character of the loop.
+
+\begin{example}[The critically damped way home]
+\label{ex:state-crit}
+The lesson starts with $K_p = 10$ and $K_d = 6.3 \approx 2\sqrt{10}$, critical damping for $m = \SI{1}{kg}$. The setpoint steps up by \SI{1}{m}. Draw the trajectory, and find where the drone moves fastest.
+
+\textbf{Step 1 — the motion.} From Example~\ref{ex:damper-crit}, with $\omega_n = \sqrt{10} = \SI{3.16}{rad/s}$ and the start $e(0) = 1$, $\dot e(0) = 0$:
+\begin{equation*}
+  e(t) = (1 + \omega_nt)\,e^{-\omega_nt}, \qquad \dot e(t) = -\omega_n^2\,t\,e^{-\omega_nt} .
+\end{equation*}
+
+\textbf{Step 2 — the fastest point.} $|\dot e|$ is largest where its derivative vanishes: $\frac{\dd}{\dd t}\big(t\,e^{-\omega_nt}\big) = (1 - \omega_nt)\,e^{-\omega_nt} = 0$, at $t = 1/\omega_n = \SI{0.32}{s}$.
+
+\textbf{Step 3 — its coordinates.} There $e = 2/e_{\mathrm{Euler}} = 0.736$ and $\dot e = -\omega_n/e_{\mathrm{Euler}} = \SI{-1.16}{m/s}$, writing $e_{\mathrm{Euler}} = 2.718$ for the base of the exponential. The drone has covered a quarter of the way when it is fastest, and spends the remaining three quarters braking.
+
+\textbf{Step 4 — the end.} For large $t$ both coordinates decay as $t\,e^{-\omega_nt}$, and their ratio $\dot e/e \to -\omega_n$: the trajectory arrives along the line $\dot e = -3.16\,e$. This is the single eigenvector of the double eigenvalue $-\omega_n$ (Appendix~A).
+
+\textbf{Step 5 — check} (\cref{fig:state-portraits}, green). The simulator's drone is fastest at \SI{1.25}{m/s}, at $e = 0.76$, \SI{0.29}{s} after the step. The motor lag makes it a little slower to start and, once going, a little faster than the ideal model: the loop with the lag is not quite critically damped (its poles are $-2.52$, $-5.16$ and $-25.7$).
+\end{example}
+
+\simfig{state_portraits}{Four tunes, one upward step of \SI{1}{m}. Left: the error in time. Right: the same flights in the phase plane, from the start $(1, 0)$ to the origin; dashed, the ideal model $e^{(A - BK)t}\vx_0$ from the same start. $K_d = 2$ (red) spirals, $K_d = 6.3$ (green) slides in, $K_d = 20$ (violet) drops at once onto the slow eigenvector (thin line) and crawls along it. $K_p = 20$, $K_d = 8$ (blue) takes the widest and fastest path home.}{fig:state-portraits}
+
+\subsection{Three shapes}
+\Cref{fig:state-portraits} shows the three shapes of \lessonref{les:damper} in the new picture. Each is a statement about the eigenvalues and eigenvectors of $A - BK$.
+
+\begin{example}[Reading the three shapes]
+\label{ex:state-shapes}
+Find the eigenvalues for $K_d = 2$, $6.3$ and $20$ (with $K_p = 10$, $m = 1$), and say what each does to the trajectory.
+
+\textbf{Step 1 — $K_d = 2$.} $s^2 + 2s + 10 = 0$: $s = -1 \pm 3j$. Complex eigenvalues have no real eigenvector: no straight line through the origin is kept, and the trajectory turns round it. In one half-turn, $\pi/3 = \SI{1.05}{s}$, the distance from the origin shrinks by $e^{-1 \cdot 1.05} = 0.35$: each crossing of the $e$-axis is at 35\,\% of the previous one. The simulator's drone overshoots by 31\,\%, a little less than the ideal 35\,\%.
+
+\textbf{Step 2 — $K_d = 6.3$.} A double eigenvalue at $-3.15$ (up to rounding) and a single eigenvector: Example~\ref{ex:state-crit}.
+
+\textbf{Step 3 — $K_d = 20$.} $s = -0.51$ and $-19.49$, with the eigenvectors $(1, -0.51)$ and $(1, -19.49)$ in the $(e, \dot e)$ plane. Any start is a combination of the two modes (Appendix~A). The fast one dies within a tenth of a second: the trajectory drops almost vertically until it meets the line $\dot e = -0.51\,e$, and then crawls along it with the time constant $1/0.51 = \SI{2}{s}$. The drone does not overshoot, and does not arrive either: \SI{4}{s} after the step it is still \SI{12}{cm} away.
+
+\textbf{Step 4 — the rule.} Real eigenvalues give straight lines to slide along; complex ones give spirals; the more the two real ones differ, the more the fast one merely \enquote{snaps} the state onto the slow one's line. In the phase plane, the tuning of Part~I becomes geometry.
+\end{example}
+
+\screen[0 0 495 998]{state}{Lesson II.1 in the app, with a lightly damped tune. The phase portrait (bottom right) spirals into the origin after each step; the time charts show the same flight as a ringing step response.}{fig:state-screen}
+
+\begin{inapp}
+\begin{itemize}[leftmargin=1.2em]
+  \item The phase portrait is one of the extra charts (\ui{chart menu\then phase portrait}), drawn by \src{src/ui/charts/PhasePortrait.tsx}. It plots $e = r - y$ against $\dot e$ from the \emph{true} position and velocity, so that sensor noise does not scribble over the curve, and draws a setpoint step as a horizontal hop.
+  \item The lesson sets \param{control.alt.kd = 6.3} with \param{iOn = false}, the wind off, and the square wave \param{setpoint.profile = 'square'} with amplitude \SI{0.5}{m} and period \SI{8}{s}.
+  \item The goal uses the step metrics of \lessonref{les:damper}: overshoot below 1\,\% and settling below \SI{1.5}{s}.
+\end{itemize}
+\end{inapp}
+
+\section{A goal as a region of the plane}
+
+The goal of the lesson — no visible overshoot, settled within \SI{1.5}{s} — asks the trajectory to come home fast \emph{without crossing the vertical axis} (crossing it means $e < 0$: overshoot). In \lessonref{les:damper} this was a specification on $\zeta$ and $\omega_n$; the geometry says the same thing: real or nearly real eigenvalues, and both far to the left.
+
+\begin{example}[Meeting the goal by placing the poles]
+\label{ex:state-goal}
+Choose $K_p$ and $K_d$ that meet the goal, and check what they ask of the motors.
+
+\textbf{Step 1 — no overshoot.} Overshoot below 1\,\% needs $\zeta \ge 0.83$ (\cref{eq:damper-mp}: $e^{-\pi \cdot 0.83/0.56} = 0.9\,\%$). Take a margin: $\zeta \approx 0.9$.
+
+\textbf{Step 2 — the speed.} \Cref{thm:damper-step}\,(iii) with $\delta = 0.02$ and $\zeta = 0.9$ gives the settling time $(3.91 + 0.83)/(\zeta\omega_n) = 4.74/(0.9\,\omega_n)$. Below \SI{1.5}{s} needs $\omega_n > \SI{3.5}{rad/s}$; aim for $\omega_n \approx 4.5$ to leave room for the motor lag.
+
+\textbf{Step 3 — the gains.} Pole placement (\lessonref{les:damper}): $K_p = m\omega_n^2 = 20$, $K_d = 2\zeta\omega_nm = 8$. That is $\zeta = 0.89$, $\omega_n = 4.47$, poles $-4 \pm 2j$.
+
+\textbf{Step 4 — the motors.} At the instant of the step P asks for $9.81 + 20 \cdot 1 = \SI{29.8}{N}$, more than the \SI{24.4}{N} available. The thrust is clipped for a moment:\pitfall{Pole placement assumes that the motors deliver. A design that saturates on every step flies a different, nonlinear loop for part of the time.} the first stretch of the trajectory is flown at full thrust rather than along the linear curve.
+
+\textbf{Step 5 — check} (\cref{fig:state-portraits}, blue). The simulator's drone settles in \SI{1.19}{s} without overshoot, and the thrust is saturated for \SI{0.08}{s}. The theorem's bound was $4.74/4 = \SI{1.18}{s}$.
+
+\textbf{Step 6 — faster still?} With $K_p = 40$ and the critical $K_d = 12.65$ the simulator settles in \SI{1.10}{s}, not in the $5.83/6.32 = \SI{0.92}{s}$ of the linear model: the thrust is now saturated for \SI{0.16}{s}, and during that time the trajectory is not the one the poles describe. Beyond a certain speed the plane is shaped by the motors, not by $K$.
+\end{example}
+
+\begin{keyidea}[Two questions]
+A state feedback $\symbf u = -K\vx$ needs two things: a matrix $K$, and the state $\vx$. Every controller of Part~II is an answer to one of the two questions — \emph{how to choose $K$} (optimal control, prediction, learning) or \emph{how to know $\vx$} when the sensors are noisy, slow or biased (the Kalman filter, disturbance observers). This chapter takes both questions in turn: the next two lessons choose $K$, the fourth estimates $\vx$.
+\end{keyidea}
+
+\begin{trythis}
+\begin{enumerate}
+  \item Open the phase portrait and watch a few steps with the starting tune. Then set $K_d = 2$, then 20. Match each shape to \cref{fig:state-portraits}.
+  \item Meet the goal: raise \emph{both} gains, as in Example~\ref{ex:state-goal}. Watch the first part of the curve when the thrust saturates.
+  \item With $K_d = 20$, estimate the slope of the line along which the curve crawls, and compare with the slow eigenvalue $-0.51$.
+\end{enumerate}
+\predict{with $K_p = 10$ and $K_d = 2$, the first crossing of the vertical axis lies at $e = -0.31$. Where will the second crossing of the \emph{horizontal} axis on the positive side lie?}
+\end{trythis}
+
+\section{The engineer's view: state feedback}
+
+\subsection{What a state feedback can do}
+For a plant with $n$ states and $p$ inputs, $K$ is a $p \times n$ matrix — $pn$ numbers to choose.\tip{Read $K$ as a table: one row per actuator, one column per state. Each entry says how hard that actuator pushes per unit of that state.} \Cref{thm:damper-placement} says what they can buy: if the plant is controllable, the $n$ eigenvalues of $A - BK$ can be put anywhere (with complex ones in conjugate pairs). For one input the choice of the eigenvalues fixes $K$ completely; for several inputs there are more numbers than eigenvalues, and the extra freedom shapes the eigenvectors too — which modes are excited by what, and how they look.
+
+Three things a state feedback does \emph{not} do, which the rest of Part~II will meet:
+\begin{itemize}
+  \item it does not follow a moving setpoint by itself: for tracking, the law becomes $\symbf u = \symbf u_{ff} - K(\vx - \vx_{ref})$, with a feedforward that keeps the reference going (Lessons~II.11 and II.12);
+  \item it does not remove a constant disturbance: the state has no integral in it, and the droop of \lessonref{les:droop} comes back (Lesson~II.3);
+  \item it needs \emph{all} of the state, and sensors deliver only some of it, with noise (Lesson~II.4).
+\end{itemize}
+
+\subsection{Where the phase plane cannot follow}
+The picture is exact for two states. With three — the motor lag, an integral — the trajectory lives in space, and the plane shows its shadow: curves may then cross themselves, which a true two-dimensional trajectory never does. Every state of more than two components is best understood through its modes (Appendix~A), and the phase plane shows the slowest pair of them.
+
+\begin{example}[A satellite with on–off thrusters]
+\label{ex:state-thrusters}
+The satellite of Example~\ref{ex:windup-sat} ($J = \SI{12}{kg.m^2}$) turns with thrusters that are either off or at full torque, $\pm\SI{0.05}{N.m}$. It must turn by $60^\circ$ and stop. How should the thrusters switch, and how long does the turn take?
+
+\textbf{Step 1 — the plane.} State: pointing error $\theta$ and rate $\omega$. With full torque, $\dot\omega = \pm\alpha$, $\alpha = 0.05/12 = \SI{0.0042}{rad/s^2}$.
+
+\textbf{Step 2 — the trajectories.} Eliminate time: $\dd\omega/\dd\theta = \dot\omega/\dot\theta = \pm\alpha/\omega$, so $\omega\,\dd\omega = \pm\alpha\,\dd\theta$ and $\tfrac12\omega^2 = \pm\alpha\,\theta + \text{const}$. Under constant torque the state moves along \emph{parabolas} (\cref{fig:state-thrusters}).
+
+\textbf{Step 3 — the way home.} Exactly two parabolas pass through the origin: $\theta = -\omega^2/(2\alpha)$ with $\omega > 0$ (braking with negative torque while turning positively) and its mirror image. Together they form the \emph{switching curve}. The fastest way home is: full torque towards the target until the state meets the switching curve, then full torque against the motion until it arrives.
+
+\textbf{Step 4 — numbers.} By symmetry the switch comes halfway, at $\theta = \SI{-30}{\degree}$, with the rate $\omega = \sqrt{\alpha\,\theta_0} = \sqrt{0.0042 \cdot 1.047} = \SI{0.066}{rad/s} = \SI{3.8}{\degree/s}$. The whole turn takes $2\sqrt{\theta_0/\alpha} = \SI{31.7}{s}$.
+
+\textbf{Step 5 — a state feedback, but not a linear one.} The rule \enquote{torque $= -\alpha\,\sign\big(\theta + \omega|\omega|/(2\alpha)\big)$} depends on both components of the state, so it is a state feedback — a nonlinear one, with the switching curve as its boundary. Lesson~IV.2 proves that it is the fastest possible,\didyouknow{Real thrusters fire in pulses of milliseconds. Near the target they cannot switch fast enough, and the state circles the origin in a small limit cycle — accepted, and budgeted in fuel.} and Lesson~IV.20 flies it with real thrusters, which cannot switch infinitely often near the origin.
+\end{example}
+
+\simfig{state_thrusters}{The satellite of Example~\ref{ex:state-thrusters} in the phase plane, drawn from the formulas. Under constant torque every trajectory is a parabola (grey). The two parabolas through the origin form the switching curve (dashed). The fastest turn from $-60^\circ$ accelerates along one parabola (orange) and brakes along the switching curve (blue).}{fig:state-thrusters}
+
+\subsection{In formal terms}
+
+\begin{theorem}[Classification of planar linear systems]
+\label{thm:state-planar}
+Let $\dot{\vx} = M\vx$ with a real $2 \times 2$ matrix $M$, and let $\tau = \operatorname{tr}M$ and $\Delta = \det M$. The eigenvalues are $\tfrac12\big(\tau \pm \sqrt{\tau^2 - 4\Delta}\big)$, and the origin is
+\begin{enumerate}[label=(\roman*)]
+  \item asymptotically stable if and only if $\tau < 0$ and $\Delta > 0$;
+  \item a \emph{node} (trajectories along straight lines) if $\tau^2 > 4\Delta > 0$, a \emph{focus} (spirals) if $\tau^2 < 4\Delta$ and $\tau \ne 0$, a \emph{centre} (closed curves) if $\tau = 0 < \Delta$, and a \emph{saddle} if $\Delta < 0$.
+\end{enumerate}
+\end{theorem}
+\begin{proof}
+The characteristic polynomial of a $2 \times 2$ matrix is $s^2 - \tau s + \Delta$, which gives the eigenvalues. (i)~is \cref{thm:spring-routh}\,(i) applied to it. (ii)~The sign of the discriminant $\tau^2 - 4\Delta$ decides between real and complex eigenvalues; with $\Delta < 0$ the two real eigenvalues have opposite signs; the shapes follow from the modal decomposition of Appendix~A.
+\end{proof}
+
+For the drone with state feedback, $M = A - BK$\recall{For a $2 \times 2$ matrix the trace is the sum of the eigenvalues and the determinant their product.} of \cref{eq:state-acl} has $\tau = -K_d/m$ and $\Delta = K_p/m$. Stability needs $K_p > 0$ and $K_d > 0$; spirals appear when $K_d^2 < 4mK_p$ — the underdamped case of \lessonref{les:damper}, now as a line in the plane of the two gains.
+
+\begin{theorem}[State feedback and coordinates]
+\label{thm:state-coord}
+Let $\symbf z = T\vx$ be new coordinates of the plant $\dot{\vx} = A\vx + B\symbf u$. The feedback $\symbf u = -K\vx$ is, in the new coordinates, $\symbf u = -KT^{-1}\symbf z$, and the closed loop has the same eigenvalues in both.
+\end{theorem}
+\begin{proof}
+In the new coordinates the closed-loop matrix is $TAT^{-1} - TB\,KT^{-1} = T(A - BK)T^{-1}$, similar to $A - BK$ (Appendix~A).
+\end{proof}
+
+The theorem is why \enquote{the state} is not a set of particular variables but a space: the drone's state could as well be the altitude and the thrust-free energy, or the two modal coordinates. The feedback gains change with the coordinates; the behaviour does not.
+
+\begin{lookahead}
+\begin{itemize}[leftmargin=1.2em]
+  \item How to choose $K$ when there are twelve states and four motors: Lesson~II.2, by minimising a cost; Lesson~II.13, by optimising over a horizon with the limits of the motors included.
+  \item How to know $\vx$: Lesson~II.4 (the Kalman filter); Lessons~II.5 and II.6 add the unknown disturbance to the state and estimate it too.
+  \item The region of the phase plane from which the drone can come home at all, with the motors' limits, is drawn by the same chart in Lesson~III.7. Whether the whole state can be recovered from what the sensors measure is Lesson~III.9, \emph{observability}.
+  \item The bang-bang turn of Example~\ref{ex:state-thrusters} is proved optimal in Lesson~IV.2, and flown with real thrusters in IV.20; the same switching curve lands a rocket with the least time in IV.4.
+\end{itemize}
+\end{lookahead}
+
+\begin{remember}
+\begin{itemize}
+  \item The state of the L1 drone is its position and velocity; a PD controller is the linear state feedback $u = -K\vx$ with $K = (K_p\ \ K_d)$.
+  \item The closed loop is $\dot{\vx} = (A - BK)\vx$. Its eigenvalues are the poles; its eigenvectors are the straight lines of the phase portrait.
+  \item In the phase plane a step is a sideways hop, the target is the origin, real eigenvalues give straight slides and complex ones spirals.
+  \item For two states: stable iff $\operatorname{tr} < 0$ and $\det > 0$; spirals iff $\operatorname{tr}^2 < 4\det$.
+  \item Part~II asks two questions: how to choose $K$, and how to know $\vx$.
+\end{itemize}
+\end{remember}
+
+\begin{curiosity}{The state vector that went to the Moon}
+\photo{apollo15}{The Apollo 15 Command and Service Module in lunar orbit, 1971, photographed from the Lunar Module.}
+Flight controllers of the Apollo missions talked about the spacecraft's \emph{state vector} as casually as about its fuel. The phrase meant exactly what it means in this lesson: the few numbers — position and velocity, three of each — that, together with gravity and the engine's burns, fix where the spacecraft will be at any later time.
+
+There were two copies of it. One lived in the guidance computer on board, updated from the spacecraft's own inertial sensors and, near the Moon, from star sightings and radar. The other was computed on the ground from the tracking antennas of the Deep Space Network, which measured the spacecraft's distance and speed by radio. Before critical burns, Mission Control compared the two and, when they disagreed, uplinked the ground's version to the computer: a \enquote{state vector update}.
+
+Two lessons of Part~II are in that routine. A controller — or an astronaut about to fire an engine — needs the state, not a single error. And no single source of the state is trusted blindly: two estimates, from different sensors with different errors, are compared and combined. Lesson~II.4 makes that combination optimal.
+\end{curiosity}
+
+\begin{exercises}
+\exercise[1] Write $K$ and $A - BK$ for $K_p = 10$, $K_d = 2$, $m = \SI{1}{kg}$, and find the eigenvalues.
+\answer{$K = (10\ \ 2)$; $A - BK = \begin{psmallmatrix}0 & 1\\ -10 & -2\end{psmallmatrix}$; eigenvalues $-1 \pm 3j$.}
+\exercise[1] The drone hovers at the setpoint when the setpoint drops by \SI{0.5}{m}. Where in the phase plane of the app does the point jump, and in which direction does it then move first?
+\answer{To $(-0.5, 0)$. The drone must descend, $v < 0$, so $\dot e = -v > 0$: the point moves upwards, into the upper half, and then to the right towards the origin.}
+\exercise[1] For $K_p = 10$ and $K_d = 20$, how long after a step of \SI{1}{m} is the drone within \SI{2}{cm} of the setpoint, according to the slow mode alone?
+\answer{$e \approx e^{-0.513t} = 0.02$: $t = \ln 50/0.513 = \SI{7.6}{s}$.}
+\exercise[2]\exkind{derive} Show that the slope of a trajectory in the phase plane is $\dd\dot e/\dd e = -(K_p e + K_d\dot e)/(m\dot e)$ for the P–D loop. Where does a trajectory cross the $e$-axis, and at what angle? Where is it horizontal?
+\answer{$\dd\dot e/\dd e = \ddot e/\dot e$ and $m\ddot e = -K_pe - K_d\dot e$. On the $e$-axis ($\dot e = 0$, $e \ne 0$) the slope is infinite: vertical crossing. Horizontal where $K_pe + K_d\dot e = 0$, on the line $\dot e = -(K_p/K_d)\,e$.}
+\exercise[2]\exkind{derive} For the critically damped loop, show that the largest speed after a step of size $e_0$ is $\omega_ne_0/e_{\mathrm{Euler}}$, reached at $e = 2e_0/e_{\mathrm{Euler}}$. What is it for $K_p = 40$ and a step of \SI{1}{m}, and why does the simulator reach less?
+\answer{As Example~\ref{ex:state-crit} with $e_0$ as a factor. For $K_p = 40$: $6.32/2.718 = \SI{2.33}{m/s}$. The simulator's drone reaches \SI{2.47}{m/s}. Saturation limits the start, but once free the motor lag lets it run slightly faster than the ideal model.}
+\exercise[2]\exkind{derive} Using \cref{thm:state-planar}, draw the plane of the two gains $(K_p, K_d)$ for $m = \SI{1}{kg}$ and mark the regions of nodes, foci and instability. Where do the default gains and the four tunes of \cref{fig:state-portraits} lie?
+\answer{Unstable for $K_p \le 0$ or $K_d \le 0$; nodes above the parabola $K_d = 2\sqrt{K_p}$, foci below it. $(10, 2)$ focus, $(10, 6.3)$ on the parabola, $(10, 20)$ node, $(20, 8)$ focus just below ($2\sqrt{20} = 8.94$), default $(10, 7)$ node just above.}
+\exercise[2]\exkind{fly} In Lesson~II.1 set $K_p = 40$, $K_d = 12.65$ and watch the first part of the phase portrait after an upward step. Which part of the curve is flown at full thrust, and what shape should it have?
+\answer{The first \SI{0.16}{s}: at full thrust the acceleration is constant, $(24.4 - 9.81)/1 = \SI{14.6}{m/s^2}$, so the curve starts as a parabola ($\tfrac12\dot e^2 = 14.6\,(1 - e)$), then joins the linear loop's curve.}
+\exercise[2]\exkind{code} In \src{src/ui/charts/PhasePortrait.tsx} the function \texttt{phaseData} sets $\dot e$ to $-v$ at samples where the setpoint moves faster than \texttt{STEP\_RATE}. What would the chart show at a step without this rule, and why is the rule harmless for ramps and sines?
+\answer{A single sample with an enormous $\dot e$ (the jump divided by one telemetry period, \SI{200}{m/s} for a \SI{1}{m} step): a spike to the edge of the chart. Ramps and sines change the setpoint by far less than \SI{20}{m/s}, so their $\dot r$ is kept.}
+\exercise[3]\exkind{derive} Time-optimal turn. For Example~\ref{ex:state-thrusters}, show that the switching happens at half the angle and that the turn takes $2\sqrt{\theta_0/\alpha}$. How long does a $10^\circ$ turn take, and why is it not six times shorter than the $60^\circ$ turn?
+\answer{By symmetry of the two parabolas the rate peaks at $\theta_0/2$; each half takes $\sqrt{\theta_0/\alpha}$. $10^\circ$: $2\sqrt{0.1745/0.0042} = \SI{12.9}{s}$. The time grows with the square root of the angle: six times the angle, $\sqrt6 = 2.45$ times the time.}
+\end{exercises}

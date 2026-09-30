@@ -32,15 +32,15 @@ Three principles hold throughout:
 
 ## 2. The five parts
 
-| Part                         | Lessons      | Vehicles                               | App                            | Book            | Plan                                 |
-| ---------------------------- | ------------ | -------------------------------------- | ------------------------------ | --------------- | ------------------------------------ |
-| I. The PID controller        | 1–14         | Quadrotor, levels L1–L3                | done (M0–M6)                   | written; see §5 | [roadmap.md](roadmap.md)             |
-| II. Beyond PID               | II.1–II.21   | Quadrotor                              | done (M7–M12)                  | not written     | [beyond-pid.md](beyond-pid.md)       |
-| III. Why it works            | III.1–III.30 | Quadrotor                              | III.1–III.5 done; rest planned | not written     | [analysis.md](analysis.md)           |
-| IV. Aerospace GNC            | IV.1–IV.29   | Quadrotor, rocket, aircraft, satellite | planned (M19–M25)              | not written     | [aerospace-gnc.md](aerospace-gnc.md) |
-| V. From whiteboard to flight | V.1–V.6      | All                                    | planned (M26)                  | not written     | [aerospace-gnc.md](aerospace-gnc.md) |
+| Part                         | Lessons      | Vehicles                               | App                        | Book            | Plan                                 |
+| ---------------------------- | ------------ | -------------------------------------- | -------------------------- | --------------- | ------------------------------------ |
+| I. The PID controller        | 1–14         | Quadrotor, levels L1–L3                | done (M0–M6)               | written; see §5 | [roadmap.md](roadmap.md)             |
+| II. Beyond PID               | II.1–II.21   | Quadrotor                              | done (M7–M12)              | not written     | [beyond-pid.md](beyond-pid.md)       |
+| III. Why it works            | III.1–III.30 | Quadrotor                              | 7 of 30 done; rest planned | not written     | [analysis.md](analysis.md)           |
+| IV. Aerospace GNC            | IV.1–IV.29   | Quadrotor, rocket, aircraft, satellite | planned (M19–M25)          | not written     | [aerospace-gnc.md](aerospace-gnc.md) |
+| V. From whiteboard to flight | V.1–V.6      | All                                    | planned (M26)              | not written     | [aerospace-gnc.md](aerospace-gnc.md) |
 
-One hundred lessons. Forty exist in the app today.
+One hundred lessons. Forty-two exist in the app today.
 
 Each part asks a different question:
 

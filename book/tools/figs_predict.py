@@ -659,3 +659,36 @@ def challenge_predict():
     xlab_time(ax[1])
     ax[1].set_xlim(5, 65)
     save(f, "challenge_predict")
+
+
+# ─── Lesson 12 ─────────────────────────────────────────────────────────────
+@fig
+def tilt_predict():
+    f, ax = plt.subplots(1, 2, figsize=(TEXT_W, 56 * MM), gridspec_kw=dict(wspace=0.34))
+    ch, cvv = 0.12, 0.25
+    a = ax[0]
+    d = win(load("tilt-l2"), 4, 30)
+    rx = d["wind.x"] - d["vel.x"]
+    drag = ch * rx.abs() * rx
+    fb = d["pos.x.part.p"] + d["pos.x.part.i"] + d["pos.x.part.d"]
+    a.plot(d.t, -drag, color=C["ink"], lw=0.8, ls=DASH)
+    a.plot(d.t, fb, color=C["accent"], lw=1.2)
+    a.plot(d.t, d["pos.x.part.i"], color=C["I"], lw=1.2)
+    a.text(29.5, -3.75, "−drag", color=C["ink"], fontsize=6.4, ha="right")
+    a.text(18.2, 0.25, "P + I + D", color=C["accent"], fontsize=6.4)
+    a.text(5.2, -0.45, "I alone", color=C["I"], fontsize=6.4)
+    a.set_ylim(-4.2, 0.6)
+    a.set_title("L2: the force against the wind")
+    a.set_ylabel("N along $x$")
+    xlab_time(a)
+    a = ax[1]
+    d = win(load("tilt-l3"), 4, 30)
+    rx, ry = d["wind.x"] - d["vel.x"], d["wind.y"] - d["vel.y"]
+    fx, fy = ch * rx.abs() * rx, cvv * ry.abs() * ry
+    a.plot(d.t, np.degrees(np.arctan2(fx, G - fy)), color=C["ink"], lw=0.8, ls=DASH)
+    a.plot(d.t, d["pitch"], color=C["meas"], lw=1.2)
+    a.text(29.8, -4.3, "dashed: $\\arctan(F_{drag}/F_{up})$", color=C["ink"], fontsize=6.4, ha="right")
+    a.set_title("L3: the pitch angle")
+    a.set_ylabel("degrees")
+    xlab_time(a)
+    save(f, "tilt_predict")

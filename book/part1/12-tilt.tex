@@ -2,21 +2,36 @@
 \label{les:tilt}
 
 \lead{\setupcard{\setuprow{Level}{L2: a point mass in three dimensions}\setuprow{Controller}{three independent PIDs}\setuprow{Wind}{a mean wind of \SI{4}{m/s}, with gusts}}%
-Until now the drone lived on a vertical line. Level 2 lets it move in three dimensions — with a cheat that makes the physics easy, and that this lesson exposes. The cheat is instructive twice: first because three independent PIDs work surprisingly well, and then because a real quadrotor cannot do what they ask.}
+Until now the drone lived on a vertical line. Level 2 lets it move in three dimensions — with a cheat that makes the physics easy, and that this lesson exposes. The cheat is instructive twice: first because three independent PIDs work surprisingly well, and then because a real quadrotor cannot do what they ask. Seeing exactly why it cannot is the way into the second half of Part~I.}
 
 \section{Three PIDs for three axes}
 
-At level L2 the drone is a point mass on which the controller applies a force vector $\vec F$ directly:
-\begin{equation}
+At level L2 the drone is a point mass on which the controller applies a force vector $\vec F$ directly. Newton's law is the same as in \cref{eq:meet-plant}, now as a vector equation,
+\begin{equation}\label{eq:tilt-l2}
   m\,\ddot{\vec p} = \vec F + m\vec g + \vec F_{drag} ,\qquad
-  \vec F = \begin{pmatrix} \mathrm{PID}_x(x_{sp} - x)\\ \hat m g + \mathrm{PID}_y(y_{sp} - y)\\ \mathrm{PID}_z(z_{sp} - z)\end{pmatrix}.
+  \vec F = \begin{pmatrix} \mathrm{PID}_x(x_{sp} - x)\\ \hat m g + \mathrm{PID}_y(y_{sp} - y)\\ \mathrm{PID}_z(z_{sp} - z)\end{pmatrix},
 \end{equation}
-(Anemostatos uses $y$ for up, like its 3D engine.) Each axis is an independent copy of the altitude loop of Part~I: a mass driven by a force. Everything you learned about $\omega_n$, $\zeta$, integral action and windup applies to each of them separately. The horizontal force is limited to \SI{5}{N}.
+with $\vec p = (x, y, z)$ the position and $\vec g = (0, -g, 0)$. (Anemostatos uses $y$ for up, like its 3D engine.) Written out, \cref{eq:tilt-l2} is three separate equations, one per axis, and each is a copy of the altitude loop of Lessons~1–11: a mass driven by a force. Everything you learned about $\omega_n$, $\zeta$, integral action and windup applies to each of them separately. Such axes are said to be \term{decoupled}. The horizontal loops use $K_p = 4$, $K_i = 0.8$, $K_d = 3$ and a force limit of \SI{5}{N}.
 
 \subsection{Holding position in a steady wind}
-The lesson blows a mean wind of \SI{4}{m/s} along $+x$. For a drone at rest the drag is $F = c_h\,w^2 = 0.12\cdot16 \approx \SI{1.9}{N}$ downwind (plus turbulence and some gusts). That is the horizontal version of the gravity droop: a constant load that nothing in the model anticipates. And the cure is the same. \Cref{fig:tilt-compare} (left) shows the $x$ terms: the \It term settles at about \SI{-1.5}{N} and holds the drone against the wind, while P and D only answer the fluctuations.
+The lesson blows a mean wind of \SI{4}{m/s} along $+x$, with turbulence and gusts on top. For a drone at rest the horizontal drag is $c_h w^2$ with $c_h = \SI{0.12}{N.s^2/m^2}$. That is the horizontal version of the gravity droop: a load that nothing in the model anticipates.
 
-\widefig{tilt_compare}{Left: at level L2 the integral term (green) of the $x$ loop holds the steady drag of a \SI{4}{m/s} wind, exactly as the altitude integral held the missing weight in \lessonref{les:integral}. Right: the L3 quadrotor in the same wind cannot push sideways; it leans into the wind by about $10^\circ$ on average, more during gusts.}{fig:tilt-compare}
+\begin{example}[The wind as a load]
+\label{ex:tilt-l2}
+What does the $x$ loop of the L2 drone do in this wind?
+
+\textbf{Step 1 — the load.} At \SI{4}{m/s}: $F_{drag} = 0.12 \cdot 16 = \SI{1.92}{N}$ along $+x$.
+
+\textbf{Step 2 — without the integral} (\lessonref{les:droop}). P alone would hold it with the droop $e_{ss} = 1.92/K_p = 1.92/4 = \SI{0.48}{m}$ downwind.
+
+\textbf{Step 3 — with the integral} (\lessonref{les:integral}). The integral grows until it carries the load by itself: $I_{ss} = \SI{-1.92}{N}$, pointing \emph{into} the wind, and the error returns to zero with the time constant $K_p/K_i = 4/0.8 = \SI{5}{s}$.
+
+\textbf{Step 4 — the wind of the run.} The recorded wind is not steady: over the run its $x$ component averages \SI{3.5}{m/s} and fluctuates by \SI{1.2}{m/s}. The drag computed from it averages \SI{1.63}{N}.
+
+\textbf{Step 5 — check} (\cref{fig:tilt-predict}, left). Averaged over the run, the feedback terms supply $\SI{-1.62}{N}$: the integral \SI{-1.29}{N} and P the remaining \SI{-0.39}{N}, with the drone on average $0.39/4 = \SI{0.10}{m}$ downwind (measured: \SI{0.096}{m}). The integral is slow: it carries the steady part of the wind, while P and D answer the gusts.
+\end{example}
+
+\widefig{tilt_compare}{Left: at level L2 the integral term (green) of the $x$ loop holds the steady drag of the wind, exactly as the altitude integral held the missing weight in \lessonref{les:integral}. Right: the L3 quadrotor in the same wind cannot push sideways; it leans into the wind by about $10^\circ$ on average, more during gusts.}{fig:tilt-compare}
 
 \begin{keyidea}[The integral points into the wind]
 In the 3D view the green I arrow of the L2 drone points upwind. It is the controller's learned estimate of the wind force — the only place in the loop where the wind is \enquote{known}, and it was learned purely from the error.
@@ -24,26 +39,55 @@ In the 3D view the green I arrow of the L2 drone points upwind. It is the contro
 
 \section{The cheat}
 
-A quadrotor's four propellers all push along one direction, the body's up-axis $\hat b$. The total force it can produce is
+A quadrotor's four propellers all push along one direction, the body's up-axis. Call the unit vector along it $\hat b$. The total force the propellers produce is
 \begin{equation}\label{eq:tilt-thrust}
-  \vec F = T\,\hat b ,\qquad T = f_1 + f_2 + f_3 + f_4 \ge 0 .
+  \vec F = T\,\hat b ,\qquad T = f_1 + f_2 + f_3 + f_4, \qquad 0 \le T \le T_{max} .
 \end{equation}
-It cannot choose the direction of $\vec F$ independently of its attitude. To push sideways it must first rotate so that $\hat b$ leans, and only then does part of the thrust point sideways. L2 skips that step — the arrow simply appears where the PIDs want it.
+The \emph{size} of the force can be chosen freely, by the motors. Its \emph{direction} cannot: it is wherever the body points. L2 skips that — the force arrow simply appears where the three PIDs want it. A real quadrotor that wants a sideways force must first rotate its whole body.
 
-What does the real drone have to do in the steady wind? At equilibrium the thrust vector must cancel both gravity and drag:
-\begin{equation}
-  T\,\hat b = \begin{pmatrix} -F_{drag} \\ m g \\ 0 \end{pmatrix}
-  \qquad\Longrightarrow\qquad
-  \tan\theta = \frac{F_{drag}}{m g} = \frac{1.92}{9.81},\qquad \theta \approx 11^\circ .
+\begin{example}[Hovering in a wind]
+\label{ex:tilt-wind}
+What must the L3 quadrotor do to stand still in a steady \SI{4}{m/s} wind along $+x$?
+
+\textbf{Step 1 — the forces.} Gravity: $mg = \SI{9.81}{N}$ down. Drag: \SI{1.92}{N} along $+x$. For equilibrium the thrust must cancel both: $T\hat b = (-1.92,\ 9.81,\ 0)$\,N.
+
+\textbf{Step 2 — the direction.} $\hat b$ leans \emph{into} the wind, away from the vertical by the angle $\theta$ with
+\begin{equation}\label{eq:tilt-angle}
+  \tan\theta = \frac{F_{drag}}{mg} = \frac{1.92}{9.81} = 0.196, \qquad \theta = 11.1^\circ .
 \end{equation}
-The quadrotor has to lean \emph{into} the wind by about eleven degrees and raise its thrust slightly, to $T = mg/\cos\theta$. \Cref{fig:tilt-compare} (right) shows the L3 drone doing exactly that, with an average of about $10^\circ$ and much more during gusts.
+
+\textbf{Step 3 — the size.} $T = \sqrt{1.92^2 + 9.81^2} = \SI{10.0}{N}$, i.e.\ $mg/\cos\theta$: a tilted drone must push harder to keep its altitude, because only the vertical part of its thrust carries the weight.
+
+\textbf{Step 4 — with the recorded wind.} The drag of the actual run averages \SI{1.63}{N}, which gives $9.4^\circ$ and \SI{9.93}{N}.
+
+\textbf{Step 5 — check} (\cref{fig:tilt-predict}, right). The L3 drone's pitch averages $9.3^\circ$ and its thrust \SI{9.95}{N}. Moment by moment the pitch follows $\arctan(F_{drag}/F_{up})$ computed from the wind, with a short delay and some overshoot: the dynamics of the next two lessons.
+\end{example}
+
+\simfig{tilt_predict}{Prediction next to measurement. Left, L2: the force that the $x$ loop applies (orange), against the drag computed from the recorded wind with the sign reversed (dashed); the integral (green) supplies the slow part. Right, L3: the quadrotor's pitch angle (blue) against the angle that would balance the instantaneous wind force, \cref{eq:tilt-angle} (dashed).}{fig:tilt-predict}
 
 \subsection{Tilting takes time}
-Changing $\hat b$ means rotating a rigid body, and rotation has its own dynamics: torques come from differences between the motors, and they accelerate the rotation through the moment of inertia. The chain from what the controller commands to where the drone goes is now long:
-\begin{equation}
-  \underbrace{\text{motor thrusts}}_{\text{lag}} \to \text{torque} \to \underbrace{\dot\omega}_{1/I} \to \underbrace{\omega}_{\int} \to \underbrace{\text{tilt}}_{\int} \to \underbrace{\text{acceleration}}_{\times g} \to \underbrace{v}_{\int} \to \underbrace{x}_{\int} .
+Changing $\hat b$ means rotating a rigid body, and rotation has its own dynamics. Torques come from \emph{differences} between the motor thrusts, and they accelerate the rotation through the moment of inertia $J$, just as a force accelerates a mass: $J\ddot\theta = \tau$.
+
+\begin{example}[How fast can the drone tilt, and then move?]
+\label{ex:tilt-time}
+The drone hovers and wants to move sideways. Estimate the shortest time to tilt by $15^\circ$, and the sideways acceleration it then has.
+
+\textbf{Step 1 — the largest torque.} In hover each motor gives \SI{2.45}{N}. For a pitch torque two motors speed up and two slow down. Keeping the total thrust, the most that can be shifted is \SI{2.45}{N} per motor (the slow pair stops). With the lever arm $d = L/\sqrt2 = \SI{0.12}{m}$ the torque is $d\,(f_1 + f_2 - f_3 - f_4) = 0.12 \cdot (4.9 + 4.9 - 0 - 0) = \SI{1.18}{N.m}$.
+
+\textbf{Step 2 — the angular acceleration.} $\alpha = \tau/J = 1.18/0.0082 = \SI{143}{rad/s^2}$.
+
+\textbf{Step 3 — the fastest tilt.} Accelerate for half the angle, brake for the other half: $\tfrac12\theta = \tfrac12\alpha(t/2)^2$, so $t = 2\sqrt{\theta/\alpha}$. For $\theta = 15^\circ = \SI{0.26}{rad}$: $t = 2\sqrt{0.26/143} = \SI{0.085}{s}$ — if the motors had no lag.
+
+\textbf{Step 4 — in the simulator.} The cascade of the next lesson takes \SI{0.30}{s} to reach $15^\circ$, with a peak rate of $\SI{91}{\degree/s}$: three times the theoretical minimum, because the motors lag by \SI{30}{ms} and the loops are tuned to be well damped, not time-optimal.
+
+\textbf{Step 5 — the sideways acceleration.} With the altitude held, the thrust is $mg/\cos\theta$ and its horizontal part $mg\tan\theta$: $a_x = g\tan\theta = 9.81 \cdot 0.268 = \SI{2.6}{m/s^2}$ at $15^\circ$. At the controller's tilt limit of $35^\circ$: \SI{6.9}{m/s^2}.
+\end{example}
+
+So the chain from what the controller commands to where the drone goes is long:
+\begin{equation}\label{eq:tilt-chain}
+  \underbrace{\text{motor thrusts}}_{\text{lag }\tau_m} \to \text{torque} \to \underbrace{\dot\omega}_{1/J} \to \underbrace{\omega}_{\int} \to \underbrace{\theta}_{\int} \to \underbrace{\text{horizontal acceleration}}_{g\tan\theta} \to \underbrace{v}_{\int} \to \underbrace{x}_{\int} .
 \end{equation}
-Four integrators in a row, plus a lag. A single PID from $x$ to the motors cannot control that; we would need derivatives up to the third order of the position, and the stability limits of \lessonref{les:edge} would be brutal. The answer is to split the chain into pieces and give each its own loop — the \emph{cascade} of the next lesson.
+Four integrators in a row, plus a lag, where the altitude loop had two. A single PID from $x$ to the motors cannot control that. \Cref{thm:edge-asymptotes} says why: the loop would have four or five more poles than its controller has zeros. The answer is to split the chain into pieces and give each its own loop — the \emph{cascade} of the next lesson.
 
 \screen[0 0 495 998]{tilt}{Level L2 in a \SI{4}{m/s} wind. The drone model tilts only cosmetically (the force is applied directly); the coloured arrows at the drone show the P, I, D contributions of the three axes, with the green I arrow pointing upwind.}{fig:tilt-screen}
 
@@ -52,25 +96,97 @@ Four integrators in a row, plus a lag. A single PID from $x$ to the motors canno
   \item Keys \key{1}, \key{2}, \key{3} switch between the levels; the same wind (same seed) keeps blowing.
   \item L2's controller is \src{src/control/pointmass.ts}: three PIDs, the vertical one with gravity feedforward. The horizontal gains are \ui{Horizontal PID} (\param{control.posH}), the force limit \param{control.maxHForce}.
   \item The loop selector in the chart header (\ui{loop}) picks which axis the charts show: \texttt{pos.x}, \texttt{pos.y}, \texttt{pos.z}.
-  \item At L2 the drone model tilts in the direction of $\vec F$ purely for display, a hint of what L3 must really do.
+  \item At L2 the drone model tilts in the direction of $\vec F$ purely for display, a hint of what L3 must really do. At L3 the rigid body of \cref{eq:prelude-rot} is integrated in \src{src/sim/dynamics.ts}.
 \end{itemize}
 \end{inapp}
 
 \begin{trythis}
 \begin{enumerate}
-  \item Watch the green I arrow grow into the wind. Switch \It off in the horizontal PID: the drone drifts downwind until P holds the drag (how far?).
+  \item Watch the green I arrow grow into the wind. Switch \It off in the horizontal PID: the drone drifts downwind until P holds the drag (Example~\ref{ex:tilt-l2}, Step~2).
   \item Press \key{3} with the same wind and watch the quadrotor lean. Read the pitch angle on the attitude chart.
   \item Raise \ui{Wind\then Mean speed} to \SI{8}{m/s} at L3. Predict the tilt first.
 \end{enumerate}
-\predict{at L3 with an \SI{8}{m/s} wind, how much tilt and how much total thrust are needed to hover?}
+\predict{at L3 with an \SI{8}{m/s} wind, how much tilt and how much total thrust are needed to hover? Is that within the $35^\circ$ limit?}
 \end{trythis}
+
+\section{The engineer's view: fewer motors than directions}
+
+\subsection{Counting}
+A rigid body in space has six \term{degrees of freedom}: three of position and three of orientation. The quadrotor has four motors, four inputs. It cannot command six things independently; two are left over. Such a vehicle is called \term{underactuated}.
+
+What the four inputs do is plain from \cref{eq:tilt-thrust} and the mixer of the next lesson: one combination of the motors is the total thrust $T$, the other three are the torques about the three body axes. So the quadrotor commands, directly, its acceleration \emph{along its own axis} and its three angular accelerations. The two sideways accelerations are missing, and they are obtained indirectly — through the attitude.
+
+\subsection{The set of possible accelerations}
+Newton's law for the quadrotor, without drag, is $m\vec a = T\hat b + m\vec g$, so
+\begin{equation}\label{eq:tilt-acc}
+  \vec a = \frac{T}{m}\,\hat b + \vec g .
+\end{equation}
+At a given instant the attitude is fixed and only $T$ can change: the possible accelerations lie on a single \emph{line segment}, from $\vec g$ (motors off, free fall) along $\hat b$. Given time to turn, $\hat b$ can point anywhere and the accelerations fill a ball of radius $T_{max}/m = \SI{24.4}{m/s^2}$ centred on $\vec g$. Everything the quadrotor can do is in that ball; how quickly it can get from one point of it to another is a matter of rotation.
+
+\Cref{eq:tilt-acc} can also be read backwards, and that is the key to controlling the vehicle: \emph{a desired acceleration determines the attitude}. If the position controller wants the acceleration $\vec a_{sp}$, the thrust vector must be $m(\vec a_{sp} - \vec g)$: its direction is where the body must point, its length is the thrust. The next lesson builds exactly this block.
+
+\begin{example}[An aeroplane turns the same way]
+\label{ex:tilt-aircraft}
+A light aircraft flies at $V = \SI{60}{m/s}$ and must fly a circle of radius $R = \SI{1}{km}$. How?
+
+\textbf{Step 1 — the required force.} Circular motion needs the centripetal acceleration $V^2/R = 3600/1000 = \SI{3.6}{m/s^2}$, horizontally, towards the centre.
+
+\textbf{Step 2 — the only available force.} A wing's lift acts along the aircraft's own up-axis, like the drone's thrust. There is no sideways engine.
+
+\textbf{Step 3 — the bank.} The aircraft rolls by the angle $\varphi$ so that the lift has a horizontal part: $\tan\varphi = (V^2/R)/g = 3.6/9.81$, $\varphi = 20.2^\circ$. It is \cref{eq:tilt-angle} with the centripetal force in place of the drag.
+
+\textbf{Step 4 — the price.} To keep its altitude the lift must grow to $mg/\cos\varphi = 1.065\,mg$: the pilot pulls back on the stick in a turn, and everyone on board feels 6.5\,\% heavier.
+
+\textbf{Step 5 — the same structure.} To change where it goes, the aircraft first changes its attitude. Its autopilot is therefore a cascade too: a heading loop commands a bank angle, a bank loop commands a roll rate, a roll-rate loop moves the ailerons (Lessons~IV.11–IV.13).
+\end{example}
+
+\subsection{In formal terms}
+
+\begin{definition}{Underactuation}
+A mechanical system with $n$ degrees of freedom and $p$ independent inputs is \term{fully actuated} if $p = n$ and \term{underactuated} if $p < n$. For the quadrotor $n = 6$ and $p = 4$.
+\end{definition}
+
+\begin{theorem}[Hovering against a horizontal force]
+\label{thm:tilt-hover}
+Let a vehicle with the thrust law \eqref{eq:tilt-thrust} be subject to gravity and a constant horizontal force of magnitude $F_h$. It has an equilibrium (at rest, not rotating) if and only if $\sqrt{(mg)^2 + F_h^2} \le T_{max}$. At the equilibrium the thrust axis is tilted from the vertical by $\theta = \arctan(F_h/mg)$ against the force, and $T = mg/\cos\theta$.
+\end{theorem}
+\begin{proof}
+At rest $T\hat b + m\vec g + \vec F_h = 0$, so $T\hat b = -(m\vec g + \vec F_h)$: a vector of length $\sqrt{(mg)^2 + F_h^2}$ with the vertical component $mg$ and the horizontal component $F_h$. Its length must not exceed $T_{max}$; its direction gives $\tan\theta = F_h/(mg)$.
+\end{proof}
+
+With a tilt limit $\theta_{max}$ the condition becomes $F_h \le mg\tan\theta_{max}$. For our drone and the controller's $35^\circ$: $F_h \le \SI{6.9}{N}$, a steady wind of $\sqrt{6.9/0.12} = \SI{7.6}{m/s}$.
+
+\begin{theorem}[The horizontal axis near hover]
+\label{thm:tilt-chain}
+Near hover, for small tilt angles, one horizontal axis of the quadrotor with the pitch torque $\tau$ as its input obeys
+\begin{equation*}
+  \ddot x = g\,\theta, \qquad J\,\ddot\theta = \tau ,
+\end{equation*}
+i.e.\ $x^{(4)} = (g/J)\,\tau$: a chain of four integrators. With the state $(x, \dot x, \theta, \dot\theta)$ it is controllable in the sense of \cref{thm:damper-placement}.
+\end{theorem}
+\begin{proof}
+With the altitude held, $T\cos\theta = mg$ and the horizontal force is $T\sin\theta = mg\tan\theta \approx mg\,\theta$. For the controllability matrix: $B = (0, 0, 0, 1/J)^\T$, $AB = (0, 0, 1/J, 0)^\T$, $A^2B = (0, g/J, 0, 0)^\T$, $A^3B = (g/J, 0, 0, 0)^\T$ — four independent vectors.
+\end{proof}
+
+Controllable, although underactuated: the two notions are different. The quadrotor can reach any position and any heading; what it cannot do is hold an arbitrary \emph{attitude} while staying in place. The theorem also says that a single state-feedback law on four states would do the job of the cascade. Lesson~II.1 takes that route; the cascade of the next lesson is the classical one.
+
+\begin{lookahead}
+\begin{itemize}[leftmargin=1.2em]
+  \item The backwards reading of \cref{eq:tilt-acc} — position determines attitude — is called \emph{differential flatness}. Lesson~II.11 uses it to compute, from a planned path alone, the attitude and the body rates the drone will need, before any error appears.
+  \item Large tilts need care: angles are a poor description of attitude beyond small ones. Lesson~II.10 flips the drone by $170^\circ$ and compares three ways to measure an attitude error.
+  \item A quadrotor that loses a motor has three inputs for six degrees of freedom. It can still fly — by giving up its heading and spinning (Lesson~III.27).
+  \item A rocket balancing on its engine tilts its thrust with a gimbal to move sideways, and at first moves the \emph{wrong} way (Lessons~IV.7 and~IV.10). A satellite has no gravity to lean against: its attitude and its position are separate problems (IV.18).
+  \item The cascade that turns a desired position into motor commands is the next lesson.
+\end{itemize}
+\end{lookahead}
 
 \begin{remember}
 \begin{itemize}
-  \item A point mass with a free force vector is controlled by three independent PIDs; the integral holds the steady wind force.
-  \item A quadrotor's force is always along its body axis: $\vec F = T\hat b$. To move or to resist a horizontal force it must tilt.
-  \item In a steady wind it leans by $\arctan(F_{drag}/mg)$ into the wind.
-  \item Tilting adds rotational dynamics: from motors to position there is a chain of integrators — the reason for cascaded control.
+  \item A point mass with a free force vector is three decoupled copies of the altitude loop; the integral of each axis holds the steady wind force.
+  \item A quadrotor's force is always along its body axis: $\vec F = T\hat b$. Four inputs, six degrees of freedom: underactuated.
+  \item To hold against a horizontal force $F_h$ it leans by $\arctan(F_h/mg)$ and raises its thrust to $mg/\cos\theta$. A tilt of $\theta$ gives the sideways acceleration $g\tan\theta$.
+  \item A desired acceleration determines the attitude: $T\hat b = m(\vec a_{sp} - \vec g)$.
+  \item From motor torque to position there are four integrators — the reason for cascaded control.
 \end{itemize}
 \end{remember}
 
@@ -82,12 +198,22 @@ Ingenuity, the small helicopter that flew on Mars 72 times between April 2021 an
 \end{curiosity}
 
 \begin{exercises}
-\exercise[1] At L2 with a \SI{4}{m/s} wind, the horizontal I term is switched off (the horizontal $K_p$ is 4). How far downwind does the drone settle?
-\answer{$e_{ss} = 1.92/4 \approx \SI{0.48}{m}$.}
-\exercise[1] The maximum tilt of the L3 controller is $35^\circ$. What is the strongest steady wind in which it can still hold position (use the drag law and ignore everything else)?
-\answer{$c_h w^2 = mg\tan35^\circ = 6.87$, $w = \sqrt{6.87/0.12} = \SI{7.6}{m/s}$. (The thrust needed is $mg/\cos35^\circ = \SI{12}{N}$, well within the limit.)}
-\exercise[2] A quadrotor holding altitude while tilted by $\theta$ must produce $T = mg/\cos\theta$. With \SI{24.4}{N} of total thrust and $m = \SI{1}{kg}$, what is the largest tilt at which it can still hold altitude, and the largest horizontal acceleration at that tilt?
-\answer{$\cos\theta = 9.81/24.4$, $\theta = 66^\circ$; horizontal acceleration $g\tan\theta = \SI{22}{m/s^2}$.}
-\exercise[3] Count the integrators from torque to position along one horizontal axis for small angles, write the linear model and its transfer function $X(s)/\tau(s)$.
-\answer{$I\ddot\theta = \tau$, $\ddot x = g\theta$ (small angles, $T \approx mg$): $X/\tau = g/(I s^4)$ — four integrators (plus the motor lag in front).}
+\exercise[1] At L2 with a steady \SI{4}{m/s} wind, the horizontal I term is switched off. How far downwind does the drone settle? And in a \SI{6}{m/s} wind — does the force limit of \SI{5}{N} matter?
+\answer{$1.92/4 = \SI{0.48}{m}$. At \SI{6}{m/s}: drag \SI{4.32}{N}, droop \SI{1.08}{m}; below the \SI{5}{N} limit, so it still holds.}
+\exercise[1] The L3 quadrotor hovers in a steady \SI{6}{m/s} wind. Compute its tilt and its thrust.
+\answer{$F = \SI{4.32}{N}$, $\theta = \arctan(4.32/9.81) = 23.8^\circ$, $T = \SI{10.7}{N}$.}
+\exercise[1] A quadrotor holding its altitude while tilted by $\theta$ must produce $T = mg/\cos\theta$. With \SI{24.4}{N} of total thrust and $m = \SI{1}{kg}$, what is the largest tilt at which it can still hold altitude, and the horizontal acceleration there?
+\answer{$\cos\theta = 9.81/24.4$, $\theta = 66^\circ$; $g\tan\theta = \SI{22}{m/s^2}$.}
+\exercise[2]\exkind{derive} Using Example~\ref{ex:tilt-time}, estimate the shortest time in which the quadrotor could move \SI{1}{m} sideways from rest to rest, tilting at most $35^\circ$. Treat the four tilt changes (tilt, reverse, level — the reversal counts twice) as taking \SI{0.13}{s} per $35^\circ$, and the rest as constant acceleration. Compare with the \SI{2}{s} or so that the cascade of \cref{fig:cascade-loops} needs.
+\answer{At $a = \SI{6.9}{m/s^2}$, accelerate over \SI{0.5}{m} and brake over \SI{0.5}{m}: $2\sqrt{2 \cdot 0.5/6.9} = \SI{0.76}{s}$, plus about $4 \times \SI{0.13}{s}$ of tilting: roughly \SI{1.3}{s}. The cascade is tuned for damping, not for minimum time.}
+\exercise[2]\exkind{derive} Show that the set of accelerations of \cref{eq:tilt-acc}, over all attitudes and $0 \le T \le T_{max}$, is the ball of radius $T_{max}/m$ centred on $\vec g$. Which accelerations can the drone produce while keeping its altitude (zero vertical acceleration)? Evaluate the largest one.
+\answer{$|\vec a - \vec g| = T/m \le T_{max}/m$, and every point of the ball is reached by choosing $\hat b$ and $T$. With $a_y = 0$: $|\vec a_h|^2 + g^2 \le (T_{max}/m)^2$, so $|\vec a_h| \le \sqrt{24.4^2 - 9.81^2} = \SI{22.3}{m/s^2}$.}
+\exercise[2]\exkind{derive} In Example~\ref{ex:tilt-aircraft}, which bank angle doubles the apparent weight of the passengers, and what is the radius of the turn at \SI{60}{m/s}?
+\answer{$1/\cos\varphi = 2$: $\varphi = 60^\circ$. $R = V^2/(g\tan\varphi) = 3600/17.0 = \SI{212}{m}$.}
+\exercise[2]\exkind{fly} At L3, set the mean wind to \SI{6}{m/s} with gusts and turbulence switched off, and read the pitch angle and the total thrust once the drone has settled. Compare with Exercise~12.2. Then raise the wind to \SI{9}{m/s}: what happens, and which limit is responsible (\cref{thm:tilt-hover})?
+\answer{About $24^\circ$ and \SI{10.7}{N}. At \SI{9}{m/s} the drag is \SI{9.7}{N}, which needs $44.7^\circ$; the controller's $35^\circ$ tilt limit allows only \SI{6.9}{N}, and the drone is blown downwind until its own speed reduces the relative wind.}
+\exercise[2]\exkind{code} In \src{src/control/pointmass.ts} the L2 controller limits the horizontal force to \param{control.maxHForce}. Replace the fixed limit by the one a real quadrotor would have at its tilt limit, $\hat m g\tan\theta_{max}$ with $\theta_{max}$ from \param{control.l3.maxTiltDeg}, and predict the strongest steady wind the L2 drone can then hold.
+\answer{$9.81\tan35^\circ = \SI{6.9}{N}$ instead of \SI{5}{N}; the wind limit rises from $\sqrt{5/0.12} = \SI{6.5}{m/s}$ to \SI{7.6}{m/s}.}
+\exercise[3]\exkind{derive} Drag changes the tilt of a moving drone too. The L3 drone flies at a constant horizontal speed $v$ in still air. Find its tilt as a function of $v$, and the speed at which the tilt limit of $35^\circ$ is reached — the top speed of the simulated drone.
+\answer{Drag $c_hv^2$ opposes the motion; equilibrium as in \cref{thm:tilt-hover}: $\tan\theta = c_hv^2/(mg)$. $35^\circ$ at $v = \sqrt{6.87/0.12} = \SI{7.6}{m/s}$.}
 \end{exercises}

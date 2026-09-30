@@ -2,30 +2,79 @@
 \label{les:windup}
 
 \lead{\setupcard{\setuprow{Level}{L1}\setuprow{Motors}{weak: \SI{3}{N} each, \SI{12}{N} in all}\setuprow{Controller}{full PID with $K_i = 3$ and no anti-windup}\setuprow{Event}{at $t = \SI{8}{s}$ the setpoint jumps to \SI{6}{m}}}%
-The integral's memory is its strength. This lesson shows when it becomes a weakness. The motors are made weak — together they can lift only a little more than the drone's weight — and the setpoint jumps four metres up. The controller asks for far more than the motors can give, the integral keeps accumulating the error of the long slow climb, and when the drone finally arrives it cannot stop.}
+The integral's memory is its strength. This lesson shows when it becomes a weakness. The motors are made weak — together they can lift only a little more than the drone's weight — and the setpoint jumps four metres up. The controller asks for far more than the motors can give, the integral keeps accumulating the error of the long slow climb, and when the drone finally arrives it cannot stop. We predict how far it overshoots, and then cure it in three different ways.}
 
 \section{Actuators have limits}
 
-Every actuator has a range. A motor cannot spin faster than its maximum, nor push downwards; a valve cannot open more than fully; an aileron stops at its hinge limit. In the simulator each motor delivers between \SI{0}{N} and $f_{max}$, and the controller output is clipped to the total range:
-\begin{equation}
-  T = \sat(u) = \min\big(\max(u,\ T_{min}),\ T_{max}\big),\qquad T_{min} = 0,\ T_{max} = 4 f_{max}.
-\end{equation}
-When $u$ is outside the range the actuator is \term{saturated}: the loop is effectively open, since any change of the command within the saturated region changes nothing.
+Every actuator has a range. A motor cannot spin faster than its maximum, nor push downwards; a valve cannot open more than fully; an aileron stops at its hinge limit. In the simulator each motor delivers between \SI{0}{N} and $f_{max}$, and the controller output is clipped to the total range.
 
-In this lesson $f_{max} = \SI{3}{N}$, so $T_{max} = \SI{12}{N}$ against a weight of \SI{9.81}{N}. The largest upward acceleration is $(12 - 9.81)/1 = \SI{2.19}{m/s^2}$, and a \SI{4}{m} climb takes, at the very least, about two seconds of full throttle followed by braking.
+\begin{definition}{Saturation}
+The \term{saturation function} clips a command to the range the actuator can deliver:
+\begin{equation}\label{eq:windup-sat}
+  \sat(u) = \begin{cases} u_{max} & u > u_{max},\\ u & u_{min} \le u \le u_{max},\\ u_{min} & u < u_{min}.\end{cases}
+\end{equation}
+The actuator is \term{saturated} when $u$ lies outside the range. For the drone $u_{min} = 0$ and $u_{max} = 4 f_{max}$, and the thrust that acts on it is $T = \sat(u)$.
+\end{definition}
+
+While the actuator is saturated, the loop is effectively open: the controller may compute whatever it likes, the drone receives the same thrust. A change of the command \emph{within} the saturated region changes nothing.
+
+In this lesson $f_{max} = \SI{3}{N}$, so $u_{max} = \SI{12}{N}$ against a weight of \SI{9.81}{N}. The motors can spare only \SI{2.19}{N} for accelerating upwards.
+
+\begin{example}[The fastest possible climb]
+\label{ex:windup-climb}
+How long does the drone need to climb the \SI{4}{m} from \SI{2}{m} to \SI{6}{m} at full thrust?
+
+\textbf{Step 1 — without air.} The net force is $12 - 9.81 = \SI{2.19}{N}$, the acceleration $a = \SI{2.19}{m/s^2}$. From $h = \tfrac12 a t^2$: $t = \sqrt{2 \cdot 4/2.19} = \SI{1.91}{s}$, arriving at $a t = \SI{4.2}{m/s}$.
+
+\textbf{Step 2 — but the air resists.} At \SI{4}{m/s} the drag would be $c_v v^2 = 0.25 \cdot 16 = \SI{4}{N}$, more than the \SI{2.19}{N} available. The drone can never go that fast. Its speed is limited to the \emph{terminal velocity}, where drag equals the spare thrust: $v_t = \sqrt{2.19/0.25} = \SI{2.96}{m/s}$.
+
+\textbf{Step 3 — the climb with drag.} The equation $m\dot v = ma - c_v v^2$ is the one solved in \lessonref{les:meet} for the falling drone, with the sign reversed: $v(t) = v_t\tanh(a t/v_t)$ and
+\begin{equation}\label{eq:windup-climb}
+  y(t) - y_0 = \frac{v_t^2}{a}\,\ln\cosh\frac{a\,t}{v_t} .
+\end{equation}
+
+\textbf{Step 4 — solve for the arrival.} With $v_t^2/a = 8.76/2.19 = \SI{4.00}{m}$ we need $\ln\cosh(at/v_t) = 1.00$, so $\cosh(at/v_t) = e = 2.718$, $at/v_t = 1.657$ and $t = 1.657 \cdot 2.96/2.19 = \SI{2.24}{s}$.
+
+\textbf{Step 5 — check.} The simulator's drone passes \SI{6}{m} \SI{2.28}{s} after the step (the motors need a moment to spin up), at \SI{2.69}{m/s}.
+\end{example}
 
 \section{How the integral winds up}
 
-Now follow the default PID ($K_i = 3$ here) through the step to \SI{6}{m} at $t = \SI{8}{s}$, in \cref{fig:windup}:
+Now follow the PID of this lesson ($K_p = 10$, $K_i = 3$, $K_d = 7$) through the step to \SI{6}{m} at $t = \SI{8}{s}$, in \cref{fig:windup}:
 \begin{enumerate}
-  \item The error jumps to \SI{4}{m}. P alone asks for $K_p\cdot 4 = \SI{40}{N}$ extra — the output saturates at once (red shading).
-  \item The drone accelerates at the most \SI{2.19}{m/s^2}. The error falls only slowly, and the whole time the integral grows: $\dot I = K_i\,e$ with $e$ of several metres. It reaches \SI{17}{N} — almost twice the drone's weight.
-  \item When the drone reaches \SI{6}{m}, P and D have come down, but the integral is still huge. It keeps the output at full thrust, and the drone shoots past the setpoint.
+  \item The error jumps to \SI{4}{m}. P alone asks for $K_p\cdot 4 = \SI{40}{N}$ extra. The output saturates at once (red shading).
+  \item The drone climbs as in Example~\ref{ex:windup-climb}. The error falls only slowly, and the whole time the integral grows: $\dot I = K_i\,e$ with $e$ of several metres.
+  \item When the drone reaches \SI{6}{m}, P has come down to zero and D is braking, but the integral is huge. It keeps the thrust high, and the drone shoots past the setpoint.
   \item Only now does the error turn negative and the integral start to unwind. The drone peaks at \SI{7.39}{m}, \SI{1.4}{m} too high, and takes ten seconds to come back.
 \end{enumerate}
 This is \term{integrator windup}. The integral, designed to learn a constant load, has instead \enquote{learned} the actuator's limitation — something it can do nothing about.
 
 \widefig{windup_compare}{The step to \SI{6}{m} with weak motors, three ways. Without anti-windup (red) the integral climbs to \SI{17}{N} during saturation and the drone overshoots by \SI{1.4}{m}. Conditional integration (green) freezes the integral while saturated: overshoot \SI{0.23}{m}. Back-calculation (blue) actively bleeds the integral, even below zero: no overshoot at all, but a slower final approach.}{fig:windup}
+
+The size of the windup can be computed in advance.
+
+\begin{example}[How large the integral gets, and how far the drone overshoots]
+\label{ex:windup-size}
+Predict the integral at the moment the drone reaches the setpoint, and the peak of the overshoot.
+
+\textbf{Step 1 — the error during the climb.} While the thrust is saturated the altitude follows \cref{eq:windup-climb}, so $e(t) = 4 - 4.00\,\ln\cosh(0.740\,t)$, from 4 at $t = 0$ to 0 at $t = \SI{2.24}{s}$.
+
+\textbf{Step 2 — the integral.} $I = K_i\int_0^{2.24} e\,\dd t$. The integral of $\ln\cosh$ has no elementary form, so we evaluate it numerically: in steps of \SI{0.28}{s} the error is $4.00,\ 3.91,\ 3.67,\ 3.27,\ 2.76,\ 2.15,\ 1.48,\ 0.76,\ 0$. The trapezoid rule gives $\int e\,\dd t \approx \SI{5.60}{m.s}$ (a finer step, \SI{5.62}{m.s}), so
+\begin{equation*}
+  I \approx 3 \cdot 5.62 = \SI{16.9}{N}.
+\end{equation*}
+A rough check: if the error fell linearly from 4 to 0, the area would be $\tfrac12 \cdot 4 \cdot 2.24 = 4.5$; the true curve is fuller than a triangle, because the drone starts from rest.
+
+\textbf{Step 3 — what that means.} \SI{16.9}{N} is 1.7 times the drone's weight. At the setpoint P is zero and the drone moves up at \SI{2.7}{m/s}, so D contributes $-7 \cdot 2.7 = \SI{-18.8}{N}$: the command is $9.81 + 16.9 - 18.8 = \SI{7.9}{N}$, only \SI{1.9}{N} below the weight. The brake is weak, and it is D alone that provides it.
+
+\textbf{Step 4 — the overshoot.} From here the loop is no longer saturated, and its motion is the third-order loop of \lessonref{les:integral}, started from $x = 0$, $\dot x = \SI{2.7}{m/s}$, $I = \SI{16.9}{N}$. Solving it (with the drag kept, step by step on a computer) gives a peak at \SI{7.37}{m}, \SI{3.6}{s} after the step.
+
+\textbf{Step 5 — check} (\cref{fig:windup-predict}). The simulator: integral \SI{17.2}{N} at the crossing, peak \SI{7.39}{m}. The model has no motor lag, and is off by two centimetres.
+
+\textbf{Step 6 — the scaling.} The integral at arrival is $K_i$ times an area that the gains do not influence — it is fixed by the motors and the air. So the windup is proportional to $K_i$: the same model gives a peak of \SI{6.51}{m} for $K_i = 1$ and \SI{8.41}{m} for $K_i = 6$.
+\end{example}
+
+\simfig{windup_predict}{Prediction next to measurement for the run without anti-windup. Left: the altitude; dotted is the full-thrust climb \eqref{eq:windup-climb}, dashed the model of Example~\ref{ex:windup-size} (saturated climb, then the PID loop). Right: the integral; the dot marks the predicted value when the drone reaches the setpoint.}{fig:windup-predict}
 
 \section{Anti-windup}
 
@@ -40,14 +89,52 @@ The remedy is to tell the integrator about the saturation. The simulator offers 
     I_k = \begin{cases} I_{k-1} & \text{if } u > u_{max},\ e_k > 0 \ \text{ or }\ u < u_{min},\ e_k<0,\\ I_{k-1} + K_i e_k\Delta t & \text{otherwise.}\end{cases}
   \end{equation*}
   \item[Back-calculation.] Feed the part of the command the actuator could not deliver back into the integrator, with a tracking gain $K_b$:
-  \begin{equation*}
+  \begin{equation}\label{eq:windup-bc}
     \dot I = K_i\,e + K_b\,\big(\sat(u) - u\big).
-  \end{equation*}
-  While saturated, $\sat(u) - u$ is negative (for the upper limit) and drags the integral down until the unsaturated command sits near the limit.
+  \end{equation}
+  While saturated at the upper limit, $\sat(u) - u$ is negative and drags the integral down.
 \end{description}
 \end{definition}
 
-\Cref{fig:windup} compares them. Conditional integration stops the integral at \SI{2.8}{N} and the overshoot shrinks from \SI{1.39}{m} to \SI{0.23}{m}. Back-calculation removes the overshoot entirely — but look at the blue integral: it goes \emph{negative}, down to \SI{-18}{N}. During the climb the P term alone asks for tens of newtons, so back-calculation pulls the integral far down to bring the total $u$ back to the limit. After the climb that negative integral holds the drone back, and the last half-metre takes several seconds. The tracking gain $K_b$ decides how hard the integral is dragged; smaller values sit between the two behaviours.
+\begin{example}[What back-calculation does to the integral]
+\label{ex:windup-bc}
+Follow the integral under back-calculation with $K_b = 2$ in the first instants after the step, and explain the blue curves of \cref{fig:windup}.
+
+\textbf{Step 1 — split the command.} Write $u = w + I$, where $w = \hat m g + K_p e - K_d\dot y$ collects everything but the integral. Just after the step $w = 9.81 + 40 - 0 = \SI{49.8}{N}$.
+
+\textbf{Step 2 — the integral's own equation.} While saturated at $u_{max}$, \cref{eq:windup-bc} reads $\dot I = K_i e + K_b(u_{max} - w - I)$, or
+\begin{equation*}
+  \dot I + K_b\,I = K_b\,(u_{max} - w) + K_i\,e .
+\end{equation*}
+A first-order equation: the integral is pulled, with the time constant $1/K_b = \SI{0.5}{s}$, towards the target $I^\circ = u_{max} - w + K_i e/K_b$.
+
+\textbf{Step 3 — the target.} $I^\circ = 12 - 49.8 + 3 \cdot 4/2 = \SI{-31.8}{N}$. The integral does not wait at zero; it runs towards a large \emph{negative} value, the one that would bring the total command down to the limit (plus a small offset).
+
+\textbf{Step 4 — but the target moves.} As the drone climbs, $e$ falls and the velocity grows, so $w$ falls and the target rises. The integral chases it, reaches about \SI{-18}{N} after \SI{0.7}{s}, and then follows it back up.
+
+\textbf{Step 5 — the consequence.} The command leaves saturation early, after \SI{0.94}{s} instead of \SI{2.1}{s}, because the integral has cancelled most of the P term. From then on the negative integral holds the drone back: it never overshoots, but it needs \SI{9.7}{s} to come within \SI{5}{cm} of the setpoint.
+
+\textbf{Step 6 — a gentler gain.} With $K_b = 0.3$ the target is $12 - 49.8 + 3 \cdot 4/0.3 = +\SI{2.2}{N}$ and the time constant \SI{3.3}{s}: the integral is hardly held back, reaches \SI{6.8}{N}, and the drone overshoots to \SI{6.55}{m}. The tracking gain sets where between \enquote{no anti-windup} and \enquote{integral cancels P} the scheme lands.
+\end{example}
+
+\begin{table}[h]
+\centering\small\sffamily
+\begin{tabular}{lrrrr}
+\toprule
+strategy & largest $|I|$ & peak & saturated & settled\\
+\midrule
+none & \SI{17.2}{N} & \SI{7.39}{m} & \SI{2.12}{s} & \SI{12.6}{s}\\
+limit, \SI{3}{N} & \SI{3.0}{N} & \SI{6.24}{m} & \SI{1.64}{s} & \SI{8.8}{s}\\
+conditional & \SI{2.8}{N} & \SI{6.23}{m} & \SI{1.54}{s} & \SI{8.8}{s}\\
+back-calc., $K_b = 0.3$ & \SI{6.8}{N} & \SI{6.55}{m} & \SI{1.72}{s} & \SI{10.5}{s}\\
+back-calc., $K_b = 2$ & \SI{18.3}{N} & \SI{6.00}{m} & \SI{0.94}{s} & \SI{9.7}{s}\\
+\bottomrule
+\end{tabular}
+\caption{Five runs of the same step, measured in the simulator: the largest integral, the peak altitude, the time spent saturated and the time after which the drone stays within \SI{5}{cm} of the setpoint. No strategy is best in every column: the ones that hold the integral near zero overshoot a little and settle first; strong back-calculation never overshoots and arrives late.}
+\label{tab:windup}
+\end{table}
+
+\Cref{tab:windup} shows that anti-windup is a choice, not a switch. Conditional integration is the default of Anemostatos, and of many industrial controllers, because it has no parameter to tune and never makes things worse.
 
 \begin{keyidea}[Saturation turns feedback off]
 While an actuator is saturated, the loop is open: the plant receives the same input whatever the controller computes. Any controller state that keeps integrating the error in this phase — an integral, a filter, an observer — collects nonsense. Anti-windup is the discipline of keeping controller states consistent with what the actuator \emph{actually} did. We will meet the same idea again in Part II: an observer must be fed the saturated input (\lessonref{les:adrc}), and model predictive control plans with the limits from the start (\lessonref{les:mpc}).
@@ -60,7 +147,7 @@ While an actuator is saturated, the loop is open: the plant receives the same in
   \item The lesson sets \param{drone.maxMotorThrust = 3}, \param{control.alt.ki = 3}, \param{control.alt.antiWindup = 'none'}, and a scripted setpoint jump to \SI{6}{m} at $t = \SI{8}{s}$.
   \item Saturated intervals are shaded red in the \ui{PID terms} chart (telemetry channel \texttt{alt.sat}); a motor at its limit also glows red on the 3D model.
   \item \ui{Snapshot} (\key{S}) freezes the current run as a grey \emph{ghost} trace; the next run is drawn over it. The seed stays the same, so the comparison is fair.
-  \item The default tune of Anemostatos uses conditional integration (\param{antiWindup: 'clamp'}).
+  \item The default tune of Anemostatos uses conditional integration (\param{antiWindup: 'clamp'}); the tracking gain is \param{control.alt.kb}, the limit \param{control.alt.iLimit}.
 \end{itemize}
 \end{inapp}
 
@@ -68,17 +155,84 @@ While an actuator is saturated, the loop is open: the plant receives the same in
 \begin{enumerate}
   \item Wait until it settles, then press \ui{Snapshot} (\key{S}).
   \item Set \ui{Anti-windup} to \ui{conditional integration}, press \key{R}. The grey ghost is the old run.
-  \item Try \ui{back-calculation}, then change its gain $K_b$ from 2 to 0.3. Where between the two behaviours does it land?
-  \item Try \ui{integral limit} with limit 10, then 3. Why does 3 not work well when the drone is heavy?
+  \item Try \ui{back-calculation}, then change its gain $K_b$ from 2 to 0.3. Compare with \cref{tab:windup}.
+  \item Try \ui{integral limit} with limit 10, then 3. Then make the drone heavier (\ui{Physics\then Mass} = \SI{1.2}{kg}, which the controller does not know) with the limit at 1. What goes wrong?
 \end{enumerate}
-\predict{with anti-windup off, does a bigger $K_i$ make the overshoot bigger or smaller? What about the time spent saturated?}
+\predict{with anti-windup off, does a bigger $K_i$ make the overshoot bigger or smaller? By how much, for $K_i = 6$? (Step~6 of Example~\ref{ex:windup-size}.)}
 \end{trythis}
+
+\section{The engineer's view: a loop that opens and closes}
+
+\subsection{Two systems in one}
+A loop with a saturating actuator is two different systems that take turns. Inside the limits it is the linear loop of \lessonref{les:integral}, with three poles in the left half-plane. At a limit it is the drone under a constant force, \cref{eq:windup-climb} — and a controller that runs on unobserved, because nothing it does reaches the plant. The state of the whole loop is $(x, \dot x, I)$ in both phases; what changes is the equation. Such a system is called \term{piecewise linear} or \term{switched}, and none of the tools of Lessons 2–5 applies to it as a whole: it has no poles. Example~\ref{ex:windup-size} analysed it the only way possible, phase by phase, passing the state from one to the next.
+
+\subsection{Why the integrator is the problem}
+In the saturated phase the drone's own state behaves well: the altitude simply approaches the setpoint as fast as the motors allow, which is the best that can be done. P and D behave well too: they are functions of the present state and forget the past. Only the integral carries something out of the saturated phase that it should not — the memory of an error that no amount of pushing could have reduced. This gives a test for any controller with internal states: \emph{what does each state do while the actuator is not listening?}
+
+\subsection{Anti-windup as tracking}
+\Cref{eq:windup-bc} has a second reading. Add and subtract to write it as
+\begin{equation}
+  \dot I = K_i e + K_b\big(T - u\big), \qquad T = \sat(u) \ \text{the thrust actually applied.}
+\end{equation}
+The integrator is driven not only by the error but also by the difference between what the actuator did and what the controller asked. In steady saturation it settles where the two agree (up to $K_ie/K_b$). The controller state is made to \emph{track} the real input. This is how an observer works (Part~II), and it is the form in which anti-windup generalises to every controller with memory: feed the controller the input that was really applied.
+
+\begin{example}[A satellite that turns too far]
+\label{ex:windup-sat}
+The satellite of Example~\ref{ex:spring-sat} ($J = \SI{12}{kg.m^2}$) is turned by a reaction wheel that delivers at most \SI{0.05}{N.m}. Its controller has $K_p = \SI{0.3}{N.m/rad}$, $K_d = \SI{2.66}{N.m.s/rad}$ and an integral with $K_i = \SI{0.01}{N.m/(rad.s)}$ against the slow torque of sunlight. It is commanded to turn by $60^\circ$. Estimate the windup.
+
+\textbf{Step 1 — saturation.} $60^\circ = \SI{1.047}{rad}$; the P term asks for $0.3 \cdot 1.047 = \SI{0.31}{N.m}$, six times the limit.
+
+\textbf{Step 2 — the fastest turn.} At full torque the angular acceleration is $0.05/12 = \SI{0.0042}{rad/s^2}$; there is no air, so $\theta = \tfrac12\alpha t^2$ and the turn takes $t = \sqrt{2 \cdot 1.047/0.0042} = \SI{22.4}{s}$ (if nothing brakes).
+
+\textbf{Step 3 — the area.} $e(t) = 1.047 - \tfrac12\alpha t^2$, so $\int_0^{22.4} e\,\dd t = 1.047 \cdot 22.4\,(1 - \tfrac13) = \SI{15.6}{rad.s}$.
+
+\textbf{Step 4 — the integral.} $I = 0.01 \cdot 15.6 = \SI{0.156}{N.m}$: three times the largest torque the wheel can produce. The wheel would stay saturated long after the target is passed, and in space no drag helps to stop the turn.
+
+\textbf{Step 5 — the practice.} Spacecraft do not step their attitude commands. They plan a slew that respects the torque and the wheel speed from the start (Lesson~IV.18), and they freeze their integrators while it runs.
+\end{example}
+
+\subsection{In formal terms}
+
+\begin{theorem}[An unreachable setpoint has no equilibrium]
+\label{thm:windup-noeq}
+In the loop of \cref{thm:droop-integral}, let the load be constant with $mg - d > u_{max}$ or $mg - d < u_{min}$. Then the loop has no equilibrium, and with the unprotected integrator $\dot I = K_i e$ either $|I(t)| \to \infty$ or the error does not converge.
+\end{theorem}
+\begin{proof}
+An equilibrium needs the thrust $T^* = mg - d$, which the actuator cannot deliver (\cref{thm:droop-integral}\,(ii)). If the error converged to a limit $e_\infty$, that limit could not be zero — then the state would converge to an equilibrium — and so $I(t) = I(0) + K_i\int_0^t e \to \pm\infty$.
+\end{proof}
+
+\begin{theorem}[Back-calculation is a stable filter]
+\label{thm:windup-bc}
+Let $u = w + I$ with the integrator \eqref{eq:windup-bc}, $K_b > 0$, and suppose that the output is saturated at $u^\circ \in \{u_{min}, u_{max}\}$ on an interval $[t_0, t_1]$. Then on that interval
+\begin{equation*}
+  I(t) = e^{-K_b(t - t_0)}\,I(t_0) + \int_{t_0}^{t} e^{-K_b(t - \tau)}\,\big(K_b\,(u^\circ - w(\tau)) + K_i\,e(\tau)\big)\,\dd\tau .
+\end{equation*}
+In particular, if $|u^\circ - w| \le W$ and $|e| \le E$ there, then $|I(t)| \le |I(t_0)| + W + K_iE/K_b$: the integral stays bounded however long the saturation lasts.
+\end{theorem}
+\begin{proof}
+On the interval $\sat(u) = u^\circ$, so \cref{eq:windup-bc} is the linear equation $\dot I = -K_b I + K_b(u^\circ - w) + K_i e$, whose solution is the formula (\cref{thm:meet-solution}). The bound follows from $\int_{t_0}^t e^{-K_b(t-\tau)}\dd\tau \le 1/K_b$.
+\end{proof}
+
+Compare the two theorems. Without protection, a setpoint out of reach makes the integral grow without bound; with back-calculation it cannot. Conditional integration gives a bound too: while the output is saturated and the error pushes outwards the integral does not move at all.
+
+What none of these schemes provides is a guarantee of \emph{stability} of the switched loop. For the altitude loop one can be given — the plant is a chain of integrators and the argument uses a Lyapunov function, as in \lessonref{les:damper} — but for plants that are unstable on their own, a saturated actuator means a region of states from which no control can recover. The general theory is found in Åström and Hägglund (2006, ch.~3) and, for a modern treatment, Zaccarian and Teel (2011).
+
+\begin{lookahead}
+\begin{itemize}[leftmargin=1.2em]
+  \item An observer that is fed the \emph{commanded} thrust winds up exactly as an integrator does; fed the applied thrust, it does not (Lesson~II.5).
+  \item Model predictive control does not repair the effect of limits afterwards: it plans with them, and its plan never asks for more than the motors have (Lessons~II.13 and~II.14).
+  \item The switched loop needs its own stability tools: Lyapunov functions for large motions (Lesson~III.7) and the describing function, which predicts the oscillation of a saturating loop (III.8).
+  \item Limits on \emph{rate} are worse than limits on size, because they add a delay that grows with the amplitude. They caused the accidents of the Out in the World page; Lesson~IV.16 puts a pilot model and a rate-limited elevator in one loop.
+  \item The fastest climb of Example~\ref{ex:windup-climb} is the first half of a \emph{bang-bang} manoeuvre: full thrust, then full brake. Lesson~IV.2 proves that this is the time-optimal way to change altitude, and IV.4 lands a rocket with it.
+\end{itemize}
+\end{lookahead}
 
 \begin{remember}
 \begin{itemize}
-  \item Real actuators saturate. While saturated, the loop is open.
-  \item An integral that keeps integrating during saturation winds up, and must unwind by overshooting.
-  \item Anti-windup keeps the integral consistent with what the actuator delivered: conditional integration freezes it, back-calculation bleeds it with a gain $K_b$.
+  \item Real actuators saturate. While saturated, the loop is open and the plant follows the limit, not the controller.
+  \item An integral that keeps integrating during saturation winds up in proportion to $K_i$ and to the area of the error during the saturated phase, and must unwind by overshooting.
+  \item Conditional integration freezes the integral; back-calculation pulls it, with the time constant $1/K_b$, to the value that puts the command at the limit.
+  \item Analyse a saturating loop phase by phase, passing the state from one phase to the next.
   \item The general lesson: controller states must be driven by what really happened, not by what was requested.
 \end{itemize}
 \end{remember}
@@ -91,12 +245,22 @@ Saturation has also crashed aircraft. On 25 April 1992 the YF-22 prototype, the 
 \end{curiosity}
 
 \begin{exercises}
-\exercise[1] With $f_{max} = \SI{3}{N}$ per motor, what is the heaviest drone that can still hover? What is the largest downward acceleration?
-\answer{$4 \cdot 3 = \SI{12}{N}$ lifts \SI{1.22}{kg}. With zero thrust the drone falls at $g$ (minus drag): the largest downward acceleration is $\approx\SI{9.81}{m/s^2}$.}
-\exercise[1] During the \SI{2.1}{s} of saturation in \cref{fig:windup} the error falls roughly linearly from \SI{4}{m} to \SI{0.5}{m}. Estimate the integral at the end of saturation with $K_i = 3$ and compare with the chart.
-\answer{$I \approx K_i \cdot \bar e \cdot \Delta t = 3 \cdot 2.25 \cdot 2.1 \approx \SI{14}{N}$; the chart shows about \SI{17}{N} at its peak (the error is not quite linear, and the integral keeps growing briefly after saturation ends).}
-\exercise[2] Show that in back-calculation with a constant saturated output, the integral approaches the value that makes the unsaturated command exactly equal to the limit plus $K_i e/K_b$. What does this say about choosing $K_b$?
-\answer{$\dot I = K_i e + K_b(u_{max} - u) = 0$ gives $u = u_{max} + K_i e/K_b$. A large $K_b$ keeps $u$ close to the limit (fast tracking, integral pulled far down while P is large); a small $K_b$ lets $u$ stay far above the limit (closer to no anti-windup).}
-\exercise[2] Conditional integration still ends with an integral of \SI{2.8}{N} in \cref{fig:windup}, although it is frozen during saturation. Where does it come from, and why is the resulting overshoot small?
-\answer{The integral is frozen (near zero) while the output is saturated, i.e.\ until $t \approx \SI{9.5}{s}$. It grows only afterwards, while the drone covers the last metre or so unsaturated with $e > 0$ — a small, short error, hence a small integral and a small overshoot.}
+\exercise[1] With $f_{max} = \SI{3}{N}$ per motor, what is the heaviest drone that can still hover? What is the largest downward acceleration of the \SI{1}{kg} drone?
+\answer{$4 \cdot 3 = \SI{12}{N}$ lifts \SI{1.22}{kg}. With zero thrust the drone falls at $g$ (minus drag): about \SI{9.81}{m/s^2}.}
+\exercise[1] Repeat Steps 1–4 of Example~\ref{ex:windup-climb} for a \SI{2}{m} climb. How long does it take, and how fast is the drone at the end?
+\answer{$\ln\cosh(at/v_t) = 0.5$, $\cosh = 1.649$, $at/v_t = 1.085$, $t = \SI{1.47}{s}$; $v = v_t\tanh 1.085 = \SI{2.35}{m/s}$.}
+\exercise[1] Using \cref{tab:windup}, which strategy would you choose for a drone that must never rise above its setpoint (a ceiling)? Which for the shortest settling time?
+\answer{Back-calculation with $K_b = 2$ (peak \SI{6.00}{m}); conditional integration or the integral limit (\SI{8.8}{s}).}
+\exercise[2]\exkind{derive} Show that with back-calculation and a constant saturated output the unsaturated command approaches $u_{max} + K_i e/K_b$. For $K_b \to \infty$ and $K_b \to 0$, which of the other strategies does the scheme become?
+\answer{$\dot I = 0$ in \cref{eq:windup-bc}: $u = u_{max} + K_ie/K_b$. $K_b \to \infty$: the command is held exactly at the limit — the integral cancels all excess. $K_b \to 0$: no anti-windup.}
+\exercise[2]\exkind{derive} Conditional integration ends with an integral of \SI{2.8}{N} in \cref{tab:windup}, although it is frozen during saturation. Where does it come from? Estimate it, using the fact that saturation ends \SI{1.54}{s} after the step, that the error is then \SI{1.9}{m}, and that the drone reaches the setpoint \SI{1.35}{s} later.
+\answer{It accumulates after saturation ends, while the drone covers the last \SI{1.9}{m} with $e > 0$. A roughly triangular area: $3 \cdot \tfrac12 \cdot 1.9 \cdot 1.35 \approx \SI{3.8}{N}$ — the right size; the true curve is more concave and gives \SI{2.8}{N}.}
+\exercise[2]\exkind{derive} In Example~\ref{ex:windup-sat}, the designers add conditional integration. Explain why the satellite still overshoots its target if the turn is commanded as a step, and estimate the angular rate at which it would arrive if D did not brake.
+\answer{Even without windup the P and D terms are saturated for most of the turn; braking can only begin when $K_pe - K_d\dot\theta$ drops below the limit. Arrival rate without braking: $\alpha t = 0.0042 \cdot 22.4 = \SI{0.093}{rad/s}$, which the wheel needs another \SI{22}{s} to remove.}
+\exercise[2]\exkind{fly} Fly the lesson with no anti-windup and $K_i = 1$, then $K_i = 6$, and read the peak altitude. Compare with Step~6 of Example~\ref{ex:windup-size}. Then plot the three overshoots against $K_i$: is the relation linear?
+\answer{About \SI{6.5}{m} and \SI{8.4}{m}. The overshoot (0.5, 1.4, 2.4\,m) grows roughly in proportion to $K_i$, a little less than linearly, because a larger integral also unwinds faster.}
+\exercise[2]\exkind{code} In \src{src/control/pid.ts} conditional integration tests whether the output \emph{would be} saturated with the new integral (\texttt{const u = p + next + d + ff}). Change the test to use the old integral instead and predict the difference: by how much can the integral now exceed the value that just saturates the output? Run \texttt{make test} and the lesson.
+\answer{By at most one step, $K_i e\,\Delta t$ — for $e = \SI{4}{m}$, $3 \cdot 4 \cdot 0.004 = \SI{0.05}{N}$. The behaviour is practically identical; the anti-windup tests still pass.}
+\exercise[3]\exkind{derive} Windup without an integral term. A P–D controller sends its D term through the low-pass filter of \lessonref{les:noise}, a state $D_f$ with $T_f\dot D_f = -D_f - K_d\dot y$. Does this state wind up during saturation in the sense of this lesson? Apply the test of the engineer's view.
+\answer{No: the filter is stable and driven by the measured velocity, not by the error or the command; during saturation it keeps tracking $-K_d\dot y$, which is still true information about the plant. States wind up when they are \emph{integrators} (or unstable) driven by signals that the saturation makes meaningless.}
 \end{exercises}

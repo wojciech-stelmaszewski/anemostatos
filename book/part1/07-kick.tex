@@ -2,60 +2,129 @@
 \label{les:kick}
 
 \lead{\setupcard{\setuprow{Level}{L1}\setuprow{Controller}{full PID with D on the error and no D filter}\setuprow{Setpoint}{a square wave of $\pm\SI{0.5}{m}$, a step every \SI{3}{s}}}%
-The D term was introduced as a damper: a force against the drone's velocity. But the formula says something slightly different — it differentiates the \emph{error}, and the error contains the setpoint. Whenever a human (or a planner) moves the setpoint abruptly, the derivative of the error is enormous. This lesson measures that spike and removes it with a one-line change.}
+The D term was introduced as a damper: a force against the drone's velocity. But the formula says something slightly different — it differentiates the \emph{error}, and the error contains the setpoint. Whenever a human (or a planner) moves the setpoint abruptly, the derivative of the error is enormous. This lesson measures that spike, follows it through the motors, and removes it with a one-line change. On the way it discovers that a controller has two jobs, which can be tuned separately.}
 
 \section{The derivative of a step}
 
-In discrete time the D term computes a difference quotient:
-\begin{equation}
-  D_k = K_d\,\frac{e_k - e_{k-1}}{\Delta t} = K_d\,\frac{(r_k - r_{k-1}) - (y_k - y_{k-1})}{\Delta t}.
+In discrete time the D term computes a difference quotient (\cref{eq:meet-discrete}):
+\begin{equation}\label{eq:kick-split}
+  D_k = K_d\,\frac{e_k - e_{k-1}}{\Delta t} = \underbrace{K_d\,\frac{r_k - r_{k-1}}{\Delta t}}_{\text{the setpoint's part}} \;-\; \underbrace{K_d\,\frac{y_k - y_{k-1}}{\Delta t}}_{\text{the drone's part}} .
 \end{equation}
-The second part is the drone's velocity, as intended. The first part is zero for a constant setpoint — and huge for one sample when the setpoint jumps. The lesson's square wave jumps by \SI{1}{m}, and with the filter on D switched off:
-\begin{equation}
-  D = K_d\,\frac{\Delta r}{\Delta t} = 7 \cdot \frac{\SI{1}{m}}{\SI{0.004}{s}} = \SI{1750}{N}.
-\end{equation}
-In continuous time it would be infinite: the derivative of a step is a Dirac delta. This spike is called the \term{derivative kick}.\aside{A setpoint step also makes the P term jump by $K_p\,\Delta r = \SI{10}{N}$. That jump is finite and is usually harmless; if it is not, the fix is \emph{setpoint weighting}, see below.}
+The second part is the damper of \lessonref{les:damper}: $K_d$ times the drone's velocity, with a minus sign. The first part is zero as long as the setpoint is constant — and huge, for one sample, when it jumps.
+
+\begin{example}[The size of the kick]
+\label{ex:kick-size}
+The lesson's square wave jumps by \SI{1}{m}; $K_d = 7$, $\Delta t = \SI{4}{ms}$, and the filter on D is switched off. What does the D term do?
+
+\textbf{Step 1 — the spike.} In the sample after the jump $r_k - r_{k-1} = \SI{1}{m}$, so the setpoint's part of \cref{eq:kick-split} is
+\begin{equation*}
+  K_d\,\frac{\Delta r}{\Delta t} = 7 \cdot \frac{1}{0.004} = \SI{1750}{N}.
+\end{equation*}
+One sample later the setpoint is constant again and the spike is gone.
+
+\textbf{Step 2 — compare.} The drone weighs \SI{9.81}{N}; all four motors together deliver \SI{24.4}{N}. The controller is asking for seventy times the maximum thrust, for four milliseconds.
+
+\textbf{Step 3 — its impulse.} Force times duration: $1750 \cdot 0.004 = \SI{7}{N.s}$ — which is $K_d\,\Delta r$, whatever the sample time. A faster controller makes the spike taller and shorter, and its area stays the same. Delivered in full to the \SI{1}{kg} drone, \SI{7}{N.s} would change its speed by \SI{7}{m/s}.
+
+\textbf{Step 4 — the limit of $\Delta t \to 0$.} The spike grows without bound while its area stays \SI{7}{N.s}: in continuous time the derivative of a step is an \emph{impulse}, the Dirac delta, and the D term is $K_d\,\Delta r\,\delta(t)$.
+\end{example}
+
+This spike is called the \term{derivative kick}.\aside{A setpoint step also makes the P term jump, by $K_p\,\Delta r = \SI{10}{N}$. That jump is finite and usually harmless; if it is not, the cure is the same (\emph{setpoint weighting}, below).}
 
 \section{What the kick does}
 
 \widefig{kick_compare}{The square-wave lesson with D acting on the error (violet) and on the measurement (green). Left: the altitude responses are indistinguishable, but the D term spikes to $\pm\SI{1750}{N}$ at every step. Right, zoomed on one step: the kick drives the motor command to its limit for one controller period; the \SI{30}{ms} motor lag smooths it into a small bump of actual thrust.}{fig:kick}
 
-\Cref{fig:kick} holds a small surprise. The spike is dramatic in the D-term chart, yet the altitude with and without it is practically the same. Two things protect the drone:
-\begin{itemize}
-  \item \textbf{Saturation.} The motor command cannot exceed \SI{24.4}{N}, so the \SI{1750}{N} request is clipped to about \SI{14}{N} of extra thrust.
-  \item \textbf{Brevity and lag.} The spike lasts exactly one controller period, \SI{4}{ms}. The motors respond with a time constant of \SI{30}{ms}, so they barely begin to spin up before the command drops back (right panel).
-\end{itemize}
-The simulated drone forgives the kick. Real systems are often less forgiving. An electric motor or its driver sees a current spike; a hydraulic valve or a steam valve is slammed open and shut and wears out; a flexible structure is struck like a bell and rings. And if the D term is low-pass filtered (as it usually is, \lessonref{les:noise}), the spike is not removed but spread out over the filter's time constant — a smaller, longer kick that the actuator does feel.
+\Cref{fig:kick} holds a small surprise. The spike is dramatic in the D-term chart, yet the altitude with and without it is practically the same. Two things protect the drone, and both can be put in numbers.
+
+\begin{example}[How much of the kick reaches the drone]
+\label{ex:kick-impulse}
+\textbf{Step 1 — saturation.} In the sample of the kick the command is $9.81 + 10 + 1750\ \si{N}$ (feedforward, P, D). The motors clip it to \SI{24.4}{N}. Without the kick the command would have been $9.81 + 10 = \SI{19.8}{N}$. The kick therefore adds at most $24.4 - 19.8 = \SI{4.6}{N}$ to the command.
+
+\textbf{Step 2 — brevity.} It does so for one period: an extra impulse of $4.6 \cdot 0.004 = \SI{0.018}{N.s}$, out of the \SI{7}{N.s} requested. The drone's speed changes by \SI{1.8}{cm/s}.
+
+\textbf{Step 3 — the motor lag.} The motors do not even follow that: with $\tau_m = \SI{30}{ms}$ they cover a fraction $1 - e^{-4/30} = 0.12$ of any change within \SI{4}{ms}.
+
+\textbf{Step 4 — check.} In the right panel of \cref{fig:kick} the two thrust curves differ by less than \SI{1}{N}, and the peak altitudes of the two runs are \SI{2.521}{m} and \SI{2.525}{m}.
+\end{example}
+
+The simulated drone forgives the kick. Real systems are often less forgiving. An electric motor or its driver sees a current spike; a hydraulic or steam valve is slammed open and shut and wears out; a flexible structure is struck like a bell and rings. And there is a case in which the kick is felt in full.
+
+\subsection{A filtered kick lasts longer}
+The D term is usually low-pass filtered (\lessonref{les:noise}). A filter does not remove the kick. It spreads it out.
+
+\begin{example}[The kick through a \SI{5}{Hz} filter]
+\label{ex:kick-filter}
+The D term passes through the first-order filter $D_k = \alpha D_{k-1} + (1-\alpha)D_k^{raw}$ with a cutoff of \SI{5}{Hz}. What does the kick look like now?
+
+\textbf{Step 1 — the filter constant.} $T_f = 1/(2\pi \cdot 5) = \SI{31.8}{ms}$, $\alpha = T_f/(T_f + \Delta t) = 31.8/35.8 = 0.888$.
+
+\textbf{Step 2 — the first sample.} The raw spike of \SI{1750}{N} enters with the weight $1 - \alpha$: $D_0 = 0.112 \cdot 1750 = \SI{195}{N}$.
+
+\textbf{Step 3 — the decay.} After that the raw input is back to normal and the filter forgets geometrically: $D_k = 195\,\alpha^k$. It falls by $1/e$ every $-\Delta t/\ln\alpha = \SI{34}{ms}$.
+
+\textbf{Step 4 — the area is unchanged.} $\sum_k D_k\,\Delta t = 195 \cdot 0.004/(1 - \alpha) = \SI{7}{N.s}$: the filter redistributes the impulse and does not reduce it.
+
+\textbf{Step 5 — how long above the limit.} The motors have \SI{4.6}{N} of headroom (Example~\ref{ex:kick-impulse}). $195\,\alpha^k > 4.6$ for $k < \ln(4.6/195)/\ln\alpha = 32$ samples: the command is saturated for \SI{0.13}{s} instead of \SI{0.004}{s}.
+
+\textbf{Step 6 — check} (\cref{fig:kick-predict}, left). The simulator's filtered D term starts at \SI{195}{N} and follows $195\,\alpha^k$ until the drone's own motion takes over; the command is saturated for \SI{0.11}{s}, and the thrust now peaks at \SI{23.9}{N} instead of \SI{17.5}{N}. This kick the motors feel.
+\end{example}
+
+\simfig{kick_predict}{Left: the D term after a setpoint step, sample by sample, on a logarithmic scale — without a filter (one sample of \SI{1750}{N}) and with a \SI{5}{Hz} filter (dots), against the geometric decay of Example~\ref{ex:kick-filter} (dashed). Right: a unit step with the setpoint entering P and I (PI-D: simulator in green, the model of Example~\ref{ex:kick-weights} dashed) and entering the integral alone (I-PD, from the model).}{fig:kick-predict}
 
 \section{Derivative on measurement}
 
-The cure follows from what we wanted in the first place. For a constant setpoint $\dot e = -\dot y$, so we may differentiate the \emph{measurement} instead of the error:
+The cure follows from what we wanted in the first place: a damper. Keep the drone's part of \cref{eq:kick-split} and drop the setpoint's part:
 \begin{equation}\label{eq:kick-dom}
   D_k = -K_d\,\frac{y_k - y_{k-1}}{\Delta t}.
 \end{equation}
-Between setpoint changes nothing changes: the damping is identical. At a setpoint change the drone's position cannot jump — it has mass — so there is no spike. In \cref{fig:kick} the green D term is smooth.
+Between setpoint changes nothing is different: for a constant setpoint $\dot e = -\dot y$ and the damping is identical. At a setpoint change the drone's position cannot jump — it has mass — so there is no spike. In \cref{fig:kick} the green D term is smooth.
 
 \begin{keyidea}[Act on the plant, not on the command]
-Terms whose job is to shape the \emph{dynamics} of the loop (like damping) should act on the measured plant output, which is continuous. Terms whose job is to track the setpoint (P and I) must see the error. Industrial controllers call the resulting structure \enquote{PI-D}: P and I on the error, D on the measurement.
+Terms whose job is to shape the \emph{dynamics} of the loop (like damping) should act on the measured plant output, which is continuous. Terms whose job is to track the setpoint must see the setpoint. Industrial controllers call the resulting structure \enquote{PI-D}: P and I on the error, D on the measurement.
 \end{keyidea}
 
 \subsection{Setpoint weighting}
-The idea generalises. Many controllers use
-\begin{equation}
-  u = K_p\,(b\,r - y) + K_i\!\int (r - y)\,\dd t + K_d\,(c\,\dot r - \dot y),
+The idea generalises. Let the setpoint enter each term with its own weight:
+\begin{equation}\label{eq:kick-weights}
+  u = K_p\,(b\,r - y) + K_i\!\int (r - y)\,\dd t + K_d\,(c\,\dot r - \dot y) + \hat m g,
 \end{equation}
-with weights $0 \le b, c \le 1$. The integral must use the full error (otherwise the steady-state error would not vanish), but $b$ and $c$ are free: they change how the loop responds to the setpoint without changing how it rejects disturbances, because disturbances enter through $y$ only. $c = 0$ is derivative on measurement; $b = 0$ as well gives the \enquote{I-PD} controller, which reacts to a setpoint step only through the integral and is very gentle. Anemostatos implements $c \in \{0, 1\}$ (\ui{D acts on}) and offers another gentle alternative: a \ui{rate limit} on the setpoint itself, which turns steps into ramps.
+with $0 \le b, c \le 1$. The integral must see the full error — otherwise the steady-state error would not vanish — but $b$ and $c$ are free. With $b = c = 1$ this is the textbook PID; $c = 0$ is derivative on measurement; $b = c = 0$ is called \enquote{I-PD}.
+
+\begin{example}[What a setpoint step does, for three structures]
+\label{ex:kick-weights}
+Insert \cref{eq:kick-weights} into the plant $m\ddot y = u - mg$ (exact feedforward) and differentiate once to remove the integral:
+\begin{equation}\label{eq:kick-ode}
+  m\dddot y + K_d\ddot y + K_p\dot y + K_i y = c\,K_d\,\ddot r + b\,K_p\,\dot r + K_i\,r .
+\end{equation}
+The left-hand side is the third-order loop of \lessonref{les:integral}. The weights appear only on the right. What does a unit step of $r$ at $t = 0$ do to the drone at rest?
+
+\textbf{Step 1 — read the undifferentiated law.} Just after the step the drone has not moved ($y = 0$, integral unchanged). The thrust above hover is $K_p\,b + K_d\,c\,\dot r$.
+
+\textbf{Step 2 — PID, $b = c = 1$.} $\dot r$ is an impulse of area 1, so the thrust contains an impulse of area $K_d$: the velocity jumps by $K_d/m = \SI{7}{m/s}$ (if the motors could deliver it). Then the P term pushes with $K_p = \SI{10}{N}$.
+
+\textbf{Step 3 — PI-D, $b = 1$, $c = 0$.} No impulse. The thrust jumps by $K_p = \SI{10}{N}$: the acceleration starts at \SI{10}{m/s^2}, the velocity at zero.
+
+\textbf{Step 4 — I-PD, $b = c = 0$.} Nothing jumps. The only term that sees the new setpoint is the integral, which starts to grow at $K_i = \SI{0.8}{N/s}$. The thrust, the acceleration and the velocity all start from zero and the drone sets off very gently.
+
+\textbf{Step 5 — how gently.} Solving \cref{eq:kick-ode} for each case (\cref{fig:kick-predict}, right): PI-D reaches 90\,\% of the step in \SI{1.26}{s} with 4.7\,\% overshoot. I-PD with the same gains needs \SI{27.8}{s}: the setpoint now travels through the slow integral pole at $-0.085$. To use I-PD one must raise $K_i$: with $K_i = 8$ it reaches 90\,\% in \SI{2.2}{s} with 6.8\,\% overshoot — and the poles have moved, to $-5.43$ and $-0.79 \pm 0.93j$.
+\end{example}
+
+The example shows both the power and the price of the weights. They change how the loop answers the setpoint and leave the left-hand side of \cref{eq:kick-ode} alone: stability and the reaction to disturbances are untouched. But removing the setpoint from a term removes that term's help in following it.
 
 \begin{watchout}[When the setpoint moves on purpose]
-If the setpoint follows a smooth trajectory, $\dot r$ carries useful information: it is the velocity the drone should have. Derivative on measurement throws it away and the loop lags behind moving targets. The cure is not to go back to D on error but to add $\dot r$ explicitly as a feedforward. That is exactly what the trajectory-tracking controllers of Part~II do (\lessonref{les:flatness}).
+If the setpoint follows a smooth trajectory, $\dot r$ carries useful information: it is the velocity the drone should have. Derivative on measurement throws it away, and the loop lags behind a moving target by $K_d v_r/K_p$ (\cref{eq:droop-ramp}). The cure is not to go back to differentiating steps, but to give the controller a setpoint that has a derivative: ramp it (below), or plan the whole motion and feed its velocity forward. That is exactly what the trajectory-tracking controllers of Part~II do (\lessonref{les:flatness}).
 \end{watchout}
+
+\subsection{Ramping the setpoint}
+Anemostatos offers one more cure: a \ui{rate limit} on the setpoint, which turns a step into a ramp. With a limit of \SI{1}{m/s} the setpoint's part of the D term is $K_d\,\dot r = 7 \cdot 1 = \SI{7}{N}$ while the ramp lasts — finite, and useful: it is exactly the force the damper will take away from a drone climbing at \SI{1}{m/s}. In the simulator's run the D term peaks at \SI{7.0}{N} and the drone follows the ramp with an error of at most \SI{12}{cm}, where derivative on measurement would lag by $K_dv_r/K_p = \SI{70}{cm}$.
 
 \screen[0 0 495 998]{kick}{Lesson 7 in the app. In the \ui{PID terms} chart the violet D term shows the kick at every setpoint step; the motor-thrust chart shows the commands hitting their limit.}{fig:kick-screen}
 
 \begin{inapp}
 \begin{itemize}[leftmargin=1.2em]
   \item The lesson sets \param{control.alt.derivativeOn = 'error'} and \param{dFilterHz = 0} (no filter), with a square wave of \SI{0.5}{m} amplitude and \SI{6}{s} period.
-  \item The switch is \ui{Practical details\then D acts on\then error / measurement}. The default is \emph{measurement}.
+  \item The switch is \ui{Practical details\then D acts on\then error / measurement}. The default is \emph{measurement}. The rate limit is \ui{Setpoint\then Rate limit} (\param{setpoint.rateLimit}).
   \item In the code (\src{src/control/pid.ts}) the difference is literally one line: \texttt{(error - prevError)/dt} or \texttt{-(measurement - prevMeasurement)/dt}.
   \item On the first sample after a reset the PID has no previous value and outputs $D = 0$: otherwise every reset would kick.
 \end{itemize}
@@ -65,18 +134,92 @@ If the setpoint follows a smooth trajectory, $\dot r$ carries useful information
 \begin{enumerate}
   \item Watch the violet spikes in the PID chart and the motor bars at every setpoint step.
   \item Switch \ui{D acts on} to \ui{measurement}. The spikes vanish, the altitude response does not change.
-  \item Switch back to \ui{error} and set the D filter to \SI{5}{Hz}. The kick is smaller but longer — look at the motor thrust now.
+  \item Switch back to \ui{error} and set the D filter to \SI{5}{Hz}. The kick is smaller but longer — look at the motor thrust now (Example~\ref{ex:kick-filter}).
   \item Set \ui{Setpoint\then Rate limit} to \SI{1}{m/s} with D on error. What happens to the kick, and to the rise time?
 \end{enumerate}
-\predict{with the D filter at \SI{5}{Hz}, how large is the peak of the filtered kick? (A first-order filter with time constant $T_f$ turns a spike of area $A$ into a jump of height $A/T_f$.)}
+\predict{with the D filter at \SI{20}{Hz} (the default) and D on the error, how large is the first sample of the kick, and for how long is the command saturated?}
 \end{trythis}
+
+\section{The engineer's view: two controllers in one}
+
+\subsection{Two questions, two transfer paths}
+A loop is asked two different questions. A \emph{disturbance} asks: how well do you hold your position? A \emph{setpoint change} asks: how well do you move to a new one? \Cref{eq:kick-ode} answers both, and it keeps them apart. Add a load $d$ to the plant and the same derivation gives
+\begin{equation}\label{eq:kick-2dof}
+  \underbrace{m\dddot y + K_d\ddot y + K_p\dot y + K_i y}_{\text{the loop: poles, stability, damping}}
+  \;=\; \underbrace{c\,K_d\,\ddot r + b\,K_p\,\dot r + K_i\,r}_{\text{how the setpoint enters}} \;+\; \underbrace{\dot d}_{\text{how a load enters}} .
+\end{equation}
+The gains $K_p, K_i, K_d$ decide the left-hand side and the load's path. The weights $b, c$ decide only the setpoint's path. A controller with this freedom is said to have \term{two degrees of freedom}: one tuning for rejecting disturbances, another for following commands.
+
+\subsection{The practice}
+This suggests a working order that professionals follow:
+\begin{enumerate}
+  \item Tune the gains for the disturbances — as stiff and as well damped as the noise, the delays and the actuators allow (Lessons~8–11). Do not look at setpoint steps while doing so.
+  \item Then shape the command: weights, a ramp, a filter on the setpoint, or a planned trajectory, until the response to the setpoint is what the mission needs.
+\end{enumerate}
+The second step cannot destabilise anything, since it does not touch the left-hand side. It is where overshoot after a setpoint step should be removed — not by detuning the loop, which would weaken it against the wind as well.
+
+\begin{example}[A comfortable cruise control]
+\label{ex:kick-cruise}
+The car of Example~\ref{ex:integral-cruise} ($m = \SI{1500}{kg}$, $K_p = \SI{800}{N/(m/s)}$, $K_i = \SI{107}{N/m}$) cruises when the driver raises the set speed by \SI{20}{km/h}. Compare P on the error ($b = 1$) with P on the measurement ($b = 0$).
+
+\textbf{Step 1 — the step.} $\Delta v_{sp} = 20/3.6 = \SI{5.56}{m/s}$.
+
+\textbf{Step 2 — $b = 1$.} The driving force jumps by $K_p\,\Delta v_{sp} = 800 \cdot 5.56 = \SI{4440}{N}$; the acceleration jumps from zero to $4440/1500 = \SI{3.0}{m/s^2}$ in an instant. Passengers feel the rate of change of acceleration, the \emph{jerk}, and here it is, in principle, infinite.
+
+\textbf{Step 3 — $b = 0$.} The force starts at zero and grows at $K_i\,\Delta v_{sp} = 107 \cdot 5.56 = \SI{593}{N/s}$: a jerk of $593/1500 = \SI{0.4}{m/s^3}$, well below the \SI{1}{}–\SI{2}{m/s^3} usually taken as the limit of comfort.
+
+\textbf{Step 4 — and on a hill.} When the road starts to climb, both cars behave identically: the hill enters through $d$, and $b$ is not on that side of the equation.
+\end{example}
+
+\subsection{In formal terms}
+
+\begin{theorem}[Two degrees of freedom]
+\label{thm:kick-2dof}
+Let the plant be $m\ddot y = u - mg + d$ and the controller \cref{eq:kick-weights} with $\hat m = m$ and $K_i \ne 0$. Then, for all weights $b$ and $c$:
+\begin{enumerate}[label=(\roman*)]
+  \item the characteristic polynomial of the loop is $m s^3 + K_d s^2 + K_p s + K_i$;
+  \item the response of $y$ to the load $d$, with $r$ constant, does not depend on $b$ and $c$;
+  \item if the loop is asymptotically stable, then for constant $r$ and $d$ the error $r - y$ tends to zero.
+\end{enumerate}
+If the integral acted on $b\,r - y$ instead of $r - y$, (iii) would fail for every $b \ne 1$.
+\end{theorem}
+\begin{proof}
+Differentiating the closed loop gives \cref{eq:kick-2dof}, a linear equation whose left-hand side contains neither $b$ nor $c$: (i). With $r$ constant its right-hand side is $K_i r + \dot d$: (ii). For constant $r$ and $d$ the right-hand side is $K_ir$ and $y = r$ is a particular solution; every other solution differs from it by a solution of the homogeneous equation, which decays: (iii). With the integral on $b\,r - y$ the constant term would be $b\,K_i\,r$ and the particular solution $y = b\,r$.
+\end{proof}
+
+\begin{theorem}[The impulse of the kick]
+\label{thm:kick-impulse}
+Let the D term act on the error through the filter $D_k = \alpha D_{k-1} + (1-\alpha)K_d(e_k - e_{k-1})/\Delta t$, $0 \le \alpha < 1$, and let the setpoint jump by $\Delta r$ at sample $0$ and stay constant. Then the setpoint contributes to the D term the sequence
+\begin{equation*}
+  D^{r}_k = \frac{K_d\,\Delta r}{\Delta t}\,(1 - \alpha)\,\alpha^k, \qquad k = 0, 1, 2, \dots
+\end{equation*}
+and its impulse is $\sum_{k \ge 0} D^{r}_k\,\Delta t = K_d\,\Delta r$, independent of $\alpha$ and of $\Delta t$.
+\end{theorem}
+\begin{proof}
+The filter is linear, so the setpoint's contribution is its response to the single input $K_d\Delta r/\Delta t$ at $k = 0$: $(1-\alpha)\alpha^k$ times that input. The geometric series $\sum\alpha^k = 1/(1-\alpha)$ gives the sum.
+\end{proof}
+
+The theorem explains why no amount of filtering or faster sampling removes a derivative kick: its area is a property of the controller structure. Only three things change it — a smaller step, a setpoint that does not jump, or $c = 0$.
+
+The hypothesis of \cref{thm:kick-2dof} that matters in practice is linearity. With saturation the setpoint's path \emph{can} disturb the loop: a kick that saturates the motors opens the loop for its duration (\lessonref{les:windup}). That is the honest reason to avoid kicks even where, as in our simulator, the drone barely notices them.
+
+\begin{lookahead}
+\begin{itemize}[leftmargin=1.2em]
+  \item The right-hand side of \cref{eq:kick-2dof} is the beginning of \emph{feedforward from the reference}. Lesson~II.11 supplies not only $\dot r$ but the acceleration, jerk and snap of a planned path, and Lesson~II.12 plans a path that has them.
+  \item In the language of Part~III the weights move the \emph{zeros} of the response to the setpoint and leave the poles alone; Lesson~III.2 shows both on one map, and III.6 designs the two paths separately.
+  \item A pilot's stick is a setpoint that jumps. Flight control systems pass it through a \emph{command filter} for the same reason as here, and a filter that is too slow invites the pilot to over-control (Lesson~IV.16).
+  \item A satellite's slew is planned as a smooth profile so that its flexible solar panels are not struck by a torque step (Lesson~IV.21) — the bell of this lesson, in orbit.
+  \item What filtering the D term is really for — the noise — is the next lesson.
+\end{itemize}
+\end{lookahead}
 
 \begin{remember}
 \begin{itemize}
-  \item The derivative of a setpoint step is a spike: $K_d\Delta r/\Delta t$ in discrete time, a delta in continuous time.
-  \item For a constant setpoint, $\dot e = -\dot y$: differentiating the measurement gives the same damping without the kick.
-  \item Setpoint weighting separates the response to the setpoint from the response to disturbances.
-  \item For moving setpoints, supply the reference's velocity as feedforward instead of differentiating it.
+  \item The derivative of a setpoint step is a spike, $K_d\Delta r/\Delta t$ in discrete time, an impulse of area $K_d\Delta r$ in continuous time. Filtering spreads it out and keeps its area.
+  \item For a constant setpoint $\dot e = -\dot y$: differentiating the measurement gives the same damping without the kick.
+  \item Setpoint weights $b$, $c$ change the response to the setpoint and nothing else: not the poles, not the response to disturbances. The integral must keep the full error.
+  \item Tune the gains for disturbances, then shape the command.
+  \item For moving setpoints, supply the reference's velocity — by a ramp or a plan — instead of differentiating steps.
 \end{itemize}
 \end{remember}
 
@@ -90,12 +233,22 @@ The round Honeywell thermostat of 1953 is a nice reminder of how long this has b
 \end{curiosity}
 
 \begin{exercises}
-\exercise[1] The controller runs at \SI{1}{kHz} instead of \SI{250}{Hz}, D on error, no filter. How big is the kick for the same \SI{1}{m} step?
-\answer{$7 \cdot 1/0.001 = \SI{7000}{N}$, four times larger (and four times shorter): the area $K_d\Delta r = \SI{7}{N.s}$ is the same.}
-\exercise[1] Show that the \emph{impulse} of the kick, $\int D\,\dd t$, does not depend on $\Delta t$. What velocity change would it cause if the motors could deliver it (\SI{1}{kg} drone)?
-\answer{$\int D\,\dd t = D\,\Delta t = K_d\Delta r = \SI{7}{N.s}$ — independent of $\Delta t$. Delivered fully it would change the velocity by \SI{7}{m/s}; the saturation limits it to about $\SI{14.6}{N} \times \SI{4}{ms} \approx \SI{0.06}{N.s}$.}
-\exercise[2] With setpoint weighting, show that the transfer function from a disturbance force $d$ to the altitude $y$ does not depend on $b$ and $c$.
-\answer{With $r = 0$ the control law is $u = -K_p y - K_i\int y - K_d\dot y$, which contains neither $b$ nor $c$; so the closed loop from $d$ to $y$ is the same for all weights.}
-\exercise[2] For the I-PD controller ($b = c = 0$), find the closed-loop transfer function from $r$ to $y$ for the plant $m\ddot y = u$ and compare its numerator with that of the ordinary PID.
-\answer{I-PD: $Y/R = K_i/(ms^3 + K_d s^2 + K_p s + K_i)$. PID: $(K_d s^2 + K_p s + K_i)/(\dots)$ with the same denominator. The poles are identical; the PID's zeros speed up (and kick) the setpoint response, the I-PD has none and responds gently.}
+\exercise[1] The controller runs at \SI{1}{kHz} instead of \SI{250}{Hz}, D on error, no filter. How big is the kick for the same \SI{1}{m} step, and what is its impulse?
+\answer{$7 \cdot 1/0.001 = \SI{7000}{N}$, four times larger and four times shorter: the impulse is still \SI{7}{N.s}.}
+\exercise[1] Repeat Steps 1–5 of Example~\ref{ex:kick-filter} for the default \SI{20}{Hz} filter. For how long is the command above the motor limit?
+\answer{$T_f = \SI{7.96}{ms}$, $\alpha = 0.666$, first sample $0.334 \cdot 1750 = \SI{585}{N}$, above \SI{4.6}{N} for $\ln(4.6/585)/\ln 0.666 = 11.9$ samples: about \SI{48}{ms}.}
+\exercise[1] A \SI{0.1}{m} step (\key{↑}) with D on the error and no filter: is the command saturated? What if the drone is hovering with \SI{14}{N} of headroom and the step is \SI{1}{cm}?
+\answer{$175$\,N: yes. \SI{1}{cm}: $17.5 + 0.1 = \SI{17.6}{N}$ above hover — still saturated. Without a filter almost every step saturates.}
+\exercise[2]\exkind{derive} Derive \cref{eq:kick-ode} from \cref{eq:kick-weights} and the plant, and then the initial conditions $y(0^+) = 0$, $\dot y(0^+) = cK_d/m$, $\ddot y(0^+) = bK_p/m - cK_d^2/m^2$ after a unit step, by integrating the undifferentiated equation across the step.
+\answer{$m\ddot y = K_p(br - y) + K_i\int(r-y) + K_d(c\dot r - \dot y)$; differentiate. Integrating over $[0^-, 0^+]$: $m\Delta\dot y = cK_d\Delta r$. Then at $0^+$: $m\ddot y = K_pb - K_d\dot y(0^+) = bK_p - cK_d^2/m$.}
+\exercise[2]\exkind{derive} For the I-PD structure ($b = c = 0$) show that the area rule of \cref{thm:integral-area} still holds, and conclude that I-PD cannot avoid overshoot either. Why is its overshoot with $K_i = 0.8$ nevertheless invisible in \cref{fig:kick-predict}?
+\answer{The rule only uses the integrator and the equilibria: $\int e = 0$, so the error must change sign. With $K_i = 0.8$ the response is dominated by the slow pole; the undershoot of the error is tiny and spread over a very long time (the model gives a peak of 0.9935 before 30 s and a very slow, shallow overshoot later).}
+\exercise[2]\exkind{derive} In Example~\ref{ex:kick-cruise}, find the weight $b$ for which the jump of acceleration after the \SI{20}{km/h} step is exactly \SI{1}{m/s^2}.
+\answer{$bK_p\Delta v/m = 1$: $b = 1500/(800 \cdot 5.56) = 0.34$.}
+\exercise[2]\exkind{fly} In Lesson~7 keep D on the error, set the D filter to \SI{5}{Hz} and read from the motor chart for how long the thrust is at its limit after a step. Compare with Step~5 of Example~\ref{ex:kick-filter}. Then set the rate limit to \SI{1}{m/s}: what is the largest value of the D term now?
+\answer{About \SI{0.11}{s}. With the ramp: \SI{7}{N}, $K_d$ times the ramp rate.}
+\exercise[2]\exkind{code} Add a setpoint weight $c$ to \src{src/control/pid.ts}: a number between 0 and 1 in \texttt{PidGains} so that the raw derivative is \texttt{c * (setpoint - prevSetpoint)/dt - (measurement - prevMeasurement)/dt}. Which two existing options does it replace? Predict the first D sample after a \SI{1}{m} step for $c = 0.1$ and check it with a unit test modelled on the kick test in \texttt{tests/pid.test.ts}.
+\answer{It replaces \texttt{derivativeOn: 'error'} ($c = 1$) and \texttt{'measurement'} ($c = 0$). First sample: $0.1 \cdot 1750 = \SI{175}{N}$ without filter.}
+\exercise[3]\exkind{derive} A setpoint filter. Instead of weights, pass the setpoint through $T_r\dot r_f + r_f = r$ and give the textbook PID ($b = c = 1$) the filtered $r_f$. Show that after a unit step the D term's setpoint part is $(K_d/T_r)\,e^{-t/T_r}$, find its impulse, and choose $T_r$ so that it never exceeds the \SI{4.6}{N} of headroom for a \SI{1}{m} step.
+\answer{$\dot r_f = e^{-t/T_r}/T_r$, so $D^r = K_d e^{-t/T_r}/T_r$ with impulse $K_d$ — the same again. Peak $K_d/T_r \le 4.6$ needs $T_r \ge \SI{1.5}{s}$ (and the P term adds its own demand, so more in practice): a filter slow enough to tame D on error is slower than the loop itself.}
 \end{exercises}

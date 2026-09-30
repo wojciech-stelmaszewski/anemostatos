@@ -315,3 +315,107 @@ def integral_locus():
     a.set_ylabel("Im $s$  [rad/s]")
     a.set_title("Where the three poles go as the integral gain grows ($m = 1.4$ kg)")
     save(f, "integral_locus")
+
+
+# ─── Lesson 6 ──────────────────────────────────────────────────────────────
+def windup_model(ki=3.0, kp=10.0, kd=7.0, tmax=12.0, cv=0.25, h=4.0, dt=0.0005, t_end=14.0):
+    """The windup lesson as a model: climb at full thrust against drag while saturated, then the
+    PID (ideal motors). Returns t, y − y0, integral, saturated flag."""
+    n = int(t_end / dt)
+    y = v = integ = 0.0
+    out = np.zeros((n, 4))
+    for k in range(n):
+        e = h - y
+        integ += ki * e * dt
+        u = G + kp * e + integ - kd * v
+        sat = u > tmax or u < 0
+        thrust = min(max(u, 0.0), tmax)
+        v += (thrust - G - cv * abs(v) * v) * dt
+        y += v * dt
+        out[k] = (k * dt, y, integ, sat)
+    return out.T
+
+
+@fig
+def windup_predict():
+    f, ax = plt.subplots(1, 2, figsize=(TEXT_W, 56 * MM), gridspec_kw=dict(wspace=0.32))
+    d = win(load("windup-none"), 7, 22)
+    t, y, integ, sat = windup_model()
+    a_, vt = 12 - G, np.sqrt((12 - G) / 0.25)
+    tc = np.linspace(0, 2.24, 200)
+    a = ax[0]
+    a.plot(d.t - 8, d["pos.y"], color=C["meas"], lw=1.4)
+    a.plot(t, 2 + y, color=C["ink"], lw=0.8, ls=DASH)
+    a.plot(tc, 2 + vt**2 / a_ * np.log(np.cosh(a_ * tc / vt)), color=C["accent"], lw=1.1, ls=DOT)
+    a.axhline(6, color=C["sp"], lw=0.8, ls=DASH)
+    a.text(2.5, 3.2, "full thrust against drag:\n$\\frac{v_t^2}{a}\\ln\\cosh\\frac{a t}{v_t}$", color=C["accent"], fontsize=6.4)
+    a.text(6.0, 6.9, "simulator, and the\nmodel of Example 6.2", color=C["ink"], fontsize=6.4)
+    a.set_xlim(-1, 14)
+    a.set_title("Altitude")
+    a.set_ylabel("m")
+    xlab_time(a, "time after the step  [s]")
+    a = ax[1]
+    a.plot(d.t - 8, d["alt.part.i"], color=C["I"], lw=1.4)
+    a.plot(t, integ, color=C["ink"], lw=0.8, ls=DASH)
+    k = np.argmax(y >= 4)
+    a.plot(t[k], integ[k], "o", color=C["accent"], ms=3.5)
+    a.annotate(f"predicted at arrival: {integ[k]:.1f} N", (t[k], integ[k]), xytext=(4.2, 14.5), fontsize=6.4,
+               color=C["accent"], arrowprops=dict(arrowstyle="-", color=C["accent"], lw=0.5))
+    a.set_xlim(-1, 14)
+    a.set_title("The integral winds up, then unwinds")
+    a.set_ylabel("N")
+    xlab_time(a, "time after the step  [s]")
+    save(f, "windup_predict")
+
+
+# ─── Lesson 7 ──────────────────────────────────────────────────────────────
+def weighted_step(b, c, kp=10.0, ki=0.8, kd=7.0, m=1.0, t_end=12.0, n=4000):
+    """Unit step response of m y''' + kd y'' + kp y' + ki y = c kd r'' + b kp r' + ki r (ideal loop).
+    The step sets the initial conditions y(0+) = 0, y'(0+) = c kd/m, y''(0+) = b kp/m − c kd²/m²."""
+    t = np.linspace(0, t_end, n)
+    a = [[0, 1, 0], [0, 0, 1], [-ki / m, -kp / m, -kd / m]]
+    x0 = [-1.0, c * kd / m, b * kp / m - c * kd**2 / m**2]  # in terms of y − 1
+    return t, 1 + _linear(a, x0, t)[0]
+
+
+@fig
+def kick_predict():
+    f, ax = plt.subplots(1, 2, figsize=(TEXT_W, 56 * MM), gridspec_kw=dict(wspace=0.34))
+    a = ax[0]
+    dt, kd = 0.004, 7.0
+    for name, fc, col in [("kick-error", 0, C["D"]), ("kick-error-f5", 5, C["accent"])]:
+        d = win(load(name), 11.99, 12.26)
+        a.semilogy(1000 * (d.t - 12.005), d["alt.part.d"].clip(lower=0.05), "o", color=col, ms=2.6)
+    tf = 1 / (2 * np.pi * 5)
+    alpha = tf / (tf + dt)
+    k = np.arange(0, 60)
+    a.semilogy(1000 * k * dt, kd / dt * (1 - alpha) * alpha**k, color=C["ink"], lw=0.8, ls=DASH)
+    a.axhline(24.4 - 19.81, color=C["err"], lw=0.6, ls=DOT)
+    a.text(250, 5.6, "headroom of the motors", color=C["err"], fontsize=6.2, ha="right")
+    a.text(14, 1750, "no filter: 1750 N, one sample", color=C["D"], fontsize=6.4, va="center")
+    a.text(60, 60, "5 Hz filter: $195\\,\\alpha^k$ N", color=C["accent"], fontsize=6.4)
+    a.set_xlim(-10, 250)
+    a.set_ylim(0.5, 4000)
+    a.set_title("The kick, sample by sample")
+    a.set_ylabel("D term  [N]")
+    a.set_xlabel("time after the step  [ms]", loc="right")
+    a.grid(True, which="major", axis="y")
+
+    a = ax[1]
+    d = win(load("kick-measurement"), 11.5, 15)
+    a.plot(d.t - 12.005, (d["pos.y"] - 1.5), color=C["I"], lw=1.4)
+    t, y = weighted_step(1, 0, t_end=3)
+    a.plot(t, y, color=C["ink"], lw=0.8, ls=DASH)
+    t, y = weighted_step(0, 0, t_end=3)
+    a.plot(t, y, color=C["meas"], lw=1.0, ls=DOT)
+    t, y = weighted_step(0, 0, ki=8, t_end=3)
+    a.plot(t, y, color=C["meas"], lw=1.0)
+    a.axhline(1, color=C["sp"], lw=0.8, ls=DASH)
+    a.text(1.0, 0.72, "PI-D: simulator,\nand its model", color=C["I"], fontsize=6.4)
+    a.text(1.85, 0.07, "I-PD, $K_i = 0.8$", color=C["meas"], fontsize=6.4)
+    a.text(1.75, 0.43, "I-PD, $K_i = 8$", color=C["meas"], fontsize=6.4)
+    a.set_xlim(-0.3, 3)
+    a.set_title("Where the setpoint enters")
+    a.set_ylabel("altitude, fraction of the step")
+    xlab_time(a, "time after the step  [s]")
+    save(f, "kick_predict")

@@ -136,6 +136,16 @@ motor lag.
 | II.20 | A controller nobody designed | L3    | a neural policy trained by imitation + evolution strategies, and its limits  |
 | II.21 | The grand comparison         | L3    | the arena: every controller, every scenario — no winner takes all            |
 
+**Part III — Why it works** (the third semester, being built; plan in [docs/analysis.md](docs/analysis.md)):
+
+| #     | Lesson                 | Level | What you learn                                                                 |
+| ----- | ---------------------- | ----- | ------------------------------------------------------------------------------ |
+| III.1 | The drone as a filter  | L1    | frequency response and the Bode plot; bandwidth, measured by flying sines      |
+| III.2 | Poles tell the story   | L1    | the pole map of the whole loop; damping ratio; a root locus drawn by hand      |
+| III.3 | How far from the edge? | L1    | gain and phase margins on the Bode and Nyquist plots                           |
+| III.4 | Delay is a phase thief | L1    | delay costs phase: predict the delay that destabilises the loop, then check it |
+| III.5 | The waterbed           | L1    | sensitivity and Bode's integral: what is rejected here is amplified there      |
+
 ## Run it
 
 The simulator runs locally in the browser. It needs Node.js ≥ 20 and a

@@ -103,6 +103,30 @@ export function referenceResponse(m: LoopModel, w: number): Complex {
 }
 
 /**
+ * Bandwidth of the closed loop: the lowest frequency, Hz, at which |Y/R| falls below −3 dB.
+ * NaN if it never does below the controller's Nyquist frequency.
+ */
+export function bandwidthHz(m: LoopModel): number {
+  const top = 0.5 / m.T;
+  const level = Math.SQRT1_2;
+  let f0 = 0.01;
+  const first = referenceResponse(m, 2 * Math.PI * f0);
+  let g0 = Math.hypot(first.re, first.im);
+  for (let f = f0 * 1.02; f < top; f *= 1.02) {
+    const v = referenceResponse(m, 2 * Math.PI * f);
+    const g = Math.hypot(v.re, v.im);
+    if (g0 >= level && g < level) {
+      // Interpolate in log-frequency between the two grid points.
+      const k = (g0 - level) / (g0 - g);
+      return Math.exp(Math.log(f0) + k * Math.log(f / f0));
+    }
+    f0 = f;
+    g0 = g;
+  }
+  return NaN;
+}
+
+/**
  * Closed-loop poles in the z-plane of the controller's sample period.
  *
  * The plant is lifted to that period. With a sensor delay of d = q·n + rem physics steps the

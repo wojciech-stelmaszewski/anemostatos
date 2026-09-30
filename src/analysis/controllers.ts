@@ -18,7 +18,11 @@ export const controlPeriod = (p: Params): { steps: number; T: number } => {
   return { steps, T: steps * PHYS_DT };
 };
 
-/** PID of src/control/pid.ts. States: the integral, the previous differentiated signal, the filtered derivative. */
+/**
+ * PID of src/control/pid.ts. States: the integral (if the I term is on), then the previous
+ * differentiated signal and the filtered derivative (if the D term is on). A term that is
+ * switched off leaves no state behind, so the model has no poles that the loop cannot move.
+ */
 function pidModel(p: Params, T: number): Lti {
   const g = p.control.alt;
   const kp = g.pOn ? g.kp : 0;
@@ -27,22 +31,42 @@ function pidModel(p: Params, T: number): Lti {
   const a = g.dFilterHz > 0 ? lowPassAlpha(g.dFilterHz, T) : 0;
   // The differentiated signal s: −y (derivative on the measurement) or r − y (on the error).
   const sr = g.derivativeOn === 'error' ? 1 : 0;
-  //            I      sPrev         dF
-  const A = [
-    [1, 0, 0],
-    [0, 0, 0],
-    [0, -(1 - a) / T, a],
-  ];
-  //            y               v  F  r
-  const B = [
-    [-ki * T, 0, 0, ki * T],
-    [-1, 0, 0, sr],
-    [-(1 - a) / T, 0, 0, (sr * (1 - a)) / T],
-  ];
-  // u = kp·(r − y) + I⁺ + kd·dF⁺
-  const C = [[1, (-kd * (1 - a)) / T, kd * a]];
-  const D = [[-kp - ki * T - (kd * (1 - a)) / T, 0, 0, kp + ki * T + (kd * sr * (1 - a)) / T]];
-  return { a: A, b: B, c: C, d: D, dt: T };
+  const A: number[][] = [];
+  const B: number[][] = [];
+  const C: number[] = [];
+  //           y     v  F  r
+  const D = [-kp, 0, 0, kp];
+  const n = (ki !== 0 ? 1 : 0) + (kd !== 0 ? 2 : 0);
+  const row = () => new Array<number>(n).fill(0);
+  let at = 0;
+  if (ki !== 0) {
+    // I⁺ = I + Ki·T·(r − y), and the output uses I⁺.
+    const r = row();
+    r[at] = 1;
+    A.push(r);
+    B.push([-ki * T, 0, 0, ki * T]);
+    C[at] = 1;
+    D[0] = D[0]! - ki * T;
+    D[3] = D[3]! + ki * T;
+    at += 1;
+  }
+  if (kd !== 0) {
+    // sPrev⁺ = s;  dF⁺ = a·dF + (1 − a)·(s − sPrev)/T, and the output uses Kd·dF⁺.
+    const c = (1 - a) / T;
+    const r1 = row();
+    A.push(r1);
+    B.push([-1, 0, 0, sr]);
+    const r2 = row();
+    r2[at] = -c;
+    r2[at + 1] = a;
+    A.push(r2);
+    B.push([-c, 0, 0, sr * c]);
+    C[at] = -kd * c;
+    C[at + 1] = kd * a;
+    D[0] = D[0]! - kd * c;
+    D[3] = D[3]! + kd * sr * c;
+  }
+  return { a: A, b: B, c: [Array.from({ length: n }, (_, i) => C[i] ?? 0)], d: [D], dt: T };
 }
 
 /** LQR / LQI of src/control/lqr.ts: u = −K·(e, v, [T], [ξ]) with e = y − r. */

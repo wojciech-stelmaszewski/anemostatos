@@ -10,12 +10,20 @@ import type { Lesson, Part } from './types';
 
 function Goal({ lesson }: { lesson: Lesson }) {
   const [status, setStatus] = useState<boolean | string>(false);
+  const prediction = useUi((s) => s.prediction);
+  const setPrediction = useUi((s) => s.setPrediction);
   useEffect(() => {
     if (!lesson.goal) return;
     const loop = useUi.getState().loop;
     const tick = () => {
       const { t, series } = sim.telemetry.window([`${loop}.sp`, `${loop}.meas`], -Infinity);
-      setStatus(lesson.goal!.check({ sim, metrics: analyzeLastStep(t, series[0]!, series[1]!) }));
+      setStatus(
+        lesson.goal!.check({
+          sim,
+          metrics: analyzeLastStep(t, series[0]!, series[1]!),
+          prediction: useUi.getState().prediction,
+        }),
+      );
     };
     tick();
     const id = setInterval(tick, 400);
@@ -35,6 +43,20 @@ function Goal({ lesson }: { lesson: Lesson }) {
       <div>
         <div className="font-semibold text-fg">{done ? 'Goal reached!' : 'Goal'}</div>
         <div className="text-muted">{lesson.goal.text}</div>
+        {lesson.predict && (
+          <label className="mt-1 flex items-center gap-1.5 text-fg">
+            {lesson.predict.label}
+            <input
+              type="number"
+              inputMode="decimal"
+              value={prediction ?? ''}
+              placeholder="?"
+              onChange={(e) => setPrediction(e.target.value === '' ? null : Number(e.target.value))}
+              className="w-16 rounded border border-border bg-bg px-1.5 py-0.5 text-right font-mono text-fg focus:border-accent/60 focus:outline-none"
+            />
+            <span className="text-muted">{lesson.predict.unit}</span>
+          </label>
+        )}
         {typeof status === 'string' && <div className="font-mono text-fg">{status}</div>}
       </div>
     </div>

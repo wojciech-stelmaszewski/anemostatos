@@ -98,6 +98,11 @@ export class Simulation {
   probe = { in: 0, u: 0, uc: 0 };
   /** When the probe was last switched on or changed; its signal starts from zero phase there. */
   private probeT0 = 0;
+
+  /** Seconds since the probe was switched on or last changed. */
+  get probeAge(): number {
+    return this.t - this.probeT0;
+  }
   private accumulator = 0;
   private poke: { force: Vec3; until: number } | null = null;
   private resetListeners = new Set<() => void>();

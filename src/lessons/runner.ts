@@ -19,6 +19,8 @@ export function startLesson(lesson: Lesson): void {
   ui.setLoop(lesson.loop ?? DEFAULT_LOOP[lesson.level]);
   ui.setExtraChart(lesson.chart ?? 'wind');
   ui.setSecondChart(lesson.chart2 ?? null);
+  ui.setBodeView(lesson.bode ?? 'loop');
+  ui.setPrediction(null);
   ui.setLesson(lesson.id);
   if (ui.paused) ui.setPaused(false);
 }

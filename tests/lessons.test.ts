@@ -39,14 +39,16 @@ const reachesGoal = (lesson: Lesson, withSolution: boolean, seconds = 45): boole
     if (k % 400 === 0) {
       const { t, series } = sim.telemetry.window([`${loop}.sp`, `${loop}.meas`], -Infinity);
       const metrics = analyzeLastStep(t, series[0]!, series[1]!);
-      if (lesson.goal!.check({ sim, metrics }) === true) return true;
+      // A lesson that asks for a prediction is solved by entering the right number.
+      const prediction = withSolution ? (lesson.predict?.truth(sim.params) ?? null) : null;
+      if (lesson.goal!.check({ sim, metrics, prediction }) === true) return true;
     }
   }
   return false;
 };
 
-describe('Part II lesson goals', () => {
-  for (const lesson of LESSONS.filter((l) => l.part === 2 && l.goal)) {
+describe('Part II and III lesson goals', () => {
+  for (const lesson of LESSONS.filter((l) => (l.part === 2 || l.part === 3) && l.goal)) {
     it(`"${lesson.title}" needs work, and its solution reaches the goal`, () => {
       expect(lesson.solution, 'a lesson with a goal documents a solution').toBeDefined();
       expect(reachesGoal(lesson, false)).toBe(false);

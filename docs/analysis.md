@@ -1,7 +1,8 @@
 # Part III — Why It Works
 
-> **Status (2026-09-30):** M13 (the foundations) is implemented; §5 lists what
-> was built and where it differs from this plan. M14–M18 are planned.
+> **Status (2026-09-30):** M13 (the foundations) and the first pass of M14
+> (lessons III.1–III.5) are implemented; §5 lists what was built and where it
+> differs from this plan. The rest of M14 and M15–M18 are planned.
 > Milestones in [roadmap.md](roadmap.md) point here.
 > Extended on 2026-09-30 from 20 to 30 lessons, so that Parts I–III together
 > cover the analysis and robustness material of a graduate control course
@@ -576,6 +577,29 @@ above:
   spectrum chart that uses it belongs to M14.
 
 ### M14 — Chapter F lessons (III.1–III.6)
+
+**First pass built (2026-09-30): III.1–III.5.** Each has a goal that the
+tests prove unmet at the start and reachable by its documented solution.
+
+- The Bode chart has four views: the open loop $L$, the closed loop $Y/R$
+  (with the −3 dB bandwidth marked), the sensitivity $S$ (with its peak),
+  and the waterbed view: $|S|$ on a linear frequency axis with the areas
+  of $\ln|S|$ above and below zero shaded and integrated to the Nyquist
+  frequency. A lesson picks the view with `bode`.
+- The `predict` field: a lesson names a quantity, the panel shows an input
+  box, and `goal.check` receives the number. The right answer comes from
+  the loop model (`truth(params)`), not from a headless run as first
+  planned: the model already agrees with flight to a fraction of a degree.
+- III.1 is judged by flight: the goal compares the drone's swing with the
+  setpoint's at the probe frequency the student chose.
+- III.5's goal is a trade stated in numbers ($|S| \le -14$ dB at 0.5 Hz
+  with a peak below 4 dB), because a stronger integral alone hardly moves
+  the peak of this loop; the bandwidth does.
+- The PID model drops the states of terms that are switched off, so the
+  pole map shows no poles that the loop cannot move.
+
+**Still to build:** III.6 (loop shaping, with `shaping.ts`), the spectrum
+chart and the `multisine` probe signal.
 
 Root-locus trail, delay margin, the `predict` field (first used by III.4),
 $S$/$T$ measurement, `shaping.ts` (lead/lag, notch on L1), spectrum chart.

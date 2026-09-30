@@ -4,6 +4,7 @@ import { SIGNAL } from '@/ui/colors';
 import { K, Notice, Try } from './Bits';
 import { M } from './Math';
 import { PART_TWO } from './part2';
+import { PART_THREE } from './part3';
 import { setAt } from './script';
 import type { Lesson } from './types';
 
@@ -542,4 +543,4 @@ const PART_ONE: Lesson[] = [
   },
 ];
 
-export const LESSONS: Lesson[] = [...PART_ONE, ...PART_TWO];
+export const LESSONS: Lesson[] = [...PART_ONE, ...PART_TWO, ...PART_THREE];

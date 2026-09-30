@@ -11,6 +11,11 @@ export type ExtraChart =
   'wind' | 'disturbance' | 'phase' | 'estimate' | 'bode' | 'nyquist' | 'poles';
 /** The analysis views of Part III, which can also take the place of the motor chart. */
 export type AnalysisChart = 'bode' | 'nyquist' | 'poles';
+/**
+ * What the Bode chart draws: the open loop L, the closed loop from setpoint to altitude Y/R, the
+ * sensitivity S, or ln|S| on a linear frequency axis (the waterbed view).
+ */
+export type BodeView = 'loop' | 'ref' | 'sens' | 'waterbed';
 
 export type CameraMode = 'orbit' | 'follow' | 'side' | 'top';
 
@@ -31,6 +36,9 @@ interface UiStore {
   extraChart: ExtraChart;
   /** A second analysis view, shown instead of the motor chart (docs/analysis.md §3.6). */
   secondChart: AnalysisChart | null;
+  bodeView: BodeView;
+  /** The number a student entered before running a lesson that asks for a prediction. */
+  prediction: number | null;
   camera: CameraMode;
   overlays: Overlays;
   panelsHidden: boolean;
@@ -42,6 +50,8 @@ interface UiStore {
   setLoop: (l: string) => void;
   setExtraChart: (c: ExtraChart) => void;
   setSecondChart: (c: AnalysisChart | null) => void;
+  setBodeView: (v: BodeView) => void;
+  setPrediction: (v: number | null) => void;
   setCamera: (c: CameraMode) => void;
   toggleOverlay: (k: keyof Overlays) => void;
   togglePanels: () => void;
@@ -54,6 +64,8 @@ export const useUi = create<UiStore>((set) => ({
   loop: 'alt',
   extraChart: 'wind',
   secondChart: null,
+  bodeView: 'loop',
+  prediction: null,
   camera: 'follow',
   overlays: {
     forces: true,
@@ -78,6 +90,8 @@ export const useUi = create<UiStore>((set) => ({
   setLoop: (loop) => set({ loop }),
   setExtraChart: (extraChart) => set({ extraChart }),
   setSecondChart: (secondChart) => set({ secondChart }),
+  setBodeView: (bodeView) => set({ bodeView }),
+  setPrediction: (prediction) => set({ prediction }),
   setCamera: (camera) => set({ camera }),
   toggleOverlay: (k) => set((s) => ({ overlays: { ...s.overlays, [k]: !s.overlays[k] } })),
   togglePanels: () => set((s) => ({ panelsHidden: !s.panelsHidden })),

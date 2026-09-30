@@ -6,7 +6,7 @@ import { FONT, INK, niceTicks, SERIES, useChartCanvas } from './canvas';
 import { useLoopData } from './store';
 
 /** Poles further left than this are fast enough not to matter and would flatten the picture. */
-const FAR_LEFT = -40;
+const FAR_LEFT = -15;
 const TRAIL = 80;
 
 /**
@@ -88,11 +88,11 @@ export function PoleMap() {
       const sets = trail.current;
       sets.slice(0, -1).forEach((set, k) => {
         ctx.fillStyle = SERIES.model;
-        ctx.globalAlpha = 0.12 + 0.4 * (k / Math.max(sets.length - 1, 1));
+        ctx.globalAlpha = 0.25 + 0.5 * (k / Math.max(sets.length - 1, 1));
         for (const z of set) {
           if (z.re < FAR_LEFT) continue;
           ctx.beginPath();
-          ctx.arc(X(z.re), Y(z.im), 1.6, 0, 2 * Math.PI);
+          ctx.arc(X(z.re), Y(z.im), 2, 0, 2 * Math.PI);
           ctx.fill();
         }
       });

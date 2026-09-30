@@ -272,3 +272,51 @@ def tb_ou():
     ax.set_xlim(0.02, 100)
     ax.grid(True, which="major", axis="both")
     save(f, "tb_ou")
+
+
+@fig
+def tb_energy():
+    """Energy of x'' = -10 x under explicit Euler, semi-implicit Euler and RK4, step 50 ms."""
+    w2, h, T = 10.0, 0.05, 20.0
+    n = int(T / h)
+
+    def run(method):
+        x, v, E = 1.0, 0.0, [1.0]
+        f = lambda x, v: (v, -w2 * x)  # noqa: E731
+        for _ in range(n):
+            if method == "explicit":
+                x, v = x + h * v, v - h * w2 * x
+            elif method == "semi":
+                v = v - h * w2 * x
+                x = x + h * v
+            else:
+                k1 = f(x, v)
+                k2 = f(x + h / 2 * k1[0], v + h / 2 * k1[1])
+                k3 = f(x + h / 2 * k2[0], v + h / 2 * k2[1])
+                k4 = f(x + h * k3[0], v + h * k3[1])
+                x += h / 6 * (k1[0] + 2 * k2[0] + 2 * k3[0] + k4[0])
+                v += h / 6 * (k1[1] + 2 * k2[1] + 2 * k3[1] + k4[1])
+            E.append((0.5 * v * v + 0.5 * w2 * x * x) / (0.5 * w2))
+        return np.array(E)
+
+    t = np.arange(n + 1) * h
+    f_, (a, b) = plt.subplots(1, 2, figsize=(TEXT_W, 58 * MM), gridspec_kw=dict(wspace=0.3, width_ratios=[1, 1.25]))
+    a.semilogy(t, run("explicit"), color=C["err"], lw=1.2, label="explicit Euler")
+    a.semilogy(t, run("semi"), color=C["I"], lw=1.2, label="semi-implicit Euler")
+    a.semilogy(t, run("rk4"), color=C["meas"], lw=1.2, label="RK4")
+    a.set_title("Twenty seconds")
+    a.set_xlabel("time  [s]", loc="right")
+    a.set_ylabel("energy / true energy")
+    a.set_xlim(0, 20)
+    a.legend(loc="upper left")
+    b.plot(t, run("semi"), color=C["I"], lw=1.0)
+    b.plot(t, run("rk4"), color=C["meas"], lw=1.2)
+    b.axhline(1, color=C["faint"], lw=0.6)
+    for y in (1 / 1.079, 1 / 0.921):
+        b.axhline(y, color=C["I"], lw=0.6, ls=(0, (4, 3)))
+    b.text(20.3, 1 / 0.921, "bound", fontsize=6.2, color=C["I"], va="center")
+    b.set_title("The same, enlarged")
+    b.set_xlabel("time  [s]", loc="right")
+    b.set_xlim(0, 20)
+    b.set_ylim(0.9, 1.11)
+    save(f_, "tb_energy")

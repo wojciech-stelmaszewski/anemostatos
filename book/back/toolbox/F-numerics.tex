@@ -1,0 +1,218 @@
+\toolchapter{F}{Numerical methods}{Most equations of this book are solved by a computer in the end. How it does so, how wrong it can be, and how to tell.}
+\label{app:num}
+
+\lead{\usedcard{\setuprow{Lesson 1}{the integral as a sum, the derivative as a difference; the simulator's step}\setuprow{Lessons 4, 5, 8}{iteration, Newton's method, bisection}\setuprow{Lesson 6}{the trapezoid rule}\setuprow{Lessons 9–11}{roots of high-degree polynomials, eigenvalues}\setuprow{Parts IV, V}{collocation (IV.6), fixed-point arithmetic (V.3)}}%
+A simulator is a numerical method, and so is a digital controller. When the lessons say \enquote{solving the cubic gives \dots}, \enquote{a finer step gives \dots} or \enquote{the simulator shows \dots}, they rely on the methods of this appendix: solving one equation, finding the roots of a polynomial, computing an integral, and — the heart of every simulator — advancing a differential equation in time. For each we ask the same three questions: how fast does the error shrink, what can go wrong, and what does Anemostatos use.}
+
+\section{Numbers with a finite number of digits}
+
+A computer stores a real number as a \term{floating-point} number: a sign, about sixteen significant decimal digits (53 binary digits in the usual \enquote{double precision}) and an exponent. Every result is rounded to the nearest such number, so each operation carries a relative error of at most
+\begin{equation}
+  \varepsilon_{mach} = 2^{-52} \approx 2.2 \times 10^{-16} ,
+\end{equation}
+the \term{machine epsilon}. Sixteen digits are far more than any sensor delivers, and rounding is harmless — with one exception.
+
+\begin{watchout}[Cancellation]
+Subtracting two nearly equal numbers cancels their leading digits and leaves only the uncertain ones. $1.000\,000\,1 - 1.000\,000\,0$ has one significant digit left if the inputs had eight. The absolute error has not grown, but the relative error has, enormously — and a division by a small number afterwards makes it absolute.
+\end{watchout}
+
+The difference quotient is exactly this operation: two nearly equal readings, subtracted and divided by a small $\Delta t$. The error it suffers from has two parts that pull in opposite directions.
+
+\begin{example}[The best step for a difference quotient]
+\label{ex:F-diff}
+A signal with $|\ddot x| \le M$ is known at two instants with errors of at most $\epsilon$ each. With which spacing $h$ is $(x(t) - x(t - h))/h$ closest to $\dot x(t)$?
+
+\textbf{Step 1 — the truncation error.} By \cref{thm:meet-discrete}, the quotient of the exact values differs from $\dot x$ by at most $\tfrac12Mh$. It shrinks with $h$.
+
+\textbf{Step 2 — the data error.} The two errors can add: the numerator is wrong by up to $2\epsilon$, the quotient by $2\epsilon/h$. It \emph{grows} as $h$ shrinks.
+
+\textbf{Step 3 — the best compromise.} The total bound $\tfrac12Mh + 2\epsilon/h$ is smallest where its derivative $\tfrac12M - 2\epsilon/h^2$ vanishes:
+\begin{equation}\label{eq:F-hopt}
+  h^* = 2\sqrt{\epsilon/M}, \qquad\text{with the error}\qquad 2\sqrt{\epsilon M} .
+\end{equation}
+
+\textbf{Step 4 — rounding.} For a smooth function in double precision, $\epsilon \approx 10^{-16}$ and $M \approx 1$: $h^* \approx 2 \times 10^{-8}$ and the derivative is good to about eight digits — half of the sixteen. Choosing $h = 10^{-14}$ \enquote{to be accurate} gives two digits.
+
+\textbf{Step 5 — a sensor.} For the altimeter of \lessonref{les:noise}, $\epsilon = \SI{1}{cm}$, and the drone's acceleration stays below $M = \SI{15}{m/s^2}$: $h^* = 2\sqrt{0.01/15} = \SI{52}{ms}$, with an error of \SI{0.8}{m/s}. The controller differentiates over \SI{4}{ms}, thirteen times less than the optimum — there the data error alone is $2 \cdot 0.01/0.004 = \SI{5}{m/s}$. That is the hairball of \cref{fig:noise-filters}, and the reason the derivative needs a filter: a low-pass filter is a way of differentiating over a longer time.
+\end{example}
+
+\section{Solving one equation}
+
+Three methods for $f(x) = 0$ appear in the lessons. They differ in what they need and in how fast they converge.
+
+\begin{theorem}[Three root finders]
+\label{thm:F-roots}
+\begin{enumerate}[label=(\roman*)]
+  \item \emph{Bisection.} If $f$ is continuous on $[a, b]$ and $f(a)$, $f(b)$ have opposite signs, halving the interval and keeping the half on which the sign changes encloses a root in an interval of length $(b - a)/2^n$ after $n$ steps.
+  \item \emph{Fixed-point iteration.} If the equation is written as $x = g(x)$ and $|g'(x)| \le L < 1$ on an interval that $g$ maps into itself, then $x_{n+1} = g(x_n)$ converges to the unique solution $x^*$ there from any start in the interval, and $|x_n - x^*| \le L^n|x_0 - x^*|$.
+  \item \emph{Newton's method.} If $f$ is twice continuously differentiable and $f'(x^*) \ne 0$ at a root $x^*$, then $x_{n+1} = x_n - f(x_n)/f'(x_n)$ converges for every start close enough to $x^*$, and $|x_{n+1} - x^*| \le C\,|x_n - x^*|^2$.
+\end{enumerate}
+(Quarteroni, Sacco and Saleri, 2007, ch.~6.)
+\end{theorem}
+
+Bisection gains one binary digit per step, about three decimal digits in ten steps, and cannot fail. Fixed-point iteration gains a fixed fraction of a digit per step, $-\log_{10}L$. Newton's method \emph{doubles} the number of correct digits at every step once it is close — and may wander off when it is not.\tip{A robust recipe: a few steps of bisection to get close, then Newton to finish. Library root finders do exactly this.}
+
+Newton's method has a picture: replace the curve by its tangent at $x_n$ and take the point where the tangent crosses zero. The quadratic convergence follows from Taylor's theorem: the tangent misses the curve by a term proportional to the square of the distance.
+
+\begin{example}[One equation, three methods]
+\label{ex:F-three}
+Example~\ref{ex:damper-crit} needed the solution of $(1 + z)\,e^{-z} = 0.02$, the settling time of the critically damped loop in units of $1/\omega_n$. Solve it three ways.
+
+\textbf{Step 1 — bracket.} $f(z) = (1 + z)e^{-z} - 0.02$ has $f(4) = +0.072$ and $f(8) = -0.017$: a root lies between.
+
+\textbf{Step 2 — bisection.} $f(6) = -0.0026$: the root is in $[4, 6]$. $f(5) = +0.020$: in $[5, 6]$. $f(5.5) = +0.0066$: in $[5.5, 6]$. Three steps, one digit. For three decimals, $4/2^n < 10^{-3}$ needs $n = 12$ steps.
+
+\textbf{Step 3 — fixed point.} Take logarithms: $z = \ln\big(50\,(1 + z)\big) = g(z)$, with $g'(z) = 1/(1 + z) \approx 0.15$ near the root. From $z_0 = 4$: $5.521$, $5.787$, $5.827$, $5.8329$, $5.8338$. Each step reduces the error about sevenfold, as $L = 0.15$ predicts.
+
+\textbf{Step 4 — Newton.} $f'(z) = -z\,e^{-z}$. From $z_0 = 4$: $4.977$, $5.595$, $5.812$, $5.8337$, $5.83392$. The first steps are slow, because the start is far from the root; the last two go from two correct digits to four to eight.
+
+\textbf{Step 5 — the answer.} $z = 5.834$: $t_s = 5.834/\omega_n$.
+\end{example}
+
+\section{The roots of a polynomial}
+
+The poles of a loop are the roots of its characteristic polynomial, and there is no formula for them beyond degree four. Two methods are used.
+
+\paragraph{By hand: Newton and deflation.} Find one real root by Newton's method, divide the polynomial by the corresponding factor, and repeat on the quotient. Example~\ref{ex:integral-poles} does this for a cubic: from the guess $s = -3$ Newton gives $-3.0345$, $-3.03340$, $-3.033397$ — three steps to seven digits — and the remaining quadratic is solved by the formula.
+
+\paragraph{By computer: eigenvalues of the companion matrix.} By \cref{thm:A-charpoly} the roots of a polynomial are the eigenvalues of its companion matrix, and numerical libraries compute eigenvalues very reliably with the \emph{QR algorithm}, which finds all of them at once, complex pairs included, without a starting guess. This is how the simulator computes the poles it displays: the function \texttt{eigenvalues} in \src{src/math/mat.ts} runs the QR algorithm on the state matrix of the loop.
+
+\begin{watchout}[Multiple roots are fragile]
+Near a double root $x^*$ a polynomial behaves like $c\,(x - x^*)^2$, so a change of $\delta$ in its value moves the root by about $\sqrt{\delta/c}$: an error of $10^{-16}$ in the coefficients becomes $10^{-8}$ in the root. A critically damped pair, computed numerically, often comes out as two slightly different real poles or a pair with a tiny imaginary part. That is the arithmetic, not the physics.
+\end{watchout}
+
+\section{Integrals}
+
+An integral $\int_a^b f\,\dd t$ over an interval divided into $n$ pieces of width $h = (b - a)/n$, with $f_k = f(a + kh)$, is approximated by
+\begin{align}
+  \text{rectangles:} \quad & h\,(f_1 + f_2 + \dots + f_n), \\
+  \text{trapezoids:} \quad & h\,\big(\tfrac12f_0 + f_1 + \dots + f_{n-1} + \tfrac12f_n\big), \\
+  \text{Simpson ($n$ even):} \quad & \tfrac{h}{3}\,\big(f_0 + 4f_1 + 2f_2 + 4f_3 + \dots + 4f_{n-1} + f_n\big) .
+\end{align}
+The first replaces $f$ on each piece by a constant, the second by a straight line, the third by a parabola through three points.
+
+\begin{theorem}[Accuracy of the three rules]
+\label{thm:F-quad}
+For a sufficiently smooth $f$ the errors are bounded by
+\begin{equation*}
+  \tfrac12(b - a)\,h\,\max|f'|, \qquad \tfrac{1}{12}(b - a)\,h^2\max|f''|, \qquad \tfrac{1}{180}(b - a)\,h^4\max|f''''|
+\end{equation*}
+respectively: of first, second and fourth order in $h$. (Quarteroni, Sacco and Saleri, 2007, ch.~9.)
+\end{theorem}
+
+\emph{Order} is the word to remember. Halving the step halves the error of the rectangles, quarters that of the trapezoids, and divides Simpson's by sixteen.
+
+\begin{example}[The area of the windup]
+\label{ex:F-quad}
+Example~\ref{ex:windup-size} needed $\int_0^{2.24}\big(4 - 4\ln\cosh(0.740\,t)\big)\,\dd t$, which has no closed form. Compare the rules.
+
+\textbf{Step 1 — eight pieces} ($h = \SI{0.28}{s}$). Rectangles: $5.04$. Trapezoids: $5.602$. Simpson: $5.6200$.
+
+\textbf{Step 2 — sixteen pieces.} Rectangles: $5.34$. Trapezoids: $5.6155$. Simpson: $5.62000$.
+
+\textbf{Step 3 — the orders, observed.} The exact value is $5.61999\dots$. The rectangles' error went from $0.58$ to $0.28$: halved. The trapezoids' from $0.018$ to $0.0045$: quartered. Simpson was right to five digits with nine function values.
+
+\textbf{Step 4 — and the controller?} The integral term of the PID uses rectangles (\cref{eq:meet-discrete}). With $h = \SI{4}{ms}$ that is accurate enough, and no better rule would help: the controller's own measurement is noisier than the rule's error.
+\end{example}
+
+\section{Differential equations, step by step}
+
+A simulator must compute $\vx(t)$ from $\dot{\vx} = f(\vx, t)$ and $\vx(0)$. It cannot do so continuously; it advances in steps of size $h$, from $\vx_k \approx \vx(t_k)$ to $\vx_{k+1}$.
+
+\begin{definition}{Four one-step methods}
+\begin{description}[leftmargin=0pt, itemsep=3pt, font=\sffamily\small\bfseries]
+  \item[Explicit Euler.] Follow the present slope for one step: $\vx_{k+1} = \vx_k + h\,f(\vx_k, t_k)$.
+  \item[Implicit Euler.] Use the slope at the \emph{end} of the step: $\vx_{k+1} = \vx_k + h\,f(\vx_{k+1}, t_{k+1})$, an equation to be solved for $\vx_{k+1}$ at every step.
+  \item[Semi-implicit (symplectic) Euler.] For a mechanical system $\dot x = v$, $\dot v = a(x, v)$: update the velocity first, then the position with the \emph{new} velocity: $v_{k+1} = v_k + h\,a(x_k, v_k)$, $x_{k+1} = x_k + h\,v_{k+1}$.
+  \item[Runge–Kutta of order four (RK4).] Evaluate the slope four times within the step — at the start, twice at the middle, at the end — and advance with their weighted mean, $\vx_{k+1} = \vx_k + \tfrac{h}{6}(\symbf k_1 + 2\symbf k_2 + 2\symbf k_3 + \symbf k_4)$.
+\end{description}
+\end{definition}
+
+\begin{theorem}[Order of accuracy]
+\label{thm:F-order}
+Let $f$ be sufficiently smooth. Over a fixed time interval the error of the three Euler methods is bounded by a constant times $h$, and that of RK4 by a constant times $h^4$, as $h \to 0$. (Hairer, Nørsett and Wanner, 1993, ch.~II.)
+\end{theorem}
+
+Accuracy for small $h$ is half of the story. The other half is what a method does at the step one can afford, and there the four behave very differently. Two test problems show it.
+
+\subsection{Test one: a decay}
+Apply the methods to $\dot x = -x/\tau$, whose solution $e^{-t/\tau}$ decays. Explicit Euler gives $x_{k+1} = (1 - h/\tau)\,x_k$: a recursion with the pole $1 - h/\tau$ (Appendix~D). It decays only if $|1 - h/\tau| < 1$:
+\begin{equation}\label{eq:F-stab}
+  \text{explicit Euler is stable for } h < 2\tau .
+\end{equation}
+Beyond that the computed solution grows, with alternating signs, although the true one decays. Implicit Euler gives $x_{k+1} = x_k/(1 + h/\tau)$, which decays for every $h$. RK4 is stable for $h < 2.79\,\tau$.
+
+For the motors, $\tau_m = \SI{30}{ms}$: explicit Euler needs $h < \SI{60}{ms}$. No problem at the simulator's \SI{1}{ms}. But a model with a fast, stable part — a stiff spring, an electrical time constant of microseconds — forces an explicit method to take tiny steps for the whole simulation, long after that fast part has died out and nothing of interest happens on its time scale. Such problems are called \term{stiff}. The cures are an implicit method or, where the fast part is linear, its exact solution: the simulator advances each motor with $e^{-h/\tau_m}$ (\cref{eq:D-lag}), which is stable and exact for any step.
+
+\subsection{Test two: an oscillation}
+Apply the methods to the undamped oscillator $\ddot x = -\omega^2x$ of \lessonref{les:spring}, whose energy $E = \tfrac12v^2 + \tfrac12\omega^2x^2$ is constant.
+
+\begin{theorem}[Energy of the oscillator under the two Euler methods]
+\label{thm:F-energy}
+For $\dot x = v$, $\dot v = -\omega^2x$ and a step $h$:
+\begin{enumerate}[label=(\roman*)]
+  \item explicit Euler multiplies the energy by exactly $1 + \omega^2h^2$ at every step;
+  \item semi-implicit Euler keeps the quantity $\tilde E = E - \tfrac12h\,\omega^2x\,v$ exactly constant, and for $\omega h < 2$, starting from rest, the energy stays between $E_0/(1 + \tfrac12\omega h)$ and $E_0/(1 - \tfrac12\omega h)$ for ever.
+\end{enumerate}
+\end{theorem}
+\begin{proof}
+(i)~$x' = x + hv$, $v' = v - h\omega^2x$. Then $v'^2 + \omega^2x'^2 = (v^2 + \omega^2x^2)(1 + \omega^2h^2)$; the cross terms cancel. (ii)~$v' = v - h\omega^2x$, $x' = x + hv'$. A direct calculation gives $v'^2 + \omega^2x'^2 - h\omega^2x'v' = v^2 + \omega^2x^2 - h\omega^2xv$. Since $|\omega x v| \le \tfrac12(v^2 + \omega^2x^2) = E$, the conserved quantity satisfies $E(1 - \tfrac12\omega h) \le \tilde E \le E(1 + \tfrac12\omega h)$, which bounds $E$ from both sides; from rest $\tilde E = E_0$.
+\end{proof}
+
+\begin{example}[The P loop under three integrators]
+\label{ex:F-energy}
+The P-only loop of \lessonref{les:spring} has $\omega = \SI{3.16}{rad/s}$. What does each method do to its energy?
+
+\textbf{Step 1 — explicit Euler at the simulator's step.} $h = \SI{1}{ms}$: $\omega^2h^2 = 10^{-5}$ per step, a thousand steps per second: the energy grows by $1.00001^{1000} - 1 = 1.0\,\%$ per second, the amplitude by 0.5\,\%. In the twenty seconds of \cref{fig:spring-run} the swing would have grown by 10\,\% for purely numerical reasons — an effect as large as the physics the lesson is about.
+
+\textbf{Step 2 — at a coarse step.} $h = \SI{50}{ms}$: $\omega^2h^2 = 0.025$ per step, twenty steps per second: the energy grows by a factor of $1.025^{20} = 1.64$ every second. After twenty seconds: $1.64^{20} \approx 19\,000$.
+
+\textbf{Step 3 — semi-implicit Euler.} $\tfrac12\omega h = 0.079$ at \SI{50}{ms}: the energy wobbles between 0.93 and 1.09 of its initial value and never leaves that band. At \SI{1}{ms} the band is $\pm0.16\,\%$. The frequency is slightly off — by a factor of $1.001$ at \SI{50}{ms}, by four parts in ten million at \SI{1}{ms}.
+
+\textbf{Step 4 — RK4.} At \SI{50}{ms} it loses $0.009\,\%$ of the energy in twenty seconds: far more accurate, at four evaluations of the forces per step, and with a slow drift in one direction.
+
+\textbf{Step 5 — the choice} (\cref{fig:F-energy}). The simulator uses semi-implicit Euler at \SI{1}{ms}. It costs one evaluation of the forces per step, it cannot invent or destroy energy in the long run, and what is left — a small wobble and a tiny shift of frequency — is far below anything a lesson measures. That is why the slow decay of \cref{fig:spring-run} can be trusted to be drag and motor lag, not arithmetic.
+\end{example}
+
+\simfig{tb_energy}{The energy of the undamped oscillator $\ddot x = -10x$, integrated with a step of \SI{50}{ms} by three methods, relative to its true constant value. Explicit Euler (red) multiplies it by 1.64 every second. Semi-implicit Euler (green), the simulator's method, keeps it in a narrow band for ever. RK4 (blue) is the most accurate and drifts slowly downwards. Computed from the definitions of the methods.}{fig:F-energy}
+
+\begin{keyidea}[Match the method to the physics]
+For a long simulation of a mechanical system, preserving the structure — energy that neither appears nor vanishes — matters more than the order of accuracy. For a short, smooth trajectory that must be accurate, a high-order method wins. For a stiff system, stability decides. No method is best at all three.
+\end{keyidea}
+
+\subsection{What else a simulator must get right}
+\begin{itemize}
+  \item \textbf{Events.} A motor that reaches its limit, a drone that touches the ground: the right-hand side changes abruptly. A fixed small step handles this crudely but robustly, the error being at most one step.
+  \item \textbf{Rates.} The controller runs every fourth physics step and holds its output between. Simulating the hold faithfully is part of the model, not a numerical detail (\lessonref{les:slow}).
+  \item \textbf{Constraints.} The attitude quaternion must keep unit length. Integration errors let it drift, so the simulator renormalises it after every step (Appendix~H).
+  \item \textbf{Randomness.} Wind and noise come from a \emph{pseudo-random} generator: a deterministic recursion whose output passes statistical tests for randomness. Started from the same \emph{seed}, it produces the same sequence, which is what makes a flight reproducible. The simulator uses the generator \texttt{mulberry32} for uniform numbers and the Box–Muller transform to turn two of them into two Gaussian ones (\src{src/math/prng.ts}).
+\end{itemize}
+
+\section{Linear equations and least squares}
+
+Part~II solves linear systems all the time — for gains, for estimates, inside an optimiser. Three rules of numerical practice are worth knowing before then.
+
+\paragraph{Solve, do not invert.} To compute $\symbf x = A^{-1}\symbf b$, solve $A\symbf x = \symbf b$ by Gaussian elimination (an $LU$ factorisation). It costs about $\tfrac13n^3$ operations, a third of what forming the inverse would, and is more accurate.
+
+\paragraph{Know the condition number.} The \term{condition number} $\kappa(A) = \|A\|\,\|A^{-1}\|$ says by how much a relative error in the data can be amplified in the solution: up to a factor of $\kappa$. With $\kappa = 10^6$, six of the sixteen digits are lost. A matrix with a large condition number is \emph{ill-conditioned}; one whose columns are nearly dependent always is.
+
+\paragraph{Do not form $X^\T X$.} The least-squares solution of Appendix~E is defined by the normal equations $X^\T X\symbf\theta = X^\T\symbf y$, but $\kappa(X^\T X) = \kappa(X)^2$: forming the product squares the sensitivity. For the four data points of Example~\ref{ex:E-fit}, $\kappa(X) = 5.2$ and $\kappa(X^\T X) = 27$ — harmless. For a fit with many parameters it is not, and libraries factor $X = QR$ with an orthogonal $Q$ instead, which solves the same problem with $\kappa(X)$.
+
+\begin{result}[Appendix F at a glance]
+\begin{center}\small
+\renewcommand{\arraystretch}{1.4}
+\begin{tabularx}{\linewidth}{@{}l>{\raggedright\arraybackslash}X@{}}
+rounding & 16 digits; cancellation destroys them in a difference of nearly equal numbers\\
+difference quotient & best step $h^* = 2\sqrt{\epsilon/M}$; smaller is worse\\
+bisection & one bit per step, never fails\\
+fixed point $x = g(x)$ & converges if $|g'| < 1$; error $\times\,|g'|$ per step\\
+Newton & $x - f/f'$; doubles the digits near a simple root\\
+polynomial roots & eigenvalues of the companion matrix; multiple roots are ill-conditioned\\
+quadrature & rectangle $O(h)$, trapezoid $O(h^2)$, Simpson $O(h^4)$\\
+explicit Euler & stable for $h < 2\tau$; adds energy to an oscillator, $\times(1 + \omega^2h^2)$ per step\\
+semi-implicit Euler & velocity first, then position with the new velocity; energy bounded for $\omega h < 2$\\
+stiff systems & implicit methods, or the exact step $e^{-h/\tau}$\\
+linear systems & solve, do not invert; $\kappa(X^\T X) = \kappa(X)^2$\\
+\end{tabularx}
+\end{center}
+\end{result}

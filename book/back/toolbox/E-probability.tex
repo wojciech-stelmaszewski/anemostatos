@@ -156,7 +156,7 @@ A noise or a wind is not one random number but one for every instant: a \term{ra
 \begin{definition}{Autocorrelation, white noise, power spectral density}
 The \term{autocorrelation} of a stationary process with zero mean is $R(\tau) = \mathbb{E}[x(t)\,x(t + \tau)]$. It is even, largest at $\tau = 0$, and $R(0)$ is the variance. The \term{power spectral density} is its Fourier transform,
 \begin{equation}
-  \Phi(\omega) = \int_{-\infty}^{\infty} R(\tau)\,e^{-j\omega\tau}\,\dd\tau, \qquad\text{so that}\qquad \sigma^2 = R(0) = \frac{1}{2\pi}\int_{-\infty}^{\infty}\Phi(\omega)\,\dd\omega .
+  \Phi(\omega) = \int_{-\infty}^{\infty} R(\tau)\,e^{-j\omega\tau}\,\dd\tau, \qquad \sigma^2 = R(0) = \frac{1}{2\pi}\int_{-\infty}^{\infty}\Phi(\omega)\,\dd\omega .
 \end{equation}
 \term{White noise} is a process with no memory at all. In discrete time: independent samples, $\mathbb{E}[n_k n_{k+j}] = 0$ for $j \ne 0$. In continuous time: $R(\tau) = q\,\delta(\tau)$ and a flat spectrum $\Phi(\omega) = q$; the number $q$ is its \term{intensity}.
 \end{definition}

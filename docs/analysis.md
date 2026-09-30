@@ -1,7 +1,8 @@
 # Part III — Why It Works
 
-> **Status (2026-09-28):** planned, nothing implemented yet. Milestones M13–M18
-> in [roadmap.md](roadmap.md) point here.
+> **Status (2026-09-30):** planned and reviewed against the code, nothing
+> implemented yet. Milestones M13–M18 in [roadmap.md](roadmap.md) point here.
+> Scope is decided (§7): the app only, M13 and the ten **must** lessons first.
 
 Part I teaches PID. Part II adds the controllers people fly today. Both are
 about **design**: a knob or a cost goes in, a controller comes out, and we
@@ -68,19 +69,26 @@ framework-free and deterministic.
 
 ```
 src/math/
-  complex.ts     complex arithmetic (add, mul, div, abs, arg, exp)
+  complex.ts     complex arithmetic (add, mul, div, abs, arg, exp); owns the `Complex` type
   lti.ts         state space {A, B, C, D} (continuous or discrete, with dt), series/feedback,
-                 frequency response via (jωI − A)⁻¹ or (e^{jωT}I − A)⁻¹, step response, c2d (ZOH, Tustin)
+                 frequency response via (jωI − A)⁻¹ or (e^{jωT}I − A)⁻¹, step response, Tustin
   eig.ts         eigenvalues of small non-symmetric matrices (Hessenberg + shifted QR)
   margins.ts     gain/phase/delay margins and crossover from a sampled frequency response
   fft.ts         radix-2 FFT, Welch PSD (for spectra and the vibration chapter)
   care.ts        continuous ARE via the Hamiltonian's stable subspace (only needed for H∞)
 ```
 
-`mat.ts` already has `expm` (Padé), which gives ZOH for free. Every
-function is unit-tested against closed-form results: a double integrator
-under PD has known margins, and a first-order lag has known phase at its
-corner frequency.
+`mat.ts` already has `expm` (Padé), `c2d` (ZOH), `toContinuous` and
+`eigenvalues`. Part III reuses the first three as they are. `eigenvalues`
+keeps its name and its tests but gets the QR algorithm of `eig.ts` behind
+it: the current method (characteristic polynomial, then Durand–Kerner) is
+documented as good for about six states, and a loop model with the PID, the
+motor lag, a Padé delay and a filter has seven to ten. `mat.ts` re-exports
+`Complex` from `complex.ts`, so existing imports keep working.
+
+Every function is unit-tested against closed-form results: a double
+integrator under PD has known margins, and a first-order lag has known
+phase at its corner frequency.
 
 ### 3.2 Models of the loop (`src/analysis/`)
 
@@ -110,7 +118,7 @@ A new block `probe` in the parameter schema:
 
 ```ts
 probe: {
-  point: 'none' | 'l1.thrust' | 'l3.torque.x' | 'l3.rate.x' | 'l3.acc.x';
+  point: 'none' | 'ref.y' | 'l1.thrust' | 'l3.torque.x' | 'l3.rate.x' | 'l3.acc.x';
   signal: 'sine' | 'chirp' | 'multisine' | 'relay';
   amp: number; // in the units of the point
   freqHz: number; // sine
@@ -120,14 +128,23 @@ probe: {
 }
 ```
 
-The injection is additive at the controller output (the classic
-"break the loop at the plant input" measurement). The open loop is
-$L(j\omega) = -U_c(j\omega)/U(j\omega)$, where $U$ is the signal that
-reaches the plant and $U_c$ is the controller's part of it. The same
-recording gives $S = U_c'/D$ and $T$. `relay` replaces the controller
-output with $\pm h$ around trim for the auto-tuner. The probe is
-deterministic and part of the seeded run, so measured Bode plots are
-reproducible. Telemetry adds `probe.in`, `probe.u` and `probe.uc`.
+There are two kinds of point:
+
+- **Loop-break points** (`l1.thrust`, `l3.*`). The probe signal $d$ is
+  added to the controller output $u_c$, so the plant receives
+  $u = u_c + d$ (the classic "break the loop at the plant input"
+  measurement; the loop itself stays closed). One recording gives all
+  three functions: $S = U/D$, $T = -U_c/D$ and $L = T/S = -U_c/U$.
+- **The reference point** (`ref.y`). The signal is added to the altitude
+  setpoint and the recording gives the closed-loop response $Y/R$. Lesson
+  III.1 uses it, because "the drone follows slow sines and ignores fast
+  ones" is about $Y/R$ and not about $L$.
+
+`relay` replaces the controller output with $\pm h$ around trim for the
+auto-tuner. The probe is deterministic and part of the seeded run, so
+measured Bode plots are reproducible. Telemetry adds `probe.in` ($d$ or
+the reference signal), `probe.u` and `probe.uc`. Sweeps run with sensor
+noise and wind off unless the lesson is about them.
 
 Sweeps run many short simulations. They reuse the headless runner of
 `engine/arena.ts` and run in time-sliced chunks, so the UI stays live. If
@@ -136,14 +153,28 @@ ideas list since M4).
 
 ### 3.4 Plant and sensor additions
 
-| Addition                                                                                                                                           | Why                                                                                                                                                      |
-| -------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Rotor vibration**: imbalance force per motor at its rotor frequency $f_i = f_{hover}\sqrt{T_i/T_{hover}}$ (`vibration.amp`, `vibration.hoverHz`) | Vibration on the gyro and accelerometer, aliasing, notch filters. Off by default so Parts I–II are unchanged.                                            |
-| **IMU sample rate** and optional analog anti-alias pole (`sensors.imuRateHz`, `sensors.aaFilterHz`)                                                | Aliasing appears only if the sensor samples slower than the physics (1 kHz). The physics step may need to drop to 0.25 ms when vibration is on (see §7). |
-| **Gyro bias** (`sensors.gyroBias`, deg/s, per axis) and a slow random walk                                                                         | Makes attitude estimation non-trivial.                                                                                                                   |
-| **Attitude source** `sensors.attitude: 'truth' \| 'complementary' \| 'mahony'`                                                                     | L3 flies on an estimate instead of noisy truth. Default `truth`, so the Part I/II regression baseline holds.                                             |
-| **Navigation source** `sensors.nav: 'truth' \| 'ekf'` with a 10 Hz GPS-like position fix and a barometer                                           | L3 position/velocity from an EKF.                                                                                                                        |
-| **Scripted total motor loss** (existing `motorEfficiency`, event helper `loseMotor(i, t)`)                                                         | Chapter J. The plant supports it already.                                                                                                                |
+| Addition                                                                                                                                                   | Why                                                                                                           |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| **Rotor vibration** on the IMU: one sinusoid per motor at its rotor frequency $f_i = f_{hover}\sqrt{T_i/T_{hover}}$ (`vibration.amp`, `vibration.hoverHz`) | Vibration on the gyro and accelerometer, aliasing, notch filters. Off by default so Parts I–II are unchanged. |
+| **IMU sample rate** and optional analog anti-alias pole (`sensors.imuRateHz`, `sensors.aaFilterHz`)                                                        | Aliasing appears only if the sensor samples slower than the physics (1 kHz).                                  |
+| **Gyro bias** (`sensors.gyroBias`, deg/s, per axis) and a slow random walk                                                                                 | Makes attitude estimation non-trivial.                                                                        |
+| **Attitude source** `sensors.attitude: 'truth' \| 'complementary' \| 'mahony'`                                                                             | L3 flies on an estimate instead of noisy truth. Default `truth`, so the Part I/II regression baseline holds.  |
+| **Navigation source** `sensors.nav: 'truth' \| 'ekf'` with a 10 Hz GPS-like position fix and a barometer                                                   | L3 position/velocity from an EKF.                                                                             |
+| **Scripted total motor loss** (existing `motorEfficiency`, event helper `loseMotor(i, t)`)                                                                 | Chapter J. The plant supports it already.                                                                     |
+
+Vibration is a **sensor-level** signal. It is added to the gyro and
+accelerometer readings inside `sim/sensors.ts` and does not enter the
+rigid-body dynamics: the motion it would cause is far below anything
+visible, and the lessons are about what it does to the measurement. Each
+motor keeps an accumulated phase, so the frequency can follow the thrust.
+With `hoverHz` up to 250 Hz the fastest rotor stays below the 500 Hz
+Nyquist frequency of the 1 ms physics step, so the step does not change.
+
+The sensor chain, in order, at the physics rate: truth, plus vibration,
+through the anti-alias pole, then sample-and-hold at `imuRateHz`. The
+controller reads the held sample. `imuRateHz = 0` (the default) means no
+hold: the controller reads the newest value on each of its ticks, as it
+does today.
 
 ### 3.5 New controllers and filters
 
@@ -183,6 +214,26 @@ src/estimation/
 
 `ExtraChart` grows `bode`, `nyquist`, `poles`, `spectrum` and `covariance`.
 
+**Layout.** Today the chart grid has one switchable extra slot, and several
+lessons need two analysis views at once (III.2: pole map beside the step
+response; III.3: Bode beside Nyquist). A lesson can therefore set
+`analysis: [ExtraChart, ExtraChart?]`. The first view takes the extra
+slot; the second replaces the Actuators chart for that lesson. Tracking
+stays visible, so the flight is always on screen next to the analysis.
+The Bode chart is one slot with two stacked panes (magnitude, phase) on a
+shared frequency axis. It has a second mode for III.5: $\ln|S|$ on a
+**linear** frequency axis up to the Nyquist frequency, with the areas
+above and below zero shaded.
+
+### 3.7 Lesson plumbing
+
+- `Part` becomes `1 | 2 | 3`, and `PARTS` in `LessonPanel.tsx` gets
+  `Part III · Why it works` with the prefix `III.`.
+- Lessons III.4 and III.7 ask for a number before the run. `Lesson` gets
+  an optional `predict: { label, unit, truth(sim), tolerance }`. The panel
+  shows an input field, `truth` is measured headlessly on the same seed,
+  and `goal.check` receives the student's value in `GoalContext`.
+
 ## 4. Designs (short)
 
 Full derivations go into a new textbook, `docs/analysis-primer.md`, written
@@ -201,12 +252,17 @@ phase margin. The lesson turns a delay slider and shows that the maximum
 usable bandwidth drops roughly as $1/\tau$. The Padé model of the delay
 has a right-half-plane zero, a first look at non-minimum-phase behaviour.
 
-**Waterbed.** For a stable open loop with relative degree ≥ 2,
-$\int_0^\infty \ln|S(j\omega)|\,d\omega = 0$: pushing $|S|$ down at low
-frequency (better gust rejection) pushes it up somewhere else. The lesson
-measures $|S|$ with the probe and plots the area below and above 0 dB.
-Turbulence at the frequency of the $|S|$ peak then gets amplified, and the
-student sees it in the air.
+**Waterbed.** For an open loop with no poles in the right half-plane and
+relative degree ≥ 2, $\int_0^\infty \ln|S(j\omega)|\,d\omega = 0$: pushing
+$|S|$ down at low frequency (better gust rejection) pushes it up somewhere
+else. Our loop qualifies: its integrators sit on the imaginary axis, not
+to the right of it. The controller is sampled, so the integral we can
+measure runs to the Nyquist frequency, where the discrete-time version of
+the theorem gives the same zero for a strictly proper loop. The areas are
+equal on a **linear** frequency axis, not on the logarithmic axis of a
+Bode plot, so the lesson uses the linear $\ln|S|$ view (§3.6). Turbulence
+at the frequency of the $|S|$ peak then gets amplified, and the student
+sees it in the air.
 
 **Lyapunov on L1.** For PD, $V = \tfrac12 k_p e^2 + \tfrac12 m v^2$ gives
 $\dot V = -k_d v^2 \le 0$, and LaSalle finishes the argument. With thrust
@@ -223,8 +279,11 @@ an altimeter dropout event, position uncertainty grows as $t^{3/2}$, and
 faster with accelerometer bias.
 
 **LQG.** Continuous single-input LQR guarantees a gain margin
-$[\tfrac12, \infty)$ and phase margin ≥ 60°. Our discrete LQR gets
-slightly less (the primer shows how much). Put the Kalman filter in front
+$[\tfrac12, \infty)$ and phase margin ≥ 60°, for the plant it was designed
+on. Our discrete LQR gets slightly less (the primer shows how much), and
+the motor lag takes about 10° more if the design ignores it. The lesson
+therefore runs with `lqr.lagState` on and no sensor delay, so the measured
+margin is the promised one. Put the Kalman filter in front
 and those guarantees vanish [Doyle 1978]. The lesson measures the margins
 of LQR, then LQR + KF with an aggressive filter, then recovers them by
 detuning the filter towards the loop-transfer-recovery limit
@@ -277,16 +336,30 @@ loop. Its $-180°$ crossing exists only because of the delay and the
 filters, which explains why Ziegler–Nichols had no answer for the pure
 double integrator in Part I.
 
-**Losing a rotor.** Linearised at hover with three motors, the vehicle is
-not controllable in yaw together with roll and pitch. The controllability
-matrix shows it. The drone can still hold position if it gives up yaw and
-spins about a tilted primary axis [Mueller 2014]. Reduced-attitude control
-of that axis, with an INDI inner loop [Sun 2021].
+**Losing a rotor.** Four motors produce four independent quantities:
+thrust and three torques. The matrix that maps motor thrusts to those four
+(the control effectiveness matrix, the inverse of the mixer) has rank 4.
+Remove a column and the rank is 3: thrust, roll, pitch and yaw can no
+longer be commanded independently, and there is no motor setting that
+hovers without rotating. The **controllability readout** of lesson III.19
+is that rank, shown with the direction that was lost. The drone can still
+hold position if it gives up yaw and spins about a tilted primary axis
+[Mueller 2014]. Reduced-attitude control of that axis, with an INDI inner
+loop [Sun 2021]. The spin settles where the yaw reaction torque meets the
+rotational drag, at roughly $c_\tau m g / k_{damp}$. With today's defaults
+that is about 78 rad/s, or 18° of rotation per 250 Hz controller tick,
+which is too fast to control (see §7).
 
 ## 5. Milestones
 
 Each ends with something runnable; `make check` passes at each commit, and
 the Part I/II behavioural baseline stays unchanged.
+
+**Build order.** Two passes. The first pass is M13 and then the **must**
+lessons of M14, M15, M17 and M18 (III.1–4, 7, 8, 14–16, 20), with only the
+code those lessons need. The second pass fills in the **should** and
+**could** lessons, all of M16 (Chapter H) and the rotor-loss lesson III.19.
+Lesson numbers are fixed now, so the first pass leaves gaps in the list.
 
 ### M13 — Foundations for Part III
 
@@ -294,16 +367,21 @@ the Part I/II behavioural baseline stays unchanged.
   against closed-form results.
 - `linearModel()` for PID, LQR/LQI and ADRC on L1; analytic L1 plant.
 - Probe block, injection, telemetry; `sweep.ts` with time-sliced runs.
-- Bode, Nyquist and pole–zero charts; `ExtraChart` additions.
-- Lesson panel shows Part III as a third course.
+- Bode, Nyquist and pole–zero charts; `ExtraChart` additions; the
+  two-view analysis layout (§3.6).
+- Lesson panel shows Part III as a third course (§3.7).
 
 **Done when** the model and measured Bode plots of the default L1 PID agree
-to within 1 dB and 5° below the Nyquist frequency.
+to within 1 dB and 5° from 0.1 Hz to 20 Hz. The default loop crosses over
+near 1.1 Hz, so the band covers a decade on each side. Below it the loop
+gain is so high that the plant input barely moves, and the measurement is
+a ratio of a large signal to a very small one; above it the 250 Hz controller and the 1 kHz physics
+stop looking like one sampled system.
 
 ### M14 — Chapter F lessons (III.1–III.6)
 
-Root-locus trail, delay margin, $S$/$T$ measurement, `shaping.ts` (lead/lag,
-notch on L1), spectrum chart.
+Root-locus trail, delay margin, the `predict` field (first used by III.4),
+$S$/$T$ measurement, `shaping.ts` (lead/lag, notch on L1), spectrum chart.
 
 ### M15 — Chapter G (III.7–III.9)
 
@@ -324,8 +402,10 @@ the L3 rate loop (PID and INDI).
 
 ### M18 — Chapter J and the report card (III.19–III.20)
 
-`loseMotor` event, `fault.ts`, controllability readout, robustness report
-card in the arena, and `make bench` printing margins next to RMS.
+Robustness report card in the arena, and `make bench` printing margins
+next to RMS (first pass). Then the `loseMotor` event, `fault.ts` and the
+controllability readout (second pass). III.19 starts with a headless
+prototype of the three-rotor spin before any lesson is written (§7).
 
 ## 6. Lessons (Part III)
 
@@ -333,22 +413,22 @@ Priority: **must** (core story), **should**, **could**.
 
 ### Chapter F — The loop as a filter
 
-| #   | id         | Title                  | Setup and events                                                               | What the student sees / goal                                                                                                                               | Prio   |
-| --- | ---------- | ---------------------- | ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
-| 1   | `bode`     | The drone as a filter  | L1 PID, sine probe on the setpoint; frequency slider, then an automatic sweep. | Slow sines are followed, fast ones are ignored, with a resonance in between. The measured dots land on the model curve. Goal: find the −3 dB bandwidth.    | must   |
-| 2   | `poles`    | Poles tell the story   | Pole map beside the step response; drag $K_p$, $K_d$.                          | Poles move, the step response changes with them; the root-locus trail crosses into instability at the gain lesson 10 found. Goal: place poles for ζ ≈ 0.7. | must   |
-| 3   | `margins`  | How far from the edge? | Loop broken at the thrust; Bode and Nyquist of $L$.                            | Gain and phase margin as distances to $-1$. Goal: PM ≥ 45° and GM ≥ 6 dB with the highest possible crossover.                                              | must   |
-| 4   | `delay`    | Delay is a phase thief | Same loop, `delayMs` slider 0 → 60 ms.                                         | The phase curve bends down, the margin disappears, and the drone oscillates at the predicted frequency. Goal: predict the critical delay within 10 %.      | must   |
-| 5   | `waterbed` | The waterbed           | Measure $\|S\|$; stronger integral action; turbulence on.                      | Better low-frequency rejection, a higher $\|S\|$ peak, and gusts at that frequency amplified in flight. Areas above and below 0 dB stay equal.             | should |
-| 6   | `shaping`  | Shape the loop         | Lead/lag and notch blocks on the L1 loop; a target loop shape drawn in.        | Design by bending the Bode plot instead of turning gains. Goal: match the target shape and hit PM ≥ 50°.                                                   | should |
+| #   | id         | Title                  | Setup and events                                                               | What the student sees / goal                                                                                                                                                    | Prio   |
+| --- | ---------- | ---------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| 1   | `bode`     | The drone as a filter  | L1 PID, sine probe on the setpoint; frequency slider, then an automatic sweep. | Slow sines are followed, fast ones are ignored, with a resonance in between. The measured dots land on the model curve. Goal: find the −3 dB bandwidth.                         | must   |
+| 2   | `poles`    | Poles tell the story   | Pole map beside the step response; drag $K_p$, $K_d$.                          | Poles move, the step response changes with them; the root-locus trail crosses into instability at the gain lesson 10 found. Goal: place poles for ζ ≈ 0.7.                      | must   |
+| 3   | `margins`  | How far from the edge? | Loop broken at the thrust; Bode and Nyquist of $L$.                            | Gain and phase margin as distances to $-1$. Goal: PM ≥ 45° and GM ≥ 6 dB with the highest possible crossover.                                                                   | must   |
+| 4   | `delay`    | Delay is a phase thief | Same loop, `delayMs` slider 0 → 60 ms.                                         | The phase curve bends down, the margin disappears, and the drone oscillates at the predicted frequency. Goal: predict the critical delay within 10 %.                           | must   |
+| 5   | `waterbed` | The waterbed           | Measure $\|S\|$; stronger integral action; turbulence on.                      | Better low-frequency rejection, a higher $\|S\|$ peak, and gusts at that frequency amplified in flight. On the linear-frequency view the areas above and below zero stay equal. | should |
+| 6   | `shaping`  | Shape the loop         | Lead/lag and notch blocks on the L1 loop; a target loop shape drawn in.        | Design by bending the Bode plot instead of turning gains. Goal: match the target shape and hit PM ≥ 50°.                                                                        | should |
 
 ### Chapter G — Stability and structure
 
-| #   | id           | Title                         | Setup and events                                                                                  | What the student sees / goal                                                                                                                        | Prio   |
-| --- | ------------ | ----------------------------- | ------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
-| 7   | `lyapunov`   | Energy that only goes down    | PD on L1, low max thrust; phase portrait with $V$ level sets; scripted dives from rising heights. | $V$ never increases, until the thrust saturates. The Lyapunov estimate sits inside the true region of attraction. Goal: predict which dive crashes. | must   |
-| 8   | `observable` | What the filter can't see     | Kalman filter with the altimeter bias as a state; then a 5 s altimeter dropout.                   | Bias covariance never shrinks (rank-deficient observability matrix); during the dropout, position uncertainty grows as $t^{3/2}$.                   | must   |
-| 9   | `lqg`        | Optimal plus optimal ≠ robust | LQR, then LQR + aggressive KF, then a detuned KF; margins measured by the probe.                  | LQR: ≥ 60° as promised. LQG: a small margin, and a slightly heavier drone oscillates. Goal: recover PM ≥ 45° by detuning the filter.                | should |
+| #   | id           | Title                         | Setup and events                                                                                                        | What the student sees / goal                                                                                                                        | Prio   |
+| --- | ------------ | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| 7   | `lyapunov`   | Energy that only goes down    | PD on L1, low max thrust; phase portrait with $V$ level sets; scripted dives from rising heights.                       | $V$ never increases, until the thrust saturates. The Lyapunov estimate sits inside the true region of attraction. Goal: predict which dive crashes. | must   |
+| 8   | `observable` | What the filter can't see     | Kalman filter with the altimeter bias as a state; then a 5 s altimeter dropout.                                         | Bias covariance never shrinks (rank-deficient observability matrix); during the dropout, position uncertainty grows as $t^{3/2}$.                   | must   |
+| 9   | `lqg`        | Optimal plus optimal ≠ robust | LQR with the lag state and no sensor delay, then LQR + aggressive KF, then a detuned KF; margins measured by the probe. | LQR: ≥ 60° as promised. LQG: a small margin, and a slightly heavier drone oscillates. Goal: recover PM ≥ 45° by detuning the filter.                | should |
 
 ### Chapter H — Robust by construction
 
@@ -371,10 +451,10 @@ Priority: **must** (core story), **should**, **could**.
 
 ### Chapter J — When things break (L3)
 
-| #   | id        | Title                      | Setup and events                                                                      | What the student sees / goal                                                                                                              | Prio   |
-| --- | --------- | -------------------------- | ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------ |
-| 19  | `3motors` | Three rotors left          | Hover at 5 m; motor 2 lost at t = 5 s; standard cascade vs fault-tolerant controller. | The cascade flips and crashes. The controllability readout loses rank in yaw. The fault controller spins and holds position within 0.5 m. | should |
-| 20  | `report`  | The robustness report card | Arena extended with probe sweeps for every L1 and L3 controller.                      | GM, PM, delay margin, $\|S\|_\infty$ next to Part II's RMS columns. Controllers that won on RMS are not always the robust ones.           | must   |
+| #   | id        | Title                      | Setup and events                                                                      | What the student sees / goal                                                                                                                              | Prio   |
+| --- | --------- | -------------------------- | ------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| 19  | `3motors` | Three rotors left          | Hover at 5 m; motor 2 lost at t = 5 s; standard cascade vs fault-tolerant controller. | The cascade flips and crashes. The effectiveness matrix drops from rank 4 to 3. The fault controller gives up yaw, spins and holds position within 0.5 m. | should |
+| 20  | `report`  | The robustness report card | Arena extended with probe sweeps for every L1 and L3 controller.                      | GM, PM, delay margin, $\|S\|_\infty$ next to Part II's RMS columns. Controllers that won on RMS are not always the robust ones.                           | must   |
 
 Goals use the existing `goal.check` mechanism. Lessons that predict a
 number (III.4, III.7) compare the student's input field with the value
@@ -382,20 +462,26 @@ measured headlessly on the same seed.
 
 ## 7. Risks and open questions
 
-| Risk                                                                                                                     | Mitigation                                                                                                                                          |
-| ------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Sweeps are slow (dozens of runs per Bode plot).                                                                          | Multisine excitation (many frequencies per run); time-sliced chunks; cache per parameter hash. Web Worker if needed.                                |
-| Vibration needs a finer physics step than 1 ms (rotor at 150–250 Hz).                                                    | Physics substep only when `vibration.amp > 0`; otherwise 1 ms as today. The Part I/II baseline is unaffected.                                       |
-| Model and measurement disagree for reasons that are not pedagogical (e.g. drag nonlinearity, saturation during a sweep). | Small probe amplitudes, calm air during sweeps, a tolerance band drawn on the Bode chart; tests pin agreement for the default loops.                |
-| `linearModel()` for every controller is a lot of work.                                                                   | Analytic models only for L1 (PID, LQR/LQI, ADRC, SMC) and the L3 rate loop; everything else is measured-only, and the report card is measured-only. |
-| Scope: 20 lessons, 6 milestones.                                                                                         | The **must** set (10 lessons: III.1–4, 7, 8, 14–16, 20) is a coherent Part III on its own. Chapter H is optional.                                   |
+| Risk                                                                                                                     | Mitigation                                                                                                                                                                                            |
+| ------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Sweeps are slow (dozens of runs per Bode plot).                                                                          | Multisine excitation (many frequencies per run); time-sliced chunks; cache per parameter hash. Web Worker if needed.                                                                                  |
+| The three-rotor spin is too fast to control: about 78 rad/s with the default `angularDamping` of 0.002 (§4).             | Prototype headlessly first. If needed, add a separate yaw-damping parameter for rotor drag in yaw, and have the lesson set it. If the prototype fails, III.19 is dropped; nothing else depends on it. |
+| Low-frequency and near-Nyquist points of a measured Bode plot are unreliable.                                            | Agreement is tested only in a stated band (M13: 0.1–20 Hz); the chart greys out points outside it.                                                                                                    |
+| Model and measurement disagree for reasons that are not pedagogical (e.g. drag nonlinearity, saturation during a sweep). | Small probe amplitudes, calm air during sweeps, a tolerance band drawn on the Bode chart; tests pin agreement for the default loops.                                                                  |
+| `linearModel()` for every controller is a lot of work.                                                                   | Analytic models only for L1 (PID, LQR/LQI, ADRC, SMC) and the L3 rate loop; everything else is measured-only, and the report card is measured-only.                                                   |
+| Scope: 20 lessons, 6 milestones.                                                                                         | The **must** set (10 lessons: III.1–4, 7, 8, 14–16, 20) is a coherent Part III on its own and is built first (§5). Chapter H is optional.                                                             |
 
-Open decisions (proposed defaults, to confirm):
+Decisions (confirmed 2026-09-30):
 
 1. **Numbering** — Part III as a third semester, restarting at III.1.
-2. **H∞** — keep only as a _could_ (lesson III.12).
+2. **H∞** — only as a _could_ (lesson III.12).
 3. **Default attitude source** — stays `truth`; estimation is opt-in per
    lesson, so every earlier tune and test stays valid.
+4. **Scope** — M13 and the ten **must** lessons first; Chapter H and
+   III.19 in the second pass (§5, build order).
+5. **The book** — Part III is built in the app only. Chapters of
+   _Standing in the Wind_ for Part III come later and are not part of
+   M13–M18.
 
 ## 8. References
 

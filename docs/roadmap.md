@@ -130,6 +130,11 @@ same quantity measured on the simulator. Third semester of lessons
 | M17       | Chapter I: sampling, vibration, notch filters, attitude estimation, EKF, sysid — lessons III.13–III.18 |
 | M18       | Chapter J: rotor loss, robustness report card in the arena — lessons III.19–III.20                     |
 
+Build order: M13, then the ten **must** lessons across M14, M15, M17 and
+M18 (III.1–4, 7, 8, 14–16, 20). The remaining lessons, Chapter H (M16) and
+the rotor-loss lesson follow in a second pass. The book gets its Part III
+later.
+
 ## Later / ideas
 
 - Ziegler–Nichols helper (dropped from M4 — the method does not fit a

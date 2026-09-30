@@ -419,3 +419,54 @@ def kick_predict():
     a.set_ylabel("altitude, fraction of the step")
     xlab_time(a, "time after the step  [s]")
     save(f, "kick_predict")
+
+
+# ─── Lesson 8 ──────────────────────────────────────────────────────────────
+def d_noise_std(fc, dt=0.004, sigma=0.01, kd=7.0):
+    """Standard deviation of the D term fed by white altimeter noise through the first-order filter."""
+    if fc <= 0:
+        return kd * np.sqrt(2) * sigma / dt
+    tf = 1 / (2 * np.pi * fc)
+    al = tf / (tf + dt)
+    return kd * sigma / dt * (1 - al) * np.sqrt(2 / (1 + al))
+
+
+@fig
+def noise_predict():
+    f, ax = plt.subplots(1, 2, figsize=(TEXT_W, 56 * MM), gridspec_kw=dict(wspace=0.34))
+    a = ax[0]
+    fcs = np.logspace(-0.2, 2.35, 200)
+    a.loglog(fcs, [d_noise_std(x) for x in fcs], color=C["ink"], lw=0.9, ls=DASH)
+    a.axhline(d_noise_std(0), color=C["ink"], lw=0.7, ls=DOT)
+    for fc in [50, 20, 10, 5, 2, 1]:
+        d = win(load(f"noise-f{fc}"), 8, 20)
+        a.plot(fc, d["alt.part.d"].std(), "o", color=C["D"], ms=4)
+    d = win(load("noise-f0"), 8, 20)
+    a.plot(180, d["alt.part.d"].std(), "o", color=C["D"], ms=4)
+    a.text(170, 33, "no filter: $\\sqrt{2}K_d\\sigma/\\Delta t$", fontsize=6.3, color=C["ink"], ha="right")
+    a.text(1.1, 3.2, "formula of\nExample 8.2", fontsize=6.3, color=C["ink"])
+    a.text(6, 0.55, "simulator", fontsize=6.3, color=C["D"])
+    a.set_xlim(0.7, 250)
+    a.set_ylim(0.3, 60)
+    a.set_xlabel("cutoff of the D filter  [Hz]", loc="right")
+    a.set_ylabel("fluctuation of the D term  [N]")
+    a.set_title("Noise in the D term")
+    a.grid(True, which="major", axis="both")
+
+    a = ax[1]
+    d = win(load("noise-f0"), 3, 20)
+    k = 300
+    roll = lambda s: s.rolling(k, center=True).mean()
+    a.plot(d.t, roll(d["alt.part.p"]), color=C["P"], lw=1.1)
+    a.plot(d.t, roll(d["alt.part.i"]), color=C["I"], lw=1.1)
+    a.plot(d.t, roll(d["alt.part.p"] + d["alt.part.i"]), color=C["ink"], lw=1.1)
+    a.axhline(-4.0, color=C["accent"], lw=0.9, ls=DOT)
+    a.text(19.8, -4.45, "predicted: −4.0 N", color=C["accent"], fontsize=6.4, ha="right")
+    a.text(16.5, -1.0, "P", color=C["P"], fontsize=6.6)
+    a.text(15, -2.25, "I", color=C["I"], fontsize=6.6)
+    a.text(12.8, -3.0, "P + I", color=C["ink"], fontsize=6.6)
+    a.set_ylim(-5, 0.3)
+    a.set_title("What the clipped noise costs")
+    a.set_ylabel("N  (3 s averages)")
+    xlab_time(a)
+    save(f, "noise_predict")

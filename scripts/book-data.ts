@@ -436,6 +436,17 @@ for (const hz of [50, 10, 2])
       alt(p, { dFilterHz: hz });
     },
   });
+// The price of the filter: the same square wave with a fast, a slow and a very slow D filter (no noise).
+for (const hz of [20, 5, 1])
+  add({
+    name: `noise-step-f${hz}`,
+    seconds: 24,
+    setup: (p) => {
+      calm(p);
+      alt(p, { iOn: false, dFilterHz: hz });
+      square(0.5, 8)(p);
+    },
+  });
 // Lesson 9: closer to the edge, in rate and in delay.
 for (const hz of [4, 3])
   add({

@@ -15,6 +15,7 @@ import { GRAVITY, type Level, type Params } from '@/sim/params';
 import { Sensors, type Measurement } from '@/sim/sensors';
 import { zoneDistance } from '@/sim/world';
 import { Wind } from '@/sim/wind';
+import { probeSignal } from './probe';
 import { profileOffset, zeroReference, type Reference } from './reference';
 import { Telemetry } from './telemetry';
 
@@ -90,6 +91,13 @@ export class Simulation {
   profileStart = 0;
   /** Seconds spent inside a keep-out zone since the last reset. */
   zoneTime = 0;
+  /**
+   * The probe (docs/analysis.md §3.3): the injected signal, the command that reaches the plant
+   * and the controller's own part of it. For a thrust probe u = uc + in, in newtons.
+   */
+  probe = { in: 0, u: 0, uc: 0 };
+  /** When the probe was last switched on or changed; its signal starts from zero phase there. */
+  private probeT0 = 0;
   private accumulator = 0;
   private poke: { force: Vec3; until: number } | null = null;
   private resetListeners = new Set<() => void>();
@@ -126,6 +134,8 @@ export class Simulation {
     const pp = prev.setpoint;
     if (sp.profile !== pp.profile || sp.profilePeriod !== pp.profilePeriod)
       this.profileStart = this.t;
+    if (next.probe !== prev.probe && JSON.stringify(next.probe) !== JSON.stringify(prev.probe))
+      this.probeT0 = this.t;
     if (next.sim.seed !== prev.sim.seed || controllerKey(next) !== controllerKey(prev))
       this.reset();
   }
@@ -150,6 +160,8 @@ export class Simulation {
     this.takingOff = true;
     this.profileStart = 0;
     this.zoneTime = 0;
+    this.probeT0 = 0;
+    this.probe = { in: 0, u: 0, uc: 0 };
     this.reference = zeroReference(v3());
     this.yaw = (p.setpoint.yawDeg * Math.PI) / 180;
     this.state.q = p.sim.level === 3 ? qFromAxisAngle(v3(0, 1, 0), 0) : this.state.q;
@@ -289,14 +301,21 @@ export class Simulation {
     const wind = this.wind.step(this.t, dt, p.wind);
     this.sensors.record(this.state);
 
+    const probing = p.probe.point !== 'none' && this.armed && !this.state.crashed;
+    const probeIn = probing ? probeSignal(p.probe, this.t - this.probeT0) : 0;
+
     if (this.armed && !this.state.crashed) {
       if (this.state.landed || this.takingOff) this.controller.resetIntegrators();
       // Reference derivatives only while the setpoint follows the profile exactly.
       const exact = p.setpoint.profile !== 'none' && rl === 0 && !this.takingOff;
       const r = this.reference;
+      const pos =
+        p.probe.point === 'ref.y' && probeIn !== 0
+          ? v3(this.setpoint.x, this.setpoint.y + probeIn, this.setpoint.z)
+          : this.setpoint;
       const sp: Setpoint = exact
-        ? { pos: this.setpoint, yaw: this.yaw, vel: r.vel, acc: r.acc, jerk: r.jerk, snap: r.snap }
-        : { pos: this.setpoint, yaw: this.yaw };
+        ? { pos, yaw: this.yaw, vel: r.vel, acc: r.acc, jerk: r.jerk, snap: r.snap }
+        : { pos, yaw: this.yaw };
       const t0 = performance.now();
       this.actuation = this.controller.tick({
         params: p,
@@ -312,6 +331,7 @@ export class Simulation {
     } else {
       this.actuation = idleActuation();
     }
+    if (probing) this.injectProbe(probeIn);
 
     const ext = this.poke && this.t < this.poke.until ? this.poke.force : v3();
     if (this.poke && this.t >= this.poke.until) this.poke = null;
@@ -323,6 +343,24 @@ export class Simulation {
     this.t += dt;
     this.stepIndex++;
     if (this.stepIndex % TELEMETRY_EVERY === 0) this.record();
+  }
+
+  /**
+   * Add the probe signal at its point and note what the plant receives. The controller's own
+   * actuation object is left untouched: controllers hold it between their samples.
+   */
+  private injectProbe(d: number): void {
+    const p = this.params;
+    const cmd = this.actuation.motorCmd;
+    const uc = cmd[0] + cmd[1] + cmd[2] + cmd[3];
+    let u = uc;
+    if (p.probe.point === 'l1.thrust' && this.level === 1) {
+      const fmax = p.drone.maxMotorThrust;
+      const f = cmd.map((c) => Math.min(Math.max(c + d / 4, 0), fmax)) as Actuation['motorCmd'];
+      this.actuation = { ...this.actuation, motorCmd: f };
+      u = f[0] + f[1] + f[2] + f[3];
+    }
+    this.probe = { in: d, u, uc };
   }
 
   private record(): void {
@@ -371,6 +409,11 @@ export class Simulation {
     const zd = zoneDistance(s.pos, this.params.world, this.level);
     tl.set('zone.dist', Number.isFinite(zd) ? zd : NaN);
     tl.set('zone.inside', zd < 0 ? 1 : 0);
+    if (this.params.probe.point !== 'none') {
+      tl.set('probe.in', this.probe.in);
+      tl.set('probe.u', this.probe.u);
+      tl.set('probe.uc', this.probe.uc);
+    }
     const loops = this.controller.loops();
     for (const id in loops) recordLoop(tl, id, loops[id]!);
     const extras = this.controller.extras();

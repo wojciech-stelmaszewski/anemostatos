@@ -62,6 +62,25 @@ export interface SensorParams {
   motorFeedback: boolean;
 }
 
+/**
+ * A test signal injected into the loop to measure its frequency response (docs/analysis.md §3.3).
+ * `l1.thrust` adds it to the thrust command (the loop broken at the plant input);
+ * `ref.y` adds it to the altitude setpoint.
+ */
+export type ProbePoint = 'none' | 'ref.y' | 'l1.thrust';
+export interface ProbeParams {
+  point: ProbePoint;
+  signal: 'sine' | 'chirp';
+  /** Amplitude in the units of the point: N for thrust, m for the setpoint. */
+  amp: number;
+  /** Frequency of the sine, Hz. */
+  freqHz: number;
+  /** The chirp sweeps logarithmically from f0 to f1 over durationS. */
+  f0Hz: number;
+  f1Hz: number;
+  durationS: number;
+}
+
 /** What the controller believes about the vehicle. The truth lives in `DroneParams`. */
 export interface ModelParams {
   /** Assumed mass m̂, kg. */
@@ -236,6 +255,7 @@ export interface Params {
   wind: WindParams;
   sensors: SensorParams;
   control: ControlParams;
+  probe: ProbeParams;
 }
 
 export const defaultParams = (): Params => ({
@@ -343,6 +363,7 @@ export const defaultParams = (): Params => ({
       safety: 'none',
     },
   },
+  probe: { point: 'none', signal: 'sine', amp: 0.3, freqHz: 1, f0Hz: 0.1, f1Hz: 20, durationS: 60 },
 });
 
 export const GRAVITY = 9.81;

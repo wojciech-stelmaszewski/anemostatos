@@ -4,7 +4,14 @@ import reactHooks from 'eslint-plugin-react-hooks';
 import reactRefresh from 'eslint-plugin-react-refresh';
 import tseslint from 'typescript-eslint';
 
-const pureCore = ['src/math/**', 'src/sim/**', 'src/control/**', 'src/engine/**'];
+const pureCore = [
+  'src/math/**',
+  'src/sim/**',
+  'src/control/**',
+  'src/engine/**',
+  'src/estimation/**',
+  'src/analysis/**',
+];
 
 export default tseslint.config(
   { ignores: ['dist', 'node_modules'] },

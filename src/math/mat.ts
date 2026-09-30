@@ -2,6 +2,9 @@
  * Small dense matrices as arrays of rows. Sized for control problems (≤ ~50×50), written for
  * clarity over speed; every function returns a new matrix.
  */
+import type { Complex } from './complex';
+import { eigQr } from './eig';
+
 export type Mat = number[][];
 
 export const zeros = (rows: number, cols = rows): Mat =>
@@ -154,59 +157,14 @@ export function eig2(a: Mat): { re: number; im: number }[] {
   ];
 }
 
-export interface Complex {
-  re: number;
-  im: number;
-}
+export type { Complex } from './complex';
 
 /**
- * Eigenvalues of a small square matrix: characteristic polynomial by Faddeev–LeVerrier, roots by
- * Durand–Kerner. Plenty for the ≤ 6-state pole readouts; not for large or ill-conditioned systems.
+ * Eigenvalues of a small square matrix, by the QR algorithm on its Hessenberg form
+ * (see ./eig.ts). Conjugate pairs come out adjacent.
  */
 export function eigenvalues(a: Mat): Complex[] {
-  const n = rows(a);
-  // Characteristic polynomial λⁿ + c[1]λⁿ⁻¹ + … + c[n].
-  const c = [1];
-  let m = zeros(n);
-  for (let k = 1; k <= n; k++) {
-    m = add(mul(a, m), scale(eye(n), c[k - 1]!));
-    const am = mul(a, m);
-    let tr = 0;
-    for (let i = 0; i < n; i++) tr += am[i]![i]!;
-    c.push(-tr / k);
-  }
-  const evalPoly = (z: Complex): Complex => {
-    let re = 1;
-    let im = 0;
-    for (let k = 1; k <= n; k++) [re, im] = [re * z.re - im * z.im + c[k]!, re * z.im + im * z.re];
-    return { re, im };
-  };
-  const radius = 1 + Math.max(...c.slice(1).map(Math.abs));
-  let roots: Complex[] = Array.from({ length: n }, (_, k) => ({
-    re: radius * 0.9 * Math.cos((2 * Math.PI * k) / n + 0.4),
-    im: radius * 0.9 * Math.sin((2 * Math.PI * k) / n + 0.4),
-  }));
-  for (let it = 0; it < 500; it++) {
-    let moved = 0;
-    roots = roots.map((z, i) => {
-      let dre = 1;
-      let dim = 0;
-      roots.forEach((w, j) => {
-        if (j === i) return;
-        const re = z.re - w.re;
-        const im = z.im - w.im;
-        [dre, dim] = [dre * re - dim * im, dre * im + dim * re];
-      });
-      const p = evalPoly(z);
-      const den = dre * dre + dim * dim || 1e-300;
-      const qre = (p.re * dre + p.im * dim) / den;
-      const qim = (p.im * dre - p.re * dim) / den;
-      moved = Math.max(moved, Math.hypot(qre, qim));
-      return { re: z.re - qre, im: z.im - qim };
-    });
-    if (moved < 1e-13 * radius) break;
-  }
-  return roots.map((z) => ({ re: z.re, im: Math.abs(z.im) < 1e-9 * radius ? 0 : z.im }));
+  return eigQr(a);
 }
 
 /** Continuous-time equivalent s = ln(z)/dt of a discrete pole. */

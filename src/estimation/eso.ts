@@ -1,6 +1,26 @@
 import { c2d, mul, type Mat } from '@/math/mat';
 
 /**
+ * The observer ż = (A − L·C)·z + B·u + L·y with all poles at −ω_o, discretised over dt.
+ * Inputs in order: u, y.
+ */
+export function esoMatrices(wo: number, b0: number, dt: number): { ad: Mat; bd: Mat } {
+  const l = [3 * wo, 3 * wo * wo, wo ** 3];
+  const a = [
+    [-l[0]!, 1, 0],
+    [-l[1]!, 0, 1],
+    [-l[2]!, 0, 0],
+  ];
+  const b = [
+    [0, l[0]!],
+    [b0, l[1]!],
+    [0, l[2]!],
+  ];
+  const d = c2d(a, b, dt);
+  return { ad: d.a, bd: d.b };
+}
+
+/**
  * Third-order extended state observer for ÿ = b₀·u + f (Han 2009, Gao 2003):
  * z = (ŷ, v̂, f̂), with all observer poles at −ω_o. The unknown "total disturbance" f becomes a
  * state and gets estimated like any other. Discretised exactly (zero-order hold) at the loop rate,
@@ -24,20 +44,7 @@ export class Eso {
   private matrices(wo: number, b0: number, dt: number) {
     const key = `${wo}|${b0}|${dt}`;
     if (this.cache?.key !== key) {
-      const l = [3 * wo, 3 * wo * wo, wo ** 3];
-      // ż = (A − L·C)·z + B·u + L·y
-      const a = [
-        [-l[0]!, 1, 0],
-        [-l[1]!, 0, 1],
-        [-l[2]!, 0, 0],
-      ];
-      const b = [
-        [0, l[0]!],
-        [b0, l[1]!],
-        [0, l[2]!],
-      ];
-      const d = c2d(a, b, dt);
-      this.cache = { key, ad: d.a, bd: d.b };
+      this.cache = { key, ...esoMatrices(wo, b0, dt) };
     }
     return this.cache;
   }

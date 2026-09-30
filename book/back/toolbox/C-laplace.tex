@@ -1,0 +1,379 @@
+\toolchapter{C}{Complex numbers and transforms}{A sinusoid is a complex number. A differential equation is a polynomial. A loop is a fraction. Three translations that turn calculus into algebra.}
+\label{app:laplace}
+
+\lead{\usedcard{\setuprow{Lesson 2}{Euler's formula, poles}\setuprow{Lesson 8}{frequency response, transfer function}\setuprow{Lessons 9–11}{loop transfer function, margins, sensitivity}\setuprow{Lessons 3, 7}{steady-state errors, two transfer paths}\setuprow{Part III}{Bode and Nyquist charts (III.1–III.6), the describing function (III.8)}}%
+The lessons of Part~I work in the time domain as long as they can, and reach for the frequency domain when a delay, a filter or a noise makes it the shorter road. This appendix lays that road properly: complex numbers as the arithmetic of sinusoids; the frequency response and its Bode plot; the Fourier series for signals that repeat; the Laplace transform for signals that start; transfer functions and the algebra of block diagrams; and the Nyquist criterion, which decides the stability of a closed loop from the frequency response of the open one.}
+
+\section{Complex numbers}
+
+A complex number $z = a + jb$ has a real part $a$, an imaginary part $b$, and $j^2 = -1$. Drawn as a point $(a, b)$ in the plane it also has a length and an angle,
+\begin{equation}
+  |z| = \sqrt{a^2 + b^2}, \qquad \angle z = \operatorname{atan2}(b, a),
+\end{equation}
+called the \term{magnitude} and the \term{phase} (or argument). Here $\operatorname{atan2}(b, a)$ is the angle of the point $(a, b)$ seen from the origin, between $-180^\circ$ and $180^\circ$; it equals $\arctan(b/a)$ when $a > 0$.\pitfall{$\arctan(b/a)$ alone loses the quadrant: $-1 - j$ and $1 + j$ have the same ratio $b/a$ and angles that differ by $180^\circ$. When the real part is negative, add or subtract $180^\circ$.}
+
+\begin{theorem}[Euler's formula and the polar form]
+\label{thm:C-euler}
+For every real $\theta$, $e^{j\theta} = \cos\theta + j\sin\theta$. Hence every complex number can be written as $z = |z|\,e^{j\angle z}$, and for two of them
+\begin{equation*}
+  |z_1z_2| = |z_1|\,|z_2|, \quad \angle(z_1z_2) = \angle z_1 + \angle z_2, \qquad
+  \Big|\frac{z_1}{z_2}\Big| = \frac{|z_1|}{|z_2|}, \quad \angle\frac{z_1}{z_2} = \angle z_1 - \angle z_2 .
+\end{equation*}
+\end{theorem}
+\begin{proof}
+Insert $j\theta$ into the power series of the exponential and use $j^2 = -1$: the even powers give the series of the cosine, the odd ones $j$ times the series of the sine. The rules follow from $e^{j\alpha}e^{j\beta} = e^{j(\alpha + \beta)}$.
+\end{proof}
+
+\emph{Magnitudes multiply, angles add.} This one sentence is why the frequency domain is convenient: a chain of blocks multiplies complex numbers, and the result is read off as a product of gains and a sum of phase shifts (the phase budget of \lessonref{les:slow}).
+
+Two more operations are used all the time. The \term{conjugate} $\bar z = a - jb$ mirrors a number in the real axis, and $z\bar z = |z|^2$. To divide, multiply numerator and denominator by the conjugate of the denominator:
+\begin{equation}\label{eq:C-divide}
+  \frac{1}{a + jb} = \frac{a - jb}{a^2 + b^2} .
+\end{equation}
+
+\begin{example}[One division, two ways]
+\label{ex:C-divide}
+Example~\ref{ex:A-forced} needed $X = 1/(3.68 + 17.59j)$. Compute it in both forms.
+
+\textbf{Step 1 — by the conjugate.} $a^2 + b^2 = 13.54 + 309.41 = 322.95$, so $X = (3.68 - 17.59j)/322.95 = 0.0114 - 0.0545j$.
+
+\textbf{Step 2 — in polar form.} $|3.68 + 17.59j| = \sqrt{322.95} = 17.97$ and its angle is $\arctan(17.59/3.68) = 78.2^\circ$. So $|X| = 1/17.97 = 0.0556$ and $\angle X = -78.2^\circ$.
+
+\textbf{Step 3 — check.} $0.0556\cos(-78.2^\circ) = 0.0114$ and $0.0556\sin(-78.2^\circ) = -0.0545$. The polar form was less work, and it is the form the answer is wanted in: an amplitude and a phase lag.
+\end{example}
+
+\section{Sinusoids as complex numbers}
+
+A sinusoid of a given frequency has two properties, an amplitude and a phase. So has a complex number. The link is
+\begin{equation}\label{eq:C-phasor}
+  A\cos(\omega t + \varphi) = \operatorname{Re}\big(X\,e^{j\omega t}\big), \qquad X = A\,e^{j\varphi} .
+\end{equation}
+The complex number $X$ is the \term{phasor} of the sinusoid. It turns two awkward operations into easy ones.
+\begin{itemize}
+  \item \textbf{Adding} two sinusoids of the same frequency is adding their phasors, as vectors in the plane.
+  \item \textbf{Differentiating} multiplies the phasor by $j\omega$: the amplitude grows by the factor $\omega$ and the phase advances by $90^\circ$. Integrating divides by $j\omega$: a factor $1/\omega$ and a lag of $90^\circ$.
+\end{itemize}
+
+\begin{example}[P and D together]
+\label{ex:C-pd}
+The drone swings as $x = \sin\omega t$ at $\omega = \SI{3.16}{rad/s}$. What is the force $K_px + K_d\dot x$ with $K_p = 10$, $K_d = 7$?
+
+\textbf{Step 1 — phasors.} Relative to $\sin\omega t$, the P term has the phasor $10$. The D term has $7 \cdot j\omega = 22.1j$: a quarter period ahead.
+
+\textbf{Step 2 — add.} $10 + 22.1j$ has the magnitude $\sqrt{100 + 489} = 24.3$ and the angle $\arctan 2.21 = 65.7^\circ$.
+
+\textbf{Step 3 — read it.} The force is $24.3\sin(\omega t + 65.7^\circ)$: a sinusoid that \emph{leads} the motion. That lead is the $+78.7^\circ$ entry of the phase budget of \lessonref{les:slow} (there at $\omega = 7$), and it is what \enquote{D anticipates} means in numbers.
+\end{example}
+
+\section{Frequency response and the Bode plot}
+
+\Cref{thm:noise-freq} stated the central fact: a stable linear block turns $\sin\omega t$ into $|H(j\omega)|\sin(\omega t + \angle H(j\omega))$, where $H(s)$ is obtained from the block's differential equation by writing $s$ for every derivative. The function $H(j\omega)$ is the \term{frequency response}.
+
+Hendrik Bode's way of drawing it uses two charts over a logarithmic frequency axis: the magnitude, also on a logarithmic scale, and the phase. The logarithm turns the product of blocks in series into a sum, so the plot of a loop is the sum of the plots of its factors, and each factor has a simple shape.
+
+\begin{definition}{Decibel, decade}
+The magnitude in \term{decibels} is $20\log_{10}|H|$. A factor of 10 is \SI{20}{dB}, a factor of 2 is \SI{6}{dB}, a factor of $\sqrt2$ is \SI{3}{dB}, and $|H| = 1$ is \SI{0}{dB}. A \term{decade} is a factor of 10 in frequency.
+\end{definition}
+
+\begin{result}[The building blocks of a Bode plot]
+\begin{center}\small
+\renewcommand{\arraystretch}{1.45}
+\begin{tabularx}{\linewidth}{@{}l>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}X@{}}
+\toprule
+factor & magnitude & phase\\
+\midrule
+gain $K$ & $K$ at all frequencies & $0^\circ$\\
+integrator $1/s$ & $1/\omega$: falls by \SI{20}{dB} per decade & $-90^\circ$\\
+differentiator $s$ & $\omega$: rises by \SI{20}{dB} per decade & $+90^\circ$\\
+lag $1/(\tau s + 1)$ & 1 below the corner $\omega = 1/\tau$, then $-\SI{20}{dB}$ per decade; $1/\sqrt2$ at the corner & $-\arctan\omega\tau$: from $0^\circ$ to $-90^\circ$, $-45^\circ$ at the corner\\
+lead $\tau s + 1$ & the mirror image of the lag & $+\arctan\omega\tau$\\
+second order $\omega_n^2/(s^2 + 2\zeta\omega_ns + \omega_n^2)$ & 1 below $\omega_n$, then $-\SI{40}{dB}$ per decade; $1/(2\zeta)$ at $\omega_n$ & from $0^\circ$ to $-180^\circ$, $-90^\circ$ at $\omega_n$\\
+delay $e^{-sT}$ & 1 at all frequencies & $-\omega T$ (radians), without limit\\
+\bottomrule
+\end{tabularx}
+\end{center}
+\end{result}
+
+Every line follows from $|H|$ and $\angle H$ of the factor. For the lag, $H = 1/(1 + j\omega\tau)$ has $|H| = 1/\sqrt{1 + \omega^2\tau^2}$: close to 1 when $\omega\tau \ll 1$ and close to $1/(\omega\tau)$ when $\omega\tau \gg 1$. The two straight lines meet at the \term{corner frequency} $1/\tau$, where the true curve is \SI{3}{dB} below them.\tip{A lag begins to cost phase a decade \emph{before} its corner: $\arctan 0.1 = 5.7^\circ$. It is the phase of the fast lags, not their gain, that a loop feels first.}
+
+\begin{example}[The Bode plot of the altitude loop, by hand]
+\label{ex:C-bode}
+Sketch the loop transfer function of \lessonref{les:slow} without delay, $L(s) = \dfrac{K_p + K_ds}{m s^2(\tau_ms + 1)}$, for the default gains.
+
+\textbf{Step 1 — factor it.} $L(s) = \dfrac{K_p}{m} \cdot \dfrac{1}{s^2} \cdot \Big(\dfrac{K_d}{K_p}s + 1\Big) \cdot \dfrac{1}{\tau_m s + 1}$: a gain of 10, two integrators, a lead with its corner at $K_p/K_d = \SI{1.43}{rad/s}$, a lag with its corner at $1/\tau_m = \SI{33.3}{rad/s}$.
+
+\textbf{Step 2 — low frequencies.} Below 1.43 only the gain and the integrators count: $|L| \approx 10/\omega^2$, falling at \SI{40}{dB} per decade, with the phase $-180^\circ$.
+
+\textbf{Step 3 — between the corners.} Above 1.43 the lead adds a factor $\omega/1.43$: $|L| \approx 7/\omega$, falling at only \SI{20}{dB} per decade, and the phase rises towards $-90^\circ$.
+
+\textbf{Step 4 — crossover.} $7/\omega = 1$ at $\omega_c \approx \SI{7}{rad/s}$ — on the gentle slope, as it should be.
+
+\textbf{Step 5 — high frequencies.} Above 33.3 the lag adds a factor $33.3/\omega$: $|L| \approx 233/\omega^2$, \SI{40}{dB} per decade again, and the phase returns towards $-180^\circ$.
+
+\textbf{Step 6 — the phase at crossover.} $-180^\circ + \arctan(7/1.43) - \arctan(7/33.3) = -180 + 78.5 - 11.9 = -113.4^\circ$: a phase margin of $66.6^\circ$ (Example~\ref{ex:slow-pm}).
+
+\textbf{Step 7 — compare} (\cref{fig:C-bode}). The exact curve has $|L(7)| = 0.999$ and $\angle L(7) = -113.4^\circ$. Three straight lines and two arctangents have reproduced it.
+\end{example}
+
+\simfig{tb_bode}{The Bode plot of the altitude loop $L(s) = (10 + 7s)/(s^2(0.03s + 1))$, computed from the formula. Blue: the exact magnitude and phase. Dashed: the straight-line asymptotes of Example~\ref{ex:C-bode}, with their corners at 1.43 and \SI{33.3}{rad/s}. The loop crosses \SI{0}{dB} at \SI{7}{rad/s}, where the phase is $66.6^\circ$ above $-180^\circ$.}{fig:C-bode}
+
+\begin{keyidea}[The shape every good loop has]
+A steep slope at low frequencies (high gain, integrators: disturbances are rejected), a gentle slope of about \SI{20}{dB} per decade around the crossover (enough phase margin), and a steep slope again at high frequencies (noise and unmodelled lags are not amplified). Lesson~III.6 turns this picture into a design method, \emph{loop shaping}.
+\end{keyidea}
+
+\section{Fourier series: signals that repeat}
+
+A sinusoid is the only signal that a linear block returns with its shape unchanged. Any other periodic signal can be taken apart into sinusoids, passed through the block one by one, and put together again.
+
+\begin{theorem}[Fourier series]
+\label{thm:C-fourier}
+Let $f$ be periodic with the period $T$, piecewise continuously differentiable, and let $\omega_0 = 2\pi/T$. Then at every point where $f$ is continuous
+\begin{equation}\label{eq:C-fourier}
+  f(t) = \frac{a_0}{2} + \sum_{k=1}^{\infty}\big(a_k\cos k\omega_0t + b_k\sin k\omega_0t\big),
+\end{equation}
+\begin{equation*}
+  a_k = \frac{2}{T}\int_0^T f(t)\cos k\omega_0t\,\dd t, \qquad b_k = \frac{2}{T}\int_0^T f(t)\sin k\omega_0t\,\dd t ,
+\end{equation*}
+and at a jump the series converges to the middle of the jump. The mean square of $f$ is the sum of the mean squares of its components (Parseval): $\frac1T\int_0^T f^2\,\dd t = \tfrac14a_0^2 + \tfrac12\sum_k(a_k^2 + b_k^2)$. (Oppenheim and Willsky, 1997, ch.~3.)
+\end{theorem}
+
+The term with $k = 1$ is the \term{fundamental}, the others are its \term{harmonics}. The formulas for the coefficients come from one fact: over a full period the product of two different members of the family $1, \cos k\omega_0t, \sin k\omega_0t$ averages to zero, and the square of each (except the constant) averages to $\tfrac12$. Multiplying \cref{eq:C-fourier} by one member and averaging therefore leaves exactly one term.
+
+\begin{example}[A square wave and what the loop makes of it]
+\label{ex:C-square}
+\Lessonref{les:damper} flies a square wave of $\pm\SI{0.5}{m}$ with a period of \SI{8}{s}. Find its harmonics, and what the closed loop with $K_p = 10$, $K_d = 7$ (derivative on the measurement) does to each.
+
+\textbf{Step 1 — symmetry.} Place $t = 0$ at an upward jump. The wave is odd, $f(-t) = -f(t)$, so all $a_k$ vanish; and the two half-periods mirror each other, so the even harmonics vanish too.
+
+\textbf{Step 2 — the coefficients.} For odd $k$: $b_k = \frac{2}{T} \cdot 2\int_0^{T/2} 0.5\sin k\omega_0t\,\dd t = \frac{2}{T} \cdot \frac{2}{k\omega_0} = \frac{2}{\pi k}$. So
+\begin{equation*}
+  f(t) = \frac{2}{\pi}\Big(\sin\omega_0t + \tfrac13\sin3\omega_0t + \tfrac15\sin5\omega_0t + \dots\Big), \qquad \omega_0 = \SI{0.785}{rad/s} .
+\end{equation*}
+The amplitudes are 0.637, 0.212, 0.127, \dots: they fall only as $1/k$, which is the mark of a signal with jumps.
+
+\textbf{Step 3 — the loop.} From setpoint to altitude, $m\ddot y + K_d\dot y + K_py = K_pr$, so $T(s) = 10/(s^2 + 7s + 10)$. At the three frequencies $0.785$, $2.36$, $3.93$: $|T| = 0.920$, $0.585$, $0.357$.
+
+\textbf{Step 4 — the output.} Harmonic amplitudes $0.637 \cdot 0.920 = 0.585$, $0.212 \cdot 0.585 = 0.124$, $0.127 \cdot 0.357 = 0.045$. At the input the third harmonic was a third of the fundamental; at the output it is a fifth, and the fifth harmonic has fallen from a fifth to a thirteenth.
+
+\textbf{Step 5 — read it.} The loop is a \emph{low-pass filter} for its setpoint. It passes the slow components and attenuates the fast ones — which, in the time domain, is exactly the rounding of the corners in \cref{fig:damper-sweep}.
+\end{example}
+
+A saturating motor or a relay turns a sinusoid into a periodic signal that is not a sinusoid. Keeping only the fundamental of that signal, on the argument that the loop filters the harmonics away as in Step~4, is the idea of the \emph{describing function} (Lesson~III.8), and Example~\ref{ex:spring-limit} was its first use.
+
+\section{The Laplace transform: signals that start}
+
+The frequency response describes a block in steady oscillation. For signals that begin at $t = 0$ — a step, a gust, a drone released from rest — the tool is the Laplace transform.
+
+\begin{definition}{Laplace transform}
+The \term{Laplace transform} of a function $f(t)$, $t \ge 0$, is
+\begin{equation}
+  F(s) = \mathcal{L}\{f\}(s) = \int_0^\infty f(t)\,e^{-st}\,\dd t ,
+\end{equation}
+defined for those complex $s$ for which the integral converges. If $|f(t)| \le M e^{\alpha t}$, that is at least the half-plane $\operatorname{Re}s > \alpha$.
+\end{definition}
+
+\begin{theorem}[Rules of the Laplace transform]
+\label{thm:C-rules}
+Let $F = \mathcal{L}\{f\}$ and $G = \mathcal{L}\{g\}$. Then
+\begin{center}
+\renewcommand{\arraystretch}{1.4}
+\begin{tabular}{@{}lll@{}}
+(i) & linearity & $\mathcal{L}\{af + bg\} = aF + bG$\\
+(ii) & derivative & $\mathcal{L}\{\dot f\} = sF(s) - f(0)$\\
+(iii) & second derivative & $\mathcal{L}\{\ddot f\} = s^2F(s) - s f(0) - \dot f(0)$\\
+(iv) & integral & $\mathcal{L}\{\int_0^t f\,\dd\tau\} = F(s)/s$\\
+(v) & delay by $T \ge 0$ & $\mathcal{L}\{f(t - T)\} = e^{-sT}F(s)$ \quad ($f = 0$ for $t < 0$)\\
+(vi) & damping & $\mathcal{L}\{e^{-at}f(t)\} = F(s + a)$\\
+(vii) & convolution & $\mathcal{L}\{\int_0^t f(t - \tau)g(\tau)\,\dd\tau\} = F(s)\,G(s)$\\
+\end{tabular}
+\end{center}
+\end{theorem}
+\begin{proof}
+(i)~The integral is linear. (ii)~Integrate by parts: $\int_0^\infty \dot f e^{-st}\dd t = [f e^{-st}]_0^\infty + s\int_0^\infty f e^{-st}\dd t$; the bracket is $-f(0)$ for $\operatorname{Re}s$ large enough. (iii)~Apply (ii) twice. (iv)~Apply (ii) to the integral, which is zero at $t = 0$. (v), (vi)~Substitute in the integral. (vii)~Exchange the order of the two integrations and use (v).
+\end{proof}
+
+Rule (ii) is the point of the whole transform: \emph{differentiation becomes multiplication by $s$}, and the initial value comes along by itself. A differential equation with its initial conditions becomes one algebraic equation.
+
+\begin{result}[The transforms that control uses]
+\begin{center}\small
+\renewcommand{\arraystretch}{1.5}
+\begin{tabular}{@{}llcll@{}}
+\toprule
+$f(t)$, $t \ge 0$ & $F(s)$ & \qquad & $f(t)$, $t \ge 0$ & $F(s)$\\
+\midrule
+impulse $\delta(t)$ & $1$ & & $\sin\omega t$ & $\dfrac{\omega}{s^2 + \omega^2}$\\
+step $1$ & $\dfrac1s$ & & $\cos\omega t$ & $\dfrac{s}{s^2 + \omega^2}$\\
+ramp $t$ & $\dfrac{1}{s^2}$ & & $e^{-at}\sin\omega t$ & $\dfrac{\omega}{(s + a)^2 + \omega^2}$\\
+$e^{-at}$ & $\dfrac{1}{s + a}$ & & $e^{-at}\cos\omega t$ & $\dfrac{s + a}{(s + a)^2 + \omega^2}$\\
+$t\,e^{-at}$ & $\dfrac{1}{(s + a)^2}$ & & $1 - e^{-t/\tau}$ & $\dfrac{1}{s(\tau s + 1)}$\\
+\bottomrule
+\end{tabular}
+\end{center}
+\end{result}
+
+The first column needs only $\int_0^\infty e^{-(s + a)t}\dd t = 1/(s + a)$ and the rules: $a = 0$ gives the step, rule~(iv) the ramp, $a = \mp j\omega$ with Euler's formula the sine and the cosine, rule~(vi) their damped versions.
+
+\subsection{Back to the time domain: partial fractions}
+The transform of a response is a ratio of polynomials. It is taken apart into the simple fractions of the table.
+
+\begin{theorem}[Partial fractions, distinct poles]
+\label{thm:C-pf}
+Let $F(s) = N(s)/D(s)$ with $\deg N < \deg D$ and let $D$ have the distinct roots $p_1, \dots, p_n$. Then
+\begin{equation*}
+  F(s) = \sum_{i=1}^n \frac{c_i}{s - p_i}, \qquad c_i = \lim_{s \to p_i}(s - p_i)\,F(s) = \frac{N(p_i)}{D'(p_i)}, \qquad f(t) = \sum_{i=1}^n c_i\,e^{p_it} .
+\end{equation*}
+\end{theorem}
+\begin{proof}
+Multiply the claimed identity by $(s - p_i)$ and let $s \to p_i$: all terms but the $i$-th vanish. That the sum of the fractions equals $F$ follows because their difference is a ratio of polynomials with no poles left and a numerator of lower degree than the denominator, hence zero.
+\end{proof}
+
+The number $c_i$ is the \term{residue} at the pole $p_i$. In practice: cover the factor $(s - p_i)$ of the denominator and evaluate what remains at $s = p_i$.
+
+\begin{example}[A setpoint step, by Laplace]
+\label{ex:C-step}
+The default P–D loop (derivative on the measurement) is at rest at $y = 0$ when the setpoint jumps to 1. Find $y(t)$.
+
+\textbf{Step 1 — the equation.} $\ddot y + 7\dot y + 10y = 10\,r$, with $y(0) = \dot y(0) = 0$ and $r = 1$ for $t \ge 0$.
+
+\textbf{Step 2 — transform.} Rules (ii), (iii) with zero initial values, and $\mathcal{L}\{1\} = 1/s$: $(s^2 + 7s + 10)\,Y(s) = 10/s$.
+
+\textbf{Step 3 — solve, algebraically.} $Y(s) = \dfrac{10}{s\,(s + 2)(s + 5)}$.
+
+\textbf{Step 4 — residues.} At $s = 0$: $10/(2 \cdot 5) = 1$. At $s = -2$: $10/((-2)(3)) = -\tfrac53$. At $s = -5$: $10/((-5)(-3)) = \tfrac23$.
+
+\textbf{Step 5 — back.} $y(t) = 1 - \tfrac53e^{-2t} + \tfrac23e^{-5t}$.
+
+\textbf{Step 6 — check.} $y(0) = 1 - \tfrac53 + \tfrac23 = 0$; $\dot y(0) = \tfrac{10}{3} - \tfrac{10}{3} = 0$; $y(\infty) = 1$. It is the first column of the matrix exponential of Example~\ref{ex:A-expm}, seen from the new setpoint.
+\end{example}
+
+A double pole $p$ contributes $c/(s - p) + d/(s - p)^2$, that is, $(c + d\,t)\,e^{pt}$; a complex pair is best kept together as a quadratic factor and matched with the damped sine and cosine of the table.
+
+\subsection{The value at the end, without the journey}
+
+\begin{theorem}[Final and initial value]
+\label{thm:C-fvt}
+(i)~If all poles of $sF(s)$ have negative real parts, then $\lim_{t \to \infty} f(t) = \lim_{s \to 0} sF(s)$. (ii)~If $f$ has no impulse at $t = 0$, $f(0^+) = \lim_{s \to \infty} sF(s)$.
+\end{theorem}
+\begin{proof}
+(i)~By \cref{thm:C-pf}, $F$ has a term $c_0/s$ with $c_0 = \lim_{s \to 0}sF(s)$ and terms whose poles lie in the left half-plane; the first is the constant $c_0$ in time, the others decay. (ii)~Similarly, from the behaviour of each fraction for large $s$.
+\end{proof}
+
+\begin{example}[The error behind a moving setpoint]
+\label{ex:C-ramp}
+Rederive \cref{eq:droop-ramp}: the setpoint climbs at the rate $v_r$, and the P–D loop has its derivative on the measurement.
+
+\textbf{Step 1 — the error's transform.} $Y = \dfrac{K_p}{ms^2 + K_ds + K_p}\,R$, so $E = R - Y = \dfrac{ms^2 + K_ds}{ms^2 + K_ds + K_p}\,R$.
+
+\textbf{Step 2 — the input.} A ramp: $R(s) = v_r/s^2$.
+
+\textbf{Step 3 — the theorem.} $sE(s) = \dfrac{(ms + K_d)\,v_r}{ms^2 + K_ds + K_p}$. Its poles are those of the loop, in the left half-plane. So $e(\infty) = \lim_{s \to 0}sE(s) = K_dv_r/K_p$.
+\end{example}
+
+\begin{watchout}[Check the hypothesis of the final-value theorem]
+The limit $\lim_{s \to 0}sF(s)$ exists for many functions that have no final value. For $f = e^{t}$, $F = 1/(s - 1)$ and $sF(s) \to 0$, while $f$ grows without bound. For $f = \sin t$ the limit is again 0 and $f$ oscillates for ever. The theorem is valid only for a stable response — check the poles first.
+\end{watchout}
+
+\section{Transfer functions and block diagrams}
+
+\begin{definition}{Transfer function, poles, zeros}
+The \term{transfer function} of a linear time-invariant block is the ratio of the Laplace transforms of its output and its input, for zero initial conditions: $G(s) = Y(s)/U(s)$. For a block described by a differential equation it is a ratio of polynomials, $G = N/D$. The roots of $D$ are its \term{poles}, the roots of $N$ its \term{zeros}.
+\end{definition}
+
+The definition ties together everything so far. By rule~(ii), $G$ is obtained by writing $s$ for each derivative — the recipe of \cref{thm:noise-freq}. Its value on the imaginary axis, $G(j\omega)$, is the frequency response. By rule~(vii), $G$ is the transform of the impulse response $h$ of \cref{eq:A-conv}. And for a system in state-space form, transforming $\dot{\vx} = A\vx + B u$ gives $(s\Id - A)X = BU$, hence
+\begin{equation}\label{eq:C-ss}
+  G(s) = C\,(s\Id - A)^{-1}B ,
+\end{equation}
+whose denominator is $\det(s\Id - A)$: the poles of the transfer function are eigenvalues of $A$.\pitfall{Not always all of them. If a mode cannot be reached by the input or seen in the output, its pole cancels in \cref{eq:C-ss}. The transfer function then hides a part of the system — harmless if that part is stable, fatal if it is not. This is controllability and observability again (Appendix~A).}
+
+A \emph{pole} $p$ is a motion $e^{pt}$ that the block can perform by itself. A \emph{zero} $z$ is an input $e^{zt}$ that the block does not pass: for that input the particular solution $G(z)e^{zt}$ vanishes. The D term's zero at $-K_p/K_d$, the setpoint weights of \lessonref{les:kick} and the \enquote{wrong-way} response of a rocket (Lesson~IV.10) are all statements about zeros.
+
+\subsection{Three rules for connecting blocks}
+Because transforms turn convolution into multiplication, connected blocks combine algebraically:
+\begin{center}
+\renewcommand{\arraystretch}{1.5}
+\begin{tabular}{@{}lll@{}}
+series & the output of $G_1$ feeds $G_2$ & $G = G_2\,G_1$\\
+parallel & the outputs are added & $G = G_1 + G_2$\\
+feedback & $y = G\,(r - Hy)$ & $\dfrac{Y}{R} = \dfrac{G}{1 + GH}$\\
+\end{tabular}
+\end{center}
+The third follows by solving $Y = G(R - HY)$ for $Y$, the step that Harold Black took in Chapter~0.
+
+\subsection{The four transfer functions of a loop}
+Take a plant $P$, a controller $C$, and let $L = PC$. Three signals enter the loop from outside: the setpoint $r$, a load $d$ at the plant's input, and sensor noise $n$. Solving the loop equations $y = P(u + d)$, $u = C(r - y - n)$ gives
+\begin{equation}\label{eq:C-gang}
+  Y = \underbrace{\frac{L}{1 + L}}_{T}\,R + \underbrace{\frac{P}{1 + L}}_{PS}\,D - \frac{L}{1 + L}\,N, \qquad
+  U = \underbrace{\frac{C}{1 + L}}_{CS}\,(R - N) - \frac{L}{1 + L}\,D .
+\end{equation}
+All four have the same denominator, $1 + L$: \emph{the closed-loop poles are the roots of $1 + L(s) = 0$}, which for $L = N_L/D_L$ is the characteristic polynomial $D_L + N_L$. The four numerators tell four different stories.
+
+\begin{result}[The altitude loop in four functions]
+With $P = 1/(ms^2)$ and $C = K_p + K_i/s + K_ds = c(s)/s$, where $c(s) = K_ds^2 + K_ps + K_i$, and with $\Delta(s) = ms^3 + c(s)$:
+\begin{center}\small
+\renewcommand{\arraystretch}{1.5}
+\begin{tabular}{@{}llll@{}}
+\toprule
+ & name & formula & seen in\\
+\midrule
+$S = 1/(1 + L)$ & sensitivity & $ms^3/\Delta$ & \lessonref{les:challenge}\\
+$T = L/(1 + L)$ & complementary sensitivity & $c(s)/\Delta$ & \lessonref{les:kick}\\
+$PS$ & load to altitude & $s/\Delta$ & \cref{eq:challenge-sens}\\
+$CS$ & noise to thrust & $ms^2\,c(s)/\Delta$ & \lessonref{les:noise}\\
+\bottomrule
+\end{tabular}
+\end{center}
+\end{result}
+
+Two identities are worth keeping. First, $S + T = 1$ at every frequency: a loop cannot reject disturbances ($S$ small) and ignore sensor noise ($T$ small) at the same frequency. Second, at high frequencies $CS \approx C \approx K_ds$: the noise reaches the motors amplified by the D term, whatever the rest of the loop does.
+
+\section{The Nyquist criterion}
+
+The Routh–Hurwitz test needs the characteristic polynomial. A loop with a delay has none, and a loop measured on a real vehicle comes as a frequency response, not as a formula. Harry Nyquist's criterion decides stability from $L(j\omega)$ alone.
+
+\begin{theorem}[Nyquist]
+\label{thm:C-nyquist}
+Let $L(s)$ be a loop transfer function (a ratio of polynomials, possibly times a delay $e^{-sT}$) that tends to zero as $|s| \to \infty$ and has $P$ poles in the open right half-plane. Draw $L(j\omega)$ in the complex plane for $\omega$ from $-\infty$ to $\infty$, passing every pole on the imaginary axis on a small half-circle to its right. If this curve does not pass through the point $-1$ and encircles it $N$ times clockwise, the closed loop has
+\begin{equation*}
+  Z = N + P
+\end{equation*}
+poles in the right half-plane. In particular, a loop that is stable when open ($P = 0$) is stable when closed if and only if the curve does not encircle $-1$. (Nyquist, 1932; Åström and Murray, 2021, ch.~10.)
+\end{theorem}
+
+The proof rests on a theorem of complex analysis, the \emph{argument principle}: when $s$ runs once clockwise round a closed curve, the angle of a function $f(s)$ turns clockwise as many times as $f$ has zeros inside the curve, minus the number of its poles inside. Apply it to $f = 1 + L$ and to a curve that encloses the whole right half-plane. The zeros of $1 + L$ are the closed-loop poles ($Z$ of them inside), its poles are those of $L$ ($P$ inside), and the number of turns of $1 + L$ about $0$ is the number of turns of $L$ about $-1$.
+
+\begin{example}[The altitude loop, and the same loop with a delay]
+\label{ex:C-nyquist}
+Apply the criterion to $L$ of Example~\ref{ex:C-bode}, without delay and with a sensor delay of \SI{200}{ms}.
+
+\textbf{Step 1 — the open loop.} Its poles are $0$, $0$ and $-33.3$: none in the open right half-plane, $P = 0$. (The two at the origin are walked round on a small half-circle. The curve answers with one full turn of enormous radius through the right half-plane, which joins its two ends far from $-1$.)
+
+\textbf{Step 2 — without delay.} For $\omega > 0$ the phase of $L$ stays between $-180^\circ$ and $-113^\circ$ (\cref{fig:C-bode}): the curve stays below the negative real axis and never crosses it. No encirclement: $N = 0$, $Z = 0$. Stable.
+
+\textbf{Step 3 — with the delay.} The factor $e^{-0.2j\omega}$ leaves every magnitude as it is and turns each point clockwise by $0.2\,\omega$ radians. The phase now reaches $-180^\circ$ at $\omega = \SI{5.78}{rad/s}$, where $|L| = 1.23$: the curve crosses the negative real axis at $-1.23$, to the left of $-1$.
+
+\textbf{Step 4 — count} (\cref{fig:C-nyquist}). The point $-1$ now lies inside the loop formed by the curve and its mirror image for $\omega < 0$, and is circled twice clockwise: $N = 2$, $Z = 2$. A pair of closed-loop poles is in the right half-plane — the growing oscillation of \cref{fig:slow-rates}.
+
+\textbf{Step 5 — the margins in the picture.} The \emph{gain margin} is how far the crossing of the negative real axis is from $-1$: here $1/1.23 = 0.81$, less than one. The \emph{phase margin} is the angle between the negative real axis and the point where the curve crosses the unit circle. Both measure the same thing: the distance of the curve from $-1$.
+\end{example}
+
+\simfig{tb_nyquist}{The Nyquist curve of the altitude loop near the point $-1$, computed from the formula, for $\omega > 0$ (solid) and $\omega < 0$ (faint). Without delay (blue) the curve passes below $-1$ and leaves it outside. With \SI{200}{ms} of delay (red) every point is turned clockwise, the curve crosses the axis at $-1.23$, and $-1$ is enclosed. The grey circle is $|L| = 1$; the phase margin is the angle from the negative real axis to the crossing of that circle.}{fig:C-nyquist}
+
+\Cref{thm:slow-bode}, stability from the phase margin, is the special case $P = 0$ with a curve that crosses the unit circle once. The closest approach of the curve to $-1$ is $\min|1 + L| = 1/\max|S|$, so the peak of the sensitivity function (\lessonref{les:challenge}) is a margin too — and a better one than either of the classical pair, because it cannot be fooled by a curve that passes close to $-1$ between the two points they look at.
+
+\begin{result}[Appendix C at a glance]
+\begin{center}\small
+\renewcommand{\arraystretch}{1.4}
+\begin{tabularx}{\linewidth}{@{}l>{\raggedright\arraybackslash}X@{}}
+complex numbers & magnitudes multiply, angles add; $1/(a + jb) = (a - jb)/(a^2 + b^2)$\\
+sinusoids & $A\cos(\omega t + \varphi) = \operatorname{Re}(Ae^{j\varphi}e^{j\omega t})$; differentiate: $\times\,j\omega$\\
+frequency response & write $s$ for $\dd/\dd t$, then $s = j\omega$; gain $|H|$, phase $\angle H$\\
+decibels & $20\log_{10}|H|$; slope $\mp\SI{20}{dB}$ per decade for each pole or zero passed\\
+square wave & $\tfrac{4A}{\pi}\big(\sin\omega_0t + \tfrac13\sin3\omega_0t + \dots\big)$ for amplitude $A$\\
+Laplace & $\dot f \to sF - f(0)$; delay $\to e^{-sT}$; convolution $\to$ product\\
+inverse & residues: $c_i = (s - p_i)F(s)$ at $s = p_i$, then $\sum c_ie^{p_it}$\\
+final value & $\lim_{s \to 0}sF(s)$, only if the response is stable\\
+feedback & $G/(1 + GH)$; closed-loop poles: $1 + L = 0$; $S + T = 1$\\
+Nyquist & closed-loop unstable poles $=$ clockwise encirclements of $-1$ $+$ open-loop unstable poles\\
+\end{tabularx}
+\end{center}
+\end{result}

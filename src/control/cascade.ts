@@ -5,6 +5,7 @@ import { clampLength, dot, length, normalize, v3, type Vec3 } from '@/math/vec3'
 import { idleActuation, type Actuation } from '@/sim/dynamics';
 import { GRAVITY, type Params } from '@/sim/params';
 import type { Measurement } from '@/sim/sensors';
+import { rotateAboutUp } from '@/sim/sensors';
 import { attitudeRates, flatnessRates, GeometricOuter } from './geometric';
 import { safetyFilter } from './cbf';
 import { L1Compensation } from './l1ac';
@@ -259,7 +260,11 @@ export class CascadeController implements Controller {
 
     // 4. Rate stage → torque → mixer.
     if (due(c.hzRate)) {
-      const s = sense();
+      // The gyro's assumed mounting angle is taken out before the rate loop sees its reading.
+      const yaw = P.control.model.imuYawDeg;
+      const raw = sense();
+      const s =
+        yaw === 0 ? raw : { ...raw, omega: rotateAboutUp(raw.omega, (-yaw * Math.PI) / 180) };
       const tau = this.rate.torque(this.wSp, s, dtOf(c.hzRate), P);
       const r = mix(this.thrust, tau.x, tau.y, tau.z, P.drone.torqueCoeff, fmax);
       this.mixerSaturated = r.saturated;

@@ -33,6 +33,13 @@ export const measurementOf = (s: DroneState): Measurement => ({
   posFresh: true,
 });
 
+/** Turn the horizontal components of a body vector by `angle` about the body's up-axis (y). */
+export const rotateAboutUp = (v: Vec3, angle: number): Vec3 => {
+  const c = Math.cos(angle);
+  const s = Math.sin(angle);
+  return v3(c * v.x + s * v.z, v.y, -s * v.x + c * v.z);
+};
+
 export class Sensors {
   private history: Measurement[] = [];
   private head = 0;
@@ -87,7 +94,8 @@ export class Sensors {
       q = qMul(q, qFromAxisAngle(e, gyro * 0.01));
     }
     const vel = noisy(truth.vel, p.velNoise);
-    const omega = noisy(truth.omega, gyro);
+    let omega = noisy(truth.omega, gyro);
+    if (p.imuYawDeg !== 0) omega = rotateAboutUp(omega, (p.imuYawDeg * Math.PI) / 180);
     const acc = noisy(truth.acc, p.accNoise);
     acc.y += p.accBias;
     const motors: Measurement['motors'] =

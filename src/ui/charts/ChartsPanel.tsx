@@ -3,6 +3,7 @@ import { controllerKey } from '@/control/registry';
 import { useParams } from '@/store/params';
 import { sim, useUi, type AnalysisChart, type ExtraChart } from '@/store/sim';
 import { BodeChart } from '@/ui/analysis/BodeChart';
+import { MimoChart } from '@/ui/analysis/MimoChart';
 import { NyquistChart } from '@/ui/analysis/NyquistChart';
 import { PoleMap } from '@/ui/analysis/PoleMap';
 import { useRaf } from '@/ui/hud/useRaf';
@@ -24,6 +25,7 @@ const EXTRA: { value: ExtraChart; label: string }[] = [
   { value: 'poles', label: 'pole map' },
   { value: 'lyapunov', label: 'phase portrait + Lyapunov' },
   { value: 'covariance', label: 'filter uncertainty' },
+  { value: 'mimo', label: 'two channels at once' },
 ];
 /** What can stand in the motor chart's place. */
 const SECOND: { value: AnalysisChart | 'motors'; label: string }[] = [
@@ -47,6 +49,8 @@ const analysisChart = (kind: string) =>
     <NyquistChart />
   ) : kind === 'poles' ? (
     <PoleMap />
+  ) : kind === 'mimo' ? (
+    <MimoChart />
   ) : kind === 'covariance' ? (
     <TimeChart title="Filter uncertainty: 1σ of each state (log scale)" series={COVARIANCE} logY />
   ) : null;
@@ -84,7 +88,12 @@ export function ChartsPanel() {
   const setExtra = useUi((s) => s.setExtraChart);
   const second = useUi((s) => s.secondChart);
   const setSecond = useUi((s) => s.setSecondChart);
-  const tall = extra === 'bode' || extra === 'nyquist' || extra === 'poles' || extra === 'lyapunov';
+  const tall =
+    extra === 'bode' ||
+    extra === 'nyquist' ||
+    extra === 'poles' ||
+    extra === 'lyapunov' ||
+    extra === 'mimo';
   const ctrlKey = useParams((s) => controllerKey(s.params));
   const loopOptions = useMemo(
     () => loopsFor(useParams.getState().params).map((l) => ({ value: l.id, label: l.name })),

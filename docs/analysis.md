@@ -1,8 +1,9 @@
 # Part III — Why It Works
 
 > **Status (2026-09-30):** M13 (the foundations) and the first pass of M14
-> (lessons III.1–III.5) and of M15 (III.7, III.9) are implemented; §5 lists what was built and where it
-> differs from this plan. The rest of M14 and M15–M18 are planned.
+> (lessons III.1–III.5), of M15 (III.7, III.9) and of M16 (III.11, III.12) are
+> implemented; §5 lists what was built and where it differs from this plan.
+> The rest of M14–M16 and M17–M18 are planned.
 > Milestones in [roadmap.md](roadmap.md) point here.
 > Extended on 2026-09-30 from 20 to 30 lessons, so that Parts I–III together
 > cover the analysis and robustness material of a graduate control course
@@ -640,6 +641,42 @@ $-1/N(A)$ overlay; altimeter-bias state and altimeter-dropout event for
 the Kalman filter; covariance chart; LQG margin measurement.
 
 ### M16 — Chapter H (III.11–III.17)
+
+**First pass built (2026-09-30): III.11 and III.12.**
+
+- `analysis/uncertainty.ts`: the plant family (mass ±30 %, motor lag
+  ×0.5–2, up to 20 ms of extra delay; the `uncertainty` block), its
+  weight $|W|$ as the largest relative error of a 75-member grid, and the
+  small-gain test $|W T| < 1$. The Bode chart has a robust-stability view
+  that draws $|T|$ under the ceiling $1/|W|$.
+- `analysis/montecarlo.ts`: seeded campaigns over the family, flown in
+  slices ("Fly 60 members"). Flight and model agree on every trial.
+- In III.11 the members that fail are the light ones with a late sensor
+  (more loop gain, less phase), not the heavy ones with slow motors that
+  the plan expected.
+- III.12 uses the fallback of §7: the coupling is a **gyro mounted turned
+  about the vertical axis** (`sensors.imuYawDeg`), which the controller
+  can correct (`control.model.imuYawDeg`). No yaw spin is needed.
+- The probe has two more points, `l3.torque.x` and `l3.torque.z`; two
+  sweeps give the 2 × 2 sensitivity $S$ and $T$ at the torque input.
+- `analysis/mimo.ts`: the model of the roll–pitch loop,
+  $L = a\,R(\theta) + b\,I$ (gyro path turned, attitude path not). It
+  matches the flown $S$ within 2 % from 0.5 to 20 Hz. Singular values of a
+  2 × 2 complex matrix are computed in closed form, so `svd.ts` was not
+  needed; the disk margin (Seiler, Packard and Gahinet 2020) lives here
+  too, not in a separate `disk.ts`.
+- $L$ is a normal matrix, so the pair splits into two eigen-loops
+  $\lambda_\pm = a\,e^{\pm j\theta} + b$: the mounting angle is a phase
+  shift of $\theta$ in the gyro path. Their margins are exact for changes
+  common to both channels, and the lesson shows them next to the
+  loop-at-a-time and the disk margin.
+- The plan's demonstration was a 15 % gain error in both channels. The
+  clearer one is delay: with the gyro at 30° the loop-at-a-time delay
+  margin is 35 ms, the true one 21 ms, and the drone shakes at 22 ms. The
+  student predicts the 21 ms, then repairs the loop by telling the
+  controller the angle.
+
+**Still to build:** III.13–III.17 (H∞, μ, sliding mode, backstepping, MRAC).
 
 First pass: `uncertainty.ts`, the dispersion block and `montecarlo.ts`
 (shared with M18), `svd.ts`, `disk.ts`, the two-axis torque probe and the

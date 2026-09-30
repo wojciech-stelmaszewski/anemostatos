@@ -52,7 +52,7 @@ describe('the probe', () => {
       b.step();
     }
     expect(b.state.pos.y).toBe(a.state.pos.y);
-    expect(a.probe).toEqual({ in: 0, u: 0, uc: 0 });
+    expect(a.probe).toEqual({ in: 0, u: 0, uc: 0, tau: { x: 0, z: 0 }, tauC: { x: 0, z: 0 } });
   });
 
   it('adds its signal to the thrust command: u = uc + in', () => {

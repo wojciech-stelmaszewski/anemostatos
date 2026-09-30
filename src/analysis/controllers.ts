@@ -3,6 +3,7 @@
 // They hold while nothing saturates. Inputs, in order: measured altitude, measured velocity,
 // measured thrust (deviation from hover), reference. Output: the thrust command (deviation).
 import { designLqr } from '@/control/lqr';
+import type { PidGains } from '@/control/pid';
 import { periodSteps } from '@/control/types';
 import { PHYS_DT } from '@/engine/simulation';
 import { esoMatrices } from '@/estimation/eso';
@@ -23,8 +24,7 @@ export const controlPeriod = (p: Params): { steps: number; T: number } => {
  * differentiated signal and the filtered derivative (if the D term is on). A term that is
  * switched off leaves no state behind, so the model has no poles that the loop cannot move.
  */
-function pidModel(p: Params, T: number): Lti {
-  const g = p.control.alt;
+export function pidLti(g: PidGains, T: number): Lti {
   const kp = g.pOn ? g.kp : 0;
   const ki = g.iOn ? g.ki : 0;
   const kd = g.dOn ? g.kd : 0;
@@ -132,7 +132,7 @@ export function l1ControllerModel(p: Params): Lti | null {
   const { T } = controlPeriod(p);
   switch (p.control.l1.kind) {
     case 'pid':
-      return pidModel(p, T);
+      return pidLti(p.control.alt, T);
     case 'lqr':
       return lqrModel(p, T);
     case 'adrc':

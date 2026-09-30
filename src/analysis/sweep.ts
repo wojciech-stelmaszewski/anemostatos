@@ -14,10 +14,16 @@ export interface SweepPoint {
   t?: Complex;
   /** Closed loop from the reference to the altitude, Y/R (reference probe only). */
   yr?: Complex;
+  /**
+   * Torque probes: one column of the 2 × 2 sensitivity and complementary sensitivity at the
+   * plant input, as [roll, pitch] responses to the probe on this point's axis.
+   */
+  sCol?: [Complex, Complex];
+  tCol?: [Complex, Complex];
 }
 
 export interface SweepOptions {
-  point?: 'l1.thrust' | 'ref.y';
+  point?: 'l1.thrust' | 'ref.y' | 'l3.torque.x' | 'l3.torque.z';
   /** Probe amplitude: N for the thrust probe, m for the reference probe. */
   amp?: number;
   /** Time to take off and settle before the first frequency, s. */
@@ -64,8 +70,8 @@ export class Sweep {
   private left: number;
   private total = 0;
   private fHz = 0;
-  /** Running correlation sums of in, u, uc, y: real and imaginary parts. */
-  private acc = new Float64Array(8);
+  /** Running correlation sums, real and imaginary parts, of: in, u, uc, y, τx, τz, τc,x, τc,z. */
+  private acc = new Float64Array(16);
   private k = 0;
 
   constructor(
@@ -127,11 +133,20 @@ export class Sweep {
     const u = c(1);
     const uc = c(2);
     const y = c(3);
-    this.points.push(
-      this.opt.point === 'ref.y'
-        ? { fHz: this.fHz, yr: cdiv(y, d) }
-        : { fHz: this.fHz, l: cneg(cdiv(uc, u)), s: cdiv(u, d), t: cneg(cdiv(uc, d)) },
-    );
+    if (this.opt.point === 'ref.y') this.points.push({ fHz: this.fHz, yr: cdiv(y, d) });
+    else if (this.opt.point === 'l1.thrust')
+      this.points.push({
+        fHz: this.fHz,
+        l: cneg(cdiv(uc, u)),
+        s: cdiv(u, d),
+        t: cneg(cdiv(uc, d)),
+      });
+    else
+      this.points.push({
+        fHz: this.fHz,
+        sCol: [cdiv(c(4), d), cdiv(c(5), d)],
+        tCol: [cneg(cdiv(c(6), d)), cneg(cdiv(c(7), d))],
+      });
   }
 
   /** Run up to `maxSteps` physics steps. Returns true when the sweep is finished. */
@@ -160,6 +175,12 @@ export class Sweep {
           a[5] = a[5]! - v2 * sn;
           a[6] = a[6]! + v3 * cs;
           a[7] = a[7]! - v3 * sn;
+          const pr = sim.probe;
+          const more = [pr.tau.x, pr.tau.z, pr.tauC.x, pr.tauC.z];
+          for (let j = 0; j < 4; j++) {
+            a[8 + 2 * j] = a[8 + 2 * j]! + more[j]! * cs;
+            a[9 + 2 * j] = a[9 + 2 * j]! - more[j]! * sn;
+          }
           this.k++;
         }
         budget -= n;

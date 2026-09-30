@@ -34,14 +34,14 @@ const VIEWS: { value: BodeView; label: string }[] = [
   { value: 'ref', label: 'following the setpoint Y/R' },
   { value: 'sens', label: 'sensitivity S' },
   { value: 'waterbed', label: 'waterbed: |S|, linear axis' },
-  { value: 'robust', label: 'robust stability: |T| against 1/|W|' },
+  { value: 'robust', label: 'robust stability' },
 ];
 const TITLE: Record<BodeView, string> = {
   loop: 'Bode plot of the open loop L',
   ref: 'Bode plot of the closed loop Y/R',
   sens: 'Bode plot of the sensitivity S',
   waterbed: 'The waterbed: |S| on a linear frequency axis',
-  robust: 'Robust stability: |T| must stay below 1/|W|',
+  robust: 'Robust stability: |T| below 1/|W|',
 };
 const SYMBOL: Record<BodeView, string> = {
   loop: 'L',
@@ -530,8 +530,8 @@ export function BodeChart() {
       rt ? (
         <span>
           {rt.worst < 1
-            ? `● test passed: every member of the family is stable (largest |W·T| ${rt.worst.toFixed(2)})`
-            : `▲ test failed at ${rt.fWorst.toFixed(1)} Hz (|W·T| ${rt.worst.toFixed(2)}): some member may be unstable`}
+            ? `● passed: every member is stable (largest |W·T| ${rt.worst.toFixed(2)})`
+            : `▲ failed at ${rt.fWorst.toFixed(1)} Hz (|W·T| ${rt.worst.toFixed(2)}): a member may be unstable`}
           {flown.length
             ? ` · flown: ${flown.length - failed} of ${flown.length} stable${campaign.running ? '…' : ''}`
             : ''}

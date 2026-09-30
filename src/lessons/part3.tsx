@@ -1,4 +1,5 @@
 import { criticalDiveSpeed } from '@/analysis/attraction';
+import { analyseRateLoop, type RateLoopAnalysis } from '@/analysis/mimo';
 import {
   bandwidthHz,
   closedLoopPoles,
@@ -47,6 +48,21 @@ const marginsOf = (p: Params): Margins | null => {
     w,
     w.map((x) => loopGain(m, x)),
   );
+};
+
+/** The roll–pitch loop of these parameters, kept until the loop changes. */
+let rateLoopMemo: { key: string; value: RateLoopAnalysis | null } | null = null;
+const rateLoopOf = (p: Params): RateLoopAnalysis | null => {
+  const key = JSON.stringify([p.sim.level, p.control, p.drone, p.sensors]);
+  if (rateLoopMemo?.key !== key) rateLoopMemo = { key, value: analyseRateLoop(p, 300) };
+  return rateLoopMemo.value;
+};
+/** Delay at which the drone as handed over (no correction, no delay yet) starts to oscillate, ms. */
+const criticalGyroDelay = (p: Params): number => {
+  const q = structuredClone(p);
+  q.sensors.delayMs = 0;
+  q.control.model.imuYawDeg = 0;
+  return (analyseRateLoop(q, 300)?.both.delayMargin ?? NaN) * 1000;
 };
 
 /** Half the peak-to-peak swing of the altitude over the last `seconds`. */
@@ -578,7 +594,7 @@ export const PART_THREE: Lesson[] = [
         </p>
         <M display>
           {
-            '|W(j\\omega)\\,T(j\\omega)| < 1 \\ \\text{for all } \\omega \\quad\\Rightarrow\\quad \\text{every member is stable.}'
+            '|W(j\\omega)\\,T(j\\omega)| < 1 \\ \\text{for all } \\omega \\ \\Rightarrow\\ \\text{all members stable}'
           }
         </M>
         <p>
@@ -597,6 +613,100 @@ export const PART_THREE: Lesson[] = [
           sensor. Random sampling finds such corners by luck; the test finds them by construction,
           without flying anything. The price is that the test is <i>sufficient</i>, not necessary:
           it may reject a design that every member would fly.
+        </Notice>
+      </>
+    ),
+  },
+  {
+    id: 'mimo',
+    n: 12,
+    part: 3,
+    chapter: H,
+    title: 'One loop at a time lies',
+    level: 3,
+    chart: 'mimo',
+    loop: 'rate.roll',
+    setup: (p) => {
+      calm(p);
+      p.sensors.imuYawDeg = 30;
+      p.setpoint.profile = 'square';
+      p.setpoint.profileAxis = 'x';
+      p.setpoint.profileAmplitude = 1;
+      p.setpoint.profilePeriod = 6;
+    },
+    predict: {
+      label: 'Critical delay',
+      unit: 'ms',
+      truth: criticalGyroDelay,
+      tolerance: 0.15,
+    },
+    goal: {
+      text: 'Predict, within 15 %, the sensor delay at which this drone starts to shake. Then set the delay to 25 ms and make the drone fly it, with at least 20° of phase margin for both channels at once.',
+      check: ({ sim, prediction }) => {
+        const p = sim.params;
+        if (prediction == null)
+          return 'first the prediction: use the margin for both channels at once, τ = PM / ω_c';
+        const truth = criticalGyroDelay(p);
+        if (Math.abs(prediction - truth) / truth > 0.15)
+          return 'not within 15 %: PM in radians, divided by the crossover in rad/s';
+        if (p.sensors.delayMs < 25) return 'now set Sensors → Delay to 25 ms';
+        const a = rateLoopOf(p);
+        if (!a) return 'this lesson needs the PID cascade';
+        if (sim.state.crashed) return 'crashed: press R to fly again';
+        return (
+          (a.stable && a.both.pmDeg >= 20 && sim.t > 6) ||
+          (a.stable
+            ? `both channels at once: PM ${a.both.pmDeg.toFixed(0)}°`
+            : 'the loop is unstable')
+        );
+      },
+    },
+    solution: (p) => {
+      p.sensors.delayMs = 25;
+      p.control.model.imuYawDeg = 30;
+    },
+    body: (
+      <>
+        <p>
+          Someone mounted the sensor board of this drone turned by 30° about the vertical axis. The
+          gyro now reports part of every roll rate as pitch rate and the other way round, so roll
+          and pitch are no longer two loops. They are <b>one loop with two channels</b>, and its
+          loop gain is a matrix:
+        </p>
+        <M display>{'L(j\\omega) = a(j\\omega)\\,R(\\theta) + b(j\\omega)\\,I'}</M>
+        <p>
+          Here <M>{'R(\\theta)'}</M> is the rotation by the mounting angle, <M>{'a'}</M> is the path
+          through the gyro, which it turns, and <M>{'b'}</M> the path through the attitude, which is
+          not turned. The classical test opens <b>one loop at a time</b>: break the roll channel,
+          leave pitch closed, read the margins. The chart shows that answer in its first bar, and it
+          looks healthy.
+        </p>
+        <p>
+          But a late sensor is late in both channels, and a wrong inertia is wrong in both. For a
+          change that is the same in both channels the pair splits into two independent loops, one
+          for each direction in which the rate vector can whirl:
+        </p>
+        <M display>{'\\lambda_{\\pm}(j\\omega) = a(j\\omega)\\,e^{\\pm j\\theta} + b(j\\omega)'}</M>
+        <p>
+          So the mounting angle is a <b>phase shift of θ</b> in the gyro path, a lead for one
+          direction and a lag for the other. The second bar is the margin of the worse of the two.
+          The third is the <b>disk margin</b>: what is guaranteed if the two channels change
+          independently, by any mix of gain and phase.
+        </p>
+        <Try>
+          Read the phase margin and crossover for <b>both channels by the same amount</b>, compute{' '}
+          <M>{'\\tau_{max} = PM/\\omega_c'}</M> and enter it. Then raise <b>Sensors → Delay</b> past
+          your number: the drone shakes long before the one-loop delay margin in the chart's summary
+          is used up. To repair it, do not detune: tell the controller the truth with{' '}
+          <b>Rate PID → Assumed gyro angle</b>. Press <b>Measure</b> to fly both torque sweeps and
+          put the dots on the curves.
+        </Try>
+        <Notice>
+          The solid curve is the largest singular value of S: the amplification of the worst{' '}
+          <i>direction</i> of disturbance torque, which no single channel shows. Where it rises
+          above the dashed curve, a loop-at-a-time test is reporting margins that the vehicle does
+          not have. This is why flight-control clearance asks for multi-loop margins, and why the
+          alignment of an inertial unit is calibrated rather than assumed.
         </Notice>
       </>
     ),

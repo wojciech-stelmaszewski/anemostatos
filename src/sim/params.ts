@@ -62,18 +62,21 @@ export interface SensorParams {
   motorFeedback: boolean;
   /** The position sensor delivers no new fixes (the last one is held). */
   posDropout: boolean;
+  /** The gyro is mounted rotated about the body's up-axis by this angle, degrees (L3). */
+  imuYawDeg: number;
 }
 
 /**
  * A test signal injected into the loop to measure its frequency response (docs/analysis.md §3.3).
  * `l1.thrust` adds it to the thrust command (the loop broken at the plant input);
- * `ref.y` adds it to the altitude setpoint.
+ * `ref.y` adds it to the altitude setpoint; `l3.torque.x` and `.z` add it to the roll and pitch
+ * torque of the quadrotor.
  */
-export type ProbePoint = 'none' | 'ref.y' | 'l1.thrust';
+export type ProbePoint = 'none' | 'ref.y' | 'l1.thrust' | 'l3.torque.x' | 'l3.torque.z';
 export interface ProbeParams {
   point: ProbePoint;
   signal: 'sine' | 'chirp';
-  /** Amplitude in the units of the point: N for thrust, m for the setpoint. */
+  /** Amplitude in the units of the point: N for thrust, m for the setpoint, N·m for a torque. */
   amp: number;
   /** Frequency of the sine, Hz. */
   freqHz: number;
@@ -104,6 +107,8 @@ export interface ModelParams {
   inertiaScale: number;
   /** Assumed motor time constant, s. */
   motorTau: number;
+  /** Assumed mounting angle of the gyro about the up-axis, degrees; its readings are turned back by it. */
+  imuYawDeg: number;
 }
 
 export interface ControlParams {
@@ -331,11 +336,12 @@ export const defaultParams = (): Params => ({
     posRateHz: 0,
     motorFeedback: true,
     posDropout: false,
+    imuYawDeg: 0,
   },
   control: {
     rateHz: 250,
     feedforward: true,
-    model: { mass: 1.0, inertiaScale: 1, motorTau: 0.03 },
+    model: { mass: 1.0, inertiaScale: 1, motorTau: 0.03, imuYawDeg: 0 },
     l1: { kind: 'pid', estimator: 'none' },
     lqr: { qPos: 100, qVel: 10, qInt: 5, r: 1, integral: false, lagState: false },
     adrc: { wc: 3, wo: 15 },

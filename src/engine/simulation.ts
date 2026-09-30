@@ -2,10 +2,11 @@ import { controllerKey, makeController } from '@/control/registry';
 import type { Controller, LoopTerms, Setpoint } from '@/control/types';
 import { qFromAxisAngle, qToEuler, type Quat } from '@/math/quat';
 import { clone, length, scale, sub, add, v3, type Vec3 } from '@/math/vec3';
-import { FOOT_HEIGHT } from '@/sim/drone';
+import { ARM_LENGTH, FOOT_HEIGHT } from '@/sim/drone';
 import {
   idleActuation,
   initialState,
+  motorTorques,
   stepDynamics,
   type Actuation,
   type DroneState,
@@ -95,7 +96,7 @@ export class Simulation {
    * The probe (docs/analysis.md §3.3): the injected signal, the command that reaches the plant
    * and the controller's own part of it. For a thrust probe u = uc + in, in newtons.
    */
-  probe = { in: 0, u: 0, uc: 0 };
+  probe = { in: 0, u: 0, uc: 0, tau: { x: 0, z: 0 }, tauC: { x: 0, z: 0 } };
   /** When the probe was last switched on or changed; its signal starts from zero phase there. */
   private probeT0 = 0;
 
@@ -166,7 +167,7 @@ export class Simulation {
     this.profileStart = 0;
     this.zoneTime = 0;
     this.probeT0 = 0;
-    this.probe = { in: 0, u: 0, uc: 0 };
+    this.probe = { in: 0, u: 0, uc: 0, tau: { x: 0, z: 0 }, tauC: { x: 0, z: 0 } };
     this.reference = zeroReference(v3());
     this.yaw = (p.setpoint.yawDeg * Math.PI) / 180;
     this.state.q = p.sim.level === 3 ? qFromAxisAngle(v3(0, 1, 0), 0) : this.state.q;
@@ -365,7 +366,24 @@ export class Simulation {
       this.actuation = { ...this.actuation, motorCmd: f };
       u = f[0] + f[1] + f[2] + f[3];
     }
-    this.probe = { in: d, u, uc };
+    const tauC = motorTorques(cmd, p.drone);
+    let tau = tauC;
+    if ((p.probe.point === 'l3.torque.x' || p.probe.point === 'l3.torque.z') && this.level === 3) {
+      // The mixer's own map from a roll or pitch torque to the four motors.
+      const k = d / (4 * (ARM_LENGTH / Math.SQRT2));
+      const sign = p.probe.point === 'l3.torque.x' ? [1, -1, -1, 1] : [1, 1, -1, -1];
+      const fmax = p.drone.maxMotorThrust;
+      const f = cmd.map((c, i) =>
+        Math.min(Math.max(c + sign[i]! * k, 0), fmax),
+      ) as Actuation['motorCmd'];
+      this.actuation = { ...this.actuation, motorCmd: f };
+      tau = motorTorques(f, p.drone);
+      const x = p.probe.point === 'l3.torque.x';
+      u = x ? tau.x : tau.z;
+      this.probe = { in: d, u, uc: x ? tauC.x : tauC.z, tau, tauC };
+      return;
+    }
+    this.probe = { in: d, u, uc, tau, tauC };
   }
 
   private record(): void {

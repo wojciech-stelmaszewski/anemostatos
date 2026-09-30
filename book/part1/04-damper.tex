@@ -175,7 +175,7 @@ For a given stiffness the fastest response without overshoot is the critically d
 \label{ex:damper-design}
 Which $K_d$ gives 5\,\% overshoot with $K_p = 10$, $m = 1$? How long does it take to settle?
 
-\textbf{Step 1 — invert \cref{eq:damper-mp}.} $\ln M_p = -\pi\zeta/\sqrt{1-\zeta^2}$. With $L = -\ln 0.05 = 3.00$ this gives $L^2(1 - \zeta^2) = \pi^2\zeta^2$, so
+\textbf{Step 1 — invert \cref{eq:damper-mp}.} Taking logarithms, $\ln M_p = -\pi\zeta/\sqrt{1-\zeta^2}$. With $L = -\ln 0.05 = 3.00$ this becomes $L^2(1 - \zeta^2) = \pi^2\zeta^2$, so
 \begin{equation*}
   \zeta = \frac{L}{\sqrt{\pi^2 + L^2}} = \frac{3.00}{\sqrt{9.87 + 9.00}} = 0.69 .
 \end{equation*}
@@ -232,7 +232,7 @@ The default tune of Anemostatos, $K_d = 7$, is $\zeta = 1.11$: slightly overdamp
 \predict{with $K_p = 40$ and critical damping, what settling time do you expect? (Use Example~\ref{ex:damper-crit}.)}
 \end{trythis}
 
-\section{The engineer's view: placing poles, and a proof without a solution}
+\section{The engineer's view: pole placement and Lyapunov}
 
 \subsection{The state matrix and the path of its poles}
 In state form the loop \eqref{eq:damper-msd} is

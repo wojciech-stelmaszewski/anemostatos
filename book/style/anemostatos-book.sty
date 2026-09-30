@@ -103,6 +103,7 @@
 
 % margin notes and side captions
 \RequirePackage{marginnote}
+\RequirePackage{marginfix}
 \renewcommand*{\marginfont}{\sffamily\footnotesize\color{muted}\raggedright\linespread{1.05}\selectfont}
 \RequirePackage[font={small,sf,color=muted},labelfont={bf,color=ink},
   labelsep=period,justification=raggedright,singlelinecheck=false,skip=5pt]{caption}
@@ -133,6 +134,7 @@
 \setlength{\parindent}{1.2em}
 \setlength{\parskip}{0pt}
 \frenchspacing
+\emergencystretch=1.5em % lines with long inline formulas stretch a little rather than stick out
 \widowpenalty=10000 \clubpenalty=10000
 \raggedbottom
 
@@ -156,6 +158,8 @@
 \titlespacing*{\subsection}{0pt}{14pt plus 3pt}{4pt}
 \titleformat{\subsubsection}[runin]{\normalfont\itshape\color{ink}}{}{0pt}{}[.]
 \titlespacing*{\subsubsection}{0pt}{8pt}{0.6em}
+\titleformat{\paragraph}[runin]{\normalfont\bfseries\color{ink}}{}{0pt}{}
+\titlespacing*{\paragraph}{0pt}{8pt plus 2pt minus 1pt}{0.8em}
 \setcounter{secnumdepth}{1}
 \setcounter{tocdepth}{0}
 
@@ -201,6 +205,7 @@
   \ifstrequal{#1}{1}{L1 · altitude}{\ifstrequal{#1}{2}{L2 · point mass}{\ifstrequal{#1}{3}{L3 · quadrotor}{#1}}}}
 \newcommand{\lesson}[6]{%
   \clearpage
+  \suppressfloats[t]% the opener's banner owns the head of this page
   \refstepcounter{chapter}%
   \renewcommand{\lessonlabel}{#1}%
   \renewcommand{\lessontitle}{#2}%
@@ -234,6 +239,7 @@
 % A lesson-free chapter (preface, prelude, appendices) with the same opener.
 \newcommand{\bookchapter}[3]{% {toc label}{title}{subtitle}
   \clearpage
+  \suppressfloats[t]%
   \refstepcounter{chapter}%
   \renewcommand{\lessonlabel}{#1}%
   \renewcommand{\lessontitle}{#2}%
@@ -312,42 +318,55 @@
   base/.style={enhanced, breakable, coltitle=ink, boxrule=0pt, arc=1.5pt, outer arc=1.5pt,
     left=10pt, right=10pt, top=7pt, bottom=7pt, before skip=12pt, after skip=12pt,
     fontupper=\normalsize, parbox=false},
+  % short boxes are never cut in two by a page break
+  whole/.style={breakable=false},
   label/.style={title={#1}, attach title to upper, coltitle=ink,
     fonttitle={\sanscaps\scriptsize}, after title={\par\smallskip}},
+  % Paragraphs inside a box are set apart by a little space and never indented. These styles must
+  % come after `attach title to upper', which replaces what stands before the upper part.
+  blockpars/.style={before upper app={\setlength{\parindent}{0pt}\setlength{\parskip}{3.5pt plus 1pt}}},
+  flushfirst/.style={after title={\par\smallskip}, blockpars},
+  flushfirstmed/.style={after title={\par\medskip}, blockpars},
 }
 \newcommand{\boxlabel}[2]{{\color{#1}\sanscaps\scriptsize #2}}
 
 % Definition — deep blue rule
 \newtcolorbox{definition}[1]{base, colback=bluesoft, borderline west={2.2pt}{0pt}{deepblue},
   title={\boxlabel{deepblue}{DEFINITION}\hspace{0.8em}{\sffamily\small\bfseries #1}}, attach title to upper,
-  after title={\par\smallskip}}
+  flushfirst}
 
 % Key idea — accent rule
-\newtcolorbox{keyidea}[1][]{base, colback=accentsoft, borderline west={2.2pt}{0pt}{accent},
+\newtcolorbox{keyidea}[1][]{base, whole, colback=accentsoft, borderline west={2.2pt}{0pt}{accent},
   title={\boxlabel{accent}{KEY IDEA}\ifstrempty{#1}{}{\hspace{0.8em}{\sffamily\small\bfseries #1}}},
-  attach title to upper, after title={\par\smallskip}}
+  attach title to upper, flushfirst}
 
 % Result (a boxed formula or statement)
-\newtcolorbox{result}[1][]{base, colback=white, colframe=accent, boxrule=0.6pt, arc=2pt,
+\newtcolorbox{result}[1][]{base, whole, colback=white, arc=0pt, outer arc=0pt, frame hidden,
+  borderline north={0.8pt}{0pt}{accent}, borderline south={0.8pt}{0pt}{accent},
+  left=0pt, right=0pt, top=7pt, bottom=7pt,
   title={\boxlabel{accent}{RESULT}\ifstrempty{#1}{}{\hspace{0.8em}{\sffamily\small\bfseries #1}}},
-  attach title to upper, after title={\par\smallskip}}
+  attach title to upper, flushfirst}
 
 % Worked example
-\newtcolorbox{example}[1][]{base, colback=white, colframe=hair, boxrule=0.6pt,
+\newtcolorbox{example}[1][]{base, colback=white, arc=0pt, outer arc=0pt, frame hidden,
+  borderline west={1pt}{0pt}{faint!55},
+  left=13pt, right=0pt, top=1pt, bottom=1pt, before skip=13pt, after skip=13pt,
   title={\boxlabel{muted}{WORKED EXAMPLE}\ifstrempty{#1}{}{\hspace{0.8em}{\sffamily\small\bfseries #1}}},
-  attach title to upper, after title={\par\smallskip}}
+  attach title to upper, flushfirst}
 
 % Watch out
-\newtcolorbox{watchout}[1][]{base, colback=warnsoft, borderline west={2.2pt}{0pt}{warn},
+\newtcolorbox{watchout}[1][]{base, whole, colback=warnsoft, borderline west={2.2pt}{0pt}{warn},
   title={\boxlabel{warn}{WATCH OUT}\ifstrempty{#1}{}{\hspace{0.8em}{\sffamily\small\bfseries #1}}},
-  attach title to upper, after title={\par\smallskip}}
+  attach title to upper, flushfirst}
 
 % Theorem — a statement with its hypotheses, proven here or cited with its source
 \newcounter{theorem}[chapter]
 \renewcommand{\thetheorem}{\lessonlabel.\arabic{theorem}}
-\newtcolorbox{theorembox}[1]{base, colback=white, colframe=deepblue, boxrule=0.6pt, arc=2pt,
+\newtcolorbox{theorembox}[1]{base, colback=white, arc=0pt, outer arc=0pt, frame hidden,
+  borderline north={0.8pt}{0pt}{deepblue}, borderline south={0.8pt}{0pt}{deepblue},
+  left=0pt, right=0pt, top=7pt, bottom=7pt,
   title={\boxlabel{deepblue}{THEOREM \thetheorem}\ifstrempty{#1}{}{\hspace{0.8em}{\sffamily\small\bfseries #1}}},
-  attach title to upper, after title={\par\smallskip}}
+  attach title to upper, flushfirst}
 \NewDocumentEnvironment{theorem}{O{}}{\refstepcounter{theorem}\begin{theorembox}{#1}}{\end{theorembox}}
 \newenvironment{proof}[1][Proof]{\par\smallskip\noindent{\sffamily\small\bfseries #1.}\enspace}
   {\unskip\nobreak\hfill\rule{0.45em}{0.45em}\par\smallskip}
@@ -357,9 +376,9 @@
 \newcommand{\vx}{\symbf{x}}
 
 % Where this leads — the thread from a lesson into the later parts of the course
-\newtcolorbox{lookahead}[1][]{base, colback=bluesoft, colframe=deepblue, boxrule=0.6pt, arc=2pt,
+\newtcolorbox{lookahead}[1][]{base, frame hidden, colback=bluesoft, arc=3pt, left=12pt, right=12pt, top=9pt, bottom=9pt,
   title={\boxlabel{deepblue}{WHERE THIS LEADS}\ifstrempty{#1}{}{\hspace{0.8em}{\sffamily\small\bfseries #1}}},
-  attach title to upper, after title={\par\smallskip}}
+  attach title to upper, flushfirst}
 
 % In Anemostatos — styled like the app itself
 \newcommand{\appmark}{\tikz[baseline=-0.1em]{\draw[accent, line width=1.2pt, line cap=round] (0,0)--(0.62em,0.62em) (0,0.62em)--(0.62em,0);}}
@@ -372,21 +391,26 @@
 % Try this — the app's own orange-bordered box
 \newtcolorbox{trythis}[1][]{base, colback=accentsoft!55, colframe=accent, boxrule=0.7pt, arc=3pt,
   title={\boxlabel{accent}{TRY THIS}\ifstrempty{#1}{}{\hspace{0.8em}{\sffamily\small\bfseries #1}}},
-  attach title to upper, after title={\par\smallskip}}
+  attach title to upper, flushfirst}
 \newcommand{\predict}[1]{\par\smallskip\noindent{\color{accent}\sffamily\small\bfseries Predict first.}\enspace\textit{#1}\par\smallskip}
 
 % What to remember
-\newtcolorbox{remember}{base, colback=mist, arc=3pt, left=12pt, right=12pt, top=9pt, bottom=9pt,
-  title={\boxlabel{ink}{WHAT TO REMEMBER}}, attach title to upper, after title={\par\medskip},
+\newtcolorbox{remember}{base, frame hidden, colback=mist, arc=3pt, left=12pt, right=12pt, top=9pt, bottom=9pt,
+  title={\boxlabel{ink}{WHAT TO REMEMBER}}, attach title to upper, flushfirstmed,
   before upper app={\setlist[itemize]{label={\tickmark}, leftmargin=1.3em}}}
 % Drawn, because the math font has no U+2713.
 \newcommand{\tickmark}{\tikz[baseline=-0.05em]{\draw[sigI, line width=0.9pt, line cap=round, line join=round] (0,0.22em)--(0.22em,0)--(0.62em,0.52em);}}
 
 % Out in the world — the curiosity pages
-\newtcolorbox{curiosity}[1]{enhanced, breakable, colback=paper, boxrule=0pt, arc=0pt,
-  left=14pt, right=14pt, top=12pt, bottom=12pt, before skip=16pt, after skip=16pt,
-  enlarge right by=-\dimexpr\marginparsep+\marginparwidth\relax,
-  width=\fullwidthlen,
+% The story is a float: it takes the head of the next page (or a page of its own when it is long)
+% and the text flows on around it, so it never leaves a hole behind it.
+\NewDocumentEnvironment{curiosity}{m +b}{%
+  \suppressfloats[t]%
+  \begin{figure}[tp]\noindent\makebox[\textwidth][l]{\begin{minipage}{\fullwidthlen}%
+    \begin{curiositybox}{#1}#2\end{curiositybox}\end{minipage}}\end{figure}}{}
+\newtcolorbox{curiositybox}[1]{enhanced, colback=paper, boxrule=0pt, arc=0pt,
+  before upper app={\setlength{\parindent}{0pt}\setlength{\parskip}{4.5pt plus 1pt}},
+  left=14pt, right=14pt, top=12pt, bottom=12pt, before skip=0pt, after skip=0pt,
   fontupper={\normalsize},
   title={\boxlabel{sepia}{OUT IN THE WORLD}\par\smallskip{\displayserif\fontsize{19}{23}\selectfont\color{ink}#1}},
   attach title to upper, after title={\par\medskip},
@@ -405,16 +429,24 @@
   \begin{wrapfigure}{r}{#2}\vspace{-6pt}\includegraphics[width=#2]{photos/#1}\par\vspace{2pt}
   {\sffamily\scriptsize\color{sepia}\raggedright #3 \hyperref[credit:#1]{\textsc{credit}}\par}\vspace{-8pt}\end{wrapfigure}}
 
-% keep box titles with their content
-\BeforeBeginEnvironment{keyidea}{\needspace{7\baselineskip}}
-\BeforeBeginEnvironment{definition}{\needspace{8\baselineskip}}
-\BeforeBeginEnvironment{result}{\needspace{6\baselineskip}}
-\BeforeBeginEnvironment{example}{\needspace{8\baselineskip}}
-\BeforeBeginEnvironment{watchout}{\needspace{7\baselineskip}}
-\BeforeBeginEnvironment{inapp}{\needspace{8\baselineskip}}
-\BeforeBeginEnvironment{trythis}{\needspace{8\baselineskip}}
-\BeforeBeginEnvironment{remember}{\needspace{10\baselineskip}}
-\BeforeBeginEnvironment{curiosity}{\clearpage}
+% Keep a box title with its first lines. Not \needspace: with \raggedbottom every page has
+% badness 10000 for TeX's page builder, and the stretch that \needspace adds makes the break in
+% front of a box the only one with a finite cost, so the page ends there even when the box fits.
+\newcommand{\keeptogether}[1]{\par\begingroup
+  \dimen@=\dimexpr#1\relax
+  \dimen@ii=\dimexpr\pagegoal-\pagetotal\relax
+  % Only when the space left is positive: right after a paragraph the page may still be
+  % overfull (its last line is no legal breakpoint), and TeX will carry that tail over by itself.
+  \ifdim\dimen@ii>\z@ \ifdim\dimen@>\dimen@ii \break \fi\fi
+  \endgroup}
+\BeforeBeginEnvironment{definition}{\keeptogether{5\baselineskip}}
+\BeforeBeginEnvironment{example}{\keeptogether{6\baselineskip}}
+\BeforeBeginEnvironment{theorem}{\keeptogether{6\baselineskip}}
+\BeforeBeginEnvironment{lookahead}{\keeptogether{6\baselineskip}}
+\BeforeBeginEnvironment{inapp}{\keeptogether{6\baselineskip}}
+\BeforeBeginEnvironment{trythis}{\keeptogether{8\baselineskip}}
+\BeforeBeginEnvironment{remember}{\keeptogether{8\baselineskip}}
+
 \newcommand{\nohyph}{\hyphenpenalty=10000\exhyphenpenalty=10000\relax}
 
 % ---------------------------------------------------------------- inline marks
@@ -445,11 +477,18 @@
 
 % ---------------------------------------------------------------- figures ---
 % Figure with a side caption in the margin (text-width graphic).
-\newcommand{\simfig}[4][]{% [width] {file} {caption} {label}
+% The graphic fills the text column; the caption stands beside it in the margin, its last line
+% level with the foot of the graphic. Being part of the float, it cannot collide with a note.
+\newcommand{\sidecapfig}[3]{% {content} {caption} {label}
   \begin{figure}[tbp]
-    \ifstrempty{#1}{\includegraphics[width=\textwidth]{#2}}{\includegraphics[width=#1]{#2}}%
-    \sidecaption{#3\label{#4}}
+    \noindent\makebox[\textwidth][l]{%
+      \begin{minipage}[b]{\textwidth}#1\end{minipage}%
+      \hspace{\marginparsep}%
+      \begin{minipage}[b]{\marginparwidth}\captionsetup{style=sidecaption,skip=0pt}%
+        \caption{#2}\label{#3}\end{minipage}}%
   \end{figure}}
+\newcommand{\simfig}[4][]{% [width] {file} {caption} {label}
+  \sidecapfig{\ifstrempty{#1}{\includegraphics[width=\linewidth]{#2}}{\includegraphics[width=#1]{#2}}}{#3}{#4}}
 % Full-width figure (text + margin), caption below.
 \newcommand{\widefig}[3]{% {file} {caption} {label}
   \begin{figure}[tbp]
@@ -476,6 +515,8 @@
   \end{figure}}
 \newenvironment{fullwidth}{\begin{adjustwidth}{0pt}{-\dimexpr\marginparsep+\marginparwidth\relax}}{\end{adjustwidth}}
 \setlength{\abovecaptionskip}{6pt}
+% a float that takes a whole page stands at the head of the column, not in its middle
+\setlength{\@fptop}{0pt}\setlength{\@fpbot}{0pt plus 1fil}
 \renewcommand{\floatpagefraction}{0.75}
 \renewcommand{\topfraction}{0.85}
 \renewcommand{\textfraction}{0.12}
@@ -483,10 +524,10 @@
 
 % A crop of an app screenshot in the margin (e.g. the lesson panel).
 \newcommand{\marginscreen}[4]{% {trim l b r t} {file} {caption} {label}
-  \marginnote{\adjincludegraphics[width=\marginparwidth, trim={#1}, clip, valign=t]{screens/#2}\par\vspace{2pt}%
+  \marginpar{\adjincludegraphics[width=\marginparwidth, trim={#1}, clip, valign=t]{screens/#2}\par\vspace{2pt}%
   \captionsetup{type=figure}\caption{#3}\label{#4}}}
 % A small figure in the margin, top-aligned with the line where it is called.
-\newcommand{\marginfig}[3]{\marginnote{\includegraphics[width=\marginparwidth,valign=t]{#1}\par\vspace{2pt}%
+\newcommand{\marginfig}[3]{\marginpar{\includegraphics[width=\marginparwidth,valign=t]{#1}\par\vspace{2pt}%
   \captionsetup{type=figure}\caption{#2}\label{#3}}}
 \newcommand{\marginphoto}[2]{\marginnote{\includegraphics[width=\marginparwidth,valign=t]{photos/#1}\par\vspace{2pt}%
   {\sffamily\scriptsize\color{sepia}#2 \hyperref[credit:#1]{\textsc{credit}}}}}
@@ -513,7 +554,8 @@
 \renewcommand{\theexercise}{\lessonlabel.\arabic{exercise}}
 \newenvironment{exercises}{%
   \section*{\color{ink}Exercises}\addcontentsline{toc}{section}{}%
-  \begin{list}{}{\setlength{\leftmargin}{2.6em}\setlength{\labelwidth}{2.4em}\setlength{\itemsep}{5pt}}}
+  \begin{list}{}{\setlength{\leftmargin}{2.6em}\setlength{\labelwidth}{2.4em}\setlength{\itemsep}{5pt}}%
+  \interlinepenalty=10000 }% an exercise is never cut in two by a page break
   {\end{list}}
 \newcommand{\exercise}[1][1]{\refstepcounter{exercise}\item[{\sffamily\small\color{accent}\theexercise}\,%
   {\color{faint}\ifcase#1\or\raisebox{0.2ex}{\tiny$\bullet$}\or\raisebox{0.2ex}{\tiny$\bullet\bullet$}\or\raisebox{0.2ex}{\tiny$\bullet\bullet\bullet$}\fi}]}

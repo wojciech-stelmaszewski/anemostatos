@@ -67,6 +67,12 @@ book/
   with a `proof` or a cited source; sources go into `back/reading.tex`.
   Symbols follow the Prelude's notation table: `\vx` for a state vector,
   `\Id` for the identity matrix, `J` for inertia, `I` for the integral term.
+- Layout rules live in the style, not in the chapters: boxes keep their title with
+  their first lines (`\keeptogether`, never `\needspace`, which leaves half-empty
+  pages under `\raggedbottom`); figures carry their caption in the margin
+  (`\simfig`, `\sidecapfig`); the _Out in the World_ story is a float that takes
+  the head of a page; short boxes and single exercises are never split.
+  After a change, look at the pages: `make book` and check for short pages.
 - Exercises use `\exercise`, and their solutions go into `\answer{...}`
   right after them. The build collects the answers into
   `build/main.ans` for the companion volume; they are not printed here.

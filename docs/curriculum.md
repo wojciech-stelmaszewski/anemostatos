@@ -179,7 +179,8 @@ collected at the end. The appendix (`book/back/math.tex`) is planned as:
 
 First checked on the build of commit `8e1df9c` (127 pages): the sources,
 the build log and the rendered pages. Lessons 1–4 were then rebuilt to the
-full standard of §4; the book now has 155 pages.
+full standard of §4; the book now has 146 pages after the layout pass
+(no half-empty pages inside lessons 1–4).
 
 **What is good.** The design system is consistent and carries the app's
 colours. Chapter 0 and the Prelude are complete. Lessons 1–4 meet the

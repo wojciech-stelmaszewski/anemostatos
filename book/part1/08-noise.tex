@@ -12,7 +12,7 @@ Until now the sensor was perfect. From here on the measurement is the truth plus
 The measured altitude is $y_k = y_k^{true} + n_k$. The \term{noise} $n_k$ is modelled as a sequence of random numbers with mean zero and standard deviation $\sigma$, each independent of all the others. Such a sequence is called \term{white noise}. In this lesson it is Gaussian with $\sigma = \SI{1}{cm}$.
 \end{definition}
 
-\enquote{Independent} is the important word: knowing one reading's error tells nothing about the next. That is what makes noise fast — it can change by its full size from one sample to the next — and it is what a derivative picks up.
+\enquote{Independent} is the important word: knowing one reading's error tells nothing about the next.\didyouknow{\emph{White} noise is named after white light: all frequencies in equal measure. Noise with more power at low frequencies is called pink or red, by the same analogy.} That is what makes noise fast — it can change by its full size from one sample to the next — and it is what a derivative picks up.
 
 \begin{example}[The noise in the raw D term]
 \label{ex:noise-raw}
@@ -23,7 +23,7 @@ How much does \SI{1}{cm} of altimeter noise disturb the D term, with $K_d = 7$, 
   \frac{y_k - y_{k-1}}{\Delta t} = \underbrace{\frac{y^{true}_k - y^{true}_{k-1}}{\Delta t}}_{\text{the drone's velocity}} + \underbrace{\frac{n_k - n_{k-1}}{\Delta t}}_{\text{noise}} .
 \end{equation*}
 
-\textbf{Step 2 — the variance of a difference.} For independent random numbers variances add, also under subtraction: $\operatorname{Var}(n_k - n_{k-1}) = \sigma^2 + \sigma^2 = 2\sigma^2$. The difference has the standard deviation $\sqrt2\,\sigma = \SI{1.41}{cm}$.
+\textbf{Step 2 — the variance of a difference.} For independent random numbers variances add, also under subtraction:\recall{For independent $X$ and $Y$: $\operatorname{Var}(X \pm Y) = \operatorname{Var}X + \operatorname{Var}Y$. Standard deviations do not add; their squares do.} $\operatorname{Var}(n_k - n_{k-1}) = \sigma^2 + \sigma^2 = 2\sigma^2$. The difference has the standard deviation $\sqrt2\,\sigma = \SI{1.41}{cm}$.
 
 \textbf{Step 3 — divide by the sample time.}
 \begin{equation}\label{eq:noise-gain}
@@ -52,7 +52,7 @@ The standard cure is to pass the derivative through a \term{low-pass filter}, wh
   D_k = \alpha\,D_{k-1} + (1 - \alpha)\,D^{raw}_k,\qquad
   \alpha = \frac{T_f}{T_f + \Delta t},\qquad T_f = \frac{1}{2\pi f_c}.
 \end{equation}
-Each new output is a weighted average of the previous output and the new input. It is the discrete form of the differential equation $T_f\dot D + D = D^{raw}$: the output follows the input with the time constant $T_f$. (Replace $\dot D$ by $(D_k - D_{k-1})/\Delta t$ and solve for $D_k$ to get \cref{eq:noise-filter}.)
+Each new output is a weighted average of the previous output and the new input. It is the discrete form of the differential equation $T_f\dot D + D = D^{raw}$: the output follows the input with the time constant $T_f$.\tip{The recipe in the bracket turns any first-order differential equation into code: replace the derivative by a difference and solve for the newest value. It is the backward Euler method.} (Replace $\dot D$ by $(D_k - D_{k-1})/\Delta t$ and solve for $D_k$ to get \cref{eq:noise-filter}.)
 
 \begin{example}[The noise that gets through the filter]
 \label{ex:noise-filtered}
@@ -60,7 +60,7 @@ Compute the fluctuation of the D term with the default \SI{20}{Hz} filter.
 
 \textbf{Step 1 — the filter constant.} $T_f = 1/(2\pi \cdot 20) = \SI{7.96}{ms}$, $\alpha = 7.96/11.96 = 0.666$.
 
-\textbf{Step 2 — follow one noise sample.} Because everything is linear, we may ask what a single error $n_0 = 1$ (all others zero) does to the output, and add the effects of all samples afterwards. The raw derivative is $+1/\Delta t$ at sample 0 and $-1/\Delta t$ at sample 1. Through the filter:
+\textbf{Step 2 — follow one noise sample.} Because everything is linear, we may ask what a single error $n_0 = 1$ (all others zero) does to the output, and add the effects of all samples afterwards.\tip{Linearity lets you study one sample at a time: find the response to a single unit error, then add up the responses to all of them. That response is the filter's fingerprint.} The raw derivative is $+1/\Delta t$ at sample 0 and $-1/\Delta t$ at sample 1. Through the filter:
 \begin{equation*}
   h_0 = \frac{1-\alpha}{\Delta t}, \qquad h_1 = \alpha h_0 - \frac{1-\alpha}{\Delta t} = -\frac{(1-\alpha)^2}{\Delta t}, \qquad h_k = \alpha\,h_{k-1} \ \ (k \ge 2).
 \end{equation*}
@@ -84,7 +84,7 @@ For $\alpha = 0$ (no filter) this is \cref{eq:noise-gain} again.
 \textbf{Step 6 — all the cutoffs} (\cref{fig:noise-predict}, left). For 50, 20, 10, 5, 2 and \SI{1}{Hz} the formula gives 11.5, 6.4, 3.7, 2.0, 0.85 and \SI{0.43}{N}; the simulator 11.1, 6.2, 3.6, 2.0, 0.83 and \SI{0.42}{N}.
 \end{example}
 
-For a slow filter ($T_f \gg \Delta t$) we have $1 - \alpha \approx \Delta t/T_f$ and the square root is close to one, so \cref{eq:noise-filtered} simplifies to
+For a slow filter ($T_f \gg \Delta t$)\innumbers{At \SI{20}{Hz} the filter lets through a quarter of the raw noise, at \SI{5}{Hz} one twelfth.} we have $1 - \alpha \approx \Delta t/T_f$ and the square root is close to one, so \cref{eq:noise-filtered} simplifies to
 \begin{equation}\label{eq:noise-simple}
   \sigma_D \approx \frac{K_d\,\sigma}{T_f} = 2\pi f_c\,K_d\,\sigma .
 \end{equation}
@@ -98,7 +98,7 @@ The noise in the D term is proportional to the cutoff frequency, and no longer d
 
 Look again at the unfiltered run in \cref{fig:noise-filters}: the drone does not merely jitter, it hovers well above the setpoint. Noise has zero mean. How can it push?
 
-Through saturation. The command swings by tens of newtons around the hover thrust, but the motors deliver only between 0 and \SI{24.4}{N}. Hover is at \SI{9.81}{N}, closer to the lower limit than to the upper one: the downward swings are cut off after \SI{9.8}{N}, the upward ones only after \SI{14.6}{N}. More of the upward half survives.
+Through saturation. The command swings by tens of newtons around the hover thrust, but the motors deliver only between 0 and \SI{24.4}{N}. Hover is at \SI{9.81}{N}, closer to the lower limit than to the upper one: the downward swings are cut off after \SI{9.8}{N}, the upward ones only after \SI{14.6}{N}. More of the upward half survives.\didyouknow{An AM radio works by rectification. A diode cuts off one half of a fast oscillation, and what is left has a slowly varying mean: the sound.}
 
 \begin{example}[The bias of clipped noise]
 \label{ex:noise-rect}
@@ -106,7 +106,7 @@ Predict where the drone hovers without a D filter.
 
 \textbf{Step 1 — the command is a random number.} In each sample the command is $u = \mu + \text{noise}$, approximately Gaussian with the standard deviation $s = \SI{24.7}{N}$ (Example~\ref{ex:noise-raw}) around a mean $\mu$ set by the slow terms: $\mu = 9.81 + K_p e + I$.
 
-\textbf{Step 2 — the mean of the clipped command.} For a Gaussian clipped to $[0, u_{max}]$, with $a = (0 - \mu)/s$, $b = (u_{max} - \mu)/s$, the normal distribution function $\Phi$ and its density $\varphi$:
+\textbf{Step 2 — the mean of the clipped command.} For a Gaussian clipped to $[0, u_{max}]$, with $a = (0 - \mu)/s$, $b = (u_{max} - \mu)/s$, the normal distribution function $\Phi$ and its density $\varphi$:\recall{$\Phi(z)$ is the probability that a standard Gaussian number is below $z$, and $\varphi(z) = e^{-z^2/2}/\sqrt{2\pi}$ its density. $\Phi(0) = 0.5$, $\Phi(1) = 0.84$, $\Phi(2) = 0.977$.}
 \begin{equation*}
   \mathbb{E}[\sat(u)] = u_{max}\big(1 - \Phi(b)\big) + \mu\,\big(\Phi(b) - \Phi(a)\big) + s\,\big(\varphi(a) - \varphi(b)\big).
 \end{equation*}
@@ -118,14 +118,14 @@ The three terms are: the samples clipped at the top, the samples passed unchange
 \end{equation*}
 The motors deliver \SI{1.5}{N} more than the \SI{9.81}{N} that was meant. The drone accelerates upwards.
 
-\textbf{Step 4 — the new balance.} The drone rises until the feedback has lowered $\mu$ enough for the mean thrust to equal the weight again. Solving $\mathbb{E}[\sat(u)] = 9.81$ for $\mu$ (by trial, or bisection) gives $\mu^* = \SI{5.81}{N}$: the slow terms must supply $K_p e + I = 5.81 - 9.81 = \SI{-4.0}{N}$.
+\textbf{Step 4 — the new balance.} The drone rises until the feedback has lowered $\mu$ enough for the mean thrust to equal the weight again. Solving $\mathbb{E}[\sat(u)] = 9.81$ for $\mu$ (by trial, or bisection)\tip{Bisection: if $f(a) < 0 < f(b)$, test the midpoint and keep the half in which the sign changes. Ten rounds give three digits.} gives $\mu^* = \SI{5.81}{N}$: the slow terms must supply $K_p e + I = 5.81 - 9.81 = \SI{-4.0}{N}$.
 
 \textbf{Step 5 — the altitude.} At first the integral is empty and P carries it alone: $e = -4.0/10 = \SI{-0.40}{m}$. The drone should hover \SI{40}{cm} high, and then sink back slowly as the integral takes over.
 
 \textbf{Step 6 — check} (\cref{fig:noise-predict}, right). Six seconds into the run the drone is \SI{36}{cm} high; P and I together average \SI{-3.8}{N} over the run. The integral does take over, but more slowly than the $K_p/K_i = \SI{12.5}{s}$ of \lessonref{les:droop}: the default anti-windup freezes it whenever the command is clipped at zero with the error pushing further down (\lessonref{les:windup}), which is 40\,\% of the time.
 \end{example}
 
-A nonlinearity has turned symmetric noise into a constant force. The effect is called \term{rectification}, and it is common wherever noisy signals meet hard limits. It is one more reason to keep noise out of the actuators: with the default \SI{20}{Hz} filter only 7\,\% of the commands are clipped and the bias is \SI{0.7}{cm}.
+A nonlinearity has turned symmetric noise into a constant force. The effect is called \term{rectification}, and it is common wherever noisy signals meet hard limits.\pitfall{A bias made by noise looks exactly like a wrong mass or a steady wind. If a hover offset changes when you change a filter, suspect rectification.} It is one more reason to keep noise out of the actuators: with the default \SI{20}{Hz} filter only 7\,\% of the commands are clipped and the bias is \SI{0.7}{cm}.
 
 \section{The price of filtering}
 
@@ -159,7 +159,7 @@ no filter & 0 & $-2.00$, $-5.00$\\
 \end{tabular}
 \end{center}
 
-\textbf{Step 5 — read them.} At \SI{20}{Hz} the loop is unchanged: the new pole is far away and the old ones barely move. At \SI{1}{Hz} the dominant pole has moved from $-2$ to $-1.33$ — a slower approach — and a lightly damped pair has appeared ($\zeta = 0.36$, a ripple of about \SI{1}{Hz}). A slow filter has turned the damper into something closer to a second spring.
+\textbf{Step 5 — read them.} At \SI{20}{Hz} the loop is unchanged: the new pole is far away and the old ones barely move. At \SI{1}{Hz} the dominant pole has moved from $-2$ to $-1.33$ — a slower approach — and a lightly damped pair has appeared ($\zeta = 0.36$, a ripple of about \SI{1}{Hz}). A slow filter has turned the damper into something closer to a second spring.\pitfall{Filtering harder is not \enquote{safer}. Below some cutoff the filter becomes part of the dynamics, and the loop starts to ring.}
 
 \textbf{Step 6 — check.} Flown on the lesson's square wave without noise, the settling time grows from \SI{2.32}{s} (\SI{20}{Hz}) to \SI{2.43}{s} (\SI{5}{Hz}) and \SI{2.97}{s} (\SI{1}{Hz}).
 \end{example}
@@ -201,9 +201,9 @@ A useful rule: the filter time constant should be several times shorter than the
 \begin{equation}\label{eq:noise-H}
   H(j\omega) = \frac{1}{1 + j\omega T_f}, \qquad |H| = \frac{1}{\sqrt{1 + \omega^2T_f^2}}, \qquad \angle H = -\arctan(\omega T_f) .
 \end{equation}
-The real part of this statement is what we want: a sinusoid of frequency $\omega$ comes out as a sinusoid of the same frequency, scaled by $|H|$ and shifted in phase by $\angle H$. The complex number $H(j\omega)$ is the \term{frequency response} of the block. A differentiator has $H = j\omega$: gain $\omega$, phase $+90^\circ$. The two in series multiply: $j\omega/(1 + j\omega T_f)$, the curves of \cref{fig:noise-bode}.
+The real part of this statement is what we want: a sinusoid of frequency $\omega$ comes out as a sinusoid of the same frequency, scaled by $|H|$ and shifted in phase by $\angle H$. The complex number $H(j\omega)$ is the \term{frequency response} of the block.\recall{A complex number $a + jb$ has the magnitude $\sqrt{a^2 + b^2}$ and the angle $\arctan(b/a)$. Taking $1/(a + jb)$ inverts the magnitude and reverses the angle.} A differentiator has $H = j\omega$: gain $\omega$, phase $+90^\circ$. The two in series multiply: $j\omega/(1 + j\omega T_f)$, the curves of \cref{fig:noise-bode}.
 
-At the frequency of the loop, $\omega = \SI{3.16}{rad/s}$, the filter's phase lag is $\arctan(3.16\,T_f)$: $1.4^\circ$ at \SI{20}{Hz}, $5.7^\circ$ at \SI{5}{Hz}, $26.7^\circ$ at \SI{1}{Hz}. A phase lag at the loop's own frequency is what costs damping; \lessonref{les:slow} turns this into a design rule.
+At the frequency of the loop, $\omega = \SI{3.16}{rad/s}$, the filter's phase lag is $\arctan(3.16\,T_f)$: $1.4^\circ$ at \SI{20}{Hz}, $5.7^\circ$ at \SI{5}{Hz}, $26.7^\circ$ at \SI{1}{Hz}. A phase lag at the loop's own frequency is what costs damping;\tip{For small angles $\arctan x \approx x$. A filter with $\omega T_f = 0.1$ costs \SI{0.1}{rad}, about $6^\circ$.} \lessonref{les:slow} turns this into a design rule.
 
 \subsection{A noise budget}
 With frequency responses, the trade-off of this lesson becomes a calculation that engineers do before they choose a sensor:
@@ -212,7 +212,7 @@ With frequency responses, the trade-off of this lesson becomes a calculation tha
   \item which cutoff does the loop need (from its time scale: here at least \SI{5}{Hz});
   \item by \cref{eq:noise-simple}, which sensor noise is then allowed: $\sigma \le \sigma_D/(2\pi f_cK_d) = 1/(2\pi \cdot 5 \cdot 7) = \SI{4.5}{mm}$.
 \end{enumerate}
-If the sensor is worse than that, no tuning will fix it.
+If the sensor is worse than that, no tuning will fix it.\innumbers{Typical altitude sensors: a barometer, 10 to \SI{20}{cm} of noise; a laser rangefinder, about a centimetre; satellite navigation alone, a few metres.}
 
 \begin{example}[Vertical speed from satellite navigation]
 \label{ex:noise-gps}
@@ -224,7 +224,7 @@ An aircraft's autopilot needs the vertical speed to within \SI{0.5}{m/s}. A sate
 
 \textbf{Step 3 — what that costs.} A vertical-speed signal that is six seconds late cannot damp an altitude loop that should react within a few seconds.
 
-\textbf{Step 4 — the way out.} The aircraft also carries an accelerometer, whose integral gives the vertical speed with very little noise but a slow drift. One sensor is good at high frequencies, the other at low ones. Combining them — the fast one through a high-pass filter, the slow one through a low-pass — gives both. That is a \emph{complementary filter}, and its optimal version is the Kalman filter of \lessonref{les:kalman}.
+\textbf{Step 4 — the way out.} The aircraft also carries an accelerometer, whose integral gives the vertical speed with very little noise but a slow drift. One sensor is good at high frequencies, the other at low ones.\didyouknow{Your sense of balance is fused the same way. The inner ear is fast and drifts; the eyes are slow and do not. When the two disagree, you feel seasick.} Combining them — the fast one through a high-pass filter, the slow one through a low-pass — gives both. That is a \emph{complementary filter}, and its optimal version is the Kalman filter of \lessonref{les:kalman}.
 \end{example}
 
 \subsection{In formal terms}
@@ -240,7 +240,7 @@ Let $n_k$ be independent random variables with mean zero and variance $\sigma^2$
 The mean is linear. For the variance, $\mathbb{E}[z_k^2] = \sum_i\sum_j h_ih_j\,\mathbb{E}[n_{k-i}n_{k-j}]$, and independence makes every term with $i \ne j$ vanish.
 \end{proof}
 
-The sequence $h_j$ is the response of the filter to a single unit sample, its \term{impulse response}; Example~\ref{ex:noise-filtered} computed it for the filtered derivative. The hypothesis is independence. Real sensor noise is often correlated from sample to sample, and then the cross terms do not vanish: a slowly wandering error (a bias, a drift) passes through a low-pass filter untouched.
+The sequence $h_j$ is the response of the filter to a single unit sample, its \term{impulse response}; Example~\ref{ex:noise-filtered} computed it for the filtered derivative. The hypothesis is independence.\pitfall{Averaging helps only against \emph{independent} errors. Average a thousand readings of a biased sensor and you get the bias, very precisely.} Real sensor noise is often correlated from sample to sample, and then the cross terms do not vanish: a slowly wandering error (a bias, a drift) passes through a low-pass filter untouched.
 
 \begin{theorem}[Frequency response]
 \label{thm:noise-freq}
@@ -260,7 +260,7 @@ The function $H(s)$ is the \term{transfer function} of the block. We shall use i
 A signal that contains no frequencies at or above $f_s/2$ is determined exactly by its samples taken at the rate $f_s$. A component at a frequency $f > f_s/2$ appears in the samples as a component at a frequency below $f_s/2$, from which it cannot be told apart. (Shannon, 1949; Oppenheim and Schafer, 2010, ch.~4.)
 \end{theorem}
 
-The second sentence is called \emph{aliasing}, and it limits what any digital filter can do: noise that has already folded down into the band of the motion cannot be filtered out afterwards. It must be removed before sampling, by an analogue filter in the sensor.
+The second sentence is called \emph{aliasing},\didyouknow{Wagon wheels that turn slowly backwards in a film are aliasing: the camera samples 24 times per second, and the spokes move almost one spacing between frames.} and it limits what any digital filter can do: noise that has already folded down into the band of the motion cannot be filtered out afterwards. It must be removed before sampling, by an analogue filter in the sensor.
 
 \begin{lookahead}
 \begin{itemize}[leftmargin=1.2em]

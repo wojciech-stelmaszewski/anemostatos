@@ -10,7 +10,7 @@ The lesson keeps $K_d = 7$ and flies a small square wave while you raise $K_p$ t
 
 \widefig{edge_runs}{The altitude with $K_d = 7$ and increasing $K_p$. Near the edge the loop \enquote{rings} longer and longer; past it the oscillation sustains itself, bounded only by the motor limits.}{fig:edge-runs}
 
-Nothing in the model of \lessonref{les:damper} predicts this. For $m\ddot x + K_d\dot x + K_p x = 0$ every positive $K_p$ and $K_d$ gives a stable loop; a larger $K_p$ merely lowers the damping ratio $\zeta = K_d/(2\sqrt{K_p m})$. At $K_p = 400$, $\zeta = 0.18$ — lightly damped, but stable. The simulator disagrees because the drone is not an ideal mass: its motors lag.
+Nothing in the model of \lessonref{les:damper} predicts this. For $m\ddot x + K_d\dot x + K_p x = 0$ every positive $K_p$ and $K_d$ gives a stable loop; a larger $K_p$ merely lowers the damping ratio $\zeta = K_d/(2\sqrt{K_p m})$. At $K_p = 400$, $\zeta = 0.18$ — lightly damped, but stable. The simulator disagrees because the drone is not an ideal mass: its motors lag.\pitfall{When a flight contradicts a formula, the formula is not wrong: one of its assumptions is. Find out which.}
 
 \section{The motor lag as a third pole}
 
@@ -18,7 +18,7 @@ The motors follow the command with a first-order lag: the thrust $T$ chases the 
 \begin{equation}
   \tau_m\dot T + T = u .
 \end{equation}
-In \lessonref{les:spring} we treated the lag as a small delay and found that it destabilises the P-only loop. Here we keep it exactly.
+In \lessonref{les:spring} we treated the lag as a small delay and found that it destabilises the P-only loop. Here we keep it exactly.\innumbers{Time constants of real thrusters: a small racing motor, 20 to \SI{40}{ms}; a large propeller, \SI{100}{ms} or more; a jet engine, seconds.}
 
 \begin{example}[The loop with its motors]
 \label{ex:edge-cubic}
@@ -39,13 +39,13 @@ For $\tau_m = 0$ this is the mass–spring–damper. The lag has added a third p
   m\,K_d > \tau_m m\,K_p \qquad\Longleftrightarrow\qquad K_p < \frac{K_d}{\tau_m} = \frac{7}{0.03} = 233 .
 \end{equation}
 
-\textbf{Step 4 — the oscillation at the edge.} At $K_p = 233$ the cubic has the roots $s = \pm j\omega$ with $\omega^2 = a_1/a_3 = K_d/(\tau_m m) = 233$ (the imaginary part of the cubic at $s = j\omega$): $\omega = \SI{15.3}{rad/s}$, a period of \SI{0.41}{s}.
+\textbf{Step 4 — the oscillation at the edge.} At $K_p = 233$ the cubic has the roots $s = \pm j\omega$ with $\omega^2 = a_1/a_3 = K_d/(\tau_m m) = 233$ (the imaginary part of the cubic at $s = j\omega$):\tip{At its edge the cubic $a_3s^3 + a_2s^2 + a_1s + a_0$ has the roots $\pm j\sqrt{a_1/a_3}$. The gain and the frequency of the edge, without solving anything.} $\omega = \SI{15.3}{rad/s}$, a period of \SI{0.41}{s}.
 
 \textbf{Step 5 — interpret.} The mass has dropped out of \cref{eq:edge-limit}: the limit is a contest between the damper and the lag alone. And the lesson of \cref{eq:spring-lag} is confirmed exactly: a lagging spring acts like a negative damper of size $K_p\tau_m$, and the loop is stable while the real damper is larger, $K_d > K_p\tau_m$.
 \end{example}
 
 \subsection{The other lags}
-The motors are not the only thing that is late. The D term passes through a \SI{20}{Hz} filter ($T_f = \SI{8}{ms}$, \lessonref{les:noise}), and the controller samples and holds (\SI{2}{ms} of delay, \lessonref{les:slow}). Each adds a pole or a delay, and the polynomial grows to degree five. It can no longer be handled by hand, but a computer finds its roots in a moment.
+The motors are not the only thing that is late. The D term passes through a \SI{20}{Hz} filter ($T_f = \SI{8}{ms}$, \lessonref{les:noise}), and the controller samples and holds (\SI{2}{ms} of delay, \lessonref{les:slow}). Each adds a pole or a delay, and the polynomial grows to degree five. It can no longer be handled by hand, but a computer finds its roots in a moment.\tip{A crude estimate lumps the small lags into one: $30 + 8 + 2 = \SI{40}{ms}$ gives $K_p < 7/0.04 = 175$. Too pessimistic here, because the filter sits on the D path only — but the right size.}
 
 \begin{example}[Predicting the ringing, gain by gain]
 \label{ex:edge-ringing}
@@ -55,7 +55,7 @@ For $K_p$ from 100 to 300, predict how fast the ringing after a small step decay
 
 \textbf{Step 2 — the dominant pair.} For each gain the roots contain one complex pair $-\sigma \pm j\omega$ close to the imaginary axis; the ringing is $e^{-\sigma t}\cos\omega t$.
 
-\textbf{Step 3 — the experiment.} A step of \SI{5}{cm}, small enough to keep the motors away from their limits. From the simulator's response we read the period between successive peaks and fit a line to the logarithm of their heights.
+\textbf{Step 3 — the experiment.} A step of \SI{5}{cm}, small enough to keep the motors away from their limits. From the simulator's response we read the period between successive peaks and fit a line to the logarithm of their heights.\tip{To measure a decay rate, plot the logarithm of the peak heights against time. An exponential envelope becomes a straight line with the slope $-\sigma$.}
 
 \textbf{Step 4 — the comparison.}
 \begin{center}\small\sffamily
@@ -92,7 +92,7 @@ The edge depends on $K_d$ too: \cref{eq:edge-limit} is a straight line in the pl
 
 \section{About Ziegler and Nichols}
 
-In 1942 John Ziegler and Nathaniel Nichols of the Taylor Instrument Company published a recipe that is still taught everywhere:
+In 1942 John Ziegler and Nathaniel Nichols of the Taylor Instrument Company published a recipe that is still taught everywhere:\didyouknow{Ziegler and Nichols found their numbers by experiment, on pneumatic controllers. Their aim was a \emph{quarter decay}: each overshoot a quarter of the one before. By today's taste that is far too lively.}
 \begin{enumerate}
   \item switch off I and D and raise $K_p$ until the loop oscillates with constant amplitude; call that gain the \emph{ultimate gain} $K_u$, and the period $T_u$;
   \item set $K_p = 0.6\,K_u$, $K_i = 1.2\,K_u/T_u$, $K_d = 0.075\,K_uT_u$.
@@ -141,7 +141,7 @@ The Ziegler–Nichols rules were derived for plants that are stable on their own
 \section{The engineer's view: gain margin}
 
 \subsection{How far from the edge}
-\Lessonref{les:slow} measured the distance to instability in \emph{delay}: the phase margin. This lesson measures it in \emph{gain}.
+\Lessonref{les:slow} measured the distance to instability in \emph{delay}: the phase margin. This lesson measures it in \emph{gain}.\recall{Decibels are $20\log_{10}$ of a ratio. A factor of 2 is \SI{6}{dB}, a factor of 10 is \SI{20}{dB}, a factor of 16 is \SI{24}{dB}.}
 
 \begin{definition}{Gain margin}
 The \term{gain margin} of a stable loop is the factor by which its loop gain can be multiplied before the loop becomes unstable. In the frequency domain: if the phase of $L(j\omega)$ reaches $-180^\circ$ at the frequency $\omega_{180}$, the gain margin is $1/|L(j\omega_{180})|$.
@@ -152,13 +152,13 @@ The two definitions agree. Multiplying the loop gain by $k$ leaves the phase alo
 For the default altitude loop (all lags included), the phase reaches $-180^\circ$ at $\omega_{180} = \SI{55}{rad/s}$, where $|L| = 0.062$: a gain margin of 16. The whole controller could be made sixteen times stronger — or the drone sixteen times lighter — before the loop shakes. That is a comfortable margin; flight control specifications usually demand at least a factor of two (\SI{6}{dB}).
 
 \subsection{Why the margin is finite}
-At high frequency the P–D controller behaves like $K_ds$ (phase $+90^\circ$), the drone like $1/(ms^2)$ ($-180^\circ$): together $-90^\circ$, safely away from $-180^\circ$. The ideal loop therefore has an \emph{infinite} gain margin, which is the statement that the mass–spring–damper is stable for all gains. Each lag contributes up to another $-90^\circ$ at high frequency, and a delay contributes without limit. With the motor lag the phase approaches $-180^\circ$; with the filter or the hold as well it crosses, and the margin becomes finite. The count is simple:
+At high frequency the P–D controller behaves like $K_ds$ (phase $+90^\circ$), the drone like $1/(ms^2)$ ($-180^\circ$): together $-90^\circ$, safely away from $-180^\circ$. The ideal loop therefore has an \emph{infinite} gain margin, which is the statement that the mass–spring–damper is stable for all gains. Each lag contributes up to another $-90^\circ$ at high frequency, and a delay contributes without limit.\recall{Phase at high frequency: every pole gives $-90^\circ$, every zero in the left half-plane $+90^\circ$, a delay $-\omega T$ without end.} With the motor lag the phase approaches $-180^\circ$; with the filter or the hold as well it crosses, and the margin becomes finite. The count is simple:
 \begin{keyidea}[Count the excess of poles]
 A loop whose transfer function has two more poles than zeros can be stable at any gain. Three or more, or any delay, and a high enough gain destabilises it. Real actuators and real computers always supply the third.
 \end{keyidea}
 
 \subsection{Too little gain}
-The default loop has a second, less expected limit. It contains an integral, and \cref{thm:integral-stability} requires $K_i < K_pK_d/m$. Scale the whole controller by $k$: the condition becomes $kK_i < k^2K_pK_d/m$, i.e.\ $k > mK_i/(K_pK_d) = 0.8/70 = 0.011$. Below one ninetieth of its nominal gain the loop is unstable again. A loop that is stable only between two gains is called \term{conditionally stable}. It matters when an actuator saturates (saturation acts like a reduced gain) or loses power — one more reason for the anti-windup of \lessonref{les:windup}.
+The default loop has a second, less expected limit. It contains an integral, and \cref{thm:integral-stability} requires $K_i < K_pK_d/m$. Scale the whole controller by $k$: the condition becomes $kK_i < k^2K_pK_d/m$, i.e.\ $k > mK_i/(K_pK_d) = 0.8/70 = 0.011$. Below one ninetieth of its nominal gain the loop is unstable again. A loop that is stable only between two gains is called \term{conditionally stable}.\didyouknow{Conditionally stable loops frighten operators: turning the gain \emph{down} to calm a shaking loop can make it worse.} It matters when an actuator saturates (saturation acts like a reduced gain) or loses power — one more reason for the anti-windup of \lessonref{les:windup}.
 
 \begin{example}[An autopilot and its servo]
 \label{ex:edge-aircraft}
@@ -172,7 +172,7 @@ A small aircraft holds its pitch angle $\theta$ with the elevator. Around the op
 
 \textbf{Step 4 — the frequency at the edge.} $\omega^2 = M_\delta K_d/\tau = 200$: \SI{14}{rad/s}, about \SI{2.3}{Hz}.
 
-\textbf{Step 5 — the practical meaning.} Wings and fuselage bend at a few hertz. An autopilot gain set close to this limit would shake the aircraft near its own structural frequencies. Designers keep a gain margin of at least two — here $K_p \le 10$ — and then check the structure separately (Lesson~IV.8 does it for a rocket).
+\textbf{Step 5 — the practical meaning.} Wings and fuselage bend at a few hertz.\innumbers{First bending frequencies: the wing of an airliner, 1 to \SI{3}{Hz}; of a fighter, 5 to 10; a large rocket, around 1.} An autopilot gain set close to this limit would shake the aircraft near its own structural frequencies. Designers keep a gain margin of at least two — here $K_p \le 10$ — and then check the structure separately (Lesson~IV.8 does it for a rocket).
 \end{example}
 
 \subsection{In formal terms}

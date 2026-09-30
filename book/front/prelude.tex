@@ -10,7 +10,7 @@
 \Cref{fig:prelude-screen} shows the whole application. Three things are worth knowing from the start.
 \begin{itemize}
   \item \textbf{Everything is live.} Every slider acts immediately. Changing the controller type or the level restarts the run; everything else is changed in flight.
-  \item \textbf{Everything is reproducible.} All randomness — wind, gusts, sensor noise — comes from one seeded generator. The same seed and the same parameters give exactly the same run, so two tunings can be compared on the same wind. The \ui{Snapshot} button (\key{S}) freezes the current run as a grey \emph{ghost} on the charts.
+  \item \textbf{Everything is reproducible.} All randomness — wind, gusts, sensor noise — comes from one seeded generator. The same seed and the same parameters give exactly the same run, so two tunings can be compared on the same wind.\tip{When two runs differ, look at the seed first. With the same seed, every difference you see was caused by what you changed, not by luck.} The \ui{Snapshot} button (\key{S}) freezes the current run as a grey \emph{ghost} on the charts.
   \item \textbf{Everything is shareable.} The link button copies a URL that contains the complete parameter tree.
 \end{itemize}
 
@@ -43,7 +43,7 @@ Each motor $i$ receives a thrust command $f_i^{cmd} \in [0, f_{max}]$ with $f_{m
 \begin{equation}\label{eq:prelude-motor}
   \tau_m\,\dot r_i = f_i^{cmd} - r_i,\qquad f_i = \eta_i\,r_i ,\qquad \tau_m = \SI{30}{ms}.
 \end{equation}
-$r_i$ is the rotor speed, expressed as the thrust a healthy propeller would make at that speed; the efficiency $\eta_i$ is 1 unless a lesson breaks a propeller (\lessonref{les:indi}). The four motors together lift at most \SI{24.4}{N}, a thrust-to-weight ratio of about 2.5 for the \SI{1}{kg} drone.
+$r_i$ is the rotor speed, expressed as the thrust a healthy propeller would make at that speed; the efficiency $\eta_i$ is 1 unless a lesson breaks a propeller (\lessonref{les:indi}). The four motors together lift at most \SI{24.4}{N}, a thrust-to-weight ratio of about 2.5 for the \SI{1}{kg} drone.\innumbers{A camera drone has a thrust-to-weight ratio near 2; a racing quadrotor 5 to 10. Below about 1.5 there is too little left over to fight a gust.}
 
 \subsection*{Translation}
 Newton's second law, with the thrust along the body's up-axis:
@@ -54,7 +54,7 @@ $R(q)$ rotates body coordinates into world coordinates (it is the identity at L1
 \begin{equation}
   F_{drag,j} = -c_j\,|v_{rel,j}|\,v_{rel,j},\qquad c_y = \SI{0.25}{}, \ c_x = c_z = \SI{0.12}{N.s^2/m^2},
 \end{equation}
-which is how the wind acts on the drone: a hovering drone in a wind $\vec w$ is pushed along the wind with a force that grows with its square.
+which is how the wind acts on the drone: a hovering drone in a wind $\vec w$ is pushed along the wind with a force that grows with its square.\innumbers{In a wind of \SI{4}{m/s} the hovering drone feels $0.12 \cdot 4^2 = \SI{1.9}{N}$ sideways: a fifth of its weight.}
 
 \subsection*{Rotation (L3)}
 The motors sit on an X-shaped frame (\cref{fig:prelude-motors}). Their thrust differences produce roll and pitch torques, and the rotors' aerodynamic drag produces a yaw torque, clockwise and counter-clockwise rotors in opposite directions:
@@ -78,11 +78,11 @@ The floor is solid. Touching it slowly means landing; touching it faster than \S
 The air velocity is uniform in space and the sum of a constant mean wind, Ornstein–Uhlenbeck turbulence and discrete \enquote{one-minus-cosine} gusts. The details are in \lessonref{les:challenge}, where they matter most.
 
 \subsection*{Sensors}
-The controller never reads the true state. It reads a sensor model that can add Gaussian noise, a bias and a transport delay to each signal, and can hold the position between slow fixes (like a barometer or a GPS receiver). Besides position, velocity, attitude and body rates, the sensors provide an accelerometer — which measures the \emph{specific force} $R^\T(\dot{\vec v} - \vec g)$, so it reads $+g$ upward while hovering and zero in free fall — and the rotor speeds of the motors. Part~II uses both.
+The controller never reads the true state. It reads a sensor model that can add Gaussian noise, a bias and a transport delay to each signal, and can hold the position between slow fixes (like a barometer or a GPS receiver). Besides position, velocity, attitude and body rates, the sensors provide an accelerometer — which measures the \emph{specific force} $R^\T(\dot{\vec v} - \vec g)$, so it reads $+g$ upward while hovering and zero in free fall — and the rotor speeds of the motors.\didyouknow{A phone finds \enquote{down} this way: at rest its accelerometer reads $g$, pointing straight up.} Part~II uses both.
 
 \section*{Time}
 
-The physics advances in fixed steps of \SI{1}{ms} with the semi-implicit (symplectic) Euler method: velocities are updated from the forces, then positions from the \emph{new} velocities; the same for the angular velocity and the quaternion, which is renormalised every step. The controllers run on their own clocks — \SI{250}{Hz} for the altitude controller, up to \SI{1}{kHz} for the fastest loop of the quadrotor — and hold their outputs between samples, exactly like the software of a real flight controller. Rendering is decoupled from all of this: the screen shows interpolated states at whatever frame rate the browser manages.
+The physics advances in fixed steps of \SI{1}{ms} with the semi-implicit (symplectic) Euler method: velocities are updated from the forces, then positions from the \emph{new} velocities;\pitfall{The order matters. With the plain Euler method — positions from the \emph{old} velocities — an undamped oscillation gains a little energy at every step and slowly explodes.} the same for the angular velocity and the quaternion, which is renormalised every step. The controllers run on their own clocks — \SI{250}{Hz} for the altitude controller, up to \SI{1}{kHz} for the fastest loop of the quadrotor — and hold their outputs between samples, exactly like the software of a real flight controller. Rendering is decoupled from all of this: the screen shows interpolated states at whatever frame rate the browser manages.
 
 \begin{inapp}[The source code]
 The simulator is written in TypeScript. The physics and the controllers are plain classes with no dependence on the user interface, so they can run headlessly — which is how this book's data were produced.
@@ -134,6 +134,6 @@ $s = \sigma + j\omega$ & complex frequency; $j = \sqrt{-1}$ & $\operatorname{Re}
 \begin{description}[leftmargin=0pt, itemsep=1pt, topsep=2pt, font=\sffamily\small\bfseries]
   \item[Marks.] A dot is a derivative with respect to time, $\dot y = \dd y/\dd t$. A hat is an estimate or a belief ($\hat m$, $\hat{\vx}$). A star is an equilibrium ($e^*$). The subscript $ss$ is a steady-state value, $sp$ a setpoint passed from one loop to the next, $0$ an initial value.
   \item[Frames and signs.] The world frame has $y$ pointing up and $x$, $z$ horizontal. Forces, positions and velocities along $y$ are positive upwards. The body frame is fixed to the drone, with its $y$-axis along the thrust.
-  \item[Units.] SI throughout. Angles are in radians and frequencies in \si{rad/s} in every formula; degrees and hertz appear only where they are written out.
+  \item[Units.] SI throughout. Angles are in radians and frequencies in \si{rad/s} in every formula; degrees and hertz appear only where they are written out.\pitfall{Hertz and radians per second differ by $2\pi \approx 6.3$. A \SI{5}{Hz} oscillation is a \SI{31}{rad/s} oscillation. Mixing the two is a classic source of wrong numbers.}
   \item[Statements.] A \emph{Definition} fixes a term. A \emph{Theorem} is a general statement with its hypotheses, followed by a proof, whose end is marked \rule{0.45em}{0.45em}, or by the source where the proof is found. A \emph{Result} is a formula derived for our drone. A \emph{Key idea} is the same thing in words. Theorems are numbered within each lesson, and the sources are listed in the \hyperref[app:refs]{references}.
 \end{description}

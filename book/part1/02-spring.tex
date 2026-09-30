@@ -14,7 +14,7 @@ the law we met in \cref{eq:meet-p}, with a feedforward that is exactly right, $\
 \begin{equation}
   m\ddot y = \underbrace{\hat m g + K_p(r-y)}_{T} - mg = K_p\,(r - y).
 \end{equation}
-The two weights cancel. The controller and the drone have merged into a single equation. It is worth pausing on this, because it is the method of the whole book:
+The two weights cancel. The controller and the drone have merged into a single equation.\tip{Always substitute the controller into the plant before thinking further. Half of the terms usually cancel, and what is left is the thing to study.} It is worth pausing on this, because it is the method of the whole book:
 
 \begin{keyidea}[The closed loop is a new system]
 A controller and a plant, connected, form a new dynamical system with its own equation. To understand a feedback loop is to understand that equation. Most of this book consists of writing it down and reading it.
@@ -25,18 +25,18 @@ The equation becomes cleaner if we measure the altitude from the setpoint. Defin
 \begin{equation}
   x(t) = y(t) - r .
 \end{equation}
-For a constant setpoint, $\dot x = \dot y$ and $\ddot x = \ddot y$, and $r - y = -x$. Substituting:
+For a constant setpoint, $\dot x = \dot y$ and $\ddot x = \ddot y$, and $r - y = -x$. Substituting:\pitfall{Two conventions live side by side: the error $e = r - y$, positive when too low, and the deviation $x = y - r = -e$. Equations of motion are cleaner in $x$; control laws are written in $e$.}
 \begin{equation}\label{eq:spring-ode}
   m\,\ddot x + K_p\,x = 0 .
 \end{equation}
-This is the equation of a mass on a spring of stiffness $K_p$. The proportional term is literally a spring stretched between the drone and the setpoint: its force $-K_p x$ is proportional to the stretch and points back towards the setpoint.
+This is the equation of a mass on a spring of stiffness $K_p$. The proportional term is literally a spring stretched between the drone and the setpoint: its force $-K_p x$ is proportional to the stretch and points back towards the setpoint.\didyouknow{Hooke first published the law of the spring in 1676 as an anagram, \emph{ceiiinosssttuv}. Two years later he gave the solution: \emph{ut tensio, sic vis} — as the extension, so the force.}
 
 \section{Solving the equation}
 
 Equation~\eqref{eq:spring-ode} is a \emph{linear ordinary differential equation with constant coefficients}. Such equations have a standard method of solution, and because we will use it in almost every lesson, we go through it carefully once.
 
 \subsection{Step 1: guess an exponential}
-We look for solutions of the form $x(t) = e^{st}$, with $s$ a number to be found. The reason for this guess: differentiating an exponential gives back the same exponential, multiplied by $s$. So $\dot x = s\,e^{st}$ and $\ddot x = s^2 e^{st}$, and every term of the equation will contain the same factor $e^{st}$.
+We look for solutions of the form $x(t) = e^{st}$, with $s$ a number to be found. The reason for this guess: differentiating an exponential gives back the same exponential, multiplied by $s$. So $\dot x = s\,e^{st}$ and $\ddot x = s^2 e^{st}$, and every term of the equation will contain the same factor $e^{st}$.\recall{$\frac{\dd}{\dd t}e^{st} = s\,e^{st}$. The exponential is the one function that differentiation only rescales, which is why it solves every linear equation with constant coefficients.}
 
 \subsection{Step 2: the characteristic equation}
 Substitute the guess into \cref{eq:spring-ode}:
@@ -54,18 +54,18 @@ Solve for $s$: $s^2 = -K_p/m$, so
 \begin{equation}
   s_{1,2} = \pm\, j\,\omega_n,\qquad \omega_n = \sqrt{K_p/m},
 \end{equation}
-where $j = \sqrt{-1}$ is the imaginary unit (engineers write $j$, because $i$ is taken by electric current). The roots are purely imaginary. For the default $K_p = 10$ and $m = 1$: $\omega_n = \sqrt{10} = \SI{3.16}{rad/s}$.
+where $j = \sqrt{-1}$ is the imaginary unit (engineers write $j$, because $i$ is taken by electric current). The roots are purely imaginary. For the default $K_p = 10$ and $m = 1$: $\omega_n = \sqrt{10} = \SI{3.16}{rad/s}$.\innumbers{\SI{3.16}{rad/s} is $3.16/2\pi = \SI{0.50}{Hz}$: one swing every two seconds, the pace of a slow walk.}
 
 \subsection{Step 4: from complex exponentials to sines and cosines}
 Both $e^{j\omega_n t}$ and $e^{-j\omega_n t}$ solve the equation, and because it is linear, so does any combination of them. They are complex, but Euler's formula,
 \begin{equation}
   e^{j\omega t} = \cos\omega t + j\sin\omega t ,
 \end{equation}
-shows that their sum and difference give real functions: $\cos\omega_n t = \tfrac12(e^{j\omega_n t} + e^{-j\omega_n t})$ and $\sin\omega_n t = \tfrac1{2j}(e^{j\omega_n t} - e^{-j\omega_n t})$. So the general real solution is
+shows that their sum and difference give real functions:\didyouknow{Put $\omega t = \pi$ into Euler's formula: $e^{j\pi} + 1 = 0$. One line that ties together $e$, $\pi$, $j$, 1 and 0.} $\cos\omega_n t = \tfrac12(e^{j\omega_n t} + e^{-j\omega_n t})$ and $\sin\omega_n t = \tfrac1{2j}(e^{j\omega_n t} - e^{-j\omega_n t})$. So the general real solution is
 \begin{equation}\label{eq:spring-general}
   x(t) = A\cos\omega_n t + B\sin\omega_n t ,
 \end{equation}
-with two constants $A$ and $B$ — two, because the equation is of second order and needs two initial conditions.
+with two constants $A$ and $B$ — two, because the equation is of second order and needs two initial conditions.\tip{Count. An equation of order $n$ has $n$ poles and needs $n$ initial conditions. A solution with fewer free constants is missing something.}
 
 \subsection{Step 5: fit the initial conditions}
 At $t = 0$: $x(0) = A$ and $\dot x(0) = B\,\omega_n$. So if the drone starts at deviation $x_0$ with velocity $v_0$,
@@ -76,7 +76,7 @@ It is an oscillation with the \term{natural frequency} $\omega_n$ and the period
 \begin{equation}\label{eq:spring-period}
   T_{osc} = \frac{2\pi}{\omega_n} = 2\pi\sqrt{\frac{m}{K_p}}.
 \end{equation}
-Nothing in this solution decays.
+Nothing in this solution decays.\innumbers{The period grows only with the square root: four times the mass, or a quarter of the gain, doubles it.}
 
 \begin{example}[The setpoint step of the lesson]
 \label{ex:spring-step}
@@ -92,7 +92,7 @@ The drone hovers at \SI{2}{m} when, at $t = \SI{6}{s}$, the setpoint jumps to \S
 
 \textbf{Step 5 — the speed.} $\dot y(t) = 3.16\,\sin(3.16\,t)$, largest when the drone passes the setpoint: \SI{3.16}{m/s}.
 
-\textbf{Step 6 — the thrust.} $T = mg - K_p x = 9.81 + 10\cos(3.16\,t)$: between $-0.19$ and \SI{19.81}{N}. The lower end is slightly negative — impossible for propellers, so the motors clip briefly at zero at the top of each swing. Everything else is within the \SI{24.4}{N} limit.
+\textbf{Step 6 — the thrust.} $T = mg - K_p x = 9.81 + 10\cos(3.16\,t)$: between $-0.19$ and \SI{19.81}{N}. The lower end is slightly negative — impossible for propellers, so the motors clip briefly at zero at the top of each swing.\pitfall{Propellers cannot pull. A thrust command below zero is simply not carried out — the first sign that the linear model has limits.} Everything else is within the \SI{24.4}{N} limit.
 \end{example}
 
 \subsection{Poles and stability}
@@ -110,7 +110,7 @@ For a linear system the roots $s$ of the characteristic equation are called its 
 \begin{example}[Three poles, three behaviours]
 What does a pole at $s = -1$, at $s = +0.15$ and at $s = \pm 3.16j$ mean for the motion, starting from $x = 1$?
 
-\textbf{$s = -1$.} $x(t) = e^{-t}$: after \SI{1}{s} it is $0.37$, after \SI{3}{s} $0.05$. Decay with time constant \SI{1}{s}.
+\textbf{$s = -1$.} $x(t) = e^{-t}$: after \SI{1}{s} it is $0.37$, after \SI{3}{s} $0.05$. Decay with time constant \SI{1}{s}.\tip{A rule worth knowing by heart: $e^{-t/\tau}$ has fallen to 37\,\% after one time constant, 5\,\% after three and below 1\,\% after five.}
 
 \textbf{$s = +0.15$.} $x(t) = e^{0.15t}$: after \SI{5}{s} it is $2.1$, after \SI{20}{s} $20$. Slow, relentless growth — unstable.
 
@@ -121,7 +121,7 @@ A P-controlled hover is marginally stable, the most fragile case of all: the sma
 
 \section{Why a spring never stops}
 
-There is a second way to see the endless oscillation, and it explains much more than the formula. Multiply \cref{eq:spring-ode} by the velocity $\dot x$:
+There is a second way to see the endless oscillation, and it explains much more than the formula. Multiply \cref{eq:spring-ode} by the velocity $\dot x$:\tip{Multiplying an equation of motion by the velocity turns forces into powers. It is the standard way to find an energy — and, much later, a Lyapunov function (Lesson~III.7).}
 \begin{equation}
   m\dot x\ddot x + K_p x\dot x = 0 .
 \end{equation}
@@ -149,9 +149,9 @@ An intuition for the same fact: when the drone passes the setpoint on its way up
   \begin{equation}\label{eq:spring-lag}
     F \approx -K_p\,x + K_p\tau_m\,\dot x ,
   \end{equation}
-  a spring plus a damper with a \emph{negative} coefficient $-K_p\tau_m$. A late spring pushes slightly in the direction of motion and pumps energy in.
+  a spring plus a damper with a \emph{negative} coefficient $-K_p\tau_m$. A late spring pushes slightly in the direction of motion and pumps energy in.\didyouknow{Lateness as negative damping is why a shower with long pipes swings between hot and cold: each correction arrives when it is no longer wanted.}
 \end{itemize}
-For large swings drag wins and the oscillation shrinks; as it shrinks, drag weakens, until the two balance and the drone settles into a steady oscillation, a \term{limit cycle}. No linear model can produce one. The balance can even be predicted.
+For large swings drag wins and the oscillation shrinks; as it shrinks, drag weakens, until the two balance and the drone settles into a steady oscillation, a \term{limit cycle}. No linear model can produce one.\didyouknow{Limit cycles are everywhere: a heartbeat, a violin string under the bow, the squeal of a brake. Each is a balance between something that feeds energy in and something that takes it out.} The balance can even be predicted.
 
 \begin{example}[Predicting the size of the limit cycle]
 \label{ex:spring-limit}
@@ -161,7 +161,7 @@ Estimate the amplitude at which drag and motor lag balance, for $K_p = 10$.
 
 \textbf{Step 2 — energy pumped in per period by the lag.} The force $+K_p\tau_m\dot x$ does work $\int F\,\dot x\,\dd t = K_p\tau_m\int\dot x^2\,\dd t$ over one period $2\pi/\omega$. Since the average of $\sin^2$ is $\tfrac12$: $W_{in} = K_p\tau_m\,A^2\omega^2\cdot\tfrac12\cdot\tfrac{2\pi}{\omega} = \pi K_p\tau_m A^2\omega$.
 
-\textbf{Step 3 — energy removed per period by drag.} $W_{out} = \int c_v|\dot x|\dot x^2\,\dd t = c_v A^3\omega^3\int|\sin|^3\,\dd t$. Over one period the average of $|\sin|^3$ is $\tfrac{4}{3\pi}$, so $W_{out} = c_v A^3\omega^3\cdot\tfrac{4}{3\pi}\cdot\tfrac{2\pi}{\omega} = \tfrac83\,c_v A^3\omega^2$.
+\textbf{Step 3 — energy removed per period by drag.} $W_{out} = \int c_v|\dot x|\dot x^2\,\dd t = c_v A^3\omega^3\int|\sin|^3\,\dd t$. Over one period the average of $|\sin|^3$ is $\tfrac{4}{3\pi}$,\recall{Averages over a period: $\overline{\sin^2} = \tfrac12$, $\overline{|\sin|} = \tfrac{2}{\pi}$, $\overline{|\sin|^3} = \tfrac{4}{3\pi}$.} so $W_{out} = c_v A^3\omega^3\cdot\tfrac{4}{3\pi}\cdot\tfrac{2\pi}{\omega} = \tfrac83\,c_v A^3\omega^2$.
 
 \textbf{Step 4 — balance.} $\pi K_p\tau_m A^2\omega = \tfrac83\,c_v A^3\omega^2$ gives
 \begin{equation*}
@@ -176,13 +176,13 @@ Estimate the amplitude at which drag and motor lag balance, for $K_p = 10$.
 \subsection{When the linear model stops being true}
 Now the orange curve. \Cref{eq:spring-period} promises that quadrupling $K_p$ halves the period, to \SI{1.0}{s}. The simulator shows \SI{1.4}{s} — and an oscillation that does not decay at all.
 
-Look at the thrust. After a \SI{1}{m} step the P term asks for $K_p\,e = \SI{40}{N}$ on top of the weight, but four motors can deliver at most $4 \times \SI{6.1}{N} = \SI{24.4}{N}$, and at least zero. On every swing the command is \emph{clipped} at one limit or the other. While it is clipped, the drone does not feel a spring of stiffness 40 at all; it feels a constant force. The effective spring is softer, so the period is longer. And the negative damping of \cref{eq:spring-lag} is four times stronger than at $K_p=10$, so the oscillation is held at the size where the motor limits and the drag stop it from growing.
+Look at the thrust. After a \SI{1}{m} step the P term asks for $K_p\,e = \SI{40}{N}$ on top of the weight, but four motors can deliver at most $4 \times \SI{6.1}{N} = \SI{24.4}{N}$, and at least zero. On every swing the command is \emph{clipped} at one limit or the other.\innumbers{At $K_p = 40$ the motors are at full thrust whenever the drone is more than $(24.4 - 9.81)/40 = \SI{36}{cm}$ too low, and at zero when it is more than $9.81/40 = \SI{25}{cm}$ too high.} While it is clipped, the drone does not feel a spring of stiffness 40 at all; it feels a constant force. The effective spring is softer, so the period is longer. And the negative damping of \cref{eq:spring-lag} is four times stronger than at $K_p=10$, so the oscillation is held at the size where the motor limits and the drag stop it from growing.
 
 \begin{watchout}[Linear results need linear conditions]
 Every formula in this lesson — $\omega_n$, the period, the pole positions — assumes that the actuators do what they are told. Large steps and large gains break that assumption. The motors of Anemostatos, like all real actuators, have limits; \lessonref{les:windup} is devoted to what that does to the integral term.
 \end{watchout}
 
-To see the linear behaviour at $K_p = 40$, keep the step small: press \key{↑} once (\SI{0.1}{m}) instead of jumping a whole metre. The thrust then stays within its limits and the period comes out close to \SI{1}{s}.
+To see the linear behaviour at $K_p = 40$, keep the step small: press \key{↑} once (\SI{0.1}{m}) instead of jumping a whole metre. The thrust then stays within its limits and the period comes out close to \SI{1}{s}.\tip{Test a loop twice: with small steps to see its linear behaviour, with large ones to see what it does in real life.}
 
 \screen[0 0 495 998]{spring}{Lesson 2 in the app: the undamped oscillation in the tracking chart and the P term alone in the PID-terms chart. The info card (bottom right) computes $\omega_n$ and $\zeta$ from the current gains — the theory next to the measurement.}{fig:spring-charts}
 
@@ -213,13 +213,13 @@ In \lessonref{les:meet} we wrote the plant with its state, the position and the 
   = \underbrace{\begin{pmatrix} 0 & 1 \\ -K_p/m & 0 \end{pmatrix}}_{A}\begin{pmatrix} x \\ \dot x \end{pmatrix},
   \qquad\text{in short}\quad \dot{\vx} = A\,\vx \quad\text{with}\quad \vx = (x, \dot x)^\T .
 \end{equation}
-Try a solution $e^{st}\symbf v$ with a constant vector $\symbf v$. Differentiating multiplies it by $s$, so $s\,\symbf v = A\symbf v$: the number $s$ must be an eigenvalue of $A$. The eigenvalues are the roots of $\det(s\Id - A) = s^2 + K_p/m$, which is the characteristic equation \eqref{eq:spring-char} once more.
+Try a solution $e^{st}\symbf v$ with a constant vector $\symbf v$. Differentiating multiplies it by $s$, so $s\,\symbf v = A\symbf v$: the number $s$ must be an eigenvalue of $A$.\recall{$\lambda$ is an eigenvalue of $A$ if $A\symbf v = \lambda\symbf v$ for some $\symbf v \ne 0$, that is, if $\det(\lambda\Id - A) = 0$. For a $2 \times 2$ matrix: $\lambda^2 - (\operatorname{tr}A)\,\lambda + \det A = 0$.} The eigenvalues are the roots of $\det(s\Id - A) = s^2 + K_p/m$, which is the characteristic equation \eqref{eq:spring-char} once more.
 
 \begin{result}[Poles are eigenvalues]
 Write a linear system as $\dot{\vx} = A\vx$. Its poles are the eigenvalues of the state matrix $A$, and its characteristic polynomial is $\det(s\Id - A)$. For two states this is a second way to write what we already had. For twelve it is the only practical way, and it is how the simulator computes the poles it displays for the controllers of Part~II (\src{src/math/mat.ts}, function \texttt{eigenvalues}).
 \end{result}
 
-The plane with $x$ on one axis and $\dot x$ on the other is the \term{phase plane}. A solution is a curve in it, traced as time passes. Energy conservation, $\tfrac12 m\dot x^2 + \tfrac12 K_p x^2 = E$, says that the curves of the ideal spring are ellipses: the drone circles the setpoint for ever, neither closer nor further. In the app, the bottom-right chart can be switched to \ui{phase portrait} to watch the curve being drawn.
+The plane with $x$ on one axis and $\dot x$ on the other is the \term{phase plane}. A solution is a curve in it, traced as time passes.\didyouknow{The phase plane is Poincaré's idea, from the 1880s: study the shape of all solutions at once instead of solving for one. He invented it for the orbits of the planets.} Energy conservation, $\tfrac12 m\dot x^2 + \tfrac12 K_p x^2 = E$, says that the curves of the ideal spring are ellipses: the drone circles the setpoint for ever, neither closer nor further. In the app, the bottom-right chart can be switched to \ui{phase portrait} to watch the curve being drawn.
 
 \subsection{The true poles}
 The ideal loop sits exactly on the boundary of stability. \Cref{eq:spring-lag} suggested that the motor lag pushes it over. With the state form we can say so exactly.
@@ -247,12 +247,12 @@ Model the motors as a first-order lag with $\tau = \SI{30}{ms}$ and find the pol
 \begin{equation*}
   s_1 = -33.63, \qquad s_{2,3} = +0.147 \pm 3.145\,j .
 \end{equation*}
-(Check: the roots of a cubic sum to minus the ratio of its first two coefficients, $-1/\tau = -33.33$, and $-33.63 + 2\cdot0.147 = -33.33$.)
+(Check: the roots of a cubic sum to minus the ratio of its first two coefficients, $-1/\tau = -33.33$, and $-33.63 + 2\cdot0.147 = -33.33$.)\tip{Vieta's rules check roots for free. For $a_3s^3 + a_2s^2 + a_1s + a_0$ the roots add up to $-a_2/a_3$ and multiply to $-a_0/a_3$.}
 
 \textbf{Step 6 — read them.} The real pole is the motor itself, a little faster than $-1/\tau$. The complex pair is the spring, at almost the old frequency (\SI{3.145}{rad/s} instead of 3.162), but with a \emph{positive} real part: the oscillation grows like $e^{0.147t}$ and doubles every $\ln 2/0.147 = \SI{4.7}{s}$. The first-order estimate of \cref{eq:spring-lag} gives $K_p\tau/(2m) = 0.15$, which is the same number.
 \end{example}
 
-So the honest statement is stronger than \enquote{marginally stable}: a proportional loop around real motors is \emph{unstable}. Then why does the drone of \cref{fig:spring-run} not fly away?
+So the honest statement is stronger than \enquote{marginally stable}: a proportional loop around real motors is \emph{unstable}.\pitfall{\enquote{It flies, so it is stable} is a wrong conclusion. This drone flies on an unstable linear loop, held back by the air. Take the air away (Example~\ref{ex:spring-sat}) and it is lost.} Then why does the drone of \cref{fig:spring-run} not fly away?
 
 \subsection{The amplitude equation}
 Because the growth is slow and the air resists more the faster the drone moves. Example~\ref{ex:spring-limit} balanced the two over one period. The same two energies give more than the balance point: they give the whole history of the amplitude. With $m\omega^2 = K_p$, an oscillation of amplitude $A$ carries the energy $E = \tfrac12 K_p A^2$. Per period it gains $W_{in} - W_{out}$; divided by the period $2\pi/\omega$, that is its average rate of change:
@@ -265,7 +265,7 @@ Dividing by $K_p A$ and using $\omega^2 = K_p/m$:
   \sigma = \frac{K_p\tau}{2m}, \qquad
   A^* = \frac{3\pi K_p\tau}{8\,c_v\,\omega}.
 \end{equation}
-This is the logistic equation, and it can be read without solving it.
+This is the logistic equation, and it can be read without solving it.\didyouknow{Verhulst wrote the logistic equation in 1838 for a population with limited food. Here the population is the amplitude, and the food is the motor lag.}
 \begin{itemize}
   \item A small oscillation, $A \ll A^*$, grows exponentially at the rate $\sigma$ — the real part of the unstable poles of Example~\ref{ex:spring-cubic}.
   \item A large one, $A > A^*$, shrinks: the bracket is negative.
@@ -287,7 +287,7 @@ A small satellite with a moment of inertia $J = \SI{12}{kg.m^2}$ about one axis 
 
 \textbf{Step 1 — the equation.} Newton's law for rotation is $J\ddot\theta = $ torque, so $J\ddot\theta + K_p\theta = 0$: \cref{eq:spring-ode} with $J$ in place of $m$.
 
-\textbf{Step 2 — the motion.} $\omega_n = \sqrt{K_p/J} = \sqrt{0.3/12} = \SI{0.158}{rad/s}$, a period of \SI{39.7}{s}. A pointing error of \SI{1}{\degree} becomes an oscillation of $\pm\SI{1}{\degree}$.
+\textbf{Step 2 — the motion.} $\omega_n = \sqrt{K_p/J} = \sqrt{0.3/12} = \SI{0.158}{rad/s}$, a period of \SI{39.7}{s}. A pointing error of \SI{1}{\degree} becomes an oscillation of $\pm\SI{1}{\degree}$.\innumbers{The reaction wheels of a small satellite deliver a few millinewton-metres. In orbit everything is slow — and nothing is damped.}
 
 \textbf{Step 3 — the actuator.} A wheel that follows its command with $\tau = \SI{0.2}{s}$ adds the growth rate $\sigma = K_p\tau/(2J) = 0.3\cdot0.2/24 = \SI{0.0025}{s^{-1}}$: the error doubles every $\ln2/0.0025 = \SI{280}{s}$.
 
@@ -307,7 +307,7 @@ Let $\vx^*$ be an equilibrium of $\dot{\vx} = f(\vx)$, that is, $f(\vx^*) = 0$. 
 \end{itemize}
 \end{definition}
 
-In words: start close enough and you stay as close as you like (stable), and moreover you return (asymptotically stable). A system that oscillates for ever with a constant amplitude is stable in this sense. \enquote{Marginally stable} means stable but not asymptotically stable.
+In words: start close enough and you stay as close as you like (stable), and moreover you return (asymptotically stable). A system that oscillates for ever with a constant amplitude is stable in this sense. \enquote{Marginally stable} means stable but not asymptotically stable.\pitfall{In the literature \enquote{stable} does not mean \enquote{comes to rest}; that is \emph{asymptotically} stable. An engineer who says stable nearly always means the stronger word.}
 
 \begin{theorem}[Stability of a linear system]
 \label{thm:spring-linear}

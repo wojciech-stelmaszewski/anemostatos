@@ -6,7 +6,7 @@ Level L3 is a real quadrotor: a rigid body with four motors, six degrees of free
 
 \section{Divide and conquer}
 
-\Lessonref{les:tilt} ended with the chain \eqref{eq:tilt-chain} from motor thrusts to position: torque, angular acceleration, rate, attitude, acceleration, velocity, position. A single controller for the whole chain would have to be designed all at once, and it would be hard to tune and to understand. A cascade does something simpler.
+\Lessonref{les:tilt} ended with the chain \eqref{eq:tilt-chain} from motor thrusts to position: torque, angular acceleration, rate, attitude, acceleration, velocity, position. A single controller for the whole chain would have to be designed all at once, and it would be hard to tune and to understand. A cascade does something simpler.\didyouknow{Cascades are as old as process control. In a steam boiler the level controller does not move the valve: it sets the flow that a second, faster controller maintains.}
 
 \begin{definition}{Cascade control}
 In a \term{cascade}, the chain is cut at variables that can be measured, and a separate loop is closed around each piece. The output of an outer loop is not an actuator command: it is the \emph{setpoint} of the loop inside it. Only the innermost loop commands the actuators.
@@ -26,7 +26,7 @@ Each loop in \cref{fig:cascade-diagram} controls a plant that is a single integr
 \begin{equation}
   \vec v_{sp} = K_{pos}\,(\vec p_{sp} - \vec p),\qquad |\vec v_{sp}| \le v_{max}.
 \end{equation}
-It turns a position error into a desired velocity: $K_{pos} = \SI{1.2}{s^{-1}}$ horizontally, so one metre of error asks for \SI{1.2}{m/s}, limited to \SI{4}{m/s}. A pure P is enough, because the loop inside provides the integral action.
+It turns a position error into a desired velocity: $K_{pos} = \SI{1.2}{s^{-1}}$ horizontally, so one metre of error asks for \SI{1.2}{m/s}, limited to \SI{4}{m/s}. A pure P is enough, because the loop inside provides the integral action.\tip{Read an outer P gain as a rate: $K_{pos} = \SI{1.2}{s^{-1}}$ means \enquote{close the error at 120\,\% per second}, a time constant of \SI{0.83}{s}.}
 
 \subsection{Velocity: PID, \SI{100}{Hz}}
 \begin{equation}
@@ -40,7 +40,7 @@ The lesson's wind produces a drag of \SI{2.86}{N} on the hovering drone. What do
 
 \textbf{Step 1 — what is needed.} To stand still the drone needs a constant acceleration command against the wind: $a = F/\hat m = \SI{2.86}{m/s^2}$.
 
-\textbf{Step 2 — with the integral.} At rest, on the setpoint, both errors are zero: P of the position loop gives $v_{sp} = 0$, P of the velocity loop gives nothing. Only the integral can hold a constant output with zero input: $I = \SI{-2.86}{m/s^2}$. The simulator: \SI{-2.82}{m/s^2}, and the drone stays within \SI{1}{cm} of its setpoint on average.
+\textbf{Step 2 — with the integral.} At rest, on the setpoint, both errors are zero: P of the position loop gives $v_{sp} = 0$, P of the velocity loop gives nothing. Only the integral can hold a constant output with zero input:\recall{Only an integrator gives a non-zero output for a zero input. That is why a constant load needs one somewhere in the chain (\cref{thm:integral-imp}).} $I = \SI{-2.86}{m/s^2}$. The simulator: \SI{-2.82}{m/s^2}, and the drone stays within \SI{1}{cm} of its setpoint on average.
 
 \textbf{Step 3 — without it.} Now the velocity P must supply the acceleration, which needs a velocity error: $K_p(v_{sp} - 0) = -2.86$, so $v_{sp} = -2.86/2.2 = \SI{-1.30}{m/s}$. And the position loop produces that setpoint only from a position error: $x - x_{sp} = 1.30/1.2 = \SI{1.08}{m}$.
 
@@ -56,7 +56,7 @@ This block is where \enquote{to move, tilt} becomes explicit. It is \cref{eq:til
 \begin{equation}\label{eq:cascade-fdes}
   \vec F_{des} = \hat m\,(\vec a_{sp} - \vec g),
 \end{equation}
-and since a quadrotor can only push along its body axis, the desired body axis is its direction, $\hat b_{sp} = \vec F_{des}/|\vec F_{des}|$, limited to a tilt of $35^\circ$. Together with the desired heading (yaw) this defines a full attitude setpoint $q_{sp}$. The collective thrust is the projection of $\vec F_{des}$ on the \emph{current} body axis, $T = \vec F_{des}\cdot\hat b$, so that the drone does not shoot upward while it is still tilting.
+and since a quadrotor can only push along its body axis, the desired body axis is its direction, $\hat b_{sp} = \vec F_{des}/|\vec F_{des}|$, limited to a tilt of $35^\circ$. Together with the desired heading (yaw) this defines a full attitude setpoint $q_{sp}$. The collective thrust is the projection of $\vec F_{des}$ on the \emph{current} body axis, $T = \vec F_{des}\cdot\hat b$, so that the drone does not shoot upward while it is still tilting.\pitfall{Were the thrust simply $|\vec F_{des}|$, a drone asked to accelerate sideways would climb first: the extra thrust would act upwards while the body is still level.}
 
 \begin{example}[From an acceleration to an attitude]
 \label{ex:cascade-tv}
@@ -76,13 +76,13 @@ The attitude error is the rotation that takes the current attitude to the desire
 \begin{equation}
   \vec\omega_{sp} = K_{att}\,\vec\theta_e, \qquad K_{att} = \SI{8}{s^{-1}} .
 \end{equation}
-The simulator computes $\vec\theta_e$ with quaternions, $q_e = q^{-1}\otimes q_{sp}$ and $\vec\theta_e = 2\,\sign(q_{e,w})\,\vec q_{e,xyz}$, which stays correct for large rotations. Why quaternions and not angles is the story of \lessonref{les:geometric}.
+The simulator computes $\vec\theta_e$ with quaternions, $q_e = q^{-1}\otimes q_{sp}$ and $\vec\theta_e = 2\,\sign(q_{e,w})\,\vec q_{e,xyz}$, which stays correct for large rotations.\didyouknow{Hamilton found the quaternions in 1843 on a walk along a canal in Dublin, and scratched their rule into a bridge. Today every game engine and every spacecraft uses them for rotations.} Why quaternions and not angles is the story of \lessonref{les:geometric}.
 
 \subsection{Rate: PID, \SI{1}{kHz}}
 \begin{equation}
   \vec\alpha_{sp} = \mathrm{PID}_{rate}(\vec\omega_{sp} - \vec\omega),\qquad \vec\tau = J\,\vec\alpha_{sp}, \qquad K_p = \SI{18}{s^{-1}},\ K_i = \SI{6}{s^{-2}},\ K_d = 0.25 .
 \end{equation}
-The innermost loop controls how fast the drone rotates, from the gyroscope. Multiplying by the inertia $J$ makes the gains physically meaningful: they produce angular accelerations, whatever the size of the drone. This is the loop where noise and filtering (\lessonref{les:noise}) matter most.
+The innermost loop controls how fast the drone rotates, from the gyroscope. Multiplying by the inertia $J$ makes the gains physically meaningful: they produce angular accelerations, whatever the size of the drone.\tip{Gains that produce accelerations carry over between vehicles. Change the frame, update $J$, and the old tune is a reasonable first guess.} This is the loop where noise and filtering (\lessonref{les:noise}) matter most.
 
 \subsection{Mixer: linear algebra}
 Finally, the four motor thrusts must produce the requested collective thrust and three torques. For the X-shaped frame with the lever arm $d$ and the rotor torque coefficient $c_\tau$ the relation is linear (Prelude),
@@ -112,7 +112,7 @@ with the signs of column $i$ of $M$.
 
 \textbf{Step 3 — the result.} The pitch row of $M$ has the signs $(+, +, -, -)$: $f_1 = f_2 = 2.45 + 0.42 = \SI{2.87}{N}$, $f_3 = f_4 = \SI{2.03}{N}$. The front pair speeds up, the rear pair slows down, the sum is unchanged.
 
-\textbf{Step 4 — the limits.} The largest pitch torque in hover is reached when one pair stops: $\tau_z = 4d \cdot 2.45 = \SI{1.18}{N.m}$, the value used in Example~\ref{ex:tilt-time}. When a command would push a motor beyond its range, the mixer first shifts all four together (trading collective thrust for attitude authority), then gives up yaw, then roll and pitch: attitude matters more than altitude for a few milliseconds.
+\textbf{Step 4 — the limits.} The largest pitch torque in hover is reached when one pair stops: $\tau_z = 4d \cdot 2.45 = \SI{1.18}{N.m}$, the value used in Example~\ref{ex:tilt-time}. When a command would push a motor beyond its range, the mixer first shifts all four together (trading collective thrust for attitude authority), then gives up yaw, then roll and pitch: attitude matters more than altitude for a few milliseconds.\didyouknow[-40pt]{The order of sacrifice is a design decision. A drone that loses a little altitude survives; one that loses its attitude does not.}
 \end{example}
 
 \section{Watching the cascade work}
@@ -127,7 +127,7 @@ with the signs of column $i$ of $M$.
 \label{ex:cascade-scales}
 Estimate how quickly each loop follows its setpoint, assuming that the loop inside it is ideal.
 
-\textbf{Step 1 — the pattern.} A loop $\dot z = K(z_{sp} - z)$ — a P controller on an integrator whose input is obeyed at once — is a first-order lag with the time constant $1/K$.
+\textbf{Step 1 — the pattern.} A loop $\dot z = K(z_{sp} - z)$ — a P controller on an integrator whose input is obeyed at once — is a first-order lag with the time constant $1/K$.\tip{The quickest estimate in control: a P loop around an integrator settles with the time constant $1/K$.}
 
 \textbf{Step 2 — position.} $\dot x = v \approx v_{sp} = 1.2\,(x_{sp} - x)$: time constant $1/1.2 = \SI{0.83}{s}$.
 
@@ -162,7 +162,7 @@ The damping depends only on the \emph{ratio} of the two gains: on how much faste
 
 \textbf{Step 4 — numbers.} $K_v/K_x = 2.2/1.2 = 1.83$: $\zeta = 0.68$, $\omega_n = \SI{1.62}{rad/s}$, overshoot $e^{-\pi\zeta/\sqrt{1 - \zeta^2}} = 5.5\,\%$.
 
-\textbf{Step 5 — the critical ratio.} $\zeta = 1$ needs $K_v = 4K_x$: an inner loop four times faster gives no overshoot. With three or four loops nested, and their lags adding up, the rule of thumb of 5–10 leaves a margin.
+\textbf{Step 5 — the critical ratio.} $\zeta = 1$ needs $K_v = 4K_x$: an inner loop four times faster gives no overshoot.\innumbers{A factor of 4 between neighbours, over four loops, is a factor of 64 from the innermost to the outermost. The speed of the rate loop decides how fast the position can be.} With three or four loops nested, and their lags adding up, the rule of thumb of 5–10 leaves a margin.
 
 \textbf{Step 6 — the rest.} The velocity integral adds some overshoot (the area rule of \lessonref{les:integral}), and the attitude loop a little more. The simulator's step overshoots by 11\,\%.
 \end{example}
@@ -201,9 +201,9 @@ The model predicts an overshoot of 10.9\,\% after \SI{2.25}{s} (simulator: 11.2\
 A cascade is not the only way to control a chain of integrators: \cref{thm:tilt-chain} says that one state-feedback law on all four states would do. Engineers prefer the cascade for reasons that have little to do with mathematics.
 \begin{itemize}
   \item \textbf{Each loop can be tested alone.} The rate loop can be tuned on a test stand before the drone has ever flown; then the attitude loop with the drone held by hand; and so on outwards.
-  \item \textbf{Each intermediate setpoint can be limited.} The velocity setpoint is clipped at \SI{4}{m/s}, the tilt at $35^\circ$, the body rate at $\SI{360}{\degree/s}$. A single big controller has no place for such limits; here they are one line each, and they are what keeps a large position error from flipping the drone.
+  \item \textbf{Each intermediate setpoint can be limited.}\tip{When you draw a cascade, write a limit next to every arrow. The limits are as much a part of the design as the gains.} The velocity setpoint is clipped at \SI{4}{m/s}, the tilt at $35^\circ$, the body rate at $\SI{360}{\degree/s}$. A single big controller has no place for such limits; here they are one line each, and they are what keeps a large position error from flipping the drone.
   \item \textbf{Disturbances are caught early.} A gust of torque is corrected by the rate loop within tens of milliseconds, long before it has changed the position. An inner loop is a shield for the loops around it.
-  \item \textbf{Modes of flight are switches.} A pilot who commands the attitude directly simply replaces the outer two loops; the inner two stay.
+  \item \textbf{Modes of flight are switches.}\didyouknow{The flight modes of a consumer drone are this switch. \emph{Acro}: the sticks command body rates. \emph{Angle}: they command the tilt. \emph{Position}: they command a velocity, and the drone stays put when they are released.} A pilot who commands the attitude directly simply replaces the outer two loops; the inner two stay.
 \end{itemize}
 
 \subsection{The reduced model}
@@ -223,7 +223,7 @@ An autopilot holds the altitude of an airliner flying at $V = \SI{230}{m/s}$. Sk
 
 \textbf{Step 5 — the pitch-rate loop.} Moves the elevator, through a servo that answers within about \SI{50}{ms} (Example~\ref{ex:edge-aircraft}).
 
-\textbf{Step 6 — the pattern.} Four loops again, with time constants of roughly 10, 3, 0.5 and \SI{0.1}{s}: separated by factors of three to five. And the limits are where the passengers are protected: the vertical speed is clipped at a few metres per second, the pitch rate at a degree or two per second.
+\textbf{Step 6 — the pattern.} Four loops again, with time constants of roughly 10, 3, 0.5 and \SI{0.1}{s}:\didyouknow{The altitude-hold button of an airliner engages this chain. A separate loop, the autothrottle, looks after the speed while the elevator looks after the height.} separated by factors of three to five. And the limits are where the passengers are protected: the vertical speed is clipped at a few metres per second, the pitch rate at a degree or two per second.
 \end{example}
 
 \subsection{In formal terms}
@@ -253,7 +253,7 @@ Consider $\dot{\vx} = f(\vx, \symbf z)$, $\varepsilon\,\dot{\symbf z} = g(\vx, \
 where $\bar{\vx}$ solves the reduced system $\dot{\bar{\vx}} = f(\bar{\vx}, h(\bar{\vx}))$. If the reduced system has an exponentially stable equilibrium, so has the full system for all sufficiently small $\varepsilon$. (Tikhonov, 1952; Khalil, 2002, ch.~11.)
 \end{theorem}
 
-For a cascade, $\symbf z$ is the state of the inner loop, $h$ is \enquote{output equals setpoint}, and $\varepsilon$ is the ratio of the time scales. The theorem promises an error of the order of that ratio — and says nothing when the ratio is not small. With ratios of two to four, as here, the reduced model is a useful guide (the dotted curve) and not a guarantee. The next lesson makes $\varepsilon$ large on purpose.
+For a cascade, $\symbf z$ is the state of the inner loop, $h$ is \enquote{output equals setpoint}, and $\varepsilon$ is the ratio of the time scales. The theorem promises an error of the order of that ratio — and says nothing when the ratio is not small.\pitfall{\enquote{For all sufficiently small $\varepsilon$} is a mathematician's promise. It does not say whether \emph{your} $\varepsilon$ is small enough.} With ratios of two to four, as here, the reduced model is a useful guide (the dotted curve) and not a guarantee. The next lesson makes $\varepsilon$ large on purpose.
 
 \begin{lookahead}
 \begin{itemize}[leftmargin=1.2em]

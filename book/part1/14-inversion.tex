@@ -6,7 +6,7 @@ The cascade rests on one assumption: when the velocity loop asks for a tilt, the
 
 \section{What the outer loop believes}
 
-The velocity loop of \lessonref{les:cascade} computes a desired acceleration and hands it on as a tilt. It never checks how long the tilt takes. It behaves as if it drove an ideal actuator. Let us make that belief explicit, and then see what happens as it becomes false.
+The velocity loop of \lessonref{les:cascade} computes a desired acceleration and hands it on as a tilt. It never checks how long the tilt takes.\didyouknow{A manager who assumes that every instruction is carried out at once is an outer loop with this belief. The remedy is the same: ask for things no faster than they can be done.} It behaves as if it drove an ideal actuator. Let us make that belief explicit, and then see what happens as it becomes false.
 
 Model the closed attitude loop, as in Example~\ref{ex:cascade-scales}, as a first-order lag: the horizontal acceleration $a$ follows its setpoint with the time constant $1/K_{att}$,
 \begin{equation}\label{eq:inv-lag}
@@ -30,7 +30,7 @@ Find the condition on $K_{att}$ for the chain to be stable.
   K_{att} > K_x .
 \end{equation}
 
-\textbf{Step 4 — read it.} The velocity gain has dropped out. The innermost loop of the three must be faster than the \emph{outermost}: a time constant $1/K_{att}$ shorter than $1/K_x = \SI{0.83}{s}$. At equality the chain oscillates at $\omega = \sqrt{a_1/a_3} = \sqrt{K_{att}K_v}$.
+\textbf{Step 4 — read it.} The velocity gain has dropped out.\tip{When a parameter drops out of a stability condition, look at the damping separately. $K_v$ does not decide \emph{whether} the chain is stable; it decides how well.} The innermost loop of the three must be faster than the \emph{outermost}: a time constant $1/K_{att}$ shorter than $1/K_x = \SI{0.83}{s}$. At equality the chain oscillates at $\omega = \sqrt{a_1/a_3} = \sqrt{K_{att}K_v}$.
 
 \textbf{Step 5 — and for good damping.} Stability is the least one can ask. \Cref{thm:cascade-nested} asked for a factor of four between neighbours to avoid overshoot; here that would be $K_{att} \ge 4K_v \ge 16K_x$.
 \end{example}
@@ -41,7 +41,7 @@ An outer loop does not control the physical plant; it controls the \emph{closed 
 
 \section{First way to break it: a soft attitude loop}
 
-Keep every rate as it is and lower the attitude gain from 8 to 1.5. The attitude loop still runs 250 times per second, but it now needs $1/1.5 = \SI{0.67}{s}$ to reach a tilt it has been asked for — almost as long as the position loop's \SI{0.83}{s}.
+Keep every rate as it is and lower the attitude gain from 8 to 1.5.\innumbers{A large, heavily loaded multicopter has an attitude loop like this: big rotors, slow motors, a lot of inertia. Its outer loops must be slowed down to match.} The attitude loop still runs 250 times per second, but it now needs $1/1.5 = \SI{0.67}{s}$ to reach a tilt it has been asked for — almost as long as the position loop's \SI{0.83}{s}.
 
 By \cref{eq:inv-rule} the chain should still be stable: $1.5 > 1.2$. But the real velocity loop has an integral, and an integral, as \lessonref{les:integral} showed, costs stability.
 
@@ -55,7 +55,7 @@ Include the velocity loop's integral, $a_{sp} = K_v(v_{sp} - v) + K_i\!\int(v_{s
 \end{equation}
 (The term in $s$ collects $\dot x$ from both the P path, $K_vK_x$, and the I path, $K_i$.) With the default gains $c = 2.2 \cdot 1.2 + 0.6 = 3.24$.
 
-\textbf{Step 2 — the test for degree four.} All coefficients positive, $a_3a_2 > a_4a_1$, and $a_1(a_3a_2 - a_4a_1) > a_3^2a_0$ (the last exercise of \lessonref{les:integral}). The last one decides:
+\textbf{Step 2 — the test for degree four.}\recall{Hurwitz for $s^4 + a_3s^3 + a_2s^2 + a_1s + a_0$: all coefficients positive, $a_3a_2 > a_1$, and $a_1(a_3a_2 - a_1) > a_3^2a_0$.} All coefficients positive, $a_3a_2 > a_4a_1$, and $a_1(a_3a_2 - a_4a_1) > a_3^2a_0$ (the last exercise of \lessonref{les:integral}). The last one decides:
 \begin{equation*}
   K_{att}c\,\big(K_{att}^2K_v - K_{att}c\big) > K_{att}^3K_iK_x
   \quad\Longleftrightarrow\quad
@@ -84,11 +84,11 @@ $K_{att}$ & oscillating poles & period & change per period\\
 
 \simfig{inversion_predict}{Prediction next to measurement. Left: a \SI{1}{m} step with the attitude gain at 8, 3 and 1.5 (colour), and the chain-of-loops model of \lessonref{les:cascade} (dashed). Right: the stability edge of Example~\ref{ex:inv-quartic} in the plane of the outermost and innermost gains, with the three runs.}{fig:inversion-predict}
 
-Nothing here is a fault of the attitude loop. On its own, with $K_{att} = 1.5$, it is perfectly stable and perfectly damped: a clean first-order lag. The instability belongs to the \emph{combination}. The outer loops were tuned for an inner loop that no longer exists.
+Nothing here is a fault of the attitude loop.\pitfall{Testing each loop alone proves nothing about the cascade. Every loop here passes its own test, and the whole is unstable.} On its own, with $K_{att} = 1.5$, it is perfectly stable and perfectly damped: a clean first-order lag. The instability belongs to the \emph{combination}. The outer loops were tuned for an inner loop that no longer exists.
 
 \section{Second way to break it: a rare attitude loop}
 
-Now restore $K_{att} = 8$ and instead let the attitude loop run less often: 30, 10, 5, 3, \SI{2}{Hz}. The gain is unchanged. What changes is the delay: between two runs of the attitude loop the body-rate setpoint is held, and by \lessonref{les:slow} a command held for a period $\Delta t$ is late by $\tfrac12\Delta t$ on average.
+Now restore $K_{att} = 8$ and instead let the attitude loop run less often: 30, 10, 5, 3, \SI{2}{Hz}.\didyouknow{Rare attitude loops exist: an attitude estimated by a camera at \SI{10}{Hz}, an overloaded processor, a radio link to a computer on the ground.} The gain is unchanged. What changes is the delay: between two runs of the attitude loop the body-rate setpoint is held, and by \lessonref{les:slow} a command held for a period $\Delta t$ is late by $\tfrac12\Delta t$ on average.
 
 \begin{example}[How rarely may the attitude loop run?]
 \label{ex:inv-rate}
@@ -106,7 +106,7 @@ Phase margin: $90 - 26.4 = 63.6^\circ = \SI{1.11}{rad}$.
 
 \textbf{Step 4 — the delay margin.} $1.11/8 = \SI{0.139}{s}$.
 
-\textbf{Step 5 — the rate.} A hold of $\tfrac12\Delta t = 0.139$ means $\Delta t = \SI{0.28}{s}$: the attitude loop must run at least at \SI{3.6}{Hz}.
+\textbf{Step 5 — the rate.} A hold of $\tfrac12\Delta t = 0.139$ means $\Delta t = \SI{0.28}{s}$:\tip{A margin in radians divided by a crossover in \si{rad/s} is a time. Double it for a sample period, because a hold delays by half a period.} the attitude loop must run at least at \SI{3.6}{Hz}.
 
 \textbf{Step 6 — check} (\cref{fig:inversion-runs}). At \SI{10}{Hz} the flight is hardly different. At \SI{5}{Hz} the pitch swings through $\pm59^\circ$ where it used to need $\pm37^\circ$. At \SI{3}{Hz}, below the predicted edge, it reaches $\pm90^\circ$ — the attitude loop itself is now unstable, held only by the limits on tilt and rate — and the position wobbles around its setpoint. At \SI{2}{Hz} the drone flips.
 \end{example}
@@ -145,14 +145,14 @@ Put Lessons 9, 10, 13 and 14 together and the design of a cascade becomes a chai
   \item Each loop outwards must be slower than the one inside it, by a factor of at least two and preferably four or more (\cref{thm:cascade-nested}): attitude 8, velocity 2.2, position \SI{1.2}{rad/s}.
   \item Each loop's \textbf{sampling rate} must be high enough that its hold uses only a small part of its phase margin: a rate of ten to twenty times its bandwidth in \si{rad/s}, expressed in hertz, is comfortable. The attitude loop (bandwidth \SI{8}{rad/s}) is unstable below \SI{3.6}{Hz} and runs at 250.
 \end{enumerate}
-Read from the outside in, the same chain is a \emph{requirement}: a position loop that must reject gusts within a second needs a velocity loop several times faster, an attitude loop faster still, and therefore motors with a lag of a few tens of milliseconds. Drones that must be agile have small propellers for this reason: a small rotor changes speed quickly.
+Read from the outside in, the same chain is a \emph{requirement}: a position loop that must reject gusts within a second needs a velocity loop several times faster, an attitude loop faster still, and therefore motors with a lag of a few tens of milliseconds. Drones that must be agile have small propellers for this reason: a small rotor changes speed quickly.\innumbers{The inertia of a rotor grows with the fifth power of its size. Halve the propeller and it is thirty times easier to spin up.}
 
 \subsection{Where the phase goes}
-In the language of \lessonref{les:slow}, every inner loop is a withdrawal from the phase budget of the loop around it. Seen from the velocity loop, whose crossover is near \SI{2.2}{rad/s}, the attitude loop with $K_{att} = 8$ costs $\arctan(2.2/8) = 15^\circ$; with $K_{att} = 1.5$ it costs $56^\circ$. Seen from the position loop the velocity loop costs its share in turn. The loops are nested, and their lags add up along the chain.
+In the language of \lessonref{les:slow}, every inner loop is a withdrawal from the phase budget of the loop around it.\tip{The price list: an inner loop $n$ times faster than the crossover costs $\arctan(1/n)$. Four times: $14^\circ$. Ten times: $6^\circ$.} Seen from the velocity loop, whose crossover is near \SI{2.2}{rad/s}, the attitude loop with $K_{att} = 8$ costs $\arctan(2.2/8) = 15^\circ$; with $K_{att} = 1.5$ it costs $56^\circ$. Seen from the position loop the velocity loop costs its share in turn. The loops are nested, and their lags add up along the chain.
 
 \begin{example}[The pilot is an outer loop]
 \label{ex:inv-pilot}
-A pilot holds the pitch attitude of an aircraft by hand: an outer loop closed through eyes, brain and arm. The pilot reacts with a delay of about $T = \SI{0.25}{s}$ and pushes the stick in proportion to the attitude error, with a gain $K$ (pitch rate commanded per unit of error, in \si{s^{-1}}). The aircraft's pitch rate follows the stick with a lag $\tau$. How aggressively can the pilot fly an agile aircraft ($\tau = \SI{0.2}{s}$) and a sluggish one ($\tau = \SI{1}{s}$)?
+A pilot holds the pitch attitude of an aircraft by hand: an outer loop closed through eyes, brain and arm.\innumbers{A human needs 0.2 to \SI{0.3}{s} to react to what the eyes see. No training removes it; pilots learn to fly with a lower gain instead.} The pilot reacts with a delay of about $T = \SI{0.25}{s}$ and pushes the stick in proportion to the attitude error, with a gain $K$ (pitch rate commanded per unit of error, in \si{s^{-1}}). The aircraft's pitch rate follows the stick with a lag $\tau$. How aggressively can the pilot fly an agile aircraft ($\tau = \SI{0.2}{s}$) and a sluggish one ($\tau = \SI{1}{s}$)?
 
 \textbf{Step 1 — the loop.} $L(s) = \dfrac{K\,e^{-sT}}{s\,(\tau s + 1)}$: the pilot's gain and delay, the aircraft's lag, and the integration from rate to angle.
 
@@ -185,7 +185,7 @@ For $K_i = 0$ the condition reduces to $K_{att} > K_x$. It is linear in $K_{att}
 In the setting of \cref{thm:cascade-tikhonov}, stability of the reduced system and of the fast subsystem implies stability of the full system \emph{for all sufficiently small} $\varepsilon$. It implies nothing for a given $\varepsilon$.
 \end{theorem}
 
-The second sentence is this lesson. With $K_{att} = 1.5$ the fast subsystem (the attitude loop) is exponentially stable and the reduced system (the outer loops with an ideal attitude) is exponentially stable, and the cascade is unstable. The ratio of time scales, $\varepsilon = K_x/K_{att}$ or so, is 0.8, which is not small. For a given design the honest test is \cref{thm:inv-three}, or a simulation.
+The second sentence is this lesson.\tip{The honest order of work: design on the reduced model, then check the full one — with \cref{thm:inv-three}, or by simulation.} With $K_{att} = 1.5$ the fast subsystem (the attitude loop) is exponentially stable and the reduced system (the outer loops with an ideal attitude) is exponentially stable, and the cascade is unstable. The ratio of time scales, $\varepsilon = K_x/K_{att}$ or so, is 0.8, which is not small. For a given design the honest test is \cref{thm:inv-three}, or a simulation.
 
 \begin{curiosity}{Your body is a cascade}
 \photo{cheetah}{A cheetah at full speed. Its legs are controlled by fast spinal reflex loops, supervised by slower loops in the brain.}

@@ -17,7 +17,7 @@ Every control problem has three ingredients:
   \item \textbf{a way to act} — a heater, a throttle, four motors (the \term{actuators});
   \item \textbf{uncertainty} — an open window, a hill, a gust of wind; and a model of the plant that is never quite right.
 \end{enumerate}
-Without the third ingredient there would be no subject. If we knew the plant exactly and nothing unexpected ever happened, we could compute the right inputs once, in advance, and simply play them back. Control theory exists because the world is uncertain.
+Without the third ingredient there would be no subject. If we knew the plant exactly and nothing unexpected ever happened, we could compute the right inputs once, in advance, and simply play them back. Control theory exists because the world is uncertain.\didyouknow{The word \emph{plant} comes from the process industry: the first control engineers regulated chemical and power plants, and the name stayed — even when the plant is a drone, a patient or an economy.}
 
 \subsection{Two ways to act: open loop and closed loop}
 There are two fundamentally different ways to choose the inputs.
@@ -26,7 +26,7 @@ There are two fundamentally different ways to choose the inputs.
 In \term{open-loop} control the input is computed from the goal and a model alone; the result is never checked. In \term{closed-loop} (\term{feedback}) control the result is measured by a \term{sensor}, compared with the goal, and the difference — the \term{error} — is used to correct the input continuously.
 \end{definition}
 
-A toaster is open-loop: it heats for a fixed time and never looks at the bread. Whether the toast comes out pale or burnt depends on the bread, the voltage and the starting temperature, and the toaster cannot tell. A thermostat is closed-loop: it measures the room temperature, compares it with the setting and switches the heater accordingly. Open the window, and the thermostat responds, without knowing that a window exists.
+A toaster is open-loop: it heats for a fixed time and never looks at the bread. Whether the toast comes out pale or burnt depends on the bread, the voltage and the starting temperature, and the toaster cannot tell. A thermostat is closed-loop: it measures the room temperature, compares it with the setting and switches the heater accordingly. Open the window, and the thermostat responds, without knowing that a window exists.\tip{To tell the two apart, ask one question: does the device look at the result? If it does not, it is open-loop, however clever its plan.}
 
 \subsection{What feedback buys — and what it costs}
 Feedback has four remarkable properties, and every one of them appears in this book.
@@ -36,7 +36,7 @@ Feedback has four remarkable properties, and every one of them appears in this b
   \item \textbf{It can stabilise what is unstable.} A drone, a rocket balancing on its engine, a fighter jet designed to be unstable: none of them can stay up without feedback (\lessonref{les:edge}).
   \item \textbf{It can shape the behaviour} — speed, smoothness, damping — almost at will, by the choice of the controller.
 \end{enumerate}
-It also has costs. A feedback loop reacts only \emph{after} an error has appeared. It feeds the sensor's noise into the actuators (\lessonref{les:noise}). And, most importantly, a badly designed feedback loop can itself make a stable system oscillate or diverge: the Watt governors that \enquote{hunted}, and the bridge of \lessonref{les:spring}. Understanding exactly when feedback helps and when it harms is the core of control theory.
+It also has costs. A feedback loop reacts only \emph{after} an error has appeared.\pitfall{The sign matters. Reverse the correction and the same loop pushes the error \emph{away} from zero. A microphone held close to its own loudspeaker howls for this reason.} It feeds the sensor's noise into the actuators (\lessonref{les:noise}). And, most importantly, a badly designed feedback loop can itself make a stable system oscillate or diverge: the Watt governors that \enquote{hunted}, and the bridge of \lessonref{les:spring}. Understanding exactly when feedback helps and when it harms is the core of control theory.
 
 \begin{example}[Feedback makes an amplifier precise]
 \label{ex:intro-black}
@@ -44,7 +44,7 @@ In 1927 the telephone engineer Harold Black faced a problem: the vacuum-tube amp
 
 \textbf{Step 1 — the open-loop amplifier.} Suppose an amplifier has a gain $A = 1000$, but, because of its tubes, the gain may vary by $\pm20\,\%$: anywhere between 800 and 1200. The output is $v_{out} = A\,v_{in}$, so the output varies by $\pm 20\,\%$ as well.
 
-\textbf{Step 2 — close the loop.} Feed a fraction $\beta$ of the output back and subtract it from the input, using a precise resistor divider with $\beta = 0.1$. The amplifier now amplifies the difference:
+\textbf{Step 2 — close the loop.} Feed a fraction $\beta$ of the output back and subtract it from the input, using a precise resistor divider with $\beta = 0.1$.\didyouknow{Black had the idea on the ferry to work on 2~August 1927 and sketched it on his copy of \emph{The New York Times}. The patent took nine years to be granted: throwing gain away to gain precision sounded absurd.} The amplifier now amplifies the difference:
 \begin{equation*}
   v_{out} = A\,(v_{in} - \beta\,v_{out}).
 \end{equation*}
@@ -56,7 +56,7 @@ In 1927 the telephone engineer Harold Black faced a problem: the vacuum-tube amp
 
 \textbf{Step 4 — put in the numbers.} For $A = 1000$: $G = 1000/101 = 9.901$. For $A = 800$: $G = 800/81 = 9.877$. For $A = 1200$: $G = 1200/121 = 9.917$.
 
-\textbf{Step 5 — interpret.} The gain has dropped from 1000 to about 10, but its variation has dropped from $\pm20\,\%$ to about $\pm0.2\,\%$ — a hundred times smaller. When $A\beta \gg 1$, $G \approx 1/\beta$: the gain is set by the precise resistors, not by the imprecise tubes. We have traded raw gain for accuracy. The factor $1 + A\beta$, by which the sensitivity drops, is called the \emph{loop gain}, and it will appear again and again, from \lessonref{les:droop} onwards.
+\textbf{Step 5 — interpret.} The gain has dropped from 1000 to about 10, but its variation has dropped from $\pm20\,\%$ to about $\pm0.2\,\%$ — a hundred times smaller. When $A\beta \gg 1$, $G \approx 1/\beta$: the gain is set by the precise resistors, not by the imprecise tubes. We have traded raw gain for accuracy.\tip{A rule to keep: feedback divides every imperfection inside the loop by the loop gain. Here $1 + A\beta = 1 + 1000 \cdot 0.1 = 101$.} The factor $1 + A\beta$, by which the sensitivity drops, is called the \emph{loop gain}, and it will appear again and again, from \lessonref{les:droop} onwards.
 \end{example}
 
 \section{How control theory is organised}
@@ -66,7 +66,7 @@ Control theory is a large field, but its structure is simple. It follows the wor
   \item \textbf{Modelling.} Write down equations that describe the plant well enough — Newton's laws for a drone, heat balances for a room, chemical kinetics for a reactor. Or measure the plant and fit a model to the data (\emph{system identification}).
   \item \textbf{Analysis.} Ask what the plant, and the plant with a given controller, will do: Is it stable? How fast does it respond? How much does a disturbance move it? How much can the model be wrong before things go bad?
   \item \textbf{Design.} Choose the controller so that the answers to these questions are acceptable. This is where the many families of methods differ.
-  \item \textbf{Implementation.} Turn the design into something that runs: on a computer, at a finite sampling rate, with real sensors and actuators that are noisy, delayed and limited. Then test it — in simulation first — and go back to step 1 when reality disagrees.
+  \item \textbf{Implementation.} Turn the design into something that runs: on a computer, at a finite sampling rate, with real sensors and actuators that are noisy, delayed and limited. Then test it — in simulation first — and go back to step 1 when reality disagrees.\didyouknow{Ask a practising control engineer where the time goes: mostly into modelling and testing. The control law itself is often a few dozen lines of code.}
 \end{enumerate}
 
 \begin{figure}[t]
@@ -79,7 +79,7 @@ Control theory is a large field, but its structure is simple. It follows the wor
 
 The families of design methods in \cref{fig:intro-map} are not rival schools; they are layers, each added when the previous ones reached their limits.
 \begin{description}[leftmargin=0pt, itemsep=3pt, font=\sffamily\small\bfseries]
-  \item[Classical control] (1920s–1950s) works with one input and one output and describes systems by how they respond to sinusoids of different frequencies. Its workhorse, the PID controller, still runs the vast majority of the world's control loops. Part~I of this book.
+  \item[Classical control] (1920s–1950s) works with one input and one output and describes systems by how they respond to sinusoids of different frequencies. Its workhorse, the PID controller, still runs the vast majority of the world's control loops.\innumbers{Surveys of process plants find that more than nine loops in ten are PID — and most of those are really PI, with the D term switched off.} Part~I of this book.
   \item[State-space control] (from 1960) describes a system by a vector of internal variables, its \emph{state}, and handles many inputs and outputs at once with linear algebra. It brought optimal control (LQR) and optimal estimation (the Kalman filter).
   \item[Nonlinear and geometric control] deals with systems whose equations cannot be linearised usefully — large rotations, for example, which matter for every aircraft and drone.
   \item[Optimal and predictive control] states the goal as a cost to be minimised and computes the control by optimisation, often online, while respecting limits such as maximum thrust or forbidden regions.
@@ -111,7 +111,7 @@ biology & body temperature, blood pressure, posture — \emph{homeostasis} & ner
 \end{tabularx}
 \end{center}
 
-The last row is a reminder that engineers did not invent feedback; they rediscovered it. Living organisms are full of control loops, and the physiologist Walter Cannon's word for them, \emph{homeostasis} (1926), means almost exactly what \emph{Anemostatos} means: standing still — in the wind of the outside world.
+The last row is a reminder that engineers did not invent feedback; they rediscovered it. Living organisms are full of control loops, and the physiologist Walter Cannon's word for them, \emph{homeostasis} (1926), means almost exactly what \emph{Anemostatos} means: standing still — in the wind of the outside world.\innumbers{Your own loop: your body temperature stays within about half a degree while the air around you may vary by fifty.}
 
 \section{A short history}
 
@@ -139,15 +139,15 @@ The history of control (\cref{fig:intro-timeline}) is a story of practice runnin
 
 \paragraph{The mechanical era.} Feedback devices are ancient. Around 270~BC Ktesibios of Alexandria kept the water level in a clock constant with a float that closed the inflow when the level rose — the ancestor of the float valve in every toilet cistern. In the 1620s Cornelis Drebbel built an incubator whose temperature regulated itself. The industrial revolution produced the most famous device of all, Watt's centrifugal governor of 1788 (\lessonref{les:meet}), and thousands of steam engines carried it.
 
-\paragraph{The mathematical era.} Governors sometimes \emph{hunted}, oscillating instead of settling, and nobody knew why. In 1868 James Clerk Maxwell wrote down the linearised equations of a governor and showed that stability depends on the roots of a polynomial; Edward Routh (1877) and Adolf Hurwitz (1895) found how to decide it from the coefficients alone, and Aleksandr Lyapunov (1892) extended the idea to nonlinear systems. These results are the backbone of \lessonref{les:spring} and \lessonref{les:damper}.
+\paragraph{The mathematical era.} Governors sometimes \emph{hunted}, oscillating instead of settling, and nobody knew why. In 1868 James Clerk Maxwell wrote down the linearised equations of a governor and showed that stability depends on the roots of a polynomial;\didyouknow{Maxwell could decide stability only up to the third order. The general question was set for the Adams Prize at Cambridge; Routh won it in 1877.} Edward Routh (1877) and Adolf Hurwitz (1895) found how to decide it from the coefficients alone, and Aleksandr Lyapunov (1892) extended the idea to nonlinear systems. These results are the backbone of \lessonref{les:spring} and \lessonref{les:damper}.
 
 \paragraph{The electronic era.} In the 1920s and 1930s telephony and ships brought new problems. Nicolas Minorsky described the PID controller for steering ships (1922, \lessonref{les:integral}); Harold Black invented the feedback amplifier (1927, Example~\ref{ex:intro-black}); at Bell Laboratories Harry Nyquist (1932) and Hendrik Bode (1940s) created the frequency-domain methods that let engineers design loops with pencil and paper. The Second World War — radar-guided guns, autopilots — turned these ideas into a discipline, and in 1948 Norbert Wiener gave it a name, \emph{cybernetics}, and a place among the sciences.
 
-\paragraph{The space age.} Around 1960 three results appeared almost at once: Lev Pontryagin's maximum principle and Richard Bellman's dynamic programming for optimal control, and Rudolf Kálmán's state-space theory, with the linear-quadratic regulator and the Kalman filter. They arrived just in time for the space race. The Apollo spacecraft navigated to the Moon with a Kalman filter running on its on-board computer, and a spare Apollo computer then flew the first digital fly-by-wire aircraft (\lessonref{les:slow}).
+\paragraph{The space age.} Around 1960 three results appeared almost at once: Lev Pontryagin's maximum principle and Richard Bellman's dynamic programming for optimal control, and Rudolf Kálmán's state-space theory, with the linear-quadratic regulator and the Kalman filter. They arrived just in time for the space race. The Apollo spacecraft navigated to the Moon with a Kalman filter running on its on-board computer,\innumbers{The Apollo guidance computer: \SI{32}{kg}, about 2\,000 words of erasable memory and 36\,000 words of program woven by hand into magnetic cores.} and a spare Apollo computer then flew the first digital fly-by-wire aircraft (\lessonref{les:slow}).
 
 \paragraph{The computer era.} As computers became cheap, control moved into software. From the late 1970s oil refineries began to run \emph{model predictive control}, solving an optimisation problem every few minutes to plan their valves; robust control theory addressed models that are known only approximately; digital fly-by-wire entered airliners with the Airbus A320 in 1988. Cheap micro-electro-mechanical sensors and microcontrollers made the multicopter possible in the 2000s.
 
-\paragraph{Today.} Optimisation and learning now run inside fast loops. Rockets land on floating platforms by solving an optimisation problem in real time, and in 2023 a quadrotor flown by a neural network trained with reinforcement learning beat human world champions in drone racing. And still, underneath almost all of it, there are PID loops, running exactly as Minorsky described them a hundred years ago.
+\paragraph{Today.} Optimisation and learning now run inside fast loops. Rockets land on floating platforms by solving an optimisation problem in real time, and in 2023 a quadrotor flown by a neural network trained with reinforcement learning beat human world champions in drone racing.\innumbers{The racing policy learned from about three weeks of flying — simulated in under an hour on one workstation.} And still, underneath almost all of it, there are PID loops, running exactly as Minorsky described them a hundred years ago.
 
 \section{Why learn it — and why on a drone}
 
@@ -158,7 +158,7 @@ Why learn it on a quadrotor rather than on a heater or a tank? Because a hoverin
 \begin{itemize}
   \item \textbf{It is unstable without control.} Switch the controller off and it falls within a second. Every mistake is visible immediately, and there is no way to hide behind a plant that would have been fine on its own.
   \item \textbf{Its physics is simple and familiar.} Newton's second law — force equals mass times acceleration — is enough for Part~I. You do not need to learn chemistry or thermodynamics first.
-  \item \textbf{It is fast.} Its dynamics play out in seconds, so experiments take seconds too. A room heater would need hours.
+  \item \textbf{It is fast.} Its dynamics play out in seconds, so experiments take seconds too. A room heater would need hours.\innumbers{Falling from rest, a drone drops \SI{4.9}{m} in its first second. A human needs a fifth of a second to react: \SI{20}{cm} are gone before a finger moves.}
   \item \textbf{It grows with you.} Restricted to vertical motion it is the simplest non-trivial plant there is: a mass pushed by a force. Released into three dimensions it becomes a rigid body with rotations, a chain of four integrators, and coupled, nonlinear dynamics — enough to motivate every family of methods in \cref{fig:intro-map}.
   \item \textbf{It meets every real-world problem.} Its motors saturate and lag, its sensors are noisy, its controller samples, the wind is random, its payload changes, its propellers break. Each of these problems has its own lesson.
 \end{itemize}
@@ -174,7 +174,7 @@ Here is a first taste of why a drone needs feedback, with numbers you will meet 
 
 \textbf{Step 4 — integrate twice.} Starting at rest, $\dot y(t) = -0.192\,t$ and $y(t) = y_0 - \tfrac12\,0.192\,t^2$.
 
-\textbf{Step 5 — evaluate.} After \SI{1}{s} the drone has sunk \SI{9.6}{cm}; after \SI{5}{s}, \SI{2.4}{m} — it has hit the floor from a hover at two metres. A two-percent error in one number has become a crash in five seconds. No model is ever that good, and the wind has not even started blowing. Feedback is not optional.
+\textbf{Step 5 — evaluate.} After \SI{1}{s} the drone has sunk \SI{9.6}{cm}; after \SI{5}{s}, \SI{2.4}{m} — it has hit the floor from a hover at two metres. A two-percent error in one number has become a crash in five seconds.\pitfall{Open-loop errors do not stay small. A constant error in force becomes an error in position that grows as $t^2$.} No model is ever that good, and the wind has not even started blowing. Feedback is not optional.
 \end{example}
 
 \subsection{What you will be able to do}
@@ -184,7 +184,7 @@ By the end of Part~I you will be able to explain every term of a PID controller 
 Each lesson is designed to be read with the simulator open. A good rhythm is:
 \begin{enumerate}
   \item read the lesson up to the first \emph{Try this} box;
-  \item before touching the simulator, answer the \emph{Predict first} question on paper;
+  \item before touching the simulator, answer the \emph{Predict first} question on paper;\tip{Write the prediction down. A guess you did not commit to cannot surprise you.}
   \item run the experiment, and compare what you see with what you predicted — the surprises are where the learning happens;
   \item work through the worked examples with a pencil, then try the exercises on your own.
 \end{enumerate}

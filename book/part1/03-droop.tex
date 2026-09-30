@@ -28,7 +28,7 @@ An \term{equilibrium} of a dynamical system is a state in which it can remain fo
 \label{ex:droop-ess}
 Find the equilibrium of \cref{eq:droop-loop} for $m = \SI{1}{kg}$, $K_p = 10$, $r = \SI{2}{m}$.
 
-\textbf{Step 1 — set the derivatives to zero.} At rest $\dot y = 0$ and $\ddot y = 0$. The left-hand side vanishes, and so does the D term:
+\textbf{Step 1 — set the derivatives to zero.} At rest $\dot y = 0$ and $\ddot y = 0$. The left-hand side vanishes, and so does the D term:\tip{Neither the damping nor the mass of the motion survives. A steady-state error depends only on what is left when every derivative is zero.}
 $0 = K_p(r - y_{ss}) - mg$.
 
 \textbf{Step 2 — solve for the error.} $K_p\,e_{ss} = mg$, so
@@ -60,7 +60,7 @@ Stiffer springs sag less, but no finite stiffness removes the sag. The same hold
 \end{keyidea}
 
 \subsection{Why not just raise the gain?}
-Equation~\eqref{eq:droop-ess} suggests an easy way out: make $K_p$ huge. To keep the droop below \SI{1}{cm} we would need $K_p = 9.81/0.01 = \SI{981}{N/m}$. In \lessonref{les:spring} we saw the first problem with large gains — the motors saturate and the loop oscillates harder. \Lessonref{les:edge} will show the fundamental one: the motors lag and the controller samples, and together they put an upper limit on any gain, around $K_p \approx 200$ for this drone. There are two better ways.
+Equation~\eqref{eq:droop-ess} suggests an easy way out: make $K_p$ huge.\didyouknow{\emph{Droop} is a term of art. The generators of a power grid share the load through a deliberate proportional droop: each lets its speed sag by a few per cent between no load and full load.} To keep the droop below \SI{1}{cm} we would need $K_p = 9.81/0.01 = \SI{981}{N/m}$. In \lessonref{les:spring} we saw the first problem with large gains — the motors saturate and the loop oscillates harder. \Lessonref{les:edge} will show the fundamental one: the motors lag and the controller samples, and together they put an upper limit on any gain, around $K_p \approx 200$ for this drone. There are two better ways.
 
 \section{Cure one: remember the error}
 
@@ -68,7 +68,7 @@ The integral term accumulates the error:
 \begin{equation}
   I(t) = K_i\int_0^t e(\tau)\,\dd\tau ,\qquad \dot I = K_i\,e .
 \end{equation}
-As long as the drone hangs low, $e > 0$ and $I$ grows. It keeps growing until it can carry the weight by itself; only then can the error — and P — return to zero.
+As long as the drone hangs low, $e > 0$ and $I$ grows. It keeps growing until it can carry the weight by itself; only then can the error — and P — return to zero.\pitfall{The integral does not ask why the error is there. It winds up just as patiently against a wall, a dead motor or a hand holding the drone (\lessonref{les:windup}).}
 
 \begin{result}[The integral can only rest at zero error]
 At any equilibrium all derivatives vanish, in particular $\dot I = K_i\,e_{ss} = 0$. With $K_i \neq 0$ this forces $e_{ss} = 0$. The integral then holds the whole load: $I_{ss} = mg$ here.
@@ -94,7 +94,7 @@ Derive how the error decays after the integral is switched on, and check the pre
   \dot e = -\frac{K_i}{K_p}\,e .
 \end{equation*}
 
-\textbf{Step 4 — solve.} This is the simplest differential equation there is: the rate of change is proportional to the value. Separating variables, $\dd e/e = -(K_i/K_p)\,\dd t$, and integrating from the moment $t_0$ when the integral is switched on,
+\textbf{Step 4 — solve.} This is the simplest differential equation there is: the rate of change is proportional to the value.\recall{$\dot e = -e/\tau$ has the solution $e_0\,e^{-t/\tau}$. Whenever a rate is proportional to the value, expect an exponential and look for its time constant.} Separating variables, $\dd e/e = -(K_i/K_p)\,\dd t$, and integrating from the moment $t_0$ when the integral is switched on,
 \begin{equation}\label{eq:droop-tau}
   e(t) = e_{ss}\,e^{-(t-t_0)/\tau_I},\qquad \tau_I = \frac{K_p}{K_i}.
 \end{equation}
@@ -117,7 +117,7 @@ Solve the creep of \cref{fig:droop-ion} without the quasi-static assumption ($m 
   m\,\dddot e + K_d\,\ddot e + K_p\,\dot e + K_i\,e = 0 .
 \end{equation*}
 
-\textbf{Step 2 — the poles.} The characteristic equation $s^3 + 7s^2 + 10s + 0.8 = 0$ has the roots
+\textbf{Step 2 — the poles.} The characteristic equation $s^3 + 7s^2 + 10s + 0.8 = 0$ has the roots\tip{Check computed roots before using them: here their sum must be $-7$ and their product $-0.8$.}
 \begin{equation*}
   s_1 = -5.052, \qquad s_2 = -1.863, \qquad s_3 = -0.0850 .
 \end{equation*}
@@ -150,7 +150,7 @@ error \SI{20}{s} after the switch & \SI{0.198}{m} & \SI{0.1910}{m} & \SI{0.1911}
 
 \section{Cure two: know the load}
 
-The other cure is not to wait for an error at all. The weight is known — roughly. So add it to the command directly:
+The other cure is not to wait for an error at all. The weight is known — roughly.\didyouknow{An experienced driver feeds forward: the foot presses before the hill begins. A beginner waits until the speed drops. Both leave the rest to feedback.} So add it to the command directly:
 \begin{equation}\label{eq:droop-ff}
   T = \underbrace{\hat m\,g}_{\text{feedforward}} + \underbrace{K_p\,e + I - K_d\,\dot y}_{\text{feedback}} .
 \end{equation}
@@ -169,7 +169,7 @@ The feedforward uses $\hat m = \SI{0.9}{kg}$ for the \SI{1}{kg} drone; I is off,
 
 \textbf{Step 2 — the error.} $e_{ss} = (m - \hat m)g/K_p = 0.1 \cdot 9.81/10 = \SI{0.098}{m}$.
 
-\textbf{Step 3 — compare.} Without feedforward the droop was \SI{0.98}{m}; with a feedforward that is 10\,\% wrong it is \SI{0.098}{m}, ten times smaller. The feedforward removes the part of the load it knows; feedback deals with the rest.
+\textbf{Step 3 — compare.} Without feedforward the droop was \SI{0.98}{m}; with a feedforward that is 10\,\% wrong it is \SI{0.098}{m}, ten times smaller.\tip{A feedforward that is 10\,\% wrong still removes 90\,\% of the problem. It need not be exact to be worth having.} The feedforward removes the part of the load it knows; feedback deals with the rest.
 \end{example}
 
 \begin{keyidea}[Feedforward and feedback]
@@ -204,7 +204,7 @@ Let the setpoint climb at a constant rate, $r = r_0 + v_r t$, with the law of th
 \begin{equation}\label{eq:droop-ramp}
   e_{ss} = \frac{K_d\,v_r}{K_p} .
 \end{equation}
-The damper resists the climb, and P needs an error to overcome it. For $v_r = \SI{0.5}{m/s}$ and the default gains that is $7 \cdot 0.5/10 = \SI{0.35}{m}$. The air adds its own resistance, $c_v v_r^2 = 0.25 \cdot 0.25 = \SI{0.06}{N}$, worth another $0.06/10 = \SI{0.006}{m}$.
+The damper resists the climb, and P needs an error to overcome it.\didyouknow{A radar dish or a telescope that follows a satellite has this problem all the time: its setpoint is a ramp. Such loops are specified by their \emph{velocity error}.} For $v_r = \SI{0.5}{m/s}$ and the default gains that is $7 \cdot 0.5/10 = \SI{0.35}{m}$. The air adds its own resistance, $c_v v_r^2 = 0.25 \cdot 0.25 = \SI{0.06}{N}$, worth another $0.06/10 = \SI{0.006}{m}$.
 
 If the derivative acts on the \emph{error} instead, the D term is $K_d(\dot r - \dot y)$, which vanishes when the drone keeps pace. Only the drag remains: \SI{0.006}{m}. The left panel of \cref{fig:droop-type} shows both, \SI{0.356}{m} and \SI{0.006}{m}, as predicted. \Lessonref{les:kick} will show what the derivative on the error costs in exchange.
 
@@ -214,7 +214,7 @@ If the derivative acts on the \emph{error} instead, the D term is $K_d(\dot r - 
 \label{ex:droop-burn}
 A spraying drone takes off at \SI{1.5}{kg}, which its controller knows, and then sprays \SI{50}{g} of liquid per second for ten seconds. The full PID is on. Where does it fly?
 
-\textbf{Step 1 — the load.} The feedforward keeps pushing with $1.5\,g$ while the weight falls. The surplus is an upward load that grows at the rate $\dot d = 0.05 \cdot 9.81 = \SI{0.49}{N/s}$.
+\textbf{Step 1 — the load.} The feedforward keeps pushing with $1.5\,g$ while the weight falls. The surplus is an upward load that grows at the rate $\dot d = 0.05 \cdot 9.81 = \SI{0.49}{N/s}$.\innumbers{A large crop-spraying drone carries 40 litres, close to half of its take-off weight, and empties the tank in a few minutes.}
 
 \textbf{Step 2 — the steady regime.} Suppose the error settles at a constant $e$. Then P is constant, D is zero, and only the integral changes, at the rate $\dot I = K_i e$. To keep the forces in balance while the load ramps, the integral must ramp at the opposite rate: $K_i e = -\dot d$, so
 \begin{equation}\label{eq:droop-burn}
@@ -268,7 +268,7 @@ Consider the altitude loop $m\ddot y = T - mg + d$ with a thrust limited to $0 \
 (i)~At an equilibrium $\dot I = K_i e = 0$, so $e = 0$; with $\dot y = \ddot y = 0$ the plant gives $T^* = mg - d$ and the controller $T^* = \hat m g + I^*$. (ii)~$T^*$ must lie in the range of the motors. (iii)~The first claim is the definition of asymptotic stability. Near the equilibrium the loop is linear with the characteristic polynomial $m s^3 + K_d s^2 + K_p s + K_i$ (Example~\ref{ex:droop-exact}), and \cref{thm:spring-routh}\,(ii) with \cref{thm:spring-indirect} gives the condition.
 \end{proof}
 
-The three hypotheses are three ways to fail. The load may exceed what the motors can carry, and then there is no equilibrium to reach: \lessonref{les:windup}. The integral gain may be too large for stability: \lessonref{les:integral}. And the load may not be constant: Example~\ref{ex:droop-burn}. The theorem is the simplest case of the \emph{internal model principle}: to reject a class of disturbances completely, a controller must contain a generator of that class, and the generator of a constant is an integrator (Francis and Wonham, 1976).
+The three hypotheses are three ways to fail. The load may exceed what the motors can carry, and then there is no equilibrium to reach: \lessonref{les:windup}. The integral gain may be too large for stability: \lessonref{les:integral}. And the load may not be constant: Example~\ref{ex:droop-burn}. The theorem is the simplest case of the \emph{internal model principle}: to reject a class of disturbances completely, a controller must contain a generator of that class, and the generator of a constant is an integrator (Francis and Wonham, 1976).\didyouknow{The same principle in other clothes: to cancel a \SI{50}{Hz} hum completely, a controller must contain a \SI{50}{Hz} oscillator; to follow a ramp without error, two integrators.}
 
 \begin{theorem}[Steady-state errors of the linear altitude loop]
 \label{thm:droop-errors}
@@ -282,9 +282,9 @@ Let the loop be $m\ddot y = K_p e + I - K_d\dot y + d$ with $\dot I = K_i e$ (ex
 With $\dot y = v_r - \dot e$ and $\ddot y = -\ddot e$ the loop reads $m\ddot e + K_d\dot e + K_p e + I = K_d v_r - d$. Every solution of a linear equation is one particular solution plus a solution of the homogeneous equation, and the latter decays by \cref{thm:spring-routh}. (i)~If $\dot d = 0$ the right-hand side is constant and $e = (K_d v_r - d_0)/K_p$ is a particular solution; otherwise the particular solution is linear in $t$ with the slope $-\dot d/K_p$. (ii)~Differentiating once gives $m\dddot e + K_d\ddot e + K_p\dot e + K_i e = -\dot d$, with the constant particular solution $e = -\dot d/K_i$.
 \end{proof}
 
-The signs follow the convention of the book: $d$ is positive upwards, so a downward load $F$ is $d_0 = -F$ and part (i) returns the droop $F/K_p$ of this lesson. The table above lists the magnitudes.
+The signs follow the convention of the book: $d$ is positive upwards, so a downward load $F$ is $d_0 = -F$ and part (i) returns the droop $F/K_p$ of this lesson.\pitfall{Sign check: $d$ counts upwards. A payload pulls down, so it is a \emph{negative} $d$, and it produces a \emph{positive} error — too low.} The table above lists the magnitudes.
 
-The quasi-static shortcut of Example~\ref{ex:droop-tau} also has a name and a hypothesis. It is a \emph{singular perturbation} argument: a fast subsystem (the drone under P and D, poles at $-2$ and $-5$) is assumed to be at its equilibrium while a slow variable (the integral) moves. It is justified when the fast subsystem is asymptotically stable and the two time scales are far apart, and its error is of the order of their ratio (Khalil, 2002, ch.~11). Here the relative correction to the slow pole was $K_d K_i/K_p^2 = 0.056$.
+The quasi-static shortcut of Example~\ref{ex:droop-tau} also has a name and a hypothesis. It is a \emph{singular perturbation} argument: a fast subsystem (the drone under P and D, poles at $-2$ and $-5$) is assumed to be at its equilibrium while a slow variable (the integral) moves. It is justified when the fast subsystem is asymptotically stable and the two time scales are far apart, and its error is of the order of their ratio (Khalil, 2002, ch.~11).\tip{Before a quasi-static shortcut, compare the time scales. Here \SI{12.5}{s} against \SI{0.5}{s}, a ratio of 25. Below about 5, do the full calculation.} Here the relative correction to the slow pole was $K_d K_i/K_p^2 = 0.056$.
 
 \begin{lookahead}
 \begin{itemize}[leftmargin=1.2em]

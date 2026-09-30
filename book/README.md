@@ -78,6 +78,15 @@ book/
   its lead (what is switched on, what happens when), exercise kinds stand there
   (`\exkind`), and so do figure captions, small figures and notes. `Try this` and
   `In Anemostatos` boxes are never split; the story (`curiosity`) follows the summary box.
+- Margin notes come in five kinds, each with its own mark and colour: `\tip` (a working
+  rule), `\pitfall` (a mistake people make), `\didyouknow` (history, other fields),
+  `\recall` (a fact from earlier, needed here) and `\innumbers` (an order of magnitude);
+  `\aside` stays for a neutral remark. Aim at about one per page, put it right after the
+  sentence it belongs to, and keep it to five or six short lines. In running text a note
+  is a `\marginpar` and finds its own place. Inside a box it is a `\marginnote` and cannot
+  see its neighbours: keep such notes to `example` boxes, and after a build run
+  `python3 book/tools/check_margins.py`; a collision is fixed with the optional shift,
+  `\tip[-30pt]{...}`, or by moving the anchor.
 - Exercises use `\exercise`, and their solutions go into `\answer{...}`
   right after them. The build collects the answers into
   `build/main.ans` for the companion volume; they are not printed here.

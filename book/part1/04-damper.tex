@@ -10,7 +10,7 @@ With a constant setpoint, the error changes only because the drone moves: $\dot 
 \begin{equation}
   D = K_d\,\dot e = -K_d\,\dot y ,
 \end{equation}
-a force proportional to the vertical velocity and opposing it — exactly what a shock absorber does. With exact feedforward, P and D together give the closed loop (with $x = y - r$, as in \lessonref{les:spring})
+a force proportional to the vertical velocity and opposing it — exactly what a shock absorber does.\didyouknow{A car's shock absorber forces oil through small holes: the faster the wheel moves, the harder the oil resists. Without it the car would bounce on its springs for many seconds after every bump.} With exact feedforward, P and D together give the closed loop (with $x = y - r$, as in \lessonref{les:spring})
 \begin{equation}\label{eq:damper-msd}
   m\,\ddot x + K_d\,\dot x + K_p\,x = 0 ,
 \end{equation}
@@ -21,7 +21,7 @@ Repeat the energy calculation of \lessonref{les:spring}: multiply \cref{eq:dampe
 \begin{equation}
   \frac{\dd}{\dd t}\Big(\tfrac12 m\dot x^2 + \tfrac12 K_p x^2\Big) = \dot x\,(m\ddot x + K_p x) = -K_d\,\dot x^2 \;\le\; 0 .
 \end{equation}
-Whenever the drone moves, the D term removes energy at the rate $K_d\dot x^2$ — the power dissipated by a damper. The energy can only decrease, and it stops decreasing only when the drone stops moving; since a spring that is stretched does not let the drone stay still, the only final state is $x = 0$, $\dot x = 0$. The oscillation must die out. The remaining questions are \emph{how fast} and \emph{in what manner}.
+Whenever the drone moves, the D term removes energy at the rate $K_d\dot x^2$ — the power dissipated by a damper. The energy can only decrease, and it stops decreasing only when the drone stops moving; since a spring that is stretched does not let the drone stay still, the only final state is $x = 0$, $\dot x = 0$. The oscillation must die out.\tip{An energy argument answers \enquote{does it stop?} without solving anything. Try one before reaching for the characteristic equation.} The remaining questions are \emph{how fast} and \emph{in what manner}.
 
 \section{Solving the damped equation}
 
@@ -33,13 +33,13 @@ We follow the recipe of \lessonref{les:spring} step by step.
   \omega_n = \sqrt{\frac{K_p}{m}},\qquad
   \zeta = \frac{K_d}{2\sqrt{K_p\,m}} .
 \end{equation}
-(Check: $2\zeta\omega_n = 2\cdot\frac{K_d}{2\sqrt{K_pm}}\cdot\sqrt{\frac{K_p}{m}} = \frac{K_d}{m}$ and $\omega_n^2 = \frac{K_p}{m}$, as required.) This \emph{standard form} separates two questions. The \term{natural frequency} $\omega_n$ sets the time scale: how fast the loop wants to move. The \term{damping ratio} $\zeta$ (zeta) is dimensionless and sets the shape: how the motion approaches the target.
+(Check: $2\zeta\omega_n = 2\cdot\frac{K_d}{2\sqrt{K_pm}}\cdot\sqrt{\frac{K_p}{m}} = \frac{K_d}{m}$ and $\omega_n^2 = \frac{K_p}{m}$, as required.) This \emph{standard form} separates two questions. The \term{natural frequency} $\omega_n$ sets the time scale: how fast the loop wants to move. The \term{damping ratio} $\zeta$ (zeta) is dimensionless and sets the shape: how the motion approaches the target.\innumbers{Typical damping ratios: the suspension of a car 0.2 to 0.4; a door closer about 1; a wine glass, which rings for seconds, below 0.001.}
 
 \paragraph{The roots.} The quadratic formula gives
 \begin{equation}\label{eq:damper-poles}
   s_{1,2} = -\zeta\omega_n \pm \omega_n\sqrt{\zeta^2 - 1} .
 \end{equation}
-The sign of $\zeta^2 - 1$ decides everything: three cases follow.
+The sign of $\zeta^2 - 1$ decides everything: three cases follow.\recall{$as^2 + bs + c = 0$ has the roots $\big({-b} \pm \sqrt{b^2 - 4ac}\,\big)/2a$. The sign under the root separates real roots from complex ones.}
 
 \begin{definition}{The three kinds of damping}
 \begin{description}[leftmargin=0pt, itemsep=3pt, font=\sffamily\small\bfseries]
@@ -51,7 +51,7 @@ The sign of $\zeta^2 - 1$ decides everything: three cases follow.
 
 \widefig{zeta_family}{The damping ratio in two pictures. Left: the poles of \cref{eq:damper-std}, scaled by $\omega_n$. For $\zeta<1$ they lie on the unit circle (their distance from the origin is $\omega_n$) and move towards the real axis as $\zeta$ grows; at $\zeta=1$ they meet; beyond it they split along the axis and one of them crawls towards the origin. Right: the corresponding step responses. The grey band is the $\pm2\,\%$ tolerance used for the settling time.}{fig:zeta-family}
 
-\Cref{fig:zeta-family} is worth a long look. The pole plane is a map of behaviour: the height of a pole above the real axis is the frequency of oscillation, its distance to the left of the imaginary axis is the speed of decay, and — since $|s| = \omega_n$ for complex poles — the angle $\theta$ from the negative real axis tells the damping, $\cos\theta = \zeta$.
+\Cref{fig:zeta-family} is worth a long look.\tip{Read the pole plane like a map. Further left: faster decay. Further up: faster oscillation. A small angle from the real axis: good damping. Poles at $45^\circ$ have $\zeta = 0.71$.} The pole plane is a map of behaviour: the height of a pole above the real axis is the frequency of oscillation, its distance to the left of the imaginary axis is the speed of decay, and — since $|s| = \omega_n$ for complex poles — the angle $\theta$ from the negative real axis tells the damping, $\cos\theta = \zeta$.
 
 \begin{example}[The step response of the underdamped loop]
 \label{ex:damper-under}
@@ -65,7 +65,7 @@ The setpoint jumps by \SI{1}{m} and $K_d = 3$ ($K_p = 10$, $m = 1$). Find the mo
 
 \textbf{Step 4 — the result.} $x(t) = -e^{-1.5t}\big(\cos 2.784t + 0.539\sin 2.784t\big)$.
 
-\textbf{Step 5 — interpret.} The oscillation has the period $2\pi/\omega_d = \SI{2.26}{s}$ — slightly longer than the undamped \SI{1.99}{s} — and its envelope shrinks like $e^{-1.5t}$: to half in $\ln 2/1.5 = \SI{0.46}{s}$.
+\textbf{Step 5 — interpret.} The oscillation has the period $2\pi/\omega_d = \SI{2.26}{s}$ — slightly longer than the undamped \SI{1.99}{s}\pitfall{A damped loop oscillates at $\omega_d$, not at $\omega_n$. If you read a period off a chart and compute a stiffness from it, correct for $\zeta$.} — and its envelope shrinks like $e^{-1.5t}$: to half in $\ln 2/1.5 = \SI{0.46}{s}$.
 \end{example}
 
 \section{Reading a step response}
@@ -103,14 +103,14 @@ Show that the overshoot of an underdamped second-order loop after a unit step is
 \begin{equation}\label{eq:damper-mp}
   M_p = e^{-\pi\zeta/\sqrt{1-\zeta^2}} .
 \end{equation}
-It depends on $\zeta$ only. For $\zeta = 0.474$: $M_p = e^{-\pi\cdot0.474/0.881} = e^{-1.69} = 0.184$, i.e.\ 18.4\,\%, reached at $t_p = \pi/2.784 = \SI{1.13}{s}$.
+It depends on $\zeta$ only.\innumbers{Worth knowing by heart: $\zeta = 0.5$ gives 16\,\% overshoot, $\zeta = 0.6$ about 10\,\%, $\zeta = 0.7$ about 5\,\%.} For $\zeta = 0.474$: $M_p = e^{-\pi\cdot0.474/0.881} = e^{-1.69} = 0.184$, i.e.\ 18.4\,\%, reached at $t_p = \pi/2.784 = \SI{1.13}{s}$.
 \end{example}
 
 \paragraph{The settling time.} The oscillation in Step 1 is multiplied by the envelope $e^{-\zeta\omega_n t}$ (times a factor close to one). The response is inside the 2\,\% band once the envelope has fallen below 0.02, i.e.\ when $\zeta\omega_n t = \ln 50 \approx 3.9$. Rounding up gives the rule
 \begin{equation}\label{eq:damper-ts}
   t_s \approx \frac{4}{\zeta\,\omega_n}.
 \end{equation}
-For $K_d = 3$: $t_s \approx 4/1.5 = \SI{2.7}{s}$.
+For $K_d = 3$: $t_s \approx 4/1.5 = \SI{2.7}{s}$.\tip{The \enquote{4} is $\ln 50 = 3.9$ rounded up. For a band of 5\,\% use $\ln 20 = 3$; for 1\,\%, $\ln 100 = 4.6$.}
 
 \begin{example}[The critically damped loop]
 \label{ex:damper-crit}
@@ -121,7 +121,7 @@ Find the $K_d$ that gives $\zeta = 1$, and the settling time of the resulting st
 \textbf{Step 2 — the response.} With the double pole at $-\omega_n$, the general solution $x = (A + Bt)e^{-\omega_n t}$ with $x(0) = -1$, $\dot x(0) = 0$ gives $A = -1$, $B = -\omega_n$, so
 $y(t) = 1 - (1 + \omega_n t)\,e^{-\omega_n t}$.
 
-\textbf{Step 3 — settling.} We need $(1 + \omega_n t)e^{-\omega_n t} = 0.02$. With $z = \omega_n t$, solve $(1+z)e^{-z} = 0.02$ by iteration, $z \leftarrow \ln\big(50(1+z)\big)$: starting from $z = 4$ gives $5.52$, then $5.77$, $5.81$, $5.83$ — converged: $z = 5.83$.
+\textbf{Step 3 — settling.} We need $(1 + \omega_n t)e^{-\omega_n t} = 0.02$. With $z = \omega_n t$, solve $(1+z)e^{-z} = 0.02$ by iteration,\tip{An equation like this has no closed solution. Rewrite it as $z = g(z)$ and iterate. When $g$ changes slowly, a few rounds are enough.} $z \leftarrow \ln\big(50(1+z)\big)$: starting from $z = 4$ gives $5.52$, then $5.77$, $5.81$, $5.83$ — converged: $z = 5.83$.
 
 \textbf{Step 4 — numbers.} $t_s = 5.83/3.162 = \SI{1.84}{s}$. The rise time (solving $y = 0.1$ and $y = 0.9$ the same way: $z = 0.53$ and $3.89$) is $(3.89 - 0.53)/3.162 = \SI{1.06}{s}$.
 \end{example}
@@ -138,7 +138,7 @@ With $K_d = 15$ ($\zeta = 2.37$), where are the poles, and why is the response s
 
 \textbf{Step 2 — who dominates.} Both modes decay, but $e^{-14.3t}$ is gone within \SI{0.3}{s}, while $e^{-0.70t}$ has a time constant of \SI{1.43}{s}. After the first fraction of a second, only the slow pole matters: it is the \term{dominant pole}.
 
-\textbf{Step 3 — settling.} The response enters the 2\,\% band when $e^{-0.70t} \approx 0.02$: $t \approx \ln 50/0.70 = \SI{5.6}{s}$ — three times slower than the critically damped loop, with a damper more than twice as strong.
+\textbf{Step 3 — settling.} The response enters the 2\,\% band when $e^{-0.70t} \approx 0.02$: $t \approx \ln 50/0.70 = \SI{5.6}{s}$ — three times slower than the critically damped loop, with a damper more than twice as strong.\pitfall{More damping is not more speed. Past $\zeta = 1$ every extra bit of $K_d$ makes the loop slower.}
 \end{example}
 
 \section{The experiment}
@@ -199,7 +199,7 @@ A setpoint step must settle within \SI{1}{s} with at most 5\,\% overshoot. Find 
   K_p = m\,\omega_n^2 = \SI{33.6}{N/m}, \qquad K_d = 2\zeta\omega_n m = \SI{8.0}{N.s/m}.
 \end{equation*}
 
-\textbf{Step 4 — what the motors must do.} At the instant of a step of height $h$ the drone is still at rest, so the command is $mg + K_p h$. The motors deliver at most \SI{24.4}{N}, so the design stays linear only for
+\textbf{Step 4 — what the motors must do.} At the instant of a step of height $h$ the drone is still at rest, so the command is $mg + K_p h$.\tip{Always ask what a design demands of the actuators at its worst moment. For a step that is the very first instant, when P sees the whole error.} The motors deliver at most \SI{24.4}{N}, so the design stays linear only for
 \begin{equation*}
   h \le \frac{24.4 - 9.81}{33.6} = \SI{0.43}{m}.
 \end{equation*}
@@ -244,7 +244,7 @@ In state form the loop \eqref{eq:damper-msd} is
 \end{equation}
 The two gains are the two entries of the bottom row: each gain multiplies one state variable. A P–D controller on this plant is \emph{state feedback}, a name that Part~II takes literally.
 
-Look again at the left panel of \cref{fig:zeta-family}, this time as a journey. As $K_d$ grows from zero, the eigenvalues leave $\pm j\omega_n$, travel along the circle of radius $\omega_n$, meet at $-\omega_n$ and separate along the real axis. A drawing of where the poles go as one gain changes is called a \term{root locus}. Engineers read it as we just did: every point of the path is a behaviour, and tuning is choosing a point.
+Look again at the left panel of \cref{fig:zeta-family}, this time as a journey. As $K_d$ grows from zero, the eigenvalues leave $\pm j\omega_n$, travel along the circle of radius $\omega_n$, meet at $-\omega_n$ and separate along the real axis. A drawing of where the poles go as one gain changes is called a \term{root locus}.\didyouknow{Walter Evans invented the root locus in 1948 while designing aircraft autopilots. He also sold a plastic tool for drawing the curves by hand, the Spirule.} Engineers read it as we just did: every point of the path is a behaviour, and tuning is choosing a point.
 
 \subsection{Pole placement}
 Example~\ref{ex:damper-spec} ran the argument backwards: from the wanted behaviour to the pole positions to the gains.
@@ -257,7 +257,7 @@ To put the closed-loop poles at $-\zeta\omega_n \pm j\omega_n\sqrt{1 - \zeta^2}$
 Two gains place two poles anywhere in the plane. A specification on overshoot is a wedge around the negative real axis ($\zeta$ large enough), one on settling time a half-plane to the left of a vertical line ($\zeta\omega_n$ large enough). The poles must lie in both.
 \end{result}
 
-Anywhere — for the plant of \cref{eq:meet-plant}. The real drone objects twice. Its motors saturate, which limits how large a step a fast design can take (Example~\ref{ex:damper-spec}). And its motors lag and its controller samples, which limits how far left the poles can go at all; that limit is the subject of \lessonref{les:slow} and \lessonref{les:edge}. The formulas say where you \emph{may} put the poles. The actuators say where you \emph{can}.
+Anywhere — for the plant of \cref{eq:meet-plant}. The real drone objects twice. Its motors saturate, which limits how large a step a fast design can take (Example~\ref{ex:damper-spec}). And its motors lag and its controller samples, which limits how far left the poles can go at all; that limit is the subject of \lessonref{les:slow} and \lessonref{les:edge}. The formulas say where you \emph{may} put the poles.\pitfall{Pole placement never says no. Ask for poles at $-100$ and it answers $K_p = 10\,000$. Whether the motors can deliver it is not part of the formula.} The actuators say where you \emph{can}.
 
 \subsection{Energy again: a first Lyapunov argument}
 Return to the energy calculation at the start of this lesson. It proved that the oscillation dies out, and it never solved the differential equation. It used three facts:
@@ -266,7 +266,7 @@ Return to the energy calculation at the start of this lesson. It proved that the
   \item along every motion $V$ does not increase: $\dot V = -K_d\dot x^2 \le 0$;
   \item $\dot V$ is zero only where $\dot x = 0$, and the system cannot stay at such a point unless $x = 0$ too, because the spring would set it moving.
 \end{enumerate}
-A function with the first two properties is called a \term{Lyapunov function}, after Aleksandr Lyapunov, who introduced the method in 1892. The third step is known as LaSalle's invariance principle; both are stated exactly below. Together they prove stability for systems whose equations cannot be solved at all: springs that are not linear, motors that saturate, a rigid body tumbling in three dimensions.
+A function with the first two properties is called a \term{Lyapunov function}, after Aleksandr Lyapunov, who introduced the method in 1892.\didyouknow{Lyapunov's thesis of 1892 was little read outside Russia for half a century. Western control engineers discovered it around 1960, and it has been the main tool of nonlinear control ever since.} The third step is known as LaSalle's invariance principle; both are stated exactly below. Together they prove stability for systems whose equations cannot be solved at all: springs that are not linear, motors that saturate, a rigid body tumbling in three dimensions.
 
 The right panel of \cref{fig:damper-predict} shows $V$ measured in flight. It falls in steps: steeply while the drone moves fast, and not at all at the turning points, where $\dot x = 0$ — exactly what $\dot V = -K_d\dot x^2$ says. The measured curve lies a little below the formula, because the air removes some energy too. And in four hundred samples it rises five times, by less than \SI{0.00004}{J} out of five: small enough to be the motor lag and the sampling, which the ideal loop does not have.
 
@@ -294,7 +294,7 @@ For every $m > 0$, $K_p > 0$ and $K_d > 0$ the equilibrium $x = 0$, $\dot x = 0$
 $V = \tfrac12 m\dot x^2 + \tfrac12 K_p x^2$ is positive definite and radially unbounded, and $\dot V = -K_d\dot x^2 \le 0$. This is zero on the whole line $\dot x = 0$ and not only at the origin, so \cref{thm:damper-lyapunov} gives stability and no more. A solution that stays on that line has $\dot x = 0$ for all time, hence $\ddot x = 0$, and \cref{eq:damper-msd} then gives $K_p x = 0$. \Cref{thm:damper-lasalle} applies.
 \end{proof}
 
-Nothing in this proof used the fact that the spring and the damper are linear. It survives the air drag, which only makes $\dot V = -K_d\dot x^2 - c_v|\dot x|^3$ more negative, and a spring that stiffens (an exercise below). It does not survive the motor lag: then the state has a third variable and this $V$ need not decrease at every instant, which is consistent with the five small rises in \cref{fig:damper-predict}.
+Nothing in this proof used the fact that the spring and the damper are linear.\tip{Looking for a Lyapunov function? Try the energy first. For mechanical systems it works surprisingly often.} It survives the air drag, which only makes $\dot V = -K_d\dot x^2 - c_v|\dot x|^3$ more negative, and a spring that stiffens (an exercise below). It does not survive the motor lag: then the state has a third variable and this $V$ need not decrease at every instant, which is consistent with the five small rises in \cref{fig:damper-predict}.
 
 \begin{theorem}[Step response of the underdamped loop]
 \label{thm:damper-step}
@@ -320,7 +320,7 @@ For the drone, with $A$ and $B$ of \cref{eq:meet-lti},
 \begin{equation*}
   \big(B \;\; AB\big) = \begin{pmatrix} 0 & 1/m \\ 1/m & 0 \end{pmatrix}
 \end{equation*}
-has rank two, and $K = (K_p,\ K_d)$ gives $\det(s\Id - A + BK) = s^2 + (K_d/m)\,s + K_p/m$: the gains of the result above, and the only ones. Controllability is a property of the vehicle, not of the controller. A drone that loses a rotor loses rank, and no gain can replace it (Lessons~III.9 and~III.27).
+has rank two, and $K = (K_p,\ K_d)$ gives $\det(s\Id - A + BK) = s^2 + (K_d/m)\,s + K_p/m$: the gains of the result above, and the only ones. Controllability is a property of the vehicle, not of the controller.\didyouknow{Kálmán defined controllability in 1960. Before that, engineers had simply assumed that a plant with an actuator could be steered wherever they liked.} A drone that loses a rotor loses rank, and no gain can replace it (Lessons~III.9 and~III.27).
 
 \begin{lookahead}
 \begin{itemize}[leftmargin=1.2em]

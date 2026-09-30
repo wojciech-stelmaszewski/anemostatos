@@ -473,6 +473,35 @@
 \newcommand{\Lessonref}[1]{\hyperref[#1]{Lesson~\ref*{#1}}}
 % A marginal paragraph, so that marginfix can move it up when it would run off the foot of the page.
 \newcommand{\aside}[1]{\marginpar{\marginfont #1}}
+
+% Margin notes of five kinds, each with its own colour, mark and label:
+%   \tip (a working rule)   \pitfall (a mistake people make)   \didyouknow (history, other fields)
+%   \recall (a fact from an earlier lesson, needed here)   \innumbers (an order of magnitude)
+% In running text they are \marginpar, so marginfix keeps them apart and on the page. Inside a box
+% a \marginpar would be lost, so there they are \marginnote; the boxes raise \ifanem@inbox.
+\newif\ifanem@inbox
+\tcbset{base/.append style={code={\anem@inboxtrue}}}
+% The optional argument shifts a note inside a box vertically (\marginnote cannot see its neighbours).
+\newcommand{\anem@mnote}[5]{% {shift}{colour}{mark}{label}{text}
+  \anem@margin{#1}{\marginfont\setlength{\parskip}{0pt}\setlength{\parindent}{0pt}%
+    {\color{#2!55}\rule{\marginparwidth}{0.5pt}}\par\vspace{2pt}%
+    {#3\hspace{0.45em}{\sanscaps\scriptsize\color{#2}#4}}\par\vspace{1.5pt}#5}}
+\newcommand{\anem@margin}[2]{\ifanem@inbox\marginnote{#2}[#1]\else\marginpar{#2}\fi}
+\newcommand{\anem@marktip}{\tikz[baseline=0.02em]{\fill[sigI] (0,0)--(0.5em,0.3em)--(0,0.6em)--cycle;}}
+\newcommand{\anem@markpit}{\tikz[baseline=0.02em]{\draw[warn, line width=0.7pt, line join=round]
+  (0,0)--(0.7em,0)--(0.35em,0.62em)--cycle; \draw[warn, line width=0.7pt, line cap=round] (0.35em,0.22em)--(0.35em,0.4em);
+  \fill[warn] (0.35em,0.1em) circle (0.035em);}}
+\newcommand{\anem@markfact}{\tikz[baseline=-0.22em]{\node[star, star points=5, star point ratio=2.3,
+  fill=sigFF, inner sep=0.115em]{};}}
+\newcommand{\anem@markrecall}{\tikz[baseline=0.02em]{\draw[deepblue, line width=0.8pt, line cap=round,
+  -{Stealth[length=0.32em, width=0.34em]}] (0.62em,0.12em) arc (-50:230:0.3em);}}
+\newcommand{\anem@marknum}{\tikz[baseline=0.02em]{\draw[sigD, line width=0.8pt, line cap=round]
+  (0,0)--(0,0.22em) (0.22em,0)--(0.22em,0.42em) (0.44em,0)--(0.44em,0.62em);}}
+\NewDocumentCommand{\tip}{O{0pt} +m}{\anem@mnote{#1}{sigI}{\anem@marktip}{TIP}{#2}}
+\NewDocumentCommand{\pitfall}{O{0pt} +m}{\anem@mnote{#1}{warn}{\anem@markpit}{PITFALL}{#2}}
+\NewDocumentCommand{\didyouknow}{O{0pt} +m}{\anem@mnote{#1}{sigFF}{\anem@markfact}{DID YOU KNOW}{#2}}
+\NewDocumentCommand{\recall}{O{0pt} +m}{\anem@mnote{#1}{deepblue}{\anem@markrecall}{RECALL}{#2}}
+\NewDocumentCommand{\innumbers}{O{0pt} +m}{\anem@mnote{#1}{sigD}{\anem@marknum}{IN NUMBERS}{#2}}
 \newcommand{\eg}{e.g.\xspace}
 \newcommand{\ie}{i.e.\xspace}
 

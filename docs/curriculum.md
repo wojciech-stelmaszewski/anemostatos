@@ -32,15 +32,15 @@ Three principles hold throughout:
 
 ## 2. The five parts
 
-| Part                         | Lessons      | Vehicles                               | App                        | Book            | Plan                                 |
-| ---------------------------- | ------------ | -------------------------------------- | -------------------------- | --------------- | ------------------------------------ |
-| I. The PID controller        | 1–14         | Quadrotor, levels L1–L3                | done (M0–M6)               | written; see §5 | [roadmap.md](roadmap.md)             |
-| II. Beyond PID               | II.1–II.21   | Quadrotor                              | done (M7–M12)              | not written     | [beyond-pid.md](beyond-pid.md)       |
-| III. Why it works            | III.1–III.30 | Quadrotor                              | 7 of 30 done; rest planned | not written     | [analysis.md](analysis.md)           |
-| IV. Aerospace GNC            | IV.1–IV.29   | Quadrotor, rocket, aircraft, satellite | planned (M19–M25)          | not written     | [aerospace-gnc.md](aerospace-gnc.md) |
-| V. From whiteboard to flight | V.1–V.6      | All                                    | planned (M26)              | not written     | [aerospace-gnc.md](aerospace-gnc.md) |
+| Part                         | Lessons      | Vehicles                               | App                         | Book            | Plan                                 |
+| ---------------------------- | ------------ | -------------------------------------- | --------------------------- | --------------- | ------------------------------------ |
+| I. The PID controller        | 1–14         | Quadrotor, levels L1–L3                | done (M0–M6)                | written; see §5 | [roadmap.md](roadmap.md)             |
+| II. Beyond PID               | II.1–II.21   | Quadrotor                              | done (M7–M12)               | not written     | [beyond-pid.md](beyond-pid.md)       |
+| III. Why it works            | III.1–III.30 | Quadrotor                              | 12 of 30 done; rest planned | not written     | [analysis.md](analysis.md)           |
+| IV. Aerospace GNC            | IV.1–IV.29   | Quadrotor, rocket, aircraft, satellite | planned (M19–M25)           | not written     | [aerospace-gnc.md](aerospace-gnc.md) |
+| V. From whiteboard to flight | V.1–V.6      | All                                    | planned (M26)               | not written     | [aerospace-gnc.md](aerospace-gnc.md) |
 
-One hundred lessons. Forty-two exist in the app today.
+One hundred lessons. Forty-seven exist in the app today.
 
 Each part asks a different question:
 
@@ -72,11 +72,11 @@ teaches each item. "App" says whether the lessons exist in the simulator.
 | Predictive control            | QP, linear MPC, sampling-based MPC, constraints                                                  | II.13–II.16                       | done    |
 | Safety filters                | Control barrier functions, envelope protection                                                   | II.17, V.5                        | partly  |
 | Estimation, linear            | Kalman filter, observability, detectability, separation                                          | II.4, III.9                       | partly  |
-| Estimation, nonlinear         | Complementary and Mahony filters, EKF, multiplicative EKF, UKF, particle filter, smoothing       | III.22–III.24, IV.22, IV.27–IV.29 | planned |
+| Estimation, nonlinear         | Complementary and Mahony filters, EKF, multiplicative EKF, UKF, particle filter, smoothing       | III.22–III.24, IV.22, IV.27–IV.29 | partly  |
 | Disturbance observers         | ADRC, extended state observer, incremental control (INDI)                                        | II.5–II.9                         | done    |
 | Nonlinear stability           | Lyapunov, LaSalle, region of attraction, describing functions, circle criterion                  | III.7, III.8                      | planned |
 | Nonlinear design              | Dynamic inversion, geometric control on SO(3), differential flatness, sliding mode, backstepping | II.7–II.12, III.15, III.16, IV.15 | partly  |
-| Robust control                | Uncertainty models, small gain, singular values, disk margins, H∞ loop shaping, μ analysis       | III.11–III.14                     | planned |
+| Robust control                | Uncertainty models, small gain, singular values, disk margins, H∞ loop shaping, μ analysis       | III.11–III.14                     | partly  |
 | Adaptive control              | MRAC, robust modifications, L1 adaptive control                                                  | II.18, III.17                     | partly  |
 | Learning-based control        | Learned residual models, neural-network policies, reinforcement learning                         | II.19–II.21                       | done    |
 | Digital implementation        | Sampling, z-plane, aliasing, quantisation, rate limits, jitter, fixed-point code                 | 9, III.18–III.20, V.3             | partly  |

@@ -692,3 +692,64 @@ def tilt_predict():
     a.set_ylabel("degrees")
     xlab_time(a)
     save(f, "tilt_predict")
+
+
+# ─── Lessons 13 and 14 ─────────────────────────────────────────────────────
+def cascade_model(att_kp=8.0, pos_kp=1.2, vel=(2.2, 0.6, 0.1), rate=(18.0, 6.0, 0.25), tau=0.03, vmax=4.0,
+                  tilt_max=np.radians(35), t_end=6.0, step=1.0, ideal_inner=False, cv=0.12):
+    """One horizontal axis of the L3 cascade as a chain of simple loops (continuous time, 1 ms steps).
+    theta is the tilt towards +x. Returns t, x, v, theta (rad), omega (rad/s), v_sp, theta_sp."""
+    dt = 0.001
+    n = int(t_end / dt)
+    x = v = th = om = iv = iw = al = dv = 0.0
+    out = np.zeros((n, 7))
+    vprev = 0.0
+    for k in range(n):
+        vsp = float(np.clip(pos_kp * (step - x), -vmax, vmax))
+        ev = vsp - v
+        iv += vel[1] * ev * dt
+        dv += ((-(v - vprev) / dt) - dv) * dt / (1 / (2 * np.pi * 10) + dt)
+        vprev = v
+        asp = vel[0] * ev + iv + vel[2] * dv
+        thsp = float(np.clip(np.arctan2(asp, G), -tilt_max, tilt_max))
+        if ideal_inner:
+            th, om = thsp, 0.0
+        else:
+            wsp = att_kp * (thsp - th)
+            ew = wsp - om
+            iw += rate[1] * ew * dt
+            acmd = rate[0] * ew + iw
+            al += (acmd - al) * dt / tau           # the motors deliver the torque with their lag
+            om += al * dt
+            th += om * dt
+        v += (G * np.tan(th) - cv * abs(v) * v) * dt
+        x += v * dt
+        out[k] = (k * dt, x, v, th, om, vsp, thsp)
+    return out.T
+
+
+@fig
+def cascade_predict():
+    d = win(load("cascade-step"), 9.5, 15)
+    t, x, v, th, om, vsp, thsp = cascade_model()
+    ti, xi, *_ = cascade_model(ideal_inner=True)
+    f, ax = plt.subplots(1, 2, figsize=(TEXT_W, 56 * MM), gridspec_kw=dict(wspace=0.34))
+    a = ax[0]
+    a.plot(d.t - 10, d["pos.x"], color=C["meas"], lw=1.5)
+    a.plot(t, x, color=C["ink"], lw=0.8, ls=DASH)
+    a.plot(ti, xi, color=C["accent"], lw=0.9, ls=DOT)
+    a.axhline(1, color=C["sp"], lw=0.8, ls=DASH)
+    a.text(2.6, 0.55, "simulator\nand the chain of loops", color=C["ink"], fontsize=6.3)
+    a.text(2.6, 0.2, "outer loops with an\ninstant attitude", color=C["accent"], fontsize=6.3)
+    a.set_xlim(-0.3, 5)
+    a.set_title("Position after a 1 m step")
+    a.set_ylabel("$x$  [m]")
+    xlab_time(a, "time after the step  [s]")
+    a = ax[1]
+    a.plot(d.t - 10, -d["pitch"], color=C["meas"], lw=1.5)
+    a.plot(t, np.degrees(th), color=C["ink"], lw=0.8, ls=DASH)
+    a.set_xlim(-0.1, 2.5)
+    a.set_title("Tilt towards the target")
+    a.set_ylabel("degrees")
+    xlab_time(a, "time after the step  [s]")
+    save(f, "cascade_predict")

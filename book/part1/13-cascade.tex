@@ -2,54 +2,90 @@
 \label{les:cascade}
 
 \lead{\setupcard{\setuprow{Level}{L3: the full quadrotor}\setuprow{Controller}{the cascade of four loops}\setuprow{Wind}{a steady \SI{5}{m/s} with light turbulence}\setuprow{Chart}{the horizontal velocity loop}}%
-Level L3 is a real quadrotor: a rigid body with four motors, six degrees of freedom and a chain of four integrators between the motors and the position. It is flown the way PX4, ArduPilot and Betaflight fly real drones — by a cascade of simple controllers. This lesson takes the cascade apart, one loop at a time.}
+Level L3 is a real quadrotor: a rigid body with four motors, six degrees of freedom and a chain of four integrators between the motors and the position. It is flown the way PX4, ArduPilot and Betaflight fly real drones — by a cascade of simple controllers. This lesson takes the cascade apart, one loop at a time, puts numbers on every link, and then rebuilds it as a model of twenty lines that flies like the simulator.}
 
 \section{Divide and conquer}
 
-\Lessonref{les:tilt} ended with the chain from motor thrusts to position: torque, angular acceleration, rate, attitude, acceleration, velocity, position. A cascade cuts that chain at the physically meaningful points and closes a loop around each piece. The outer loop's output does not go to the motors; it becomes the \emph{setpoint} of the loop inside it (\cref{fig:cascade-diagram}).
+\Lessonref{les:tilt} ended with the chain \eqref{eq:tilt-chain} from motor thrusts to position: torque, angular acceleration, rate, attitude, acceleration, velocity, position. A single controller for the whole chain would have to be designed all at once, and it would be hard to tune and to understand. A cascade does something simpler.
+
+\begin{definition}{Cascade control}
+In a \term{cascade}, the chain is cut at variables that can be measured, and a separate loop is closed around each piece. The output of an outer loop is not an actuator command: it is the \emph{setpoint} of the loop inside it. Only the innermost loop commands the actuators.
+\end{definition}
 
 \begin{figure}[h]
 \begin{fullwidth}
   \centering\input{tikz/cascade}
-  \caption{The L3 cascade of Anemostatos. Each block is a small controller from Part~I; each arrow is the setpoint of the next block. The rates in grey are how often each loop runs.}
+  \caption{The L3 cascade of Anemostatos. Each block is a small controller from Lessons~1–11; each arrow is the setpoint of the next block. The rates in grey are how often each loop runs.}
   \label{fig:cascade-diagram}
 \end{fullwidth}
 \end{figure}
 
+Each loop in \cref{fig:cascade-diagram} controls a plant that is a single integrator — velocity integrates to position, acceleration to velocity, rate to angle, torque to rate — and for a single integrator a P or a PI controller is enough (Example~\ref{ex:integral-cruise}). We go through the blocks from the outside in.
+
 \subsection{Position: P, \SI{50}{Hz}}
 \begin{equation}
-  \vec v_{sp} = K_{p,pos}\,(\vec p_{sp} - \vec p),\qquad |\vec v_{sp}| \le v_{max}.
+  \vec v_{sp} = K_{pos}\,(\vec p_{sp} - \vec p),\qquad |\vec v_{sp}| \le v_{max}.
 \end{equation}
-A pure P is enough: it turns a position error into a desired velocity (\SI{1.2}{(m/s)/m} horizontally), limited to \SI{4}{m/s}. Position is the integral of velocity, so the next loop provides all the dynamics this one needs.
+It turns a position error into a desired velocity: $K_{pos} = \SI{1.2}{s^{-1}}$ horizontally, so one metre of error asks for \SI{1.2}{m/s}, limited to \SI{4}{m/s}. A pure P is enough, because the loop inside provides the integral action.
 
 \subsection{Velocity: PID, \SI{100}{Hz}}
 \begin{equation}
-  \vec a_{sp} = \mathrm{PID}_{vel}(\vec v_{sp} - \vec v).
+  \vec a_{sp} = \mathrm{PID}_{vel}(\vec v_{sp} - \vec v), \qquad K_p = \SI{2.2}{s^{-1}},\ K_i = \SI{0.6}{s^{-2}},\ K_d = 0.1 .
 \end{equation}
-It outputs a desired acceleration. Its integral is the one that holds a steady wind: a constant drag needs a constant extra acceleration command, and only an integral can supply it without a velocity error. Switch it off and the drone drifts downwind by a metre (\cref{fig:cascade-noi}).
+It outputs a desired acceleration. Its integral is the one that holds a steady wind.
+
+\begin{example}[Who holds the wind?]
+\label{ex:cascade-wind}
+The lesson's wind produces a drag of \SI{2.86}{N} on the hovering drone. What does each loop contribute, with and without the velocity loop's integral?
+
+\textbf{Step 1 — what is needed.} To stand still the drone needs a constant acceleration command against the wind: $a = F/\hat m = \SI{2.86}{m/s^2}$.
+
+\textbf{Step 2 — with the integral.} At rest, on the setpoint, both errors are zero: P of the position loop gives $v_{sp} = 0$, P of the velocity loop gives nothing. Only the integral can hold a constant output with zero input: $I = \SI{-2.86}{m/s^2}$. The simulator: \SI{-2.82}{m/s^2}, and the drone stays within \SI{1}{cm} of its setpoint on average.
+
+\textbf{Step 3 — without it.} Now the velocity P must supply the acceleration, which needs a velocity error: $K_p(v_{sp} - 0) = -2.86$, so $v_{sp} = -2.86/2.2 = \SI{-1.30}{m/s}$. And the position loop produces that setpoint only from a position error: $x - x_{sp} = 1.30/1.2 = \SI{1.08}{m}$.
+
+\textbf{Step 4 — check} (\cref{fig:cascade-noi}). With the velocity integral off, the simulator's drone sits \SI{1.08}{m} downwind, asking for \SI{-1.29}{m/s} that it never reaches.
+
+\textbf{Step 5 — the tilt.} In both cases the drone leans into the wind by $\arctan(2.86/9.81) = 16.3^\circ$ (\cref{thm:tilt-hover}); the simulator shows $16.3^\circ$. The integral does not change what the drone must do, only where it does it.
+\end{example}
+
+\simfig{cascade_noi}{In a \SI{5}{m/s} wind the velocity loop's integral holds the drone on its setpoint (green). Without it (red) the position P alone must hold the drag, and the drone settles a metre downwind.}{fig:cascade-noi}
 
 \subsection{Thrust vector: geometry, no gains}
-This block is where \enquote{to move, tilt} becomes explicit. The desired force, including the gravity feedforward, is
+This block is where \enquote{to move, tilt} becomes explicit. It is \cref{eq:tilt-acc} read backwards. The desired force, including the gravity feedforward, is
 \begin{equation}\label{eq:cascade-fdes}
   \vec F_{des} = \hat m\,(\vec a_{sp} - \vec g),
 \end{equation}
 and since a quadrotor can only push along its body axis, the desired body axis is its direction, $\hat b_{sp} = \vec F_{des}/|\vec F_{des}|$, limited to a tilt of $35^\circ$. Together with the desired heading (yaw) this defines a full attitude setpoint $q_{sp}$. The collective thrust is the projection of $\vec F_{des}$ on the \emph{current} body axis, $T = \vec F_{des}\cdot\hat b$, so that the drone does not shoot upward while it is still tilting.
 
+\begin{example}[From an acceleration to an attitude]
+\label{ex:cascade-tv}
+The velocity loop asks for $\vec a_{sp} = (2, 0, 0)\,\si{m/s^2}$ while the drone hovers level. What does the thrust-vector block command?
+
+\textbf{Step 1 — the force.} $\vec g = (0, -9.81, 0)$, so $\vec F_{des} = 1 \cdot (2,\ 9.81,\ 0)$\,N, with the length $\sqrt{4 + 96.2} = \SI{10.01}{N}$.
+
+\textbf{Step 2 — the axis.} $\hat b_{sp} = (0.200,\ 0.980,\ 0)$: tilted towards $+x$ by $\arctan(2/9.81) = 11.5^\circ$.
+
+\textbf{Step 3 — the thrust, now.} The body is still level, $\hat b = (0, 1, 0)$, so $T = \vec F_{des}\cdot\hat b = \SI{9.81}{N}$: exactly the weight.
+
+\textbf{Step 4 — the thrust, once tilted.} When $\hat b = \hat b_{sp}$: $T = |\vec F_{des}| = \SI{10.01}{N}$. The vertical part is $10.01 \cdot 0.980 = \SI{9.81}{N}$ throughout: the altitude is not disturbed by the manoeuvre.
+\end{example}
+
 \subsection{Attitude: P, \SI{250}{Hz}}
-The attitude error is the rotation that takes the current attitude to the desired one, computed with quaternions: $q_e = q^{-1}\otimes q_{sp}$. Its vector part, doubled, is (for small errors) the rotation angle times its axis, and a P law turns it into a desired body rate:
+The attitude error is the rotation that takes the current attitude to the desired one. For small errors it is simply a small angle about some axis, and a P law turns it into a desired body rate about that axis:
 \begin{equation}
-  \vec\omega_{sp} = K_{att}\cdot 2\,\sign(q_{e,w})\,\vec q_{e,xyz}.
+  \vec\omega_{sp} = K_{att}\,\vec\theta_e, \qquad K_{att} = \SI{8}{s^{-1}} .
 \end{equation}
-Why quaternions, not angles, is a story for \lessonref{les:geometric}.
+The simulator computes $\vec\theta_e$ with quaternions, $q_e = q^{-1}\otimes q_{sp}$ and $\vec\theta_e = 2\,\sign(q_{e,w})\,\vec q_{e,xyz}$, which stays correct for large rotations. Why quaternions and not angles is the story of \lessonref{les:geometric}.
 
 \subsection{Rate: PID, \SI{1}{kHz}}
 \begin{equation}
-  \vec\alpha_{sp} = \mathrm{PID}_{rate}(\vec\omega_{sp} - \vec\omega),\qquad \vec\tau = J\,\vec\alpha_{sp}.
+  \vec\alpha_{sp} = \mathrm{PID}_{rate}(\vec\omega_{sp} - \vec\omega),\qquad \vec\tau = J\,\vec\alpha_{sp}, \qquad K_p = \SI{18}{s^{-1}},\ K_i = \SI{6}{s^{-2}},\ K_d = 0.25 .
 \end{equation}
-The innermost loop controls how fast the drone rotates, from the gyroscope. Multiplying by the inertia matrix $J$ makes the gains physically meaningful (angular accelerations rather than torques). This is the loop where noise and filtering matter most.
+The innermost loop controls how fast the drone rotates, from the gyroscope. Multiplying by the inertia $J$ makes the gains physically meaningful: they produce angular accelerations, whatever the size of the drone. This is the loop where noise and filtering (\lessonref{les:noise}) matter most.
 
 \subsection{Mixer: linear algebra}
-Finally, the four motor thrusts must produce the requested collective thrust and three torques. For the X-shaped frame with arm projection $d$ and rotor torque coefficient $c_\tau$ the relation is linear,
+Finally, the four motor thrusts must produce the requested collective thrust and three torques. For the X-shaped frame with the lever arm $d$ and the rotor torque coefficient $c_\tau$ the relation is linear (Prelude),
 \begin{equation}\label{eq:cascade-mixer}
   \begin{pmatrix}T\\ \tau_x\\ \tau_y\\ \tau_z\end{pmatrix} =
   \underbrace{\begin{pmatrix}
@@ -57,23 +93,86 @@ Finally, the four motor thrusts must produce the requested collective thrust and
     d & -d & -d & d\\
     c_\tau & -c_\tau & c_\tau & -c_\tau\\
     d & d & -d & -d
-  \end{pmatrix}}_{A}
+  \end{pmatrix}}_{M}
   \begin{pmatrix}f_1\\ f_2\\ f_3\\ f_4\end{pmatrix},
-  \qquad \vec f = A^{-1}\,(T, \tau_x, \tau_y, \tau_z)^\T ,
 \end{equation}
-and the \term{mixer} (control allocation) inverts it. When a motor would have to exceed its limits, the mixer first shifts all four together (trading collective thrust for attitude authority), then gives up yaw, then roll and pitch — attitude matters more than altitude for a few milliseconds.\aside{$\tau_y$ is yaw here because Anemostatos has $y$ up. Yaw torque comes from the rotors' drag: clockwise and counter-clockwise rotors twist the frame in opposite directions, and yaw is steered by speeding up one pair and slowing the other.}
+and the \term{mixer} (control allocation) inverts it.\aside{$\tau_y$ is yaw here because Anemostatos has $y$ up. Yaw torque comes from the rotors' drag: clockwise and counter-clockwise rotors twist the frame in opposite directions, and yaw is steered by speeding up one pair and slowing the other.}
+
+\begin{example}[Four thrusts from one thrust and three torques]
+\label{ex:cascade-mixer}
+In hover the rate loop asks for a pitch torque of \SI{0.2}{N.m} and nothing else. Which thrusts does the mixer command?
+
+\textbf{Step 1 — the inverse.} The four rows of $M$ are perpendicular to each other (check one pair: row 2 times row 4 is $d^2 - d^2 - d^2 + d^2 = 0$), so $MM^\T$ is diagonal, $\diag(4,\ 4d^2,\ 4c_\tau^2,\ 4d^2)$, and $M^{-1} = M^\T(MM^\T)^{-1}$. Written out:
+\begin{equation*}
+  f_i = \frac{T}{4} \pm \frac{\tau_x}{4d} \pm \frac{\tau_y}{4c_\tau} \pm \frac{\tau_z}{4d},
+\end{equation*}
+with the signs of column $i$ of $M$.
+
+\textbf{Step 2 — the numbers.} $T = \SI{9.81}{N}$, $\tau_z = 0.2$, $d = 0.17/\sqrt2 = \SI{0.120}{m}$: $T/4 = 2.45$ and $\tau_z/(4d) = 0.2/0.48 = 0.42$.
+
+\textbf{Step 3 — the result.} The pitch row of $M$ has the signs $(+, +, -, -)$: $f_1 = f_2 = 2.45 + 0.42 = \SI{2.87}{N}$, $f_3 = f_4 = \SI{2.03}{N}$. The front pair speeds up, the rear pair slows down, the sum is unchanged.
+
+\textbf{Step 4 — the limits.} The largest pitch torque in hover is reached when one pair stops: $\tau_z = 4d \cdot 2.45 = \SI{1.18}{N.m}$, the value used in Example~\ref{ex:tilt-time}. When a command would push a motor beyond its range, the mixer first shifts all four together (trading collective thrust for attitude authority), then gives up yaw, then roll and pitch: attitude matters more than altitude for a few milliseconds.
+\end{example}
 
 \section{Watching the cascade work}
 
-\simfig{cascade_loops}{A \SI{1}{m} step in $x$ at $t = \SI{10}{s}$, seen by the four loops (dashed: setpoint, blue: measured). Top to bottom the time scale shrinks: the position takes seconds, the velocity about a second, the pitch a few hundred milliseconds, the pitch rate tens of milliseconds. Each inner loop follows its setpoint so closely that the loop outside it barely notices it is there.}{fig:cascade-loops}
+\simfig{cascade_loops}{A \SI{1}{m} step in $x$ at $t = \SI{10}{s}$, seen by the four loops (dashed: setpoint, blue: measured). Top to bottom the time scale shrinks: the position takes seconds, the velocity about a second, the pitch a few hundred milliseconds, the pitch rate tens of milliseconds.}{fig:cascade-loops}
 
-\Cref{fig:cascade-loops} is the cascade in one picture. The position loop asks for a velocity of \SI{1.2}{m/s} the instant the setpoint jumps. The velocity loop answers with an acceleration, which the thrust-vector block turns into a pitch of about $-13^\circ$ (nose down to go forward). The attitude loop asks for a pitch rate of $\SI{-110}{\degree/s}$, and the rate loop, the fastest, delivers it within a few tens of milliseconds. Then everything unwinds in reverse to brake.
+\Cref{fig:cascade-loops} is the cascade in one picture. The position loop asks for a velocity of \SI{1.2}{m/s} the instant the setpoint jumps. The velocity loop answers with an acceleration, which the thrust-vector block turns into a pitch of about $-15^\circ$ (nose down to go forward). The attitude loop asks for a pitch rate of about $\SI{-120}{\degree/s}$, and the rate loop, the fastest, delivers $\SI{-92}{\degree/s}$ within a tenth of a second. Then everything unwinds in reverse to brake.
 
-\simfig{cascade_noi}{In a \SI{5}{m/s} wind the velocity loop's integral holds the drone on its setpoint (green). Without it (red) the position P alone must hold the drag, and the drone settles a metre downwind.}{fig:cascade-noi}
+\subsection{How fast is each loop?}
+
+\begin{example}[The four time scales]
+\label{ex:cascade-scales}
+Estimate how quickly each loop follows its setpoint, assuming that the loop inside it is ideal.
+
+\textbf{Step 1 — the pattern.} A loop $\dot z = K(z_{sp} - z)$ — a P controller on an integrator whose input is obeyed at once — is a first-order lag with the time constant $1/K$.
+
+\textbf{Step 2 — position.} $\dot x = v \approx v_{sp} = 1.2\,(x_{sp} - x)$: time constant $1/1.2 = \SI{0.83}{s}$.
+
+\textbf{Step 3 — velocity.} $\dot v = a \approx a_{sp} = 2.2\,(v_{sp} - v)$: \SI{0.45}{s}.
+
+\textbf{Step 4 — attitude.} $\dot\theta = \omega \approx \omega_{sp} = 8\,(\theta_{sp} - \theta)$: \SI{0.125}{s}.
+
+\textbf{Step 5 — rate.} Here the loop inside is the motors, which are not ideal: $\tau_m\ddot\omega + \dot\omega = 18\,(\omega_{sp} - \omega)$, a second-order loop with $\omega_n = \sqrt{18/0.03} = \SI{24.5}{rad/s}$ and $\zeta = 1/(2\sqrt{18 \cdot 0.03}) = 0.68$. Its envelope decays with $1/(\zeta\omega_n) = \SI{0.06}{s}$.
+
+\textbf{Step 6 — the ratios.} From the inside out: 0.06, 0.125, 0.45, \SI{0.83}{s}. Each loop is between two and four times faster than the one around it.
+\end{example}
 
 \begin{keyidea}[Time-scale separation]
-A cascade works because each inner loop is much faster than the one around it. The outer loop can then treat the inner one as an ideal actuator: \enquote{I ask for a velocity, I get it}. Designers tune from the inside out — rate first, position last — and keep a factor of about 5–10 in bandwidth between neighbours. What happens when that rule is broken is the subject of the next lesson.
+A cascade works because each inner loop is faster than the one around it. The outer loop can then treat the inner one as a nearly ideal actuator: \enquote{I ask for a velocity, I get it}. Designers tune from the inside out — rate first, position last — and the usual advice is a factor of 5–10 in speed between neighbours. Less is possible, as in this cascade, and is paid for with overshoot.
 \end{keyidea}
+
+How much overshoot follows from the ratio itself.
+
+\begin{example}[Two nested loops and their damping]
+\label{ex:cascade-nested}
+Take the position and velocity loops with an ideal attitude, and ignore the integral. What is the damping of the pair, and which ratio of gains would be critical?
+
+\textbf{Step 1 — the equations.} $\dot x = v$ and $\dot v = K_v(v_{sp} - v)$ with $v_{sp} = K_x(x_{sp} - x)$.
+
+\textbf{Step 2 — eliminate $v$.} $\ddot x = K_v\big(K_x(x_{sp} - x) - \dot x\big)$, i.e.\ $\ddot x + K_v\dot x + K_vK_x\,x = K_vK_x\,x_{sp}$.
+
+\textbf{Step 3 — compare with the standard form} (\cref{eq:damper-std}): $\omega_n^2 = K_vK_x$ and $2\zeta\omega_n = K_v$, so
+\begin{equation}\label{eq:cascade-zeta}
+  \omega_n = \sqrt{K_vK_x}, \qquad \zeta = \frac12\sqrt{\frac{K_v}{K_x}} .
+\end{equation}
+The damping depends only on the \emph{ratio} of the two gains: on how much faster the inner loop is.
+
+\textbf{Step 4 — numbers.} $K_v/K_x = 2.2/1.2 = 1.83$: $\zeta = 0.68$, $\omega_n = \SI{1.62}{rad/s}$, overshoot $e^{-\pi\zeta/\sqrt{1 - \zeta^2}} = 5.5\,\%$.
+
+\textbf{Step 5 — the critical ratio.} $\zeta = 1$ needs $K_v = 4K_x$: an inner loop four times faster gives no overshoot. With three or four loops nested, and their lags adding up, the rule of thumb of 5–10 leaves a margin.
+
+\textbf{Step 6 — the rest.} The velocity integral adds some overshoot (the area rule of \lessonref{les:integral}), and the attitude loop a little more. The simulator's step overshoots by 11\,\%.
+\end{example}
+
+\subsection{The cascade as a model}
+Put the pieces of this lesson in a row for one horizontal axis: position P, velocity PID, $\theta_{sp} = \arctan(a_{sp}/g)$, attitude P, rate PI with the motor lag, and $\ddot x = g\tan\theta$. That is a model of twenty lines. \Cref{fig:cascade-predict} flies it next to the simulator's full rigid body with quaternions, mixer and sampled loops.
+
+\simfig{cascade_predict}{Prediction next to measurement for the \SI{1}{m} step. Blue: the simulator. Dashed: the chain of simple loops of this lesson. Dotted: the two outer loops alone, with the attitude assumed instant. Left: the position. Right: the tilt.}{fig:cascade-predict}
+
+The model predicts an overshoot of 10.9\,\% after \SI{2.25}{s} (simulator: 11.2\,\% after \SI{2.26}{s}), 90\,\% of the step after \SI{1.41}{s} (\SI{1.43}{s}) and a largest tilt of $14.5^\circ$ ($14.9^\circ$). With the attitude assumed instant, the dotted curve, the overshoot is 9.1\,\% — most of the behaviour is decided by the two outer loops, and the inner ones add a delay of a tenth of a second. That is time-scale separation at work, and it is what makes a cascade easy to reason about.
 
 \screen[0 0 495 998]{cascade}{Lesson 13 in the app. The loop selector (chart header) is set to \texttt{vel.x}; the amber arrow at the drone is the desired thrust vector from \cref{eq:cascade-fdes}, the white one the actual thrust.}{fig:cascade-screen}
 
@@ -81,26 +180,98 @@ A cascade works because each inner loop is much faster than the one around it. T
 \begin{itemize}[leftmargin=1.2em]
   \item The whole cascade is \src{src/control/cascade.ts}; the rate stage lives in \src{src/control/stages.ts}, the mixer in \src{src/control/mixer.ts}, quaternion arithmetic in \src{src/math/quat.ts}.
   \item Every loop is registered under an id — \texttt{pos.x}, \texttt{vel.x}, \texttt{att.pitch}, \texttt{rate.pitch}, \ldots\ — and the chart selector shows any of them with its own P, I, D terms.
-  \item Gains and rates of all four loops are in the \ui{L3 cascade} groups (\param{control.l3.*}): e.g.\ \param{attKpRP = 8}, \param{rateRP.kp = 18}, \param{hzAtt = 250}.
+  \item Gains and rates of all four loops are in the \ui{L3 cascade} groups (\param{control.l3.*}): e.g.\ \param{posKpH = 1.2}, \param{velH.kp = 2.2}, \param{attKpRP = 8}, \param{rateRP.kp = 18}, \param{hzAtt = 250}.
   \item The info card of the rate loop shows the mixer's saturation; a saturated motor glows red on the model.
 \end{itemize}
 \end{inapp}
 
 \begin{trythis}
 \begin{enumerate}
-  \item Pick the loops in turn in the chart selector: \texttt{rate.pitch}, \texttt{att.pitch}, \texttt{vel.x}, \texttt{pos.x}. Compare their time scales.
-  \item In \ui{Velocity PID — horizontal} switch \It off. The drone drifts downwind and stays there (\cref{fig:cascade-noi}). Switch it back on.
+  \item Pick the loops in turn in the chart selector: \texttt{rate.pitch}, \texttt{att.pitch}, \texttt{vel.x}, \texttt{pos.x}. Compare their time scales with Example~\ref{ex:cascade-scales}.
+  \item In \ui{Velocity PID — horizontal} switch \It off. The drone drifts downwind and stays there (Example~\ref{ex:cascade-wind}). Switch it back on.
   \item Drag the setpoint sphere sideways and watch the amber desired-thrust arrow lead the tilt of the drone.
+  \item Set the position gain to 0.55, a quarter of the velocity gain, and step the setpoint. Is the overshoot gone (Example~\ref{ex:cascade-nested})?
 \end{enumerate}
-\predict{if the maximum tilt were $15^\circ$ instead of $35^\circ$, what would limit a fast sideways move, and could the drone still hold position in a \SI{5}{m/s} wind?}
+\predict{if the maximum tilt were $15^\circ$ instead of $35^\circ$, could the drone still hold position in the \SI{5}{m/s} wind of this lesson?}
 \end{trythis}
+
+\section{The engineer's view: loops as building blocks}
+
+\subsection{Why cut the chain}
+A cascade is not the only way to control a chain of integrators: \cref{thm:tilt-chain} says that one state-feedback law on all four states would do. Engineers prefer the cascade for reasons that have little to do with mathematics.
+\begin{itemize}
+  \item \textbf{Each loop can be tested alone.} The rate loop can be tuned on a test stand before the drone has ever flown; then the attitude loop with the drone held by hand; and so on outwards.
+  \item \textbf{Each intermediate setpoint can be limited.} The velocity setpoint is clipped at \SI{4}{m/s}, the tilt at $35^\circ$, the body rate at $\SI{360}{\degree/s}$. A single big controller has no place for such limits; here they are one line each, and they are what keeps a large position error from flipping the drone.
+  \item \textbf{Disturbances are caught early.} A gust of torque is corrected by the rate loop within tens of milliseconds, long before it has changed the position. An inner loop is a shield for the loops around it.
+  \item \textbf{Modes of flight are switches.} A pilot who commands the attitude directly simply replaces the outer two loops; the inner two stay.
+\end{itemize}
+
+\subsection{The reduced model}
+When the inner loops are fast, the outer loops can be designed on a \emph{reduced} model in which the inner loops are replaced by \enquote{output equals setpoint}. Example~\ref{ex:cascade-nested} did that, and \cref{fig:cascade-predict} showed the quality of the approximation: the dotted curve. The technique has a name, \term{singular perturbation}, and a theorem behind it, stated below. Its practical content: tune the inner loop well, then forget it.
+
+\begin{example}[The same cascade in an airliner]
+\label{ex:cascade-aircraft}
+An autopilot holds the altitude of an airliner flying at $V = \SI{230}{m/s}$. Sketch its cascade and put numbers on it for an altitude error of \SI{30}{m}.
+
+\textbf{Step 1 — the chain.} The elevator produces a pitching moment; the moment changes the pitch rate; the rate integrates to the pitch angle; the pitch angle sets the climb angle; the climb angle times the speed is the vertical speed; and that integrates to the altitude. The same chain as \cref{eq:tilt-chain}, with the wing in place of the tilted thrust.
+
+\textbf{Step 2 — the altitude loop (P).} With a gain of \SI{0.1}{s^{-1}}: \SI{30}{m} of error asks for a vertical speed of \SI{3}{m/s}. Time constant \SI{10}{s}.
+
+\textbf{Step 3 — the vertical-speed loop.} A vertical speed of \SI{3}{m/s} at \SI{230}{m/s} is a climb angle of $3/230 = \SI{0.013}{rad} = 0.75^\circ$: this loop commands a change of pitch attitude of that size. Time constant a few seconds.
+
+\textbf{Step 4 — the pitch loop (P).} With a gain of \SI{2}{s^{-1}}: $0.75^\circ$ of pitch error asks for a pitch rate of $\SI{1.5}{\degree/s}$. Time constant \SI{0.5}{s}.
+
+\textbf{Step 5 — the pitch-rate loop.} Moves the elevator, through a servo that answers within about \SI{50}{ms} (Example~\ref{ex:edge-aircraft}).
+
+\textbf{Step 6 — the pattern.} Four loops again, with time constants of roughly 10, 3, 0.5 and \SI{0.1}{s}: separated by factors of three to five. And the limits are where the passengers are protected: the vertical speed is clipped at a few metres per second, the pitch rate at a degree or two per second.
+\end{example}
+
+\subsection{In formal terms}
+
+\begin{theorem}[The mixer]
+\label{thm:cascade-mixer}
+For $d > 0$ and $c_\tau > 0$ the matrix $M$ of \cref{eq:cascade-mixer} is invertible, with $M^{-1} = M^\T\,\diag\!\big(\tfrac14,\ \tfrac{1}{4d^2},\ \tfrac{1}{4c_\tau^2},\ \tfrac{1}{4d^2}\big)$. Every combination of thrust and torques is produced by exactly one set of motor thrusts; it can be realised if and only if each of them lies in $[0, f_{max}]$.
+\end{theorem}
+\begin{proof}
+The rows of $M$ are mutually orthogonal with the squared lengths $4$, $4d^2$, $4c_\tau^2$, $4d^2$, so $MM^\T$ is that diagonal matrix and $M^\T(MM^\T)^{-1}$ is a right inverse, hence the inverse of the square matrix $M$.
+\end{proof}
+
+\begin{theorem}[Two nested first-order loops]
+\label{thm:cascade-nested}
+The loop $\dot x = v$, $\dot v = K_v\big(K_x(x_{sp} - x) - v\big)$ with $K_v, K_x > 0$ is asymptotically stable, with $\omega_n = \sqrt{K_vK_x}$ and $\zeta = \tfrac12\sqrt{K_v/K_x}$. Its step response has no overshoot if and only if $K_v \ge 4K_x$.
+\end{theorem}
+\begin{proof}
+Example~\ref{ex:cascade-nested} and \cref{thm:damper-step}; for $\zeta \ge 1$ the poles are real and the response from rest is monotone.
+\end{proof}
+
+\begin{theorem}[Time-scale separation]
+\label{thm:cascade-tikhonov}
+Consider $\dot{\vx} = f(\vx, \symbf z)$, $\varepsilon\,\dot{\symbf z} = g(\vx, \symbf z)$ with a small parameter $\varepsilon > 0$ and smooth $f$, $g$. Suppose that for each fixed $\vx$ the fast equation has an equilibrium $\symbf z = h(\vx)$ that is exponentially stable, uniformly in $\vx$. Then, on any finite time interval and after an initial transient of duration of order $\varepsilon$, the solution satisfies
+\begin{equation*}
+  \vx(t) = \bar{\vx}(t) + O(\varepsilon), \qquad \symbf z(t) = h(\bar{\vx}(t)) + O(\varepsilon),
+\end{equation*}
+where $\bar{\vx}$ solves the reduced system $\dot{\bar{\vx}} = f(\bar{\vx}, h(\bar{\vx}))$. If the reduced system has an exponentially stable equilibrium, so has the full system for all sufficiently small $\varepsilon$. (Tikhonov, 1952; Khalil, 2002, ch.~11.)
+\end{theorem}
+
+For a cascade, $\symbf z$ is the state of the inner loop, $h$ is \enquote{output equals setpoint}, and $\varepsilon$ is the ratio of the time scales. The theorem promises an error of the order of that ratio — and says nothing when the ratio is not small. With ratios of two to four, as here, the reduced model is a useful guide (the dotted curve) and not a guarantee. The next lesson makes $\varepsilon$ large on purpose.
+
+\begin{lookahead}
+\begin{itemize}[leftmargin=1.2em]
+  \item What happens when the separation fails is the next lesson.
+  \item Part~II replaces the blocks one at a time and keeps the structure: the rate loop by one that measures the angular acceleration instead of modelling it (INDI, Lesson~II.7), the two outer loops by a single tracking law (II.11) or by an optimiser that plans with the tilt and thrust limits (II.15), the attitude law by one that is correct for large rotations (II.10).
+  \item One state-feedback law for the whole chain, with gains from an optimisation instead of four separate tunings, is Lessons~II.1–II.2.
+  \item The mixer has a harder version when a motor fails: three thrusts for four demands (Lesson~III.27). Loops that interact — roll and pitch while spinning — need more than one-loop-at-a-time margins (III.12).
+  \item A launcher's guidance, navigation and control is a cascade too, and an aircraft's autopilot (Example~\ref{ex:cascade-aircraft}) returns in Lessons~IV.11–IV.13 and IV.17.
+\end{itemize}
+\end{lookahead}
 
 \begin{remember}
 \begin{itemize}
-  \item A cascade cuts the chain of integrators into pieces: position → velocity → thrust vector → attitude → rate → mixer.
-  \item Each loop's output is the next loop's setpoint; the thrust-vector block turns an acceleration into an attitude.
+  \item A cascade cuts the chain of integrators into pieces: position → velocity → thrust vector → attitude → rate → mixer. Each loop's output is the next loop's setpoint.
+  \item The thrust-vector block turns an acceleration into an attitude and a thrust: $\vec F_{des} = \hat m(\vec a_{sp} - \vec g)$. The mixer turns thrust and torques into four motor thrusts by inverting a $4 \times 4$ matrix.
   \item The velocity loop's integral holds steady forces such as wind.
-  \item Inner loops must be much faster than outer ones; tune from the inside out.
+  \item A P loop on an integrator has the time constant $1/K$. Two nested ones have $\zeta = \tfrac12\sqrt{K_{inner}/K_{outer}}$: a ratio of 4 is critical.
+  \item Tune from the inside out; when the inner loops are fast, design the outer ones on the reduced model.
 \end{itemize}
 \end{remember}
 
@@ -112,12 +283,22 @@ The same structure appears in electric drives (a position loop around a speed lo
 \end{curiosity}
 
 \begin{exercises}
-\exercise[1] The velocity loop asks for $\vec a_{sp} = (2, 0, 0)\,\si{m/s^2}$ while hovering. Compute $\vec F_{des}$, the tilt, and the collective thrust for $\hat m = \SI{1}{kg}$.
-\answer{$\vec F_{des} = (2, 9.81, 0)$\,N (with $\vec g = (0,-9.81,0)$), $|\vec F| = \SI{10.01}{N}$, tilt $\arctan(2/9.81) = 11.5^\circ$.}
-\exercise[2] Invert the mixer matrix of \cref{eq:cascade-mixer} symbolically. (Hint: its rows are orthogonal.)
-\answer{The rows of $A$ are mutually orthogonal: $AA^\T = \diag(4, 4d^2, 4c_\tau^2, 4d^2)$, so $A^{-1} = A^\T\,\diag(\tfrac14, \tfrac1{4d^2}, \tfrac1{4c_\tau^2}, \tfrac1{4d^2})$, e.g.\ $f_1 = \tfrac T4 + \tfrac{\tau_x}{4d} + \tfrac{\tau_y}{4c_\tau} + \tfrac{\tau_z}{4d}$.}
-\exercise[2] Hovering, a pitch torque of \SI{0.2}{N.m} is requested with $d = 0.17/\sqrt2 = \SI{0.12}{m}$. How much must each motor change?
-\answer{$\Delta f = \tau_z/(4d) = 0.2/0.48 = \SI{0.42}{N}$: $f_1, f_2$ up, $f_3, f_4$ down by \SI{0.42}{N} each (from \SI{2.45}{N}).}
-\exercise[3] Model the closed rate loop as a first-order lag with time constant $\tau_r$, and the attitude loop as $\dot\theta = \omega$, $\omega_{sp} = K_{att}(\theta_{sp} - \theta)$. Find the closed-loop poles of the attitude loop and the condition for $\zeta \ge 0.7$. Evaluate for $K_{att} = 8$ and $\tau_r = \SI{20}{ms}$.
-\answer{$\tau_r\ddot\theta + \dot\theta = K_{att}(\theta_{sp} - \theta)$: $\omega_n = \sqrt{K_{att}/\tau_r}$, $\zeta = 1/(2\sqrt{K_{att}\tau_r})$. $\zeta \ge 0.7$ needs $K_{att}\tau_r \le 0.51$. With $8 \cdot 0.02 = 0.16$: $\zeta = 1.25$, well damped.}
+\exercise[1] The velocity loop asks for $\vec a_{sp} = (0, 0, -3)\,\si{m/s^2}$ while hovering. Compute $\vec F_{des}$, the tilt and its direction, and the thrust once the tilt is reached, for $\hat m = \SI{1}{kg}$.
+\answer{$(0,\ 9.81,\ -3)$\,N; tilt $\arctan(3/9.81) = 17.0^\circ$ towards $-z$; $T = \SI{10.26}{N}$.}
+\exercise[1] Hovering, the rate loop asks for a roll torque $\tau_x = \SI{0.1}{N.m}$ and a yaw torque $\tau_y = \SI{0.01}{N.m}$ at the same time ($c_\tau = \SI{0.016}{m}$). Find the four thrusts.
+\answer{$\tau_x/(4d) = 0.208$, $\tau_y/(4c_\tau) = 0.156$. Signs from the columns of $M$: $f_1 = 2.45 + 0.21 + 0.16 = 2.82$, $f_2 = 2.45 - 0.21 - 0.16 = 2.09$, $f_3 = 2.45 - 0.21 + 0.16 = 2.40$, $f_4 = 2.45 + 0.21 - 0.16 = 2.50$\,N.}
+\exercise[1] The wind of the lesson rises to \SI{7}{m/s} (drag $0.12 \cdot 49 = \SI{5.9}{N}$). With the velocity integral off, how far downwind does the drone settle?
+\answer{$v_{sp} = 5.9/2.2 = \SI{2.67}{m/s}$, $x = 2.67/1.2 = \SI{2.2}{m}$.}
+\exercise[2]\exkind{derive} Add the attitude loop to Example~\ref{ex:cascade-nested} as a first-order lag with the time constant $1/K_{att}$, keep the two outer P loops, and write the characteristic polynomial of the three loops together. Use \cref{thm:spring-routh} to find the smallest $K_{att}$ for which the chain is stable with $K_v = 2.2$, $K_x = 1.2$.
+\answer{$\theta$-lag: $\dot a = K_{att}(a_{sp} - a)$, with $\dot v = a$, $a_{sp} = K_v(K_x(x_{sp} - x) - v)$: $s^3 + K_{att}s^2 + K_{att}K_vs + K_{att}K_vK_x$. Routh: $K_{att} \cdot K_{att}K_v > K_{att}K_vK_x$, i.e.\ $K_{att} > K_x = 1.2$. The default 8 is far above.}
+\exercise[2]\exkind{derive} Show that the rate loop with the motor lag, $\tau_m\ddot\omega + \dot\omega + K\omega = K\omega_{sp}$, has $\zeta = 1/(2\sqrt{K\tau_m})$, and find the largest rate gain $K$ for which $\zeta \ge 0.5$. Why can the rate gain of a drone with slower motors not be as high?
+\answer{$\omega_n^2 = K/\tau_m$, $2\zeta\omega_n = 1/\tau_m$. $\zeta \ge 0.5$ needs $K \le 1/\tau_m = \SI{33}{s^{-1}}$. With $\tau_m = \SI{60}{ms}$ the limit halves: the actuator sets the speed of the innermost loop, and through the ratios the speed of all the others.}
+\exercise[2]\exkind{derive} In Example~\ref{ex:cascade-aircraft} the altitude and vertical-speed loops are P loops with gains 0.1 and \SI{0.3}{s^{-1}}. What are $\zeta$ and the overshoot of the pair (\cref{thm:cascade-nested})? Which altitude gain would remove the overshoot?
+\answer{$\zeta = \tfrac12\sqrt{3} = 0.87$, overshoot $e^{-\pi \cdot 0.87/0.5} = 0.4\,\%$. None for $K_h \le 0.3/4 = \SI{0.075}{s^{-1}}$.}
+\exercise[2]\exkind{fly} In Lesson~13 switch the wind off and make a \SI{1}{m} step in $x$ (drag the sphere, or use the square-wave profile on the $x$ axis). Read the overshoot. Then set \ui{Position P — horizontal} to 0.55 and repeat; then to 2.2. Compare the three overshoots with \cref{eq:cascade-zeta}.
+\answer{About 11\,\%, then none, then about 30\,\%: the formula gives $\zeta = 0.68$, $1.0$ and $0.5$ (overshoots of 5\,\%, 0 and 16\,\% for the two loops alone; the integral and the inner loops add the rest).}
+\exercise[2]\exkind{code} Read \texttt{cascade\_model} in \src{book/tools/figs\_predict.py}, the twenty-line model of \cref{fig:cascade-predict}, and find in \src{src/control/cascade.ts} the line that corresponds to each of its lines. Which features of the real cascade does the model leave out? Remove the velocity integral from the model and compute the overshoot.
+\answer{Left out: the three-dimensional rotation and the quaternion error, the mixer and its saturation logic, the sampling of each loop, the D filters of the rate loop, the projection of the thrust on the current axis. Without the velocity integral the model's overshoot falls from 10.9\,\% to about 7\,\%.}
+\exercise[3]\exkind{derive} The mixer when it cannot deliver. In hover the rate loop asks for $\tau_z = \SI{1.5}{N.m}$, more than the \SI{1.18}{N.m} of Example~\ref{ex:cascade-mixer}. Compute the four thrusts from $M^{-1}$ and show which constraint is violated. If the collective thrust may be raised, what is the smallest $T$ for which the torque can be delivered, and is it within the motors' range?
+\answer{$\tau_z/(4d) = 3.12$: $f_{3,4} = 2.45 - 3.12 < 0$. Raising $T$ until $f_{3,4} = 0$: $T/4 = 3.12$, $T = \SI{12.5}{N}$, with $f_{1,2} = \SI{6.24}{N}$ — just above $f_{max} = \SI{6.1}{N}$. The torque cannot be delivered in full; the largest deliverable is $4d \cdot 3.05 = \SI{1.47}{N.m}$ at $T = \SI{12.2}{N}$, and the drone climbs while it turns.}
 \end{exercises}

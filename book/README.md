@@ -63,6 +63,10 @@ book/
 - A chapter follows the standard of `docs/curriculum.md` §4. Lessons 1–4
   are the model: the section _The engineer's view_, the `lookahead` box
   and exercises labelled `\exkind{derive}`, `\exkind{fly}`, `\exkind{code}`.
+- General claims are stated in `theorem` environments (numbered per lesson)
+  with a `proof` or a cited source; sources go into `back/reading.tex`.
+  Symbols follow the Prelude's notation table: `\vx` for a state vector,
+  `\Id` for the identity matrix, `J` for inertia, `I` for the integral term.
 - Exercises use `\exercise`, and their solutions go into `\answer{...}`
   right after them. The build collects the answers into
   `build/main.ans` for the companion volume; they are not printed here.

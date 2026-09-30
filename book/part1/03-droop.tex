@@ -251,6 +251,40 @@ load ramping at $\dot d$ & grows without bound & $\dot d/K_i$\\
 A loop follows without error exactly those inputs that its own integrators can produce. The drone integrates force twice on the way to position, so a constant setpoint costs nothing. One integrator in the controller, placed before the point where the load enters, holds a constant load; a ramping load would need two. Each integrator buys one more power of $t$, and each one costs stability, as \lessonref{les:integral} will show.
 \end{keyidea}
 
+\subsection{In formal terms}
+\enquote{The integral removes the droop} is true under three hypotheses, and each of them fails somewhere in this book.
+
+\begin{theorem}[Integral action]
+\label{thm:droop-integral}
+Consider the altitude loop $m\ddot y = T - mg + d$ with a thrust limited to $0 \le T \le T_{max}$, the controller $T = \hat m g + K_p e + I - K_d\dot y$ with $\dot I = K_i e$, $K_i > 0$, and a constant setpoint $r$ and load $d$.
+\begin{enumerate}[label=(\roman*)]
+  \item At every equilibrium $e = 0$ and $I^* = (m - \hat m)\,g - d$.
+  \item An equilibrium exists if and only if the thrust it needs can be delivered: $0 \le mg - d \le T_{max}$.
+  \item If that equilibrium is asymptotically stable, then $e(t) \to 0$ from every initial state in its region of attraction. For the loop away from its limits this holds if and only if $K_i < K_p K_d/m$.
+\end{enumerate}
+\end{theorem}
+\begin{proof}
+(i)~At an equilibrium $\dot I = K_i e = 0$, so $e = 0$; with $\dot y = \ddot y = 0$ the plant gives $T^* = mg - d$ and the controller $T^* = \hat m g + I^*$. (ii)~$T^*$ must lie in the range of the motors. (iii)~The first claim is the definition of asymptotic stability. Near the equilibrium the loop is linear with the characteristic polynomial $m s^3 + K_d s^2 + K_p s + K_i$ (Example~\ref{ex:droop-exact}), and \cref{thm:spring-routh}\,(ii) with \cref{thm:spring-indirect} gives the condition.
+\end{proof}
+
+The three hypotheses are three ways to fail. The load may exceed what the motors can carry, and then there is no equilibrium to reach: \lessonref{les:windup}. The integral gain may be too large for stability: \lessonref{les:integral}. And the load may not be constant: Example~\ref{ex:droop-burn}. The theorem is the simplest case of the \emph{internal model principle}: to reject a class of disturbances completely, a controller must contain a generator of that class, and the generator of a constant is an integrator (Francis and Wonham, 1976).
+
+\begin{theorem}[Steady-state errors of the linear altitude loop]
+\label{thm:droop-errors}
+Let the loop be $m\ddot y = K_p e + I - K_d\dot y + d$ with $\dot I = K_i e$ (exact feedforward, no drag, no saturation), and let the setpoint and the load be $r(t) = r_0 + v_r t$ and $d(t) = d_0 + \dot d\,t$ with constants $v_r$, $d_0$, $\dot d$.
+\begin{enumerate}[label=(\roman*)]
+  \item Without the integral ($K_i = 0$, $I = 0$; $K_p, K_d > 0$): if $\dot d = 0$, then $e(t) \to (K_d v_r - d_0)/K_p$; if $\dot d \ne 0$, $|e(t)|$ grows without bound.
+  \item With the integral ($0 < K_i < K_p K_d/m$): $e(t) \to -\dot d/K_i$, whatever $v_r$ and $d_0$ are.
+\end{enumerate}
+\end{theorem}
+\begin{proof}
+With $\dot y = v_r - \dot e$ and $\ddot y = -\ddot e$ the loop reads $m\ddot e + K_d\dot e + K_p e + I = K_d v_r - d$. Every solution of a linear equation is one particular solution plus a solution of the homogeneous equation, and the latter decays by \cref{thm:spring-routh}. (i)~If $\dot d = 0$ the right-hand side is constant and $e = (K_d v_r - d_0)/K_p$ is a particular solution; otherwise the particular solution is linear in $t$ with the slope $-\dot d/K_p$. (ii)~Differentiating once gives $m\dddot e + K_d\ddot e + K_p\dot e + K_i e = -\dot d$, with the constant particular solution $e = -\dot d/K_i$.
+\end{proof}
+
+The signs follow the convention of the book: $d$ is positive upwards, so a downward load $F$ is $d_0 = -F$ and part (i) returns the droop $F/K_p$ of this lesson. The table above lists the magnitudes.
+
+The quasi-static shortcut of Example~\ref{ex:droop-tau} also has a name and a hypothesis. It is a \emph{singular perturbation} argument: a fast subsystem (the drone under P and D, poles at $-2$ and $-5$) is assumed to be at its equilibrium while a slow variable (the integral) moves. It is justified when the fast subsystem is asymptotically stable and the two time scales are far apart, and its error is of the order of their ratio (Khalil, 2002, ch.~11). Here the relative correction to the slow pole was $K_d K_i/K_p^2 = 0.056$.
+
 \begin{lookahead}
 \begin{itemize}[leftmargin=1.2em]
   \item The table above is the beginning of a classification that engineers call the \emph{type} of a loop. Lesson~III.2 derives it for any loop from its transfer function, together with the Routh–Hurwitz test that limits how many integrators a loop can carry.
@@ -304,4 +338,6 @@ The small remaining frequency error is then removed on a slower time scale, over
 \answer{Copy the existing test, keep \texttt{feedforward} on, set \texttt{p.control.model.mass = 0.9}, and expect $0.1\cdot9.81/K_p$. It exercises the line that computes \texttt{ff} as the model mass times gravity.}
 \exercise[3]\exkind{code} The spraying drone of Example~\ref{ex:droop-burn} knows how fast it sprays. Change \src{src/control/altitude.ts} so that the feedforward uses a mass that falls at a given rate while spraying, and fly the experiment again (the run is \texttt{droop-burn} in \src{scripts/book-data.ts}). What error do you expect during the burn, and what if the assumed rate is 10\,\% too low?
 \answer{With the right rate the unknown load vanishes and so does the error. With a rate 10\,\% too low the load ramps at $0.1\dot d$ and the error is ten times smaller than before, \SI{6}{cm} for $K_i = 0.8$.}
+\exercise[2]\exkind{derive} Use \cref{thm:droop-integral}. What is the heaviest drone for which the altitude loop has an equilibrium at all, given $T_{max} = \SI{24.4}{N}$? A drone of \SI{2}{kg} flies with $\hat m = \SI{1}{kg}$, $K_p = 10$, $K_d = 7$: what is $I^*$, and what is the largest $K_i$ for which the theorem guarantees that the error vanishes?
+\answer{$mg \le T_{max}$ gives $m \le \SI{2.49}{kg}$. $I^* = (m - \hat m)g = \SI{9.81}{N}$. $K_i < K_pK_d/m = 35$.}
 \end{exercises}

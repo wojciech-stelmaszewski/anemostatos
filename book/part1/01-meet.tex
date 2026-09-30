@@ -328,6 +328,71 @@ Feedback is powerful, and it is worth knowing its limits on the first day.
 The loop drives the \emph{measurement} to the setpoint, not the truth. If the altimeter reads $b$ too high, the controller is satisfied when $y + b = r$, so the drone flies at $y = r - b$: exactly $b$ too low, however good the gains, integral or not. Feedback removes the effect of every disturbance that enters \emph{after} the comparison and of none that enters through the sensor. This is why the second half of Part~I is about sensors, and why estimation takes as many lessons of this course as control does.
 \end{watchout}
 
+\subsection{In formal terms}
+The statements of this lesson, made exact. Every lesson has such a subsection. It can be skipped on a first reading, and should not be on the second.
+
+\begin{definition}{Linear time-invariant system}
+A system is \term{linear and time-invariant} (LTI) if its state $\vx(t) \in \mathbb{R}^n$ obeys
+\begin{equation}\label{eq:meet-lti}
+  \dot{\vx} = A\,\vx + B\,\symbf u, \qquad \symbf y = C\,\vx ,
+\end{equation}
+with constant matrices $A$ ($n \times n$), $B$ ($n \times p$) and $C$ ($q \times n$), an input $\symbf u(t) \in \mathbb{R}^p$ and an output $\symbf y(t) \in \mathbb{R}^q$. For the L1 drone of \cref{eq:meet-state}, $n = 2$ and $\vx = (y, v)^\T$; the input is the net force $u = T - mg + d$, the output is the altitude, and
+\begin{equation*}
+  A = \begin{pmatrix} 0 & 1 \\ 0 & 0 \end{pmatrix}, \qquad
+  B = \begin{pmatrix} 0 \\ 1/m \end{pmatrix}, \qquad
+  C = \begin{pmatrix} 1 & 0 \end{pmatrix}.
+\end{equation*}
+\end{definition}
+
+\begin{theorem}[The solution of a linear system]
+\label{thm:meet-solution}
+Let $A$ and $B$ be constant real matrices and $\symbf u$ a piecewise continuous function on $[0, \infty)$. Then for every initial state $\vx_0$ the problem $\dot{\vx} = A\vx + B\symbf u$, $\vx(0) = \vx_0$, has exactly one solution,
+\begin{equation}\label{eq:meet-voc}
+  \vx(t) = e^{At}\,\vx_0 + \int_0^t e^{A(t - \tau)}\,B\,\symbf u(\tau)\,\dd\tau ,
+  \qquad\text{where}\qquad e^{At} = \sum_{k=0}^{\infty} \frac{(At)^k}{k!} .
+\end{equation}
+\end{theorem}
+\begin{proof}
+The series converges for every $t$, because $\|(At)^k/k!\| \le (\|A\|\,t)^k/k!$, and it may be differentiated term by term, which gives $\frac{\dd}{\dd t}e^{At} = A\,e^{At}$. Differentiating \cref{eq:meet-voc} then gives $\dot{\vx} = A\vx + B\symbf u$ wherever $\symbf u$ is continuous, and $\vx(0) = \vx_0$. For uniqueness let $\symbf z$ be the difference of two solutions. Then $\dot{\symbf z} = A\symbf z$ and $\symbf z(0) = 0$, so $\frac{\dd}{\dd t}\big(e^{-At}\symbf z\big) = e^{-At}(\dot{\symbf z} - A\symbf z) = 0$. Hence $e^{-At}\symbf z$ keeps its initial value, zero, and since $e^{-At}$ has the inverse $e^{At}$, $\symbf z = 0$.
+\end{proof}
+
+This theorem is what makes the state a state: $\vx_0$ and the input from now on fix the whole future, and nothing else is needed. For the drone the series even stops after two terms, because $A^2 = 0$:
+\begin{equation*}
+  e^{At} = \Id + At = \begin{pmatrix} 1 & t \\ 0 & 1 \end{pmatrix},
+\end{equation*}
+and for a constant net force $u_0$ \cref{eq:meet-voc} becomes
+\begin{equation*}
+  y(t) = y_0 + v_0 t + \frac{u_0}{2m}\,t^2, \qquad v(t) = v_0 + \frac{u_0}{m}\,t .
+\end{equation*}
+Example~\ref{ex:meet-open} is this formula with $u_0 = \SI{-0.49}{N}$. The model with drag is not linear and has no such formula, but it still has exactly one solution from every initial state, because its right-hand side is continuously differentiable (Khalil, 2002, ch.~3).
+
+\begin{theorem}[A loop with integral action regulates its measurement]
+\label{thm:meet-sensor}
+Let a controller contain a state $I$ with $\dot I = K_i\,(r - y_m)$, where $K_i \ne 0$, the setpoint $r$ is constant, and $y_m = y + b$ is the measurement of the controlled variable $y$ with a constant sensor error $b$. Then at every equilibrium of the closed loop $y_m = r$, that is, $y = r - b$ — whatever the plant, the other terms of the controller and the constant disturbances.
+\end{theorem}
+\begin{proof}
+At an equilibrium every derivative vanishes, in particular $\dot I = K_i(r - y_m) = 0$.
+\end{proof}
+
+The theorem says nothing about whether an equilibrium exists or is ever reached; \lessonref{les:droop} adds those hypotheses. It is the exact form of the warning above: the sensor error $b$ passes to the output undiminished.
+
+\begin{theorem}[Accuracy of the discrete integral and derivative]
+\label{thm:meet-discrete}
+Let $e$ be twice continuously differentiable on $[0, t_N]$ and $t_k = k\,\Delta t$. Then
+\begin{align*}
+  \Big|\sum_{k=1}^{N} e(t_k)\,\Delta t - \int_0^{t_N} e(\tau)\,\dd\tau\Big| &\le \tfrac12\,\Delta t\;t_N\,\max|\dot e| , \\
+  \Big|\frac{e(t_k) - e(t_{k-1})}{\Delta t} - \dot e(t_k)\Big| &\le \tfrac12\,\Delta t\,\max|\ddot e| .
+\end{align*}
+\end{theorem}
+\begin{proof}
+On the interval $[t_{k-1}, t_k]$, by the mean value theorem, $|e(t_k) - e(\tau)| \le \max|\dot e|\,(t_k - \tau)$. Integrating this over the interval bounds its share of the error by $\tfrac12\max|\dot e|\,\Delta t^2$, and there are $N = t_N/\Delta t$ intervals. For the derivative, Taylor's theorem with the Lagrange remainder gives, for some $\xi$ in the interval,
+\begin{equation*}
+  e(t_{k-1}) = e(t_k) - \dot e(t_k)\,\Delta t + \tfrac12\,\ddot e(\xi)\,\Delta t^2 .
+\end{equation*}
+\end{proof}
+
+Both errors shrink in proportion to $\Delta t$: the two rules are \emph{first-order accurate}. With $\Delta t = \SI{4}{ms}$ and an error whose second derivative stays below the drone's largest acceleration, about \SI{15}{m/s^2}, the derivative is wrong by at most \SI{0.03}{m/s}, which $K_d = 7$ turns into \SI{0.2}{N}.
+
 \begin{lookahead}
 Each idea of this lesson returns later in the course, sharper.
 \begin{itemize}[leftmargin=1.2em]
@@ -386,4 +451,6 @@ Eighty years later Norbert Wiener named his new science \emph{cybernetics} partl
 \answer{Unscaled: the I term doubles at once to \SI{0.98}{N}, a thrust jump of \SI{0.49}{N}. Scaled: nothing jumps; only the future growth rate doubles. The test is \enquote{changing Ki does not jump the output (integral stored pre-scaled)}; run it with \texttt{make test}.}
 \exercise[3]\exkind{code} Write the core of the simulator yourself, in any language: a loop with $\Delta t = \SI{1}{ms}$ that updates $v \leftarrow v + \big(T - mg - c_v|v|v\big)\Delta t/m$ and then $y \leftarrow y + v\,\Delta t$, with $T = \SI{9.81}{N}$, $m = \SI{1.05}{kg}$, $c_v = 0.25$. Start at rest at \SI{2}{m}, stop at \SI{0.052}{m}, and reproduce both model curves of \cref{fig:meet-predict} (set $c_v = 0$ for the first). Then open \src{src/sim/dynamics.ts}, find the two lines that do the same, and note their order. What is the method called, and what would the other order be?
 \answer{Touchdown at \SI{2.89}{s} without drag and \SI{3.12}{s} with it. The simulator updates the velocity first and uses the \emph{new} velocity for the position: semi-implicit (symplectic) Euler. Using the old velocity is explicit Euler, which slowly adds energy to an oscillating system.}
+\exercise[2]\exkind{derive} Compute $e^{At}$ for the drone's $A$ from the series of \cref{thm:meet-solution} and evaluate \cref{eq:meet-voc} for a force that is zero until $t_1$ and the constant $u_0$ afterwards. Check the result against elementary mechanics.
+\answer{$A^2 = 0$, so $e^{At} = \Id + At$. For $t > t_1$: $v = v_0 + u_0(t - t_1)/m$, $y = y_0 + v_0 t + u_0(t - t_1)^2/(2m)$: uniform motion until $t_1$, then uniform acceleration.}
 \end{exercises}

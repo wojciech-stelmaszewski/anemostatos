@@ -65,10 +65,10 @@ The motors sit on an X-shaped frame (\cref{fig:prelude-motors}). Their thrust di
 \end{equation}
 with $d = L/\sqrt2$, $L = \SI{0.17}{m}$ and $c_\tau = \SI{0.016}{m}$. The body rotates according to Euler's equation and the attitude quaternion $q$ integrates the angular velocity:
 \begin{equation}\label{eq:prelude-rot}
-  I\,\dot{\vec\omega} = \vec\tau - \vec\omega \times (I\vec\omega) - c_\omega\vec\omega ,\qquad
+  J\,\dot{\vec\omega} = \vec\tau - \vec\omega \times (J\vec\omega) - c_\omega\vec\omega ,\qquad
   \dot q = \tfrac12\,q\otimes(0, \vec\omega).
 \end{equation}
-The inertia is diagonal, $I = \diag(0.0082,\ 0.0149,\ 0.0082)\,\si{kg.m^2}$, the middle entry being the yaw axis. Quaternions — four numbers that describe a rotation without the singularities of angles — are explained in \lessonref{les:geometric} and the \hyperref[app:quat]{appendix}.
+The inertia matrix is diagonal, $J = \diag(0.0082,\ 0.0149,\ 0.0082)\,\si{kg.m^2}$, the middle entry being the yaw axis. Quaternions — four numbers that describe a rotation without the singularities of angles — are explained in \lessonref{les:geometric} and the \hyperref[app:quat]{appendix}.
 \marginnote{\input{tikz/motors}\par\vspace{2pt}\captionsetup{type=figure}\caption{The motor layout seen from above.}\label{fig:prelude-motors}}
 
 \subsection*{Ground}
@@ -95,20 +95,43 @@ The simulator is written in TypeScript. The physics and the controllers are plai
 \end{itemize}
 \end{inapp}
 
-\section*{Notation}
+\clearpage
+\section*{Notation and conventions}
+\label{sec:notation}
+
+The same symbol means the same thing in every chapter. Where the literature uses one letter for two things, this book keeps them apart, and the table says how.
 
 \begin{center}\small
-\begin{tabularx}{\linewidth}{@{}lX@{\hspace{1.5em}}lX@{}}
+\renewcommand{\arraystretch}{1.12}
+\begin{tabularx}{\linewidth}{@{}l>{\raggedright\arraybackslash}X@{\hspace{1.2em}}l>{\raggedright\arraybackslash}X@{}}
 \toprule
-$y$ & altitude (up) & $\vec p,\ \vec v$ & position, velocity\\
-$r$ & setpoint (reference) & $q,\ R(q)$ & attitude quaternion, rotation matrix\\
-$e = r - y$ & error & $\vec\omega$ & body angular velocity\\
-$u$ & controller output & $T,\ f_i$ & collective thrust, motor thrusts\\
-$K_p,\ K_i,\ K_d$ & PID gains & $\tau_m$ & motor time constant\\
-$m,\ \hat m$ & true and assumed mass & $\Delta t$ & controller sample period\\
-$\omega_n,\ \zeta$ & natural frequency, damping ratio & $s$ & Laplace variable\\
-$x$ & state vector (Part II) & $d$ & disturbance\\
+\multicolumn{4}{@{}l}{\sffamily\bfseries Signals of a loop}\\
+$r$ & setpoint (reference) & $y$ & controlled variable; at L1 the altitude\\
+$e = r - y$ & error, positive when too low & $x = y - r$ & deviation from the setpoint, $x = -e$\\
+$u$ & controller output (command) & $d$ & disturbance, positive upwards\\
+$T$ & total thrust & $f_i$ & thrust of motor $i$\\
+\midrule
+\multicolumn{4}{@{}l}{\sffamily\bfseries The controller and the plant}\\
+$K_p,\ K_i,\ K_d$ & PID gains & $I$ & the integral term, $I = K_i\!\int\! e\,\dd t$\\
+$m,\ \hat m$ & true and assumed mass & $g$ & \SI{9.81}{m/s^2}\\
+$\tau_m$ & motor time constant & $c_v$ & vertical drag coefficient\\
+$\Delta t$ & controller sample period & $t_k = k\,\Delta t$ & sampling instants; $e_k = e(t_k)$\\
+$\omega_n,\ \zeta$ & natural frequency, damping ratio & $\omega_d$ & damped frequency\\
+$T_{osc}$ & period of an oscillation & $\tau$ & a time constant or a delay\\
+\midrule
+\multicolumn{4}{@{}l}{\sffamily\bfseries Vectors, matrices, complex numbers}\\
+$\vx,\ \symbf{u}$ & state and input vectors: bold & $A,\ B,\ C,\ K$ & matrices: italic capitals\\
+$\Id$ & the identity matrix & $A^\T$ & transpose\\
+$\vec p,\ \vec v,\ \vec\omega$ & vectors in 3D space: arrows & $J$ & inertia (a number or a matrix)\\
+$q,\ R(q)$ & attitude quaternion, rotation matrix (body to world) & $\|\cdot\|,\ |\cdot|$ & Euclidean norm, absolute value\\
+$s = \sigma + j\omega$ & complex frequency; $j = \sqrt{-1}$ & $\operatorname{Re},\ \operatorname{Im}$ & real and imaginary part\\
 \bottomrule
 \end{tabularx}
 \end{center}
-A hat marks an estimate or a belief ($\hat m$, $\hat x$); a subscript $sp$ a setpoint; $ss$ a steady-state value. Vectors in 3D space carry arrows; state vectors and matrices of Part~II do not.
+
+\begin{description}[leftmargin=0pt, itemsep=3pt, font=\sffamily\small\bfseries]
+  \item[Marks.] A dot is a derivative with respect to time, $\dot y = \dd y/\dd t$. A hat is an estimate or a belief ($\hat m$, $\hat{\vx}$). A star is an equilibrium ($e^*$). The subscript $ss$ is a steady-state value, $sp$ a setpoint passed from one loop to the next, $0$ an initial value.
+  \item[Frames and signs.] The world frame has $y$ pointing up and $x$, $z$ horizontal. Forces, positions and velocities along $y$ are positive upwards. The body frame is fixed to the drone, with its $y$-axis along the thrust.
+  \item[Units.] SI throughout. Angles are in radians and frequencies in \si{rad/s} in every formula; degrees and hertz appear only where they are written out.
+  \item[Statements.] A \emph{Definition} fixes a term. A \emph{Theorem} is a general statement with its hypotheses, followed by a proof, whose end is marked \rule{0.45em}{0.45em}, or by the source where the proof is found. A \emph{Result} is a formula derived for our drone. A \emph{Key idea} is the same thing in words. Theorems are numbered within each lesson, and the sources are listed in the \hyperref[app:refs]{references}.
+\end{description}

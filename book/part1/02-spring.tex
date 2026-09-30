@@ -209,12 +209,13 @@ To see the linear behaviour at $K_p = 40$, keep the step small: press \key{↑} 
 In \lessonref{les:meet} we wrote the plant with its state, the position and the velocity. The closed loop \eqref{eq:spring-ode} has the same state, $(x, \dot x)$, and in that form it reads
 \begin{equation}\label{eq:spring-state}
   \frac{\dd}{\dd t}\begin{pmatrix} x \\ \dot x \end{pmatrix}
-  = \underbrace{\begin{pmatrix} 0 & 1 \\ -K_p/m & 0 \end{pmatrix}}_{A}\begin{pmatrix} x \\ \dot x \end{pmatrix}.
+  = \underbrace{\begin{pmatrix} 0 & 1 \\ -K_p/m & 0 \end{pmatrix}}_{A}\begin{pmatrix} x \\ \dot x \end{pmatrix},
+  \qquad\text{in short}\quad \dot{\vx} = A\,\vx \quad\text{with}\quad \vx = (x, \dot x)^\T .
 \end{equation}
-Try a solution $e^{st}\mathbf v$ with a constant vector $\mathbf v$. Differentiating multiplies it by $s$, so $s\,\mathbf v = A\mathbf v$: the number $s$ must be an eigenvalue of $A$. The eigenvalues are the roots of $\det(sI - A) = s^2 + K_p/m$, which is the characteristic equation \eqref{eq:spring-char} once more.
+Try a solution $e^{st}\symbf v$ with a constant vector $\symbf v$. Differentiating multiplies it by $s$, so $s\,\symbf v = A\symbf v$: the number $s$ must be an eigenvalue of $A$. The eigenvalues are the roots of $\det(s\Id - A) = s^2 + K_p/m$, which is the characteristic equation \eqref{eq:spring-char} once more.
 
 \begin{result}[Poles are eigenvalues]
-Write a linear system as $\dot{\mathbf x} = A\mathbf x$. Its poles are the eigenvalues of the state matrix $A$, and its characteristic polynomial is $\det(sI - A)$. For two states this is a second way to write what we already had. For twelve it is the only practical way, and it is how the simulator computes the poles it displays for the controllers of Part~II (\src{src/math/mat.ts}, function \texttt{eigenvalues}).
+Write a linear system as $\dot{\vx} = A\vx$. Its poles are the eigenvalues of the state matrix $A$, and its characteristic polynomial is $\det(s\Id - A)$. For two states this is a second way to write what we already had. For twelve it is the only practical way, and it is how the simulator computes the poles it displays for the controllers of Part~II (\src{src/math/mat.ts}, function \texttt{eigenvalues}).
 \end{result}
 
 The plane with $x$ on one axis and $\dot x$ on the other is the \term{phase plane}. A solution is a curve in it, traced as time passes. Energy conservation, $\tfrac12 m\dot x^2 + \tfrac12 K_p x^2 = E$, says that the curves of the ideal spring are ellipses: the drone circles the setpoint for ever, neither closer nor further. In the app, the bottom-right chart can be switched to \ui{phase portrait} to watch the curve being drawn.
@@ -237,7 +238,7 @@ Model the motors as a first-order lag with $\tau = \SI{30}{ms}$ and find the pol
   \tau m\,s^3 + m\,s^2 + K_p = 0 .
 \end{equation*}
 
-\textbf{Step 4 — a test without solving.} If all three roots had negative real parts, the polynomial would be a product of factors $(s + a)$ and $(s^2 + bs + c)$ with positive $a$, $b$, $c$, and multiplying such factors out gives only positive coefficients. Ours has no $s$ term at all: its coefficient is zero. So at least one root is not in the left half-plane — for \emph{every} positive $K_p$ and $\tau$. No choice of gain makes this loop stable.
+\textbf{Step 4 — a test without solving.} If all three roots had negative real parts, the polynomial would be a product of factors $(s + a)$ and $(s^2 + bs + c)$ with positive $a$, $b$, $c$, and multiplying such factors out gives only positive coefficients. Ours has no $s$ term at all: its coefficient is zero. So at least one root is not in the left half-plane — for \emph{every} positive $K_p$ and $\tau$. No choice of gain makes this loop stable. (\Cref{thm:spring-routh} below states the test in full.)
 
 \textbf{Step 5 — the roots.} Numerically, for $0.03\,s^3 + s^2 + 10 = 0$:
 \begin{equation*}
@@ -289,6 +290,68 @@ A small satellite with a moment of inertia $J = \SI{12}{kg.m^2}$ about one axis 
 
 \textbf{Step 4 — and nothing stops it.} In orbit there is no air, so there is no drag term and no limit cycle: the oscillation grows until the wheel saturates. This is why no spacecraft is pointed by a proportional law alone. Every attitude controller also feeds back the turn rate measured by gyroscopes, which is the damper of \lessonref{les:damper}.
 \end{example}
+
+\subsection{In formal terms}
+This lesson used the words stable and unstable for where the poles lie. The literature defines them for any system, linear or not, and the pole condition becomes a theorem.
+
+\begin{definition}{Stability of an equilibrium, after Lyapunov}
+Let $\vx^*$ be an equilibrium of $\dot{\vx} = f(\vx)$, that is, $f(\vx^*) = 0$. It is
+\begin{itemize}
+  \item \term{stable} if for every $\varepsilon > 0$ there is a $\delta > 0$ such that $\|\vx(0) - \vx^*\| < \delta$ implies $\|\vx(t) - \vx^*\| < \varepsilon$ for all $t \ge 0$;
+  \item \term{asymptotically stable} if it is stable and there is a $\delta_0 > 0$ such that $\|\vx(0) - \vx^*\| < \delta_0$ implies $\vx(t) \to \vx^*$ as $t \to \infty$;
+  \item \term{globally asymptotically stable} if it is stable and $\vx(t) \to \vx^*$ from every initial state;
+  \item \term{unstable} if it is not stable.
+\end{itemize}
+\end{definition}
+
+In words: start close enough and you stay as close as you like (stable), and moreover you return (asymptotically stable). A system that oscillates for ever with a constant amplitude is stable in this sense. \enquote{Marginally stable} means stable but not asymptotically stable.
+
+\begin{theorem}[Stability of a linear system]
+\label{thm:spring-linear}
+Let $\lambda_1, \dots, \lambda_n$ be the eigenvalues of $A$. The equilibrium $\vx = 0$ of $\dot{\vx} = A\vx$ is
+\begin{enumerate}[label=(\roman*)]
+  \item asymptotically stable if and only if $\operatorname{Re}\lambda_i < 0$ for every $i$; it is then globally so, and there are constants $c, \alpha > 0$ with $\|\vx(t)\| \le c\,e^{-\alpha t}\|\vx(0)\|$;
+  \item stable if and only if $\operatorname{Re}\lambda_i \le 0$ for every $i$ and every eigenvalue with zero real part has as many independent eigenvectors as its multiplicity;
+  \item unstable in every other case.
+\end{enumerate}
+\end{theorem}
+\begin{proof}
+If $A$ has $n$ independent eigenvectors $\symbf v_i$, every solution is $\sum_i c_i\,e^{\lambda_i t}\symbf v_i$ by \cref{thm:meet-solution}, and $|e^{\lambda_i t}| = e^{\operatorname{Re}\lambda_i\,t}$, from which the three cases follow. A matrix without a full set of eigenvectors adds terms $t^k e^{\lambda_i t}$; they still decay when $\operatorname{Re}\lambda_i < 0$ and grow when $\operatorname{Re}\lambda_i = 0$. The general proof uses the Jordan form of $A$ (Khalil, 2002, ch.~4).
+\end{proof}
+
+The theorem sorts the three systems we have met. The drone alone, \cref{eq:meet-state}, has the eigenvalue $0$ twice and only one eigenvector, $(1, 0)^\T$: case (iii), \emph{unstable} — a drone given the slightest velocity drifts away as $v_0 t$. The ideal P loop has $\pm j\omega_n$, each once: case (ii), stable but not asymptotically. The P loop with its motors has a pair with real part $+0.147$: unstable.
+
+\begin{theorem}[Routh–Hurwitz, degrees two and three]
+\label{thm:spring-routh}
+Let the coefficients be real and the leading one positive.
+\begin{enumerate}[label=(\roman*)]
+  \item All roots of $a_2 s^2 + a_1 s + a_0$ have negative real parts if and only if $a_1 > 0$ and $a_0 > 0$.
+  \item All roots of $a_3 s^3 + a_2 s^2 + a_1 s + a_0$ have negative real parts if and only if $a_2 > 0$, $a_0 > 0$ and $a_2 a_1 > a_3 a_0$.
+  \item For a polynomial of any degree, coefficients that are all positive are necessary.
+\end{enumerate}
+\end{theorem}
+\begin{proof}
+Divide by the leading coefficient. (i)~The roots have the sum $-a_1$ and the product $a_0$. Two real roots are both negative exactly when their sum is negative and their product positive; a complex pair has the real part $-a_1/2$ and a positive product.
+(ii)~A real cubic has a real root, $-a$, so it factors as $(s + a)(s^2 + bs + c)$ with $a_2 = a + b$, $a_1 = ab + c$, $a_0 = ac$, and by (i) all roots lie in the left half-plane exactly when $a, b, c > 0$. A short calculation gives $a_2 a_1 - a_0 = b\,(a\,a_2 + c)$. If $a, b, c > 0$, the three conditions hold. Conversely, $a_0 = ac > 0$ makes $a$ and $c$ of one sign. Were both negative, then $a\,a_2 + c < 0$ and $b = a_2 - a > 0$, so $a_2 a_1 - a_0 < 0$, a contradiction. Hence $a, c > 0$, so $a\,a_2 + c > 0$ and therefore $b > 0$.
+(iii)~A polynomial with all roots in the left half-plane is a product of factors $(s + a)$ and $(s^2 + bs + c)$ with positive $a, b, c$, and such a product has positive coefficients.
+\end{proof}
+
+Step~4 of Example~\ref{ex:spring-cubic} is part (ii) with $a_1 = 0$: then $a_2 a_1 = 0 < a_3 a_0$ for every positive gain and lag. \Lessonref{les:integral} applies the same part to $m s^3 + K_d s^2 + K_p s + K_i$ and finds $K_i < K_p K_d/m$.
+
+\begin{theorem}[Stability from the linearisation]
+\label{thm:spring-indirect}
+Let $f$ be continuously differentiable, $f(\vx^*) = 0$, and let $A$ be the matrix of partial derivatives of $f$ at $\vx^*$.
+\begin{enumerate}[label=(\roman*)]
+  \item If every eigenvalue of $A$ has a negative real part, $\vx^*$ is an asymptotically stable equilibrium of the nonlinear system $\dot{\vx} = f(\vx)$.
+  \item If at least one eigenvalue has a positive real part, $\vx^*$ is unstable.
+  \item If no eigenvalue has a positive real part but some lie on the imaginary axis, $A$ decides nothing: the nonlinear terms do.
+\end{enumerate}
+This is Lyapunov's indirect method; for a proof see Khalil (2002, ch.~4).
+\end{theorem}
+
+This theorem is the licence for analysing a nonlinear drone with linear tools, and it marks where the licence ends. The real P loop is case (ii): the hover is unstable however small the disturbance, and the air drag cannot change that, because $c_v|v|v$ has no linear part — its derivative at $v = 0$ is zero. The ideal P loop is case (iii), and there the drag does decide: with drag and no lag the energy obeys $\dot E = -c_v|\dot x|^3 \le 0$ and the drone comes to rest after all, which the linear model could not know.
+
+One more hypothesis deserves its name. \Cref{eq:spring-amp} was obtained by averaging over one period, which is legitimate when the amplitude changes little within a period, $\sigma \ll \omega$. Here $\sigma/\omega = 0.16/3.16 = 0.05$, and the method of averaging bounds the error by a quantity of that order (Khalil, 2002, ch.~10). The measured $\sigma$ and $A^*$ differ from the predicted ones by 4 to 5\,\%.
 
 \begin{lookahead}
 \begin{itemize}[leftmargin=1.2em]
@@ -345,4 +408,6 @@ In the language of this lesson, the poles of the bridge moved from just left of 
 \answer{The true mass, \texttt{params.drone.mass}: the period is a property of the real plant. A flight computer only has its estimate $\hat m$; the simulator can look at the truth.}
 \exercise[3]\exkind{code} \src{tests/closed-loop.test.ts} holds the closed-loop tests. Add one: calm air, I and D off, exact feedforward, a setpoint step of \SI{0.1}{m}. Measure the time between two successive upward crossings of the setpoint and assert that it is within 3\,\% of $2\pi\sqrt{m/K_p}$ for $K_p = 10$. Then repeat Example~\ref{ex:spring-cubic} for $K_p = 40$ and say what your test must take care of at that gain.
 \answer{About twenty lines with the helpers \texttt{calm} and \texttt{run} of that file; the period is \SI{2.00}{s}. For $K_p = 40$ the roots are $-34.5$ and $+0.56 \pm 6.20j$: the period is \SI{1.01}{s}, 2\,\% longer than $2\pi\sqrt{m/K_p}$, and the oscillation doubles every \SI{1.2}{s}, so it reaches the motor limits within seconds. Measure the first crossings only.}
+\exercise[3]\exkind{derive} Prove from the definition that the ideal P loop is stable. With the Euclidean norm of $\vx = (x, \dot x)^\T$ and the conserved quantity $\dot x^2 + \omega_n^2 x^2$, find a $\delta$ for every $\varepsilon$. Why is the loop not asymptotically stable?
+\answer{If $\omega_n \ge 1$: $x^2 + \dot x^2 \le \dot x^2 + \omega_n^2x^2 = \dot x_0^2 + \omega_n^2x_0^2 \le \omega_n^2\|\vx(0)\|^2$, so $\delta = \varepsilon/\omega_n$ works; if $\omega_n < 1$, $\delta = \varepsilon\,\omega_n$. In both cases $\delta = \varepsilon\min(\omega_n, 1/\omega_n)$. The conserved quantity keeps every solution at a fixed distance from the origin, so none converges.}
 \end{exercises}

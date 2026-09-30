@@ -43,9 +43,9 @@ Why quaternions, not angles, is a story for \lessonref{les:geometric}.
 
 \subsection{Rate: PID, \SI{1}{kHz}}
 \begin{equation}
-  \vec\alpha_{sp} = \mathrm{PID}_{rate}(\vec\omega_{sp} - \vec\omega),\qquad \vec\tau = I\,\vec\alpha_{sp}.
+  \vec\alpha_{sp} = \mathrm{PID}_{rate}(\vec\omega_{sp} - \vec\omega),\qquad \vec\tau = J\,\vec\alpha_{sp}.
 \end{equation}
-The innermost loop controls how fast the drone rotates, from the gyroscope. Multiplying by the inertia matrix $I$ makes the gains physically meaningful (angular accelerations rather than torques). This is the loop where noise and filtering matter most.
+The innermost loop controls how fast the drone rotates, from the gyroscope. Multiplying by the inertia matrix $J$ makes the gains physically meaningful (angular accelerations rather than torques). This is the loop where noise and filtering matter most.
 
 \subsection{Mixer: linear algebra}
 Finally, the four motor thrusts must produce the requested collective thrust and three torques. For the X-shaped frame with arm projection $d$ and rotor torque coefficient $c_\tau$ the relation is linear,

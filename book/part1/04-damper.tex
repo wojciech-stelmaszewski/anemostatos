@@ -239,7 +239,7 @@ In state form the loop \eqref{eq:damper-msd} is
 \begin{equation}\label{eq:damper-state}
   \frac{\dd}{\dd t}\begin{pmatrix} x \\ \dot x \end{pmatrix}
   = \begin{pmatrix} 0 & 1 \\ -K_p/m & -K_d/m \end{pmatrix}\begin{pmatrix} x \\ \dot x \end{pmatrix},
-  \qquad \det(sI - A) = s^2 + \frac{K_d}{m}\,s + \frac{K_p}{m} .
+  \qquad \det(s\Id - A) = s^2 + \frac{K_d}{m}\,s + \frac{K_p}{m} .
 \end{equation}
 The two gains are the two entries of the bottom row: each gain multiplies one state variable. A P–D controller on this plant is \emph{state feedback}, a name that Part~II takes literally.
 
@@ -265,9 +265,61 @@ Return to the energy calculation at the start of this lesson. It proved that the
   \item along every motion $V$ does not increase: $\dot V = -K_d\dot x^2 \le 0$;
   \item $\dot V$ is zero only where $\dot x = 0$, and the system cannot stay at such a point unless $x = 0$ too, because the spring would set it moving.
 \end{enumerate}
-A function with the first two properties is called a \term{Lyapunov function}, after Aleksandr Lyapunov, who introduced the method in 1892. The third step is known as LaSalle's invariance principle. Together they prove stability for systems whose equations cannot be solved at all: springs that are not linear, motors that saturate, a rigid body tumbling in three dimensions.
+A function with the first two properties is called a \term{Lyapunov function}, after Aleksandr Lyapunov, who introduced the method in 1892. The third step is known as LaSalle's invariance principle; both are stated exactly below. Together they prove stability for systems whose equations cannot be solved at all: springs that are not linear, motors that saturate, a rigid body tumbling in three dimensions.
 
 The right panel of \cref{fig:damper-predict} shows $V$ measured in flight. It falls in steps: steeply while the drone moves fast, and not at all at the turning points, where $\dot x = 0$ — exactly what $\dot V = -K_d\dot x^2$ says. The measured curve lies a little below the formula, because the air removes some energy too. And in four hundred samples it rises five times, by less than \SI{0.00004}{J} out of five: small enough to be the motor lag and the sampling, which the ideal loop does not have.
+
+\subsection{In formal terms}
+The three facts of the energy argument are the hypotheses of two theorems.
+
+\begin{definition}{Positive definite functions and their derivative along solutions}
+A continuously differentiable function $V : \mathbb{R}^n \to \mathbb{R}$ is \term{positive definite} if $V(0) = 0$ and $V(\vx) > 0$ for $\vx \ne 0$. It is \term{radially unbounded} if $V(\vx) \to \infty$ as $\|\vx\| \to \infty$. Its \term{derivative along the solutions} of $\dot{\vx} = f(\vx)$ is $\dot V(\vx) = \nabla V(\vx) \cdot f(\vx)$, which can be computed without solving the equation.
+\end{definition}
+
+\begin{theorem}[Lyapunov's direct method]
+\label{thm:damper-lyapunov}
+Let $\vx = 0$ be an equilibrium of $\dot{\vx} = f(\vx)$ with $f$ locally Lipschitz, and let $V$ be positive definite on a neighbourhood of the origin. If $\dot V(\vx) \le 0$ there, the origin is stable. If $\dot V(\vx) < 0$ for all $\vx \ne 0$ there, it is asymptotically stable. (Khalil, 2002, ch.~4.)
+\end{theorem}
+
+\begin{theorem}[The invariance principle]
+\label{thm:damper-lasalle}
+Let $V$ be positive definite and radially unbounded with $\dot V(\vx) \le 0$ on all of $\mathbb{R}^n$. If the only solution that stays in the set $\{\vx : \dot V(\vx) = 0\}$ for all time is $\vx(t) = 0$, then the origin is globally asymptotically stable. (Barbashin and Krasovskii; LaSalle. Khalil, 2002, ch.~4.)
+\end{theorem}
+
+\begin{result}[The P–D loop is globally asymptotically stable]
+For every $m > 0$, $K_p > 0$ and $K_d > 0$ the equilibrium $x = 0$, $\dot x = 0$ of \cref{eq:damper-msd} is globally asymptotically stable.
+\end{result}
+\begin{proof}
+$V = \tfrac12 m\dot x^2 + \tfrac12 K_p x^2$ is positive definite and radially unbounded, and $\dot V = -K_d\dot x^2 \le 0$. This is zero on the whole line $\dot x = 0$ and not only at the origin, so \cref{thm:damper-lyapunov} gives stability and no more. A solution that stays on that line has $\dot x = 0$ for all time, hence $\ddot x = 0$, and \cref{eq:damper-msd} then gives $K_p x = 0$. \Cref{thm:damper-lasalle} applies.
+\end{proof}
+
+Nothing in this proof used the fact that the spring and the damper are linear. It survives the air drag, which only makes $\dot V = -K_d\dot x^2 - c_v|\dot x|^3$ more negative, and a spring that stiffens (an exercise below). It does not survive the motor lag: then the state has a third variable and this $V$ need not decrease at every instant, which is consistent with the five small rises in \cref{fig:damper-predict}.
+
+\begin{theorem}[Step response of the underdamped loop]
+\label{thm:damper-step}
+Let $\ddot x + 2\zeta\omega_n\dot x + \omega_n^2 x = 0$ with $0 < \zeta < 1$, $x(0) = -1$, $\dot x(0) = 0$, and let $\omega_d = \omega_n\sqrt{1 - \zeta^2}$ and $\varphi = \arccos\zeta$. Then
+\begin{enumerate}[label=(\roman*)]
+  \item $x(t) = -\dfrac{e^{-\zeta\omega_n t}}{\sqrt{1 - \zeta^2}}\,\sin(\omega_d t + \varphi)$;
+  \item the largest overshoot is $M_p = e^{-\pi\zeta/\sqrt{1 - \zeta^2}}$, reached at $t_p = \pi/\omega_d$;
+  \item $|x(t)| \le \delta$ for all $t \ge \dfrac{1}{\zeta\omega_n}\Big(\ln\dfrac{1}{\delta} + \dfrac12\ln\dfrac{1}{1 - \zeta^2}\Big)$.
+\end{enumerate}
+\end{theorem}
+\begin{proof}
+(i)~The solution of Example~\ref{ex:damper-mp} contains $\cos\omega_d t + \frac{\zeta}{\sqrt{1 - \zeta^2}}\sin\omega_d t$. Since $\cos\varphi = \zeta$ and $\sin\varphi = \sqrt{1 - \zeta^2}$, this equals $\sin(\omega_d t + \varphi)/\sqrt{1 - \zeta^2}$. (ii)~Example~\ref{ex:damper-mp}; later peaks are smaller because the envelope decays. (iii)~$|\sin| \le 1$ in (i), solved for $t$.
+\end{proof}
+
+The rule $t_s \approx 4/(\zeta\omega_n)$ of \cref{eq:damper-ts} is part (iii) with $\delta = 0.02$ and the second term dropped. Part (iii) is a guarantee and the rule an estimate: for $K_d = 3$ the guarantee is $(3.91 + 0.13)/1.5 = \SI{2.69}{s}$, and the simulator settles in \SI{2.5}{s}.
+
+\begin{theorem}[Pole placement]
+\label{thm:damper-placement}
+Let $\dot{\vx} = A\vx + B u$ have one input and $n$ states, with the feedback $u = -K\vx$. A gain $K$ that gives $\det(s\Id - A + BK)$ any chosen real polynomial of degree $n$ with leading coefficient one exists if and only if the $n \times n$ matrix $\big(B \;\; AB \;\; \cdots \;\; A^{n-1}B\big)$ has rank $n$. The system is then called \term{controllable}. (Wonham, 1967; Kailath, 1980.)
+\end{theorem}
+
+For the drone, with $A$ and $B$ of \cref{eq:meet-lti},
+\begin{equation*}
+  \big(B \;\; AB\big) = \begin{pmatrix} 0 & 1/m \\ 1/m & 0 \end{pmatrix}
+\end{equation*}
+has rank two, and $K = (K_p,\ K_d)$ gives $\det(s\Id - A + BK) = s^2 + (K_d/m)\,s + K_p/m$: the gains of the result above, and the only ones. Controllability is a property of the vehicle, not of the controller. A drone that loses a rotor loses rank, and no gain can replace it (Lessons~III.9 and~III.27).
 
 \begin{lookahead}
 \begin{itemize}[leftmargin=1.2em]
@@ -320,4 +372,6 @@ Your car contains four much smaller dampers doing the same job. Car suspensions 
 \answer{About 2\,\% and \SI{0.86}{s} for the large step, 3\,\% and \SI{0.83}{s} for the small one. The red shading first appears at a step of about \SI{0.43}{m}, as Step~4 predicts.}
 \exercise[2]\exkind{code} In \src{src/engine/metrics.ts} the function \texttt{analyzeLastStep} has a parameter \texttt{band} with the default 0.02. Use the envelope argument behind \cref{eq:damper-ts} to predict the settling time of the $K_d = 3$ loop for a band of 5\,\%. Change the default, fly the lesson and compare. Then run \texttt{make test}: which expectations depended on the 2\,\% definition?
 \answer{$e^{-\zeta\omega_n t} = 0.05$ gives $t_s \approx 3/(\zeta\omega_n) = 3/1.5 = \SI{2.0}{s}$ instead of \SI{2.7}{s}. The tests of \texttt{tests/metrics.test.ts} that assert settling times, and the lesson goals that use them, are the ones to check.}
+\exercise[3]\exkind{derive} The function $V$ of this lesson has a derivative that is only negative \emph{semi}definite, which is why \cref{thm:damper-lasalle} was needed. Show that $W = V + \beta\,m\,x\dot x$ is positive definite for $0 < \beta < \sqrt{K_p/m}$ and that $\dot W$ is negative definite for $0 < \beta < 4K_pK_d/(K_d^2 + 4mK_p)$, so that \cref{thm:damper-lyapunov} alone proves asymptotic stability. Evaluate both bounds for the default gains.
+\answer{$W$ is a quadratic form with the matrix $\tfrac12\begin{psmallmatrix}K_p & \beta m\\ \beta m & m\end{psmallmatrix}$, positive definite when $\beta^2m^2 < mK_p$. $\dot W = -(K_d - \beta m)\dot x^2 - \beta K_d x\dot x - \beta K_p x^2$, negative definite when $4(K_d - \beta m)\beta K_p > \beta^2K_d^2$. For $K_p = 10$, $K_d = 7$, $m = 1$: $\beta < 3.16$ and $\beta < 280/89 = 3.15$.}
 \end{exercises}

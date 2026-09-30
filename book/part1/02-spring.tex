@@ -169,7 +169,7 @@ Estimate the amplitude at which drag and motor lag balance, for $K_p = 10$.
 
 \textbf{Step 5 — numbers.} With $K_p = 10$, $\tau_m = \SI{0.03}{s}$ plus about \SI{2}{ms} of controller sampling (Lesson 9) — $\tau \approx \SI{0.032}{s}$ — $c_v = 0.25$ and $\omega = 3.16$: $A = 3\pi\cdot0.32/(8\cdot0.25\cdot3.16) = 3.02/6.32 = \SI{0.48}{m}$.
 
-\textbf{Step 6 — check.} In \cref{fig:spring-run} the peaks at the end of the run are at \SI{3.49}{m}, i.e.\ an amplitude of \SI{0.49}{m}, and still sinking very slowly towards the predicted value. A back-of-the-envelope energy balance predicts the nonlinear behaviour of the simulator to within a centimetre.
+\textbf{Step 6 — check.} In \cref{fig:spring-run} the peaks at the end of the twenty-second run are at \SI{3.49}{m}, i.e.\ an amplitude of \SI{0.49}{m}, and still sinking. Flown for a full minute (\cref{fig:spring-predict}), the oscillation settles at \SI{0.46}{m}. A back-of-the-envelope energy balance predicts a nonlinear effect of the simulator to within 4\,\%.
 \end{example}
 
 \subsection{When the linear model stops being true}
@@ -203,6 +203,104 @@ To see the linear behaviour at $K_p = 40$, keep the step small: press \key{↑} 
 \predict{if the drone were twice as heavy (\ui{Physics\then Mass} = \SI{2}{kg}, with the assumed mass changed too), what would the period be at $K_p = 10$?}
 \end{trythis}
 
+\section{The engineer's view: the state, the true poles and a limit cycle}
+
+\subsection{The loop in state form}
+In \lessonref{les:meet} we wrote the plant with its state, the position and the velocity. The closed loop \eqref{eq:spring-ode} has the same state, $(x, \dot x)$, and in that form it reads
+\begin{equation}\label{eq:spring-state}
+  \frac{\dd}{\dd t}\begin{pmatrix} x \\ \dot x \end{pmatrix}
+  = \underbrace{\begin{pmatrix} 0 & 1 \\ -K_p/m & 0 \end{pmatrix}}_{A}\begin{pmatrix} x \\ \dot x \end{pmatrix}.
+\end{equation}
+Try a solution $e^{st}\mathbf v$ with a constant vector $\mathbf v$. Differentiating multiplies it by $s$, so $s\,\mathbf v = A\mathbf v$: the number $s$ must be an eigenvalue of $A$. The eigenvalues are the roots of $\det(sI - A) = s^2 + K_p/m$, which is the characteristic equation \eqref{eq:spring-char} once more.
+
+\begin{result}[Poles are eigenvalues]
+Write a linear system as $\dot{\mathbf x} = A\mathbf x$. Its poles are the eigenvalues of the state matrix $A$, and its characteristic polynomial is $\det(sI - A)$. For two states this is a second way to write what we already had. For twelve it is the only practical way, and it is how the simulator computes the poles it displays for the controllers of Part~II (\src{src/math/mat.ts}, function \texttt{eigenvalues}).
+\end{result}
+
+The plane with $x$ on one axis and $\dot x$ on the other is the \term{phase plane}. A solution is a curve in it, traced as time passes. Energy conservation, $\tfrac12 m\dot x^2 + \tfrac12 K_p x^2 = E$, says that the curves of the ideal spring are ellipses: the drone circles the setpoint for ever, neither closer nor further. In the app, the bottom-right chart can be switched to \ui{phase portrait} to watch the curve being drawn.
+
+\subsection{The true poles}
+The ideal loop sits exactly on the boundary of stability. \Cref{eq:spring-lag} suggested that the motor lag pushes it over. With the state form we can say so exactly.
+
+\begin{example}[The proportional loop with its motors, exactly]
+\label{ex:spring-cubic}
+Model the motors as a first-order lag with $\tau = \SI{30}{ms}$ and find the poles of the P loop for $K_p = 10$, $m = \SI{1}{kg}$.
+
+\textbf{Step 1 — the motor.} Let $F$ be the force the motors actually deliver beyond the weight. It follows the command $-K_p x$ with a time constant $\tau$: $\tau\,\dot F = -F - K_p x$.
+
+\textbf{Step 2 — the drone.} $m\ddot x = F$. The system now has three state variables, $x$, $\dot x$ and $F$.
+
+\textbf{Step 3 — one equation.} Differentiate Newton's law and insert the motor: $m\dddot x = \dot F = -(F + K_p x)/\tau = -(m\ddot x + K_p x)/\tau$. Multiply by $\tau$:
+\begin{equation*}
+  \tau m\,\dddot x + m\,\ddot x + K_p\,x = 0,
+  \qquad\text{characteristic equation}\qquad
+  \tau m\,s^3 + m\,s^2 + K_p = 0 .
+\end{equation*}
+
+\textbf{Step 4 — a test without solving.} If all three roots had negative real parts, the polynomial would be a product of factors $(s + a)$ and $(s^2 + bs + c)$ with positive $a$, $b$, $c$, and multiplying such factors out gives only positive coefficients. Ours has no $s$ term at all: its coefficient is zero. So at least one root is not in the left half-plane — for \emph{every} positive $K_p$ and $\tau$. No choice of gain makes this loop stable.
+
+\textbf{Step 5 — the roots.} Numerically, for $0.03\,s^3 + s^2 + 10 = 0$:
+\begin{equation*}
+  s_1 = -33.63, \qquad s_{2,3} = +0.147 \pm 3.145\,j .
+\end{equation*}
+(Check: the roots of a cubic sum to minus the ratio of its first two coefficients, $-1/\tau = -33.33$, and $-33.63 + 2\cdot0.147 = -33.33$.)
+
+\textbf{Step 6 — read them.} The real pole is the motor itself, a little faster than $-1/\tau$. The complex pair is the spring, at almost the old frequency (\SI{3.145}{rad/s} instead of 3.162), but with a \emph{positive} real part: the oscillation grows like $e^{0.147t}$ and doubles every $\ln 2/0.147 = \SI{4.7}{s}$. The first-order estimate of \cref{eq:spring-lag} gives $K_p\tau/(2m) = 0.15$, which is the same number.
+\end{example}
+
+So the honest statement is stronger than \enquote{marginally stable}: a proportional loop around real motors is \emph{unstable}. Then why does the drone of \cref{fig:spring-run} not fly away?
+
+\subsection{The amplitude equation}
+Because the growth is slow and the air resists more the faster the drone moves. Example~\ref{ex:spring-limit} balanced the two over one period. The same two energies give more than the balance point: they give the whole history of the amplitude. With $m\omega^2 = K_p$, an oscillation of amplitude $A$ carries the energy $E = \tfrac12 K_p A^2$. Per period it gains $W_{in} - W_{out}$; divided by the period $2\pi/\omega$, that is its average rate of change:
+\begin{equation*}
+  \frac{\dd E}{\dd t} = K_p A\,\dot A = \frac{\omega}{2\pi}\Big(\pi K_p\tau A^2\omega - \tfrac83\,c_v A^3\omega^2\Big).
+\end{equation*}
+Dividing by $K_p A$ and using $\omega^2 = K_p/m$:
+\begin{equation}\label{eq:spring-amp}
+  \dot A = \sigma A\Big(1 - \frac{A}{A^*}\Big), \qquad
+  \sigma = \frac{K_p\tau}{2m}, \qquad
+  A^* = \frac{3\pi K_p\tau}{8\,c_v\,\omega}.
+\end{equation}
+This is the logistic equation, and it can be read without solving it.
+\begin{itemize}
+  \item A small oscillation, $A \ll A^*$, grows exponentially at the rate $\sigma$ — the real part of the unstable poles of Example~\ref{ex:spring-cubic}.
+  \item A large one, $A > A^*$, shrinks: the bracket is negative.
+  \item At $A = A^*$ it stays. Every oscillation, from either side, ends there.
+\end{itemize}
+Its solution from an amplitude $A_0$ is $A(t) = A^*\big/\big(1 + (A^*/A_0 - 1)\,e^{-\sigma t}\big)$. With $\tau = \SI{32}{ms}$ (motor lag plus half a sample): $\sigma = \SI{0.16}{s^{-1}}$ and $A^* = \SI{0.48}{m}$.
+
+\simfig{spring_predict}{Two flights of a minute each, one after a \SI{1}{m} step and one after a \SI{0.1}{m} step. Left: the height of every peak above the setpoint (dots) and \cref{eq:spring-amp} started from the second peak (dashed). Right: both flights in the phase plane, with the predicted limit cycle (dashed ellipse). The large oscillation winds inwards and the small one outwards, onto the same curve.}{fig:spring-predict}
+
+\Cref{fig:spring-predict} is the test. After a large step the oscillation shrinks; after a small one it \emph{grows}, by itself, out of a drone that was almost at rest. Both end at \SI{0.46}{m}. Fitting \cref{eq:spring-amp} to the measured peaks gives $\sigma = \SI{0.152}{s^{-1}}$ and $A^* = \SI{0.46}{m}$, against the predicted 0.16 and 0.48.
+
+\begin{keyidea}[Linear analysis says whether, nonlinear analysis says how far]
+The poles of the linear model decide whether a small motion grows or dies. They cannot say where a growing motion ends, because in a linear model it never ends. The end is set by whatever stops being linear first — here the air drag, at $K_p = 40$ the motor limits. A steady oscillation that attracts its neighbours from both sides is called a \term{stable limit cycle}, and it is one of the signatures of a nonlinear loop.
+\end{keyidea}
+
+\begin{example}[The same equation in orbit]
+\label{ex:spring-sat}
+A small satellite with a moment of inertia $J = \SI{12}{kg.m^2}$ about one axis is turned by a reaction wheel. Its pointing error $\theta$ is fed back proportionally, torque $= -K_p\theta$ with $K_p = \SI{0.3}{N.m/rad}$. What does it do?
+
+\textbf{Step 1 — the equation.} Newton's law for rotation is $J\ddot\theta = $ torque, so $J\ddot\theta + K_p\theta = 0$: \cref{eq:spring-ode} with $J$ in place of $m$.
+
+\textbf{Step 2 — the motion.} $\omega_n = \sqrt{K_p/J} = \sqrt{0.3/12} = \SI{0.158}{rad/s}$, a period of \SI{39.7}{s}. A pointing error of \SI{1}{\degree} becomes an oscillation of $\pm\SI{1}{\degree}$.
+
+\textbf{Step 3 — the actuator.} A wheel that follows its command with $\tau = \SI{0.2}{s}$ adds the growth rate $\sigma = K_p\tau/(2J) = 0.3\cdot0.2/24 = \SI{0.0025}{s^{-1}}$: the error doubles every $\ln2/0.0025 = \SI{280}{s}$.
+
+\textbf{Step 4 — and nothing stops it.} In orbit there is no air, so there is no drag term and no limit cycle: the oscillation grows until the wheel saturates. This is why no spacecraft is pointed by a proportional law alone. Every attitude controller also feeds back the turn rate measured by gyroscopes, which is the damper of \lessonref{les:damper}.
+\end{example}
+
+\begin{lookahead}
+\begin{itemize}[leftmargin=1.2em]
+  \item \enquote{Poles are eigenvalues} is how Part~II works from its first lesson (II.1), where the controller feeds back the whole state and places the poles where it wants them.
+  \item The test of Step~4 — all coefficients present and positive — is the first line of the Routh–Hurwitz criterion, which decides stability from the coefficients alone. \Lessonref{les:integral} uses it for the integral gain, and Lesson~III.2 draws the poles moving as a gain changes.
+  \item How much lag a loop can stand has an exact answer, the phase margin. It appears in \lessonref{les:slow} and \lessonref{les:edge} and becomes a design tool in Lessons~III.3 and~III.4.
+  \item The energy $E$ is our first \emph{Lyapunov function}: a quantity that the ideal loop cannot increase. Lesson~III.7 builds the general method on it, including how large a disturbance a loop survives.
+  \item Balancing energies over one period, as in Example~\ref{ex:spring-limit}, is a special case of the \emph{describing function}, which predicts limit cycles caused by saturation and by quantisation (Lessons~III.8 and~III.19) and, in aircraft, by a pilot and a rate-limited actuator (IV.16).
+  \item The satellite of Example~\ref{ex:spring-sat} returns with its wheels and its limits in Lessons~IV.18 and~IV.19; structures that oscillate on their own, like the bridge below, in IV.8.
+\end{itemize}
+\end{lookahead}
+
 \begin{curiosity}{Galloping Gertie}
 \photo{tacoma}{The Tacoma Narrows Bridge twisting on 7 November 1940, an hour before it fell into Puget Sound.}
 The Tacoma Narrows Bridge in Washington State opened on 1 July 1940. It was elegant and very slender, and from the first day it moved: in moderate wind the deck rose and fell by a metre or more, and drivers came from far away to ride \enquote{Galloping Gertie}. On the morning of 7 November, in a steady wind of about \SI{65}{km/h}, the motion changed into a violent twisting mode. It grew for an hour, and then the main span tore apart.
@@ -217,7 +315,9 @@ In the language of this lesson, the poles of the bridge moved from just left of 
   \item With P alone (and exact feedforward) the closed loop is $m\ddot x + K_p x = 0$: a mass on a spring of stiffness $K_p$.
   \item Linear ODEs with constant coefficients are solved with $e^{st}$: the characteristic equation gives the poles, the initial conditions fix the constants.
   \item The P loop's poles are $\pm j\omega_n$, $\omega_n = \sqrt{K_p/m}$: marginally stable, oscillating forever with period $2\pi/\omega_n$.
-  \item A position-dependent force conserves energy; only a velocity-dependent one can remove it. A lagging force can even add energy.
+  \item A force that depends on position alone conserves energy. Only a force that depends on velocity can remove it, and a lagging force adds it.
+  \item Poles are the eigenvalues of the state matrix. With the motor lag included, the P loop has a pair in the right half-plane: it is unstable for every gain.
+  \item Drag limits the growth. The amplitude obeys $\dot A = \sigma A(1 - A/A^*)$ and ends on a limit cycle from either side.
   \item Linear predictions hold only while the actuators stay within their limits.
 \end{itemize}
 \end{remember}
@@ -229,10 +329,20 @@ In the language of this lesson, the poles of the bridge moved from just left of 
 \answer{$x = (1/3.16)\sin 3.16t$; highest point $\SI{0.316}{m}$ above the setpoint.}
 \exercise[1] Where are the poles of $m\ddot x + K_p x = 0$ if, by mistake, $K_p$ is negative, $K_p = -10$? Describe the motion.
 \answer{$s = \pm\sqrt{10} = \pm3.16$: one pole in the right half-plane, the deviation grows like $e^{3.16t}$ — the \enquote{spring} pushes away from the setpoint.}
-\exercise[2] Show that for $m\ddot x + K_p x = 0$ the trajectory in the $(x, \dot x)$ plane is an ellipse, and find its semi-axes for $x_0 = \SI{-1}{m}$, $v_0 = 0$, $K_p = 10$, $m = 1$.
+\exercise[2]\exkind{derive} Show that for $m\ddot x + K_p x = 0$ the trajectory in the $(x, \dot x)$ plane is an ellipse, and find its semi-axes for $x_0 = \SI{-1}{m}$, $v_0 = 0$, $K_p = 10$, $m = 1$.
 \answer{Energy conservation: $\tfrac12 m\dot x^2 + \tfrac12 K_p x^2 = E$ is an ellipse; semi-axes \SI{1}{m} and \SI{3.16}{m/s}.}
 \exercise[2] Repeat Example~\ref{ex:spring-limit} for a motor time constant of \SI{60}{ms} (\SI{62}{ms} with sampling). Is the limit cycle larger or smaller, and by what factor?
 \answer{$A \propto \tau$: $0.48 \cdot 62/32 \approx \SI{0.93}{m}$, about twice as large.}
-\exercise[3] Model the motor lag as a pure delay: $m\ddot x = -K_p\,x(t-\tau)$. Expand to first order in $\tau$ to get \cref{eq:spring-lag}, write the characteristic equation and show that the poles move into the right half-plane. How fast does the oscillation grow for $K_p = 10$, $\tau = \SI{30}{ms}$, if nothing else damps it?
+\exercise[3]\exkind{derive} Model the motor lag as a pure delay: $m\ddot x = -K_p\,x(t-\tau)$. Expand to first order in $\tau$ to get \cref{eq:spring-lag}, write the characteristic equation and show that the poles move into the right half-plane. How fast does the oscillation grow for $K_p = 10$, $\tau = \SI{30}{ms}$, if nothing else damps it?
 \answer{$m s^2 - K_p\tau s + K_p = 0$, $\operatorname{Re}s = K_p\tau/(2m) = \SI{0.15}{s^{-1}}$: growth like $e^{0.15t}$, about 35\,\% per period.}
+\exercise[2]\exkind{derive} Multiply out $(s + a)(s^2 + bs + c)$ and show that positive $a$, $b$, $c$ give four positive coefficients. The converse is false: show that $s^3 + s^2 + s + 10$ has all coefficients positive and is nevertheless unstable. (Hint: try a root near $0.7 + 1.9j$, or wait for the Routh test of \lessonref{les:integral}.)
+\answer{$s^3 + (a+b)s^2 + (ab + c)s + ac$. The roots of $s^3+s^2+s+10$ are $-2.37$ and $+0.68 \pm 1.94j$. Positive coefficients are necessary, not sufficient; for a cubic $a_3s^3+a_2s^2+a_1s+a_0$ the full condition adds $a_2a_1 > a_3a_0$, here $1 < 10$.}
+\exercise[2]\exkind{derive} Verify that $A(t) = A^*/(1 + (A^*/A_0 - 1)e^{-\sigma t})$ solves \cref{eq:spring-amp}. With $\sigma = 0.16$ and $A^* = \SI{0.48}{m}$, how long does an oscillation need to grow from \SI{0.1}{m} to \SI{0.4}{m}?
+\answer{Substitute, or note that $\ln\big(A/(A^*-A)\big)$ grows linearly at the rate $\sigma$. $t = \tfrac{1}{0.16}\ln\tfrac{0.4/0.08}{0.1/0.38} = 6.25\ln 19 = \SI{18.4}{s}$.}
+\exercise[2]\exkind{fly} Watch an oscillation grow out of nothing. In Lesson~2, let the drone reach its limit cycle, then switch \Dt on until it rests at the setpoint. Switch \Dt off again and press \key{↑} once. Open the \ui{phase portrait} and watch for a minute. Read the amplitude of three peaks ten seconds apart and estimate $\sigma$ as in the previous exercise.
+\answer{The peaks grow from about \SI{0.1}{m} to \SI{0.46}{m}; $\ln\big(A/(A^*-A)\big)$ rises by about 1.5 every ten seconds, $\sigma \approx \SI{0.15}{s^{-1}}$.}
+\exercise[2]\exkind{code} \src{src/ui/charts/InfoCard.tsx} computes the $\omega_n = \sqrt{K_p/m}$ that the info card shows. Which mass does it use: the true mass of the drone or the mass the controller assumes? Which is right for predicting the period, and why could a real flight computer not do the same?
+\answer{The true mass, \texttt{params.drone.mass}: the period is a property of the real plant. A flight computer only has its estimate $\hat m$; the simulator can look at the truth.}
+\exercise[3]\exkind{code} \src{tests/closed-loop.test.ts} holds the closed-loop tests. Add one: calm air, I and D off, exact feedforward, a setpoint step of \SI{0.1}{m}. Measure the time between two successive upward crossings of the setpoint and assert that it is within 3\,\% of $2\pi\sqrt{m/K_p}$ for $K_p = 10$. Then repeat Example~\ref{ex:spring-cubic} for $K_p = 40$ and say what your test must take care of at that gain.
+\answer{About twenty lines with the helpers \texttt{calm} and \texttt{run} of that file; the period is \SI{2.00}{s}. For $K_p = 40$ the roots are $-34.5$ and $+0.56 \pm 6.20j$: the period is \SI{1.01}{s}, 2\,\% longer than $2\pi\sqrt{m/K_p}$, and the oscillation doubles every \SI{1.2}{s}, so it reaches the motor limits within seconds. Measure the first crossings only.}
 \end{exercises}

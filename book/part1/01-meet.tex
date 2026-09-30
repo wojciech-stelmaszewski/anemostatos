@@ -215,6 +215,8 @@ Start it from the lesson panel: \ui{Part I · PID\then 1. Meet the loop\then Sta
 Keys: \key{↑}\,\key{↓} move the setpoint, \key{G} fires a gust, \key{M} switches the controller off, \key{R} resets, \key{Space} pauses.
 \end{inapp}
 
+\marginfig{meet_off}{Switch the controller off (\key{M}) and the drone falls: nothing holds it up anymore.}{fig:meet-off}
+
 \begin{trythis}
 \begin{enumerate}
   \item Press \key{↑} a few times, or drag the setpoint sphere. Watch all four charts react: the error jumps, P reacts at once, I slowly follows.
@@ -225,7 +227,117 @@ Keys: \key{↑}\,\key{↓} move the setpoint, \key{G} fires a gust, \key{M} swit
 \predict{when the controller is off, the drone falls like a stone. How long does the fall from \SI{2}{m} take? (Use $y = \tfrac12 g t^2$ and compare with the chart.)}
 \end{trythis}
 
-\marginfig{meet_off}{Switch the controller off (\key{M}) and the drone falls: nothing holds it up anymore.}{fig:meet-off}
+
+\section{Testing the two predictions}
+
+Examples~\ref{ex:meet-open} and~\ref{ex:meet-closed} each made a prediction about a drone that is \SI{50}{g} heavier than its controller believes: without feedback it is on the floor in about three seconds; with a proportional correction it rests \SI{4.9}{cm} low. A prediction is worth as much as its test, so we fly both. For the first ten seconds the full PID holds the heavy drone at \SI{2}{m}; its integral has quietly found the missing \SI{0.49}{N}. Then we take the feedback away.
+
+\simfig{meet_predict}{The two predictions of this lesson against the simulator. Left: all three terms are switched off and only the \SI{9.81}{N} feedforward remains. Right: only the integral is switched off, so P and D must carry the unknown \SI{0.49}{N}.}{fig:meet-predict}
+
+\paragraph{With feedback (right).} The drone sinks and comes to rest at \SI{1.951}{m}. Its error, \SI{0.0490}{m}, is the number of Example~\ref{ex:meet-closed} to the last digit. Equilibria are easy to predict, because at rest nothing moves and everything that depends on motion drops out of the equation.
+
+\paragraph{Without feedback (left).} The body of the drone rests on its landing gear at \SI{0.052}{m}, so the fall is \SI{1.948}{m} and the model of Example~\ref{ex:meet-open} predicts touchdown after $\sqrt{2 \cdot 1.948/0.467} = \SI{2.89}{s}$. For the first second the dashed curve and the simulator agree. Then the simulator falls behind, and it lands after \SI{3.15}{s}. Our model has left something out, and the shape of the disagreement says what: the error grows with the speed. It is the air.
+
+\begin{example}[The fall, with drag]
+\label{ex:meet-drag}
+The simulator's air resists the motion with a force $c_v v^2$, where $c_v = \SI{0.25}{N.s^2/m^2}$. Repeat Example~\ref{ex:meet-open} with it.
+
+\textbf{Step 1 — the equation.} Let $u$ be the speed \emph{downwards}. The net downward force without drag is $F = (m - \hat m)g = \SI{0.4905}{N}$, and the drag pushes up:
+\begin{equation*}
+  m\,\dot u = F - c_v u^2 .
+\end{equation*}
+
+\textbf{Step 2 — the speed limit.} The acceleration vanishes when drag equals $F$, at the \term{terminal velocity}
+\begin{equation*}
+  u_T = \sqrt{F/c_v} = \sqrt{0.4905/0.25} = \SI{1.40}{m/s}.
+\end{equation*}
+The drone can never fall faster. The drag-free model predicted $0.467 \cdot 2.89 = \SI{1.35}{m/s}$ at touchdown, almost the limit. That comparison alone shows that drag cannot be neglected here.
+
+\textbf{Step 3 — solve for the speed.} With $a = F/m = \SI{0.467}{m/s^2}$ the equation reads $\dot u = a\,(1 - u^2/u_T^2)$. Separate the variables and integrate from rest:
+\begin{gather*}
+  \int_0^u \frac{\dd u'}{1 - u'^2/u_T^2} = a\,t
+  \quad\Longrightarrow\quad
+  u_T \operatorname{artanh}\frac{u}{u_T} = a\,t ,\\
+  u(t) = u_T \tanh\frac{a\,t}{u_T}.
+\end{gather*}
+For small $t$, $\tanh z \approx z$ and $u \approx a\,t$: the old answer. For large $t$, $\tanh z \to 1$ and $u \to u_T$.
+
+\textbf{Step 4 — the distance.} Since $\int\tanh z\,\dd z = \ln\cosh z$, the distance fallen is
+\begin{equation*}
+  s(t) = \frac{u_T^2}{a}\,\ln\cosh\frac{a\,t}{u_T}, \qquad \frac{u_T^2}{a} = \frac{1.962}{0.467} = \SI{4.20}{m}.
+\end{equation*}
+
+\textbf{Step 5 — touchdown.} Set $s = 1.948$: $\ln\cosh z = 1.948/4.20 = 0.464$, so $\cosh z = 1.590$ and $z = \ln\!\big(1.590 + \sqrt{1.590^2 - 1}\big) = 1.039$. Then $t = z\,u_T/a = 1.039 \cdot 1.40/0.467 = \SI{3.12}{s}$, at a speed of $1.40\tanh 1.039 = \SI{1.09}{m/s}$.
+
+\textbf{Step 6 — compare.} The simulator lands after \SI{3.15}{s} at \SI{1.09}{m/s}. The dotted curve in \cref{fig:meet-predict} lies almost on the measurement.
+
+\textbf{Step 7 — the last \SI{0.03}{s}.} The motors do not drop from \SI{10.30}{N} to \SI{9.81}{N} at once; they follow with a time constant of \SI{30}{ms}. For that long the drone still has its extra \SI{0.49}{N}, an impulse of $0.49 \cdot 0.03 = \SI{0.015}{N.s}$, which leaves it \SI{1.4}{cm/s} slower than the model for the whole fall: about \SI{4}{cm} after three seconds, which takes three to four hundredths of a second to cover at \SI{1.09}{m/s}.
+\end{example}
+
+\begin{keyidea}[A model is a choice]
+Three models of the same fall: without drag, with drag, with drag and motor lag. Each is more accurate and more work than the one before. None is \enquote{the} model. The right one is the simplest whose error does not change the decision — and for designing a feedback loop the first is usually enough, because feedback itself corrects what the model leaves out. That is why \cref{eq:meet-plant} carries us through half of Part~I. When a prediction and a flight disagree, the disagreement is information: ask what grows the way the error grows.
+\end{keyidea}
+
+\section{The engineer's view: state, and what feedback cannot do}
+
+Every lesson of this book ends its theory with a short section like this one. It says the same thing again in the language that engineers use at work, and it is where the threads to the later parts of the course begin.
+
+\subsection{The state}
+To predict where the drone will be a moment from now, it is not enough to know where it is. We also need its velocity. With those two numbers and the forces, Newton's law gives everything that follows. Nothing else about the past matters.
+
+\begin{definition}{State}
+The \term{state} of a dynamical system is the smallest set of numbers that, together with the inputs from now on, determines its future. For the L1 drone it is the altitude and the vertical velocity, $(y, v)$.
+\end{definition}
+
+Written with the state, the second-order equation \eqref{eq:meet-plant} becomes two first-order ones:
+\begin{equation*}
+  \dot y = v, \qquad \dot v = \frac{1}{m}\,\big(T - m g + d\big),
+\end{equation*}
+or, collected in one line of matrices,
+\begin{equation}\label{eq:meet-state}
+  \frac{\dd}{\dd t}\begin{pmatrix} y \\ v \end{pmatrix}
+  = \begin{pmatrix} 0 & 1 \\ 0 & 0 \end{pmatrix}\begin{pmatrix} y \\ v \end{pmatrix}
+  + \begin{pmatrix} 0 \\ 1/m \end{pmatrix}\big(T - m g + d\big).
+\end{equation}
+The matrix form looks like bureaucracy for so small a system. Its value appears when the vehicle has twelve state variables instead of two, and the same notation still fits on one line. As a picture, the plant is a force divided by the mass and integrated twice:
+\begin{center}
+\begin{tikzpicture}
+  \node[lab] (f) {$T - mg + d$};
+  \node[blk, right=7mm of f] (m) {$1/m$};
+  \node[blk, right=12mm of m] (i1) {$\int$};
+  \node[blk, right=12mm of i1] (i2) {$\int$};
+  \coordinate[right=10mm of i2] (o);
+  \draw[sig] (f) -- (m);
+  \draw[sig] (m) -- node[above, lab] {$\dot v$} (i1);
+  \draw[sig] (i1) -- node[above, lab] {$v$} (i2);
+  \draw[sig] (i2) -- node[above, lab] {$y$} (o);
+\end{tikzpicture}
+\end{center}
+This is the \emph{double integrator} of Example~\ref{ex:meet-open}, and it is literally how the simulator computes. One thousand times per second, \src{src/sim/dynamics.ts} adds the acceleration times one millisecond to the velocity, and then the new velocity times one millisecond to the position: the two integrals of the picture, as two lines of code.
+
+\subsection{What feedback cannot do}
+Feedback is powerful, and it is worth knowing its limits on the first day.
+
+\begin{enumerate}
+  \item \textbf{It acts after the fact.} A feedback controller does nothing until an error exists. If you know what is coming — the weight, a planned manoeuvre — acting on that knowledge in advance is better. That is feedforward (\lessonref{les:droop}).
+  \item \textbf{It can make things worse.} A loop that corrects too hard or too late oscillates or diverges. The next lesson meets the first case and \lessonref{les:edge} finds the limit.
+  \item \textbf{It trusts its sensor.} This one deserves a box.
+\end{enumerate}
+
+\begin{watchout}[Feedback is only as good as its sensor]
+The loop drives the \emph{measurement} to the setpoint, not the truth. If the altimeter reads $b$ too high, the controller is satisfied when $y + b = r$, so the drone flies at $y = r - b$: exactly $b$ too low, however good the gains, integral or not. Feedback removes the effect of every disturbance that enters \emph{after} the comparison and of none that enters through the sensor. This is why the second half of Part~I is about sensors, and why estimation takes as many lessons of this course as control does.
+\end{watchout}
+
+\begin{lookahead}
+Each idea of this lesson returns later in the course, sharper.
+\begin{itemize}[leftmargin=1.2em]
+  \item The state $(y, v)$ becomes the centre of Part~II. Lesson~II.1 feeds back the whole state instead of one error, and Lesson~II.2 computes the best gains for it.
+  \item \enquote{Each term acts on its own time scale} (Example~\ref{ex:meet-ticks}) is a statement about frequencies. Part~III draws it: the loop as a filter with a bandwidth (Lesson~III.1) and with margins that say how far it is from instability (III.3).
+  \item The sensor in the loop gets a filter in \lessonref{les:noise}, a Kalman filter in Lesson~II.4, and the attitude and navigation filters of real flight computers in Lessons~III.22–III.24.
+  \item The test of this lesson — one flight against one formula — becomes a method in Lesson~III.29: hundreds of flights with every parameter varied, and a pass rate instead of an anecdote.
+  \item The equation $m\ddot y = T - mg$ also describes a rocket landing on its engine, with one difference: $m$ shrinks as the fuel burns. Part~IV lands it with the least fuel (Lesson~IV.4).
+\end{itemize}
+\end{lookahead}
 
 \begin{curiosity}{The governor that started it all}
 \sidephoto{governor}{52mm}{A centrifugal governor by Boulton \& Watt. As the shaft spins faster, the balls fly outward and close the steam valve.}
@@ -243,6 +355,9 @@ Eighty years later Norbert Wiener named his new science \emph{cybernetics} partl
   \item Feedback measures the result, compares it with the setpoint and acts on the error. Even a pure proportional correction turns an unbounded drift into a bounded error $(m - \hat m)g/K_p$.
   \item The PID controller combines three views of the error: present (P), past (I), future (D) — plus a feedforward guess.
   \item A real controller runs in discrete steps: a running sum for the integral, a difference quotient for the derivative.
+  \item The state of the drone is $(y, v)$: two numbers that, with the forces, fix its future.
+  \item Feedback corrects what enters after the comparison. It cannot correct its own sensor, and it acts only once an error exists.
+  \item A prediction is tested by flying it. Where model and flight disagree, the shape of the error says what the model left out.
 \end{itemize}
 \end{remember}
 
@@ -255,10 +370,20 @@ Eighty years later Norbert Wiener named his new science \emph{cybernetics} partl
 \answer{P $= -0.5$, I $\approx 0.8\cdot(-0.05\cdot4) = -0.16$, D $= 7\cdot(+0.2) = +1.4$ ($\dot e = -\dot y = +0.2$). Total $= 9.81 - 0.5 - 0.16 + 1.4 = \SI{10.55}{N}$: above the weight — D brakes the descent.}
 \exercise[2] Continue Example~\ref{ex:meet-ticks} for a fourth tick with $e_3 = 0.025$. What happens to D, and why is its sign now negative?
 \answer{$D = 7(0.025 - 0.026)/0.004 = -1.75$: the error has started to shrink, so D already brakes the rise. $I_3 = 0.000304$, $P = 0.25$, $u_3 = \SI{8.31}{N}$.}
-\exercise[2] Show that with $d = $ const and \emph{no} controller the altitude error grows quadratically, and with the pure P law \eqref{eq:meet-p} (and $\hat m = m$) it stays bounded. What is the bound if the drone starts at rest at the setpoint?
+\exercise[2]\exkind{derive} Show that with $d = $ const and \emph{no} controller the altitude error grows quadratically, and with the pure P law \eqref{eq:meet-p} (and $\hat m = m$) it stays bounded. What is the bound if the drone starts at rest at the setpoint?
 \answer{Open loop: $y = y_0 + \tfrac{d}{2m}t^2$. With P: $m\ddot x + K_p x = d$, a harmonic oscillator around $x^* = d/K_p$; from $x = 0$ it swings between $0$ and $2d/K_p$.}
 \exercise[3] The rectangle rule for the integral uses $e_k\,\Delta t$. The trapezoid rule would use $\tfrac12(e_k + e_{k-1})\Delta t$. For the errors of Example~\ref{ex:meet-ticks}, compare $I_2$ with both rules. Why does the choice hardly matter in practice?
 \answer{Rectangle $0.000224$, trapezoid $0.000208$: both negligible compared with the other terms; the integral matters over seconds, where both rules agree.}
-\exercise[3] In the app, press \key{M} while hovering at \SI{2}{m}. Estimate the fall time from Equation~\eqref{eq:meet-plant} and check it on the altitude chart. Why is the measured time slightly longer?
+\exercise[3]\exkind{fly} In the app, press \key{M} while hovering at \SI{2}{m}. Estimate the fall time from Equation~\eqref{eq:meet-plant} and check it on the altitude chart. Why is the measured time slightly longer?
 \answer{$t = \sqrt{2h/g} \approx \SI{0.64}{s}$; the motors spin down with a lag and drag slows the fall.}
+\exercise[2]\exkind{fly} Fly the right-hand panel of \cref{fig:meet-predict} yourself. Set \ui{Physics\then Mass} to \SI{1.05}{kg} and leave the assumed mass at \SI{1}{kg}. Wait until the I term in the live formula has stopped growing (about a minute with the default $K_i$; set $K_i = 5$ to shorten it), read its value, then switch \It off. Where does the drone come to rest? Repeat with $K_p = 20$ and predict the result first.
+\answer{The I term has settled near \SI{0.49}{N}. With I off the drone rests at \SI{1.951}{m} ($e^* = 0.49/10$); with $K_p = 20$ at \SI{1.975}{m}.}
+\exercise[2]\exkind{derive} A \SI{7000}{kg} lunar lander hovers on its engine, where $g = \SI{1.62}{m/s^2}$. Its throttle setting is 1\,\% too low. How far has it sunk after \SI{10}{s} of open-loop hover? With a proportional correction of $K_p = \SI{2000}{N/m}$, where does it come to rest? Compare both answers with the drone's and say which quantities of the vehicle they depend on.
+\answer{Force error $0.01 \cdot 7000 \cdot 1.62 = \SI{113}{N}$, $a = 0.01 \cdot 1.62 = \SI{0.0162}{m/s^2}$, $\tfrac12 a t^2 = \SI{0.81}{m}$. Rest error $113/2000 = \SI{5.7}{cm}$. The open-loop drift depends only on the relative thrust error and $g$; the closed-loop error on the absolute force error and $K_p$.}
+\exercise[3]\exkind{derive} Verify by differentiation that $u(t) = u_T\tanh(a t/u_T)$ solves $\dot u = a(1 - u^2/u_T^2)$ with $u(0) = 0$. Show that the distance fallen reduces to $\tfrac12 a t^2$ for small $t$. How long does the drone of Example~\ref{ex:meet-drag} need to reach 90\,\% of its terminal velocity?
+\answer{$\dot u = a\,\mathrm{sech}^2 z = a(1 - \tanh^2 z)$. $\ln\cosh z \approx z^2/2$, so $s \approx \tfrac{u_T^2}{a}\cdot\tfrac{a^2t^2}{2u_T^2} = \tfrac12 a t^2$. $\operatorname{artanh}0.9 = 1.472$, $t = 1.472\cdot1.40/0.467 = \SI{4.4}{s}$.}
+\exercise[2]\exkind{code} In \src{src/control/pid.ts} the field \texttt{integral} is documented as \enquote{already scaled by $K_i$}: the controller stores $\sum K_i e\,\Delta t$, not $\sum e\,\Delta t$. Suppose it stored the unscaled sum $S$ and computed the I term as $K_i S$. The drone hovers with $K_i = 0.8$ and an I term of \SI{0.49}{N}; you move the $K_i$ slider to 1.6. What happens to the thrust in each design? Find the test in \src{tests/pid.test.ts} that pins this behaviour and run it.
+\answer{Unscaled: the I term doubles at once to \SI{0.98}{N}, a thrust jump of \SI{0.49}{N}. Scaled: nothing jumps; only the future growth rate doubles. The test is \enquote{changing Ki does not jump the output (integral stored pre-scaled)}; run it with \texttt{make test}.}
+\exercise[3]\exkind{code} Write the core of the simulator yourself, in any language: a loop with $\Delta t = \SI{1}{ms}$ that updates $v \leftarrow v + \big(T - mg - c_v|v|v\big)\Delta t/m$ and then $y \leftarrow y + v\,\Delta t$, with $T = \SI{9.81}{N}$, $m = \SI{1.05}{kg}$, $c_v = 0.25$. Start at rest at \SI{2}{m}, stop at \SI{0.052}{m}, and reproduce both model curves of \cref{fig:meet-predict} (set $c_v = 0$ for the first). Then open \src{src/sim/dynamics.ts}, find the two lines that do the same, and note their order. What is the method called, and what would the other order be?
+\answer{Touchdown at \SI{2.89}{s} without drag and \SI{3.12}{s} with it. The simulator updates the velocity first and uses the \emph{new} velocity for the position: semi-implicit (symplectic) Euler. Using the old velocity is explicit Euler, which slowly adds energy to an oscillating system.}
 \end{exercises}

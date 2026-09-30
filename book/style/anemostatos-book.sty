@@ -341,6 +341,11 @@
   title={\boxlabel{warn}{WATCH OUT}\ifstrempty{#1}{}{\hspace{0.8em}{\sffamily\small\bfseries #1}}},
   attach title to upper, after title={\par\smallskip}}
 
+% Where this leads — the thread from a lesson into the later parts of the course
+\newtcolorbox{lookahead}[1][]{base, colback=bluesoft, colframe=deepblue, boxrule=0.6pt, arc=2pt,
+  title={\boxlabel{deepblue}{WHERE THIS LEADS}\ifstrempty{#1}{}{\hspace{0.8em}{\sffamily\small\bfseries #1}}},
+  attach title to upper, after title={\par\smallskip}}
+
 % In Anemostatos — styled like the app itself
 \newcommand{\appmark}{\tikz[baseline=-0.1em]{\draw[accent, line width=1.2pt, line cap=round] (0,0)--(0.62em,0.62em) (0,0.62em)--(0.62em,0);}}
 \newtcolorbox{inapp}[1][]{base, colback=night, colupper=nighttext, coltitle=nighttext, arc=3pt,
@@ -497,6 +502,8 @@
   {\end{list}}
 \newcommand{\exercise}[1][1]{\refstepcounter{exercise}\item[{\sffamily\small\color{accent}\theexercise}\,%
   {\color{faint}\ifcase#1\or\raisebox{0.2ex}{\tiny$\bullet$}\or\raisebox{0.2ex}{\tiny$\bullet\bullet$}\or\raisebox{0.2ex}{\tiny$\bullet\bullet\bullet$}\fi}]}
+% The kind of an exercise: derive (pencil and paper), fly (in the simulator), code (against the source)
+\newcommand{\exkind}[1]{{\sanscaps\scriptsize\color{deepblue}#1}\enspace}
 % answers collected for the appendix
 \newwrite\answersfile
 \immediate\openout\answersfile=\jobname.ans

@@ -26,12 +26,14 @@ const at = (sim: Simulation, t: number, path: string, value: unknown) =>
 const calm = (p: Params) => {
   p.wind.enabled = false;
 };
-const square = (amp: number, period: number, axis: 'x' | 'y' = 'y') => (p: Params) => {
-  p.setpoint.profile = 'square';
-  p.setpoint.profileAxis = axis;
-  p.setpoint.profileAmplitude = amp;
-  p.setpoint.profilePeriod = period;
-};
+const square =
+  (amp: number, period: number, axis: 'x' | 'y' = 'y') =>
+  (p: Params) => {
+    p.setpoint.profile = 'square';
+    p.setpoint.profileAxis = axis;
+    p.setpoint.profileAmplitude = amp;
+    p.setpoint.profilePeriod = period;
+  };
 const gustChallenge = (p: Params) => {
   p.sim.seed = 4242;
   p.wind.gustsPerMinute = 14;
@@ -89,6 +91,25 @@ add({
   setup: calm,
   events: (s) => s.schedule(10, (x) => x.setArmed(false)),
 });
+// Prediction against measurement: a drone 50 g heavier than the controller believes. The integral
+// carries the missing 0.49 N until t = 10 s; then all feedback is removed (open loop), or only the
+// integral is (P and D remain).
+for (const [tag, off] of [
+  ['open', ['pOn', 'iOn', 'dOn']],
+  ['pd', ['iOn']],
+] as const)
+  add({
+    name: `meet-wrongmass-${tag}`,
+    seconds: 16,
+    setup: (p) => {
+      calm(p);
+      p.drone.mass = 1.05;
+      alt(p, { ki: 5 }); // so that the integral has settled by t = 10 s
+    },
+    events: (s) => {
+      for (const k of off) at(s, 10, `control.alt.${k}`, false);
+    },
+  });
 for (const kp of [10, 40])
   add({
     name: `spring-kp${kp}`,
@@ -99,6 +120,25 @@ for (const kp of [10, 40])
     },
     events: (s) => at(s, 6, 'setpoint.y', 3),
   });
+// The limit cycle attracts from both sides: a small step grows towards it, the large one shrinks.
+add({
+  name: 'spring-small',
+  seconds: 70,
+  setup: (p) => {
+    calm(p);
+    alt(p, { iOn: false, dOn: false });
+  },
+  events: (s) => at(s, 6, 'setpoint.y', 2.1),
+});
+add({
+  name: 'spring-long',
+  seconds: 70,
+  setup: (p) => {
+    calm(p);
+    alt(p, { iOn: false, dOn: false });
+  },
+  events: (s) => at(s, 6, 'setpoint.y', 3),
+});
 for (const kp of [10, 40])
   add({
     name: `droop-kp${kp}`,
@@ -119,6 +159,33 @@ add({
   },
   events: (s) => at(s, 10, 'control.alt.iOn', true),
 });
+// Which inputs leave an error: a setpoint ramp of 0.5 m/s with the derivative on the measurement
+// and on the error (I off), and a load that ramps (the drone loses 50 g/s for 10 s) with I on.
+for (const on of ['measurement', 'error'] as const)
+  add({
+    name: `droop-ramp-${on}`,
+    seconds: 22,
+    setup: (p) => {
+      calm(p);
+      alt(p, { iOn: false, derivativeOn: on });
+      p.setpoint.rateLimit = 0.5;
+    },
+    events: (s) => at(s, 8, 'setpoint.y', 6),
+  });
+for (const ki of [0.8, 3])
+  add({
+    name: `droop-burn-ki${ki}`,
+    seconds: 36,
+    setup: (p) => {
+      calm(p);
+      p.drone.mass = 1.5;
+      p.control.model.mass = 1.5;
+      alt(p, { ki });
+    },
+    events: (s) => {
+      for (let k = 1; k <= 100; k++) at(s, 10 + k * 0.1, 'drone.mass', 1.5 - 0.005 * k);
+    },
+  });
 for (const kd of [0.8, 3, 6.3, 15, 30])
   add({
     name: `damper-kd${kd}`,
@@ -128,6 +195,18 @@ for (const kd of [0.8, 3, 6.3, 15, 30])
       alt(p, { iOn: false, kd });
       square(0.5, 8)(p);
     },
+  });
+// A design from specifications (settling within 1 s, overshoot below 5 %), on a step the motors
+// can follow and on one they cannot.
+for (const step of [0.4, 1])
+  add({
+    name: `damper-spec-step${step}`,
+    seconds: 12,
+    setup: (p) => {
+      calm(p);
+      alt(p, { iOn: false, kp: 33.6, kd: 8 });
+    },
+    events: (s) => at(s, 6, 'setpoint.y', 2 + step),
   });
 for (const [tag, iOn, ki] of [
   ['off', false, 0.8],
@@ -642,6 +721,8 @@ for (const e of E) {
   }
   writeFileSync(new URL(`${e.name}.csv.gz`, OUT), gzipSync(rows.join('\n')));
   const crash = sim.state.crashed ? ' CRASHED' : '';
-  console.log(`${e.name.padEnd(22)} ${keep.length} channels, zone ${sim.zoneTime.toFixed(2)} s${crash}`);
+  console.log(
+    `${e.name.padEnd(22)} ${keep.length} channels, zone ${sim.zoneTime.toFixed(2)} s${crash}`,
+  );
 }
 console.log(`${((performance.now() - t0) / 1000).toFixed(0)} s`);

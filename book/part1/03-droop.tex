@@ -105,6 +105,48 @@ Derive how the error decays after the integral is switched on, and check the pre
 
 The time constant $K_p/K_i$ is exactly the \term{integral time} $T_i$ of the \enquote{standard form} of the PID that industrial controllers use,\aside{Standard form: $u = K_p\big(e + \tfrac{1}{T_i}\int e + T_d\,\dot e\big)$ with $T_i = K_p/K_i$ and $T_d = K_d/K_p$. It is the same controller with different knobs.} and it tells you how long the integral needs to pay back a load. It also explains why the quasi-static assumption worked: \SI{12.5}{s} is much slower than the spring–damper motion of the drone, which settles within a second or two.
 
+A shortcut deserves one check against the full calculation. The tools are those of \lessonref{les:spring}.
+
+\begin{example}[Checking the shortcut: the exact solution]
+\label{ex:droop-exact}
+Solve the creep of \cref{fig:droop-ion} without the quasi-static assumption ($m = 1$, $K_p = 10$, $K_d = 7$, $K_i = 0.8$) and compare with the simulator.
+
+\textbf{Step 1 — the full equation.} After the switch, $m\ddot y = K_p e + I - K_d\dot y - mg$ with $\dot I = K_i e$. In terms of the error ($\dot y = -\dot e$): $m\ddot e + K_d\dot e + K_p e + I - mg = 0$. Differentiate once to remove the constant and insert $\dot I$:
+\begin{equation*}
+  m\,\dddot e + K_d\,\ddot e + K_p\,\dot e + K_i\,e = 0 .
+\end{equation*}
+
+\textbf{Step 2 — the poles.} The characteristic equation $s^3 + 7s^2 + 10s + 0.8 = 0$ has the roots
+\begin{equation*}
+  s_1 = -5.052, \qquad s_2 = -1.863, \qquad s_3 = -0.0850 .
+\end{equation*}
+Without the integral the polynomial would be $s(s^2 + 7s + 10) = s(s+5)(s+2)$: the two poles of the mass–spring–damper and one at the origin. The integral gain has shifted them slightly and moved the third from the origin to $-0.0850$. The quasi-static estimate was $-K_i/K_p = -0.080$.
+
+\textbf{Step 3 — the initial conditions.} At the switch the drone is at rest with $e = e_{ss} = 0.981$ and the integral starts from zero, so the forces still balance: $e(0) = 0.981$, $\dot e(0) = 0$, $\ddot e(0) = 0$.
+
+\textbf{Step 4 — the solution.} $e(t) = c_1e^{s_1t} + c_2e^{s_2t} + c_3e^{s_3t}$. The three conditions are three linear equations for the constants, with the solution
+\begin{equation*}
+  c_3 = e_{ss}\,\frac{s_1 s_2}{(s_3 - s_1)(s_3 - s_2)} = 0.981 \cdot \frac{9.412}{4.967 \cdot 1.778} = 1.0455,
+\end{equation*}
+and, by the same formula with the indices exchanged, $c_1 = 0.0098$ and $c_2 = -0.0743$.
+
+\textbf{Step 5 — evaluate.} The first two terms are gone after two seconds. After that $e(t) = 1.0455\,e^{-0.0850\,t}$:
+\begin{center}\small
+\begin{tabular}{lccc}
+\toprule
+ & quasi-static & exact & simulator\\
+\midrule
+error \SI{10}{s} after the switch & \SI{0.441}{m} & \SI{0.4469}{m} & \SI{0.4470}{m}\\
+error \SI{20}{s} after the switch & \SI{0.198}{m} & \SI{0.1910}{m} & \SI{0.1911}{m}\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{Step 6 — the verdict.} The linear model reproduces the simulator to four digits: in this slow creep nothing saturates, drag is negligible and the motor lag does not matter. The shortcut is off by a few per cent, and it gave us the insight — a time constant of $K_p/K_i$ — that the three roots do not show at a glance. Use the shortcut to understand and the exact solution to be sure.
+\end{example}
+
+\simfig{droop_exact}{The error after the integral is switched on: the simulator (red), the exact third-order solution of Example~\ref{ex:droop-exact} (dashed, hidden under the measurement) and the quasi-static shortcut of Example~\ref{ex:droop-tau} (dotted).}{fig:droop-exact}
+
 \section{Cure two: know the load}
 
 The other cure is not to wait for an error at all. The weight is known — roughly. So add it to the command directly:
@@ -150,6 +192,75 @@ Feedforward acts on what you know, before any error exists. Feedback acts on wha
 \predict{with the feedforward on but $\hat m = \SI{0.9}{kg}$ (and I off), where does the drone settle? (Example~\ref{ex:droop-ff}.)}
 \end{trythis}
 
+\section{The engineer's view: which inputs leave an error}
+
+This lesson found the steady-state error for one case, a constant load on a proportional loop. An engineer asks the question for the whole loop at once: which inputs does it follow exactly, and which leave an error? The method never changes. Assume that a steady regime exists, write down what is constant in it, and solve.
+
+Two things act on the loop from outside, the setpoint $r$ and the load $d$, and each can be constant or changing. A constant setpoint with a known weight leaves no error even with P alone: the drone needs no extra force to stay where it is. The interesting cases are the other three.
+
+\subsection{A setpoint that moves}
+Let the setpoint climb at a constant rate, $r = r_0 + v_r t$, with the law of this lesson plus exact feedforward, $T = mg + K_p e - K_d\dot y$. In the steady regime the drone climbs at the same rate with a constant error: $\dot y = v_r$, $\ddot y = 0$. Newton's law then reads $0 = K_p e - K_d v_r$, so
+\begin{equation}\label{eq:droop-ramp}
+  e_{ss} = \frac{K_d\,v_r}{K_p} .
+\end{equation}
+The damper resists the climb, and P needs an error to overcome it. For $v_r = \SI{0.5}{m/s}$ and the default gains that is $7 \cdot 0.5/10 = \SI{0.35}{m}$. The air adds its own resistance, $c_v v_r^2 = 0.25 \cdot 0.25 = \SI{0.06}{N}$, worth another $0.06/10 = \SI{0.006}{m}$.
+
+If the derivative acts on the \emph{error} instead, the D term is $K_d(\dot r - \dot y)$, which vanishes when the drone keeps pace. Only the drag remains: \SI{0.006}{m}. The left panel of \cref{fig:droop-type} shows both, \SI{0.356}{m} and \SI{0.006}{m}, as predicted. \Lessonref{les:kick} will show what the derivative on the error costs in exchange.
+
+\subsection{A load that changes}
+
+\begin{example}[A drone that gets lighter]
+\label{ex:droop-burn}
+A spraying drone takes off at \SI{1.5}{kg}, which its controller knows, and then sprays \SI{50}{g} of liquid per second for ten seconds. The full PID is on. Where does it fly?
+
+\textbf{Step 1 — the load.} The feedforward keeps pushing with $1.5\,g$ while the weight falls. The surplus is an upward load that grows at the rate $\dot d = 0.05 \cdot 9.81 = \SI{0.49}{N/s}$.
+
+\textbf{Step 2 — the steady regime.} Suppose the error settles at a constant $e$. Then P is constant, D is zero, and only the integral changes, at the rate $\dot I = K_i e$. To keep the forces in balance while the load ramps, the integral must ramp at the opposite rate: $K_i e = -\dot d$, so
+\begin{equation}\label{eq:droop-burn}
+  e_{ss} = -\frac{\dot d}{K_i} = -\frac{0.49}{0.8} = \SI{-0.61}{m} .
+\end{equation}
+The drone rides \SI{61}{cm} \emph{above} its setpoint for as long as it sprays. An integrator removes a constant load completely and a ramping load not at all: it only keeps the error from growing.
+
+\textbf{Step 3 — the approach.} The quasi-static balance of Example~\ref{ex:droop-tau}, now with the load, is $K_p e + I + d = 0$. Differentiating: $K_p\dot e + K_i e + \dot d = 0$, a first-order equation with the solution $e(t) = e_{ss}\big(1 - e^{-t/\tau_I}\big)$, $\tau_I = K_p/K_i = \SI{12.5}{s}$.
+
+\textbf{Step 4 — after ten seconds.} $e = -0.61\,(1 - e^{-0.8}) = \SI{-0.34}{m}$. The simulator shows \SI{-0.334}{m}.
+
+\textbf{Step 5 — a stronger integral.} With $K_i = 3$: $e_{ss} = -0.49/3 = \SI{-0.16}{m}$, reached within the ten seconds because $\tau_I = \SI{3.3}{s}$. The simulator shows \SI{-0.159}{m} (\cref{fig:droop-type}, right).
+\end{example}
+
+\simfig{droop_type}{Two inputs that a PID does not follow exactly. Left: the setpoint climbs at \SI{0.5}{m/s} for eight seconds, with the integral off; the dotted lines are \cref{eq:droop-ramp} with the drag added. Right: the drone loses \SI{50}{g/s} for ten seconds with the integral on; dashed is Step~3 of Example~\ref{ex:droop-burn}, dotted the steady value \eqref{eq:droop-burn}.}{fig:droop-type}
+
+\begin{result}[The steady-state errors of the altitude loop]
+With exact feedforward at the start and the drag neglected:
+\begin{center}\small
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{}lll@{}}
+\toprule
+input & P and D & P, I and D\\
+\midrule
+constant setpoint & $0$ & $0$\\
+setpoint climbing at $v_r$ & $K_d v_r/K_p$ \;(D on the measurement) & $0$\\
+constant load $F$ & $F/K_p$ & $0$\\
+load ramping at $\dot d$ & grows without bound & $\dot d/K_i$\\
+\bottomrule
+\end{tabular}
+\end{center}
+\end{result}
+
+\begin{keyidea}[Count the integrators]
+A loop follows without error exactly those inputs that its own integrators can produce. The drone integrates force twice on the way to position, so a constant setpoint costs nothing. One integrator in the controller, placed before the point where the load enters, holds a constant load; a ramping load would need two. Each integrator buys one more power of $t$, and each one costs stability, as \lessonref{les:integral} will show.
+\end{keyidea}
+
+\begin{lookahead}
+\begin{itemize}[leftmargin=1.2em]
+  \item The table above is the beginning of a classification that engineers call the \emph{type} of a loop. Lesson~III.2 derives it for any loop from its transfer function, together with the Routh–Hurwitz test that limits how many integrators a loop can carry.
+  \item The integral as one more state variable, with a gain chosen together with the others, is Lesson~II.3.
+  \item Waiting \SI{12.5}{s} for an integral is slow. A \emph{disturbance observer} estimates the load directly from how the drone moves and cancels it within tenths of a second: Lessons~II.5 to~II.8.
+  \item The derivative on the error removed the following error because it feeds the setpoint's velocity forward. Lesson~II.11 feeds forward the whole planned motion — velocity, acceleration and more — and cuts a tracking error from \SI{80}{cm} to \SI{2}{cm}.
+  \item A rocket is the spraying drone of Example~\ref{ex:droop-burn} for its whole flight: its mass falls by the second. Lesson~IV.4 lands one. An aircraft's loads change with speed and altitude instead, and its gains follow them (Lesson~IV.13).
+\end{itemize}
+\end{lookahead}
+
 \begin{curiosity}{The grid that sags on purpose}
 \photo{turbinehall}{A turbine hall of the 1920s. Every generator in a power grid runs a speed governor — with a deliberate droop.}
 The electrical grid of a continent is one enormous machine turning in synchrony: every generator in Europe spins in step with a frequency of \SI{50}{Hz}. When you switch on a kettle, the load rises, the turbines slow down a little, and the frequency dips. Each power station answers with a speed governor that opens its steam or water valve.
@@ -165,6 +276,8 @@ The small remaining frequency error is then removed on a slower time scale, over
   \item A proportional loop under a constant load $F$ settles with $e_{ss} = F/K_p$. Raising $K_p$ reduces the droop but cannot remove it.
   \item An integral can only rest at zero error, so it removes any constant droop — slowly, with time constant about $K_p/K_i$.
   \item Feedforward removes the known part of the load immediately; feedback handles what the model gets wrong.
+  \item A setpoint that climbs at $v_r$ leaves $K_d v_r/K_p$ when D acts on the measurement. A load that ramps at $\dot d$ leaves $\dot d/K_i$ even with the integral on.
+  \item A loop follows without error the inputs that its integrators can produce. Count them, and where they sit relative to the load.
 \end{itemize}
 \end{remember}
 
@@ -175,10 +288,20 @@ The small remaining frequency error is then removed on a slower time scale, over
 \answer{$e_{ss} = 3/4 = \SI{0.75}{m}$; $K_p = 30$.}
 \exercise[1] With $K_p = 10$ and $K_i = 0.8$, how long after switching the integral on is the droop halved?
 \answer{$t = \tau_I\ln2 = 12.5\cdot0.693 = \SI{8.7}{s}$.}
-\exercise[2] Derive \cref{eq:droop-tau} again, this time keeping the D term and the inertia: write the closed-loop characteristic polynomial $m s^3 + K_d s^2 + K_p s + K_i$ and show that for small $K_i$ it has one real root close to $-K_i/K_p$. (Hint: substitute $s = -\varepsilon$ and keep first-order terms.)
+\exercise[2]\exkind{derive} Derive \cref{eq:droop-tau} again, this time keeping the D term and the inertia: write the closed-loop characteristic polynomial $m s^3 + K_d s^2 + K_p s + K_i$ and show that for small $K_i$ it has one real root close to $-K_i/K_p$. (Hint: substitute $s = -\varepsilon$ and keep first-order terms.)
 \answer{$-m\varepsilon^3 + K_d\varepsilon^2 - K_p\varepsilon + K_i \approx -K_p\varepsilon + K_i = 0$, so $\varepsilon \approx K_i/K_p$.}
 \exercise[2] In the power-grid story, two generators of \SI{100}{MW} and \SI{300}{MW} both have a 5\,\% droop. A load of \SI{40}{MW} is added. How does it split, and how far does the frequency fall (before secondary control acts)?
 \answer{\SI{10}{MW} and \SI{30}{MW}; $\Delta f/f_0 = 0.05\cdot40/400 = 0.5\,\%$, i.e.\ \SI{0.25}{Hz}.}
 \exercise[3] The quasi-static assumption of Example~\ref{ex:droop-tau} neglects $m\ddot y$ and $K_d\dot y$. Using the solution \eqref{eq:droop-tau}, estimate both at the moment the integral is switched on and compare them with the \SI{9.81}{N} being shared. Is the assumption justified?
 \answer{$\dot y = e_{ss}/\tau_I = \SI{0.078}{m/s}$, $K_d\dot y = \SI{0.55}{N}$, about 6\,\%; $m\ddot y \approx \SI{0.006}{N}$. Reasonable.}
+\exercise[2]\exkind{derive} Improve the estimate of the slow pole in Example~\ref{ex:droop-exact}. Put $s = -\varepsilon$ into $m s^3 + K_d s^2 + K_p s + K_i = 0$, keep terms up to $\varepsilon^2$, and show that $\varepsilon \approx \frac{K_i}{K_p}\big(1 + \frac{K_d K_i}{K_p^2}\big)$. Evaluate it and compare with the exact $0.0850$.
+\answer{$K_d\varepsilon^2 - K_p\varepsilon + K_i \approx 0$; inserting $\varepsilon_0 = K_i/K_p$ into the quadratic term gives $\varepsilon \approx 0.08\,(1 + 0.056) = 0.0845$, within 1\,\% of the exact value.}
+\exercise[2]\exkind{derive} The setpoint accelerates: $r = \tfrac12 a_r t^2$. Show that with exact gravity feedforward and the derivative on the error, a P–D loop follows it with the steady error $e_{ss} = m\,a_r/K_p$. Which feedforward term would remove it? Evaluate for $a_r = \SI{2}{m/s^2}$.
+\answer{In the steady regime $\ddot y = a_r$ and $\dot e = 0$, so $m a_r = K_p e$. Adding $m a_r$ to the feedforward removes it: the controller then supplies the force the planned motion needs. $e_{ss} = \SI{0.2}{m}$.}
+\exercise[2]\exkind{fly} Fly the left panel of \cref{fig:droop-type}. With the wind off and \It off, set \ui{Setpoint\then Rate limit} to \SI{0.5}{m/s} and raise the setpoint from \SI{2}{m} to \SI{6}{m}. Read the error during the climb. Then set \ui{Altitude PID\then D acts on} to \ui{error} and repeat. Finally predict the error for a rate limit of \SI{1}{m/s} and check it.
+\answer{\SI{0.356}{m} and \SI{0.006}{m}. At \SI{1}{m/s}: $7/10 + 0.25/10 = \SI{0.725}{m}$ with D on the measurement, \SI{0.025}{m} with D on the error.}
+\exercise[2]\exkind{code} \src{tests/closed-loop.test.ts} contains the test \enquote{P-only without feedforward droops by m·g/Kp}. Write its sibling for Example~\ref{ex:droop-ff}: feedforward on, a model mass of \SI{0.9}{kg}, the integral off, and the assertion that the drone settles $(m - \hat m)g/K_p$ below the setpoint. Which line of \src{src/control/altitude.ts} does your test exercise?
+\answer{Copy the existing test, keep \texttt{feedforward} on, set \texttt{p.control.model.mass = 0.9}, and expect $0.1\cdot9.81/K_p$. It exercises the line that computes \texttt{ff} as the model mass times gravity.}
+\exercise[3]\exkind{code} The spraying drone of Example~\ref{ex:droop-burn} knows how fast it sprays. Change \src{src/control/altitude.ts} so that the feedforward uses a mass that falls at a given rate while spraying, and fly the experiment again (the run is \texttt{droop-burn} in \src{scripts/book-data.ts}). What error do you expect during the burn, and what if the assumed rate is 10\,\% too low?
+\answer{With the right rate the unknown load vanishes and so does the error. With a rate 10\,\% too low the load ramps at $0.1\dot d$ and the error is ten times smaller than before, \SI{6}{cm} for $K_i = 0.8$.}
 \end{exercises}

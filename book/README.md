@@ -57,6 +57,12 @@ book/
 - Every time series is flown by the simulator. No plot is drawn from a
   formula alone unless the caption says so.
 - Signal colours are the app's colours (`style/anemostatos-book.sty`).
+- A number attributed to the simulator comes from an experiment in
+  `scripts/book-data.ts`. Figures that draw a formula over a flight live in
+  `tools/figs_predict.py`.
+- A chapter follows the standard of `docs/curriculum.md` §4. Lessons 1–4
+  are the model: the section _The engineer's view_, the `lookahead` box
+  and exercises labelled `\exkind{derive}`, `\exkind{fly}`, `\exkind{code}`.
 - Exercises use `\exercise`, and their solutions go into `\answer{...}`
   right after them. The build collects the answers into
   `build/main.ans` for the companion volume; they are not printed here.

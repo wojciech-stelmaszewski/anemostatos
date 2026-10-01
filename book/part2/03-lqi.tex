@@ -1,0 +1,201 @@
+\lesson{II.3}{Integral, the optimal way}{An optimal controller is optimal for its model. When the model is wrong, it droops like any P controller — unless the integral becomes one more state.}{1}{lqi}{Part II · Beyond PID}
+\label{les:lqi}
+
+\lead{\setupcard{\setuprow{Level}{L1}\setuprow{Controller}{the LQR of Lesson~II.2, $q_e = 100$, $q_v = 10$, $r = 1$}\setuprow{Model}{$\hat m = \SI{0.8}{kg}$ for a drone of \SI{1}{kg}}\setuprow{Event}{at $t = \SI{15}{s}$ the setpoint steps from \SI{2}{m} to \SI{3}{m}}\setuprow{Goal}{steady-state error below \SI{1}{cm}, with the model still wrong}}%
+The LQR of the previous lesson was derived for a model, and the model in this lesson is wrong: it believes the drone weighs \SI{0.8}{kg}. The feedforward is two newtons short, and the optimal controller does what the P controller of Lesson~3 did — it hangs twenty centimetres low and stays there. The cure is the same idea as Part~I's integral term, done the way of Part~II: make the accumulated error a state, give it a price, and let the Riccati equation choose its gain together with the others.}
+
+\section{Optimal for the wrong drone}
+
+The LQR knows only its model, $\hat m\,\ddot y = u$ with $u = T - \hat mg$. With $\hat m = \SI{0.8}{kg}$ its gains are, by \cref{eq:lqr-gains},
+\begin{equation*}
+  k_1 = \sqrt{q_e/r} = 10, \qquad k_2 = \sqrt{q_v/r + 2\hat m k_1} = \sqrt{10 + 16} = 5.10 ,
+\end{equation*}
+and its feedforward is $\hat m g = \SI{7.85}{N}$.
+
+\begin{example}[The droop of an optimal controller]
+\label{ex:lqi-droop}
+Where does the \SI{1}{kg} drone hover?
+
+\textbf{Step 1 — the missing force.} $(m - \hat m)\,g = 0.2 \cdot 9.81 = \SI{1.96}{N}$.
+
+\textbf{Step 2 — the equilibrium.} At rest $v = 0$, so only the position term can supply it: $k_1\,(-x) = 1.96$, $x = -1.96/k_1$.
+
+\textbf{Step 3 — numbers.} With the continuous $k_1 = 10$: \SI{19.6}{cm} below the setpoint. The simulator's discrete design at \SI{250}{Hz} has $k_1 = 9.89$, hence \SI{19.8}{cm}; it hovers \SI{19.87}{cm} low (\cref{fig:lqi-runs}, red).
+
+\textbf{Step 4 — read it.} \Cref{eq:droop-ess} again, with $k_1$ for $K_p$. Optimality does not protect against a wrong model: the cost was minimised for a drone that does not exist.\pitfall[-80pt]{A model error of 20\,\% is not unusual: a battery swap, a camera, a parcel. A controller that is only right for the nominal mass is right on few flights.}
+\end{example}
+
+\section{The integral as a state}
+
+Part~I's cure was to add $K_i\int e\,\dd t$ to the command. In the language of state feedback the integral is a new state variable with its own equation,
+\begin{equation}\label{eq:lqi-xi}
+  \xi = \int_0^t x\,\dd\tau, \qquad \dot\xi = x ,
+\end{equation}
+(with $x = y - r$, so $\xi = -\int e$). The augmented system has three states:
+\begin{equation}\label{eq:lqi-aug}
+  \frac{\dd}{\dd t}\begin{pmatrix} x\\ v\\ \xi\end{pmatrix}
+  = \underbrace{\begin{pmatrix} 0 & 1 & 0\\ 0 & 0 & 0\\ 1 & 0 & 0\end{pmatrix}}_{A_a}\begin{pmatrix} x\\ v\\ \xi\end{pmatrix}
+  + \underbrace{\begin{pmatrix} 0\\ 1/\hat m\\ 0\end{pmatrix}}_{B_a} u .
+\end{equation}
+It is still linear, so the whole machinery of Lesson~II.2 applies: add a weight $q_i$ on $\xi^2$ to the cost, solve the Riccati equation for the $3 \times 3$ matrix $P$, and read off three gains,
+\begin{equation}\label{eq:lqi-law}
+  u = -k_1\,x - k_2\,v - k_i\,\xi .
+\end{equation}
+This is the \term{linear–quadratic regulator with integral action}, LQI. It is a PID — $k_1$ a $K_p$, $k_2$ a $K_d$ on the measurement, $k_i$ a $K_i$ — but one whose three gains were chosen together, by one cost.\tip{To read an LQI as a PID: $K_p = k_1$, $K_d = k_2$ on the measurement, $K_i = k_i$. The info card shows them under these names.}\recall{\Cref{thm:integral-imp}: a controller that removes every constant load must contain an integrator. LQI is that theorem put into the state.}
+
+\begin{example}[The three gains of the LQI]
+\label{ex:lqi-gains}
+Find the LQI gains for $\hat m = 0.8$, $q_e = 100$, $q_v = 10$, $r = 1$ and $q_i = 5$; then the poles of the loop with the \emph{true} drone.
+
+\textbf{Step 1 — one entry by hand.} Write $P$ with the entries $p_{ij}$, $i, j \in \{x, v, \xi\}$. The $(\xi, \xi)$ entry of the Riccati equation \eqref{eq:lqr-care} contains no $A_a$ term, because the column of $A_a$ that belongs to $\xi$ is zero. It reads $-p_{v\xi}^2/(r\hat m^2) + q_i = 0$. So $p_{v\xi} = \hat m\sqrt{rq_i}$, and the integral gain is
+\begin{equation*}
+  k_i = \frac{p_{v\xi}}{r\hat m} = \sqrt{\frac{q_i}{r}} = \sqrt5 = 2.24 .
+\end{equation*}
+The same pattern as $k_1 = \sqrt{q_e/r}$ in the plain LQR.
+
+\textbf{Step 2 — the rest numerically.} The other five equations are coupled; solved by a computer they give $k_1 = 11.1$ and $k_2 = 5.27$. The integral has made the position gain a little stiffer. The simulator's discrete design: $(10.98,\ 5.22,\ 2.21)$.
+
+\textbf{Step 3 — the loop with the real drone.} The true plant is $m\ddot x = u - (m - \hat m)g$ with $m = 1$. Differentiating once with \cref{eq:lqi-law} removes the constant: $m\dddot x + k_2\ddot x + k_1\dot x + k_ix = 0$, the PID loop of \lessonref{les:integral}.
+
+\textbf{Step 4 — the poles.} $s^3 + 5.27s^2 + 11.1s + 2.24$: $-2.52 \pm 1.90j$ and $-0.224$. Routh–Hurwitz: $5.27 \cdot 11.1 = 58.5 > 2.24$, stable with a wide margin.
+
+\textbf{Step 5 — read them.} The pair is the LQR as before. The real pole is the integral learning the missing load, with the time constant $1/0.224 = \SI{4.5}{s}$; the quasi-static estimate of \lessonref{les:droop}, $k_i/k_1 = 0.20$, is close. In the simulator the droop shrinks from 13.2 to \SI{4.3}{cm} between $t = 5$ and \SI{10}{s}: a factor of $e^{-0.224 \cdot 5} = 0.33$, as the pole says.
+\end{example}
+
+\simfig{lqi_runs}{The wrong model, three controllers. The LQR without integral (red) hangs \SI{19.8}{cm} low. The LQI learns the missing \SI{1.96}{N}: slowly with $q_i = 5$ (blue), fast with $q_i = 50$ (green), and both overshoot the step at \SI{15}{s} — the larger weight more. Dashed: the linear loop with the true mass and the discrete gains, started from the flown state at \SI{5}{s}.}{fig:lqi-runs}
+
+\section{The old friend: overshoot}
+
+At $t = \SI{15}{s}$ the setpoint steps up by a metre. Both LQI runs overshoot (\cref{fig:lqi-runs}), and the one with the heavier integral weight more. This is not a defect of the design. It is the area rule of \lessonref{les:integral}: after a setpoint step with an unchanged load, the integral must return to the value that carries that load, so the area under the error must come back to zero, and a positive area during the climb needs a negative one after it.
+
+\begin{example}[How much overshoot, by the model]
+\label{ex:lqi-step}
+Predict the peak after the step for $q_i = 5$ and $q_i = 50$, and compare with the simulator.
+
+\textbf{Step 1 — the gains.} $q_i = 5$: $(10.98,\ 5.22,\ 2.21)$. $q_i = 50$: by Step~1 of Example~\ref{ex:lqi-gains}, $k_i = \sqrt{50} = 7.07$ (discrete: 6.97), with $k_1 = 13.2$, $k_2 = 5.55$.
+
+\textbf{Step 2 — the model.} The loop $\ddot x = -k_1x - k_2v - k_i\xi - (m - \hat m)g$, $\dot\xi = x$, integrated from the state the simulator had at \SI{5}{s} (position, velocity and the value of the integral term), with the step at \SI{15}{s}.
+
+\textbf{Step 3 — the results.} $q_i = 5$: peak at \SI{3.097}{m}, \SI{1.57}{s} after the step; the simulator \SI{3.091}{m} after \SI{1.64}{s}. $q_i = 50$: \SI{3.215}{m} after \SI{1.31}{s}; the simulator \SI{3.211}{m} after \SI{1.34}{s}.
+
+\textbf{Step 4 — the trade.} The heavier integral removes the droop in a second instead of five and overshoots the step by 21 instead of \SI{9}{cm}. Between the two lies the design decision, now expressed as a single weight $q_i$ rather than a third knob.\innumbers[-70pt]{From $q_i = 5$ to 50 the integral pole moves from $-0.22$ to $-0.72$: three times faster at learning the load, twice the overshoot on a step.}
+\end{example}
+
+\begin{keyidea}[Optimality does not repair a model — it hedges]
+An optimal controller makes the best of the model it is given and knows nothing about the errors of that model. Integral action is how it hedges against the one error that every model has: a constant offset. In Part~II the same idea returns in stronger forms — an observer that estimates the whole disturbance (Lesson~II.5), an adaptive law that estimates the model's parameters (Lesson~II.18) — each a way of making the controller learn what its model got wrong.
+\end{keyidea}
+
+\screen[0 0 495 998]{lqi}{Lesson II.3 in the app with LQI switched on. The contributions chart shows the new green integral contribution growing to carry the missing weight; the info card lists three gains.}{fig:lqi-screen}
+
+\begin{inapp}
+\begin{itemize}[leftmargin=1.2em]
+  \item The switch is \ui{LQR\then Integral state (LQI)} (\param{control.lqr.integral}), the weight \param{control.lqr.qInt}. The wrong model is \param{control.model.mass = 0.8}.
+  \item In \src{src/control/lqr.ts} the integral is a fourth entry of the state, \texttt{xi}, advanced by $e\,\Delta t$. Like the PID's, it is held at zero during take-off, and it stops integrating while the thrust is saturated and the error pushes further (conditional integration, \lessonref{les:windup}).
+  \item The goal checks the error and the vertical speed after the step, and that the model mass is still at most \SI{0.8}{kg}: the point is to fix the droop without fixing the model.
+\end{itemize}
+\end{inapp}
+
+\begin{trythis}
+\begin{enumerate}
+  \item Watch the droop of the LQR, then switch \ui{Integral state (LQI)} on.
+  \item Raise $q_i$ from 5 to 50, then to 500, and watch the step at \SI{15}{s}.
+  \item With LQI on, set the model mass back to \SI{1}{kg}. What does the integral contribution settle to now?
+\end{enumerate}
+\predict{with $q_i = 500$, what is the integral gain $k_i$? Will the loop still be stable with $k_1 \approx 19$ and $k_2 \approx 6.4$? (Use the condition of \lessonref{les:integral}.)}
+\end{trythis}
+
+\section{The engineer's view: augmenting the state}
+
+\subsection{A general recipe}
+Integral action in state space is a recipe that works for any plant and any number of outputs. Given $\dot{\vx} = A\vx + B\symbf u$ and outputs $\symbf y = C\vx$ that must follow a constant reference without error, append one integrator per output,
+\begin{equation}\label{eq:lqi-general}
+  \frac{\dd}{\dd t}\begin{pmatrix}\vx\\ \symbf\xi\end{pmatrix} = \begin{pmatrix} A & 0\\ C & 0\end{pmatrix}\begin{pmatrix}\vx\\ \symbf\xi\end{pmatrix} + \begin{pmatrix} B\\ 0\end{pmatrix}\symbf u - \begin{pmatrix} 0\\ \symbf y_{ref}\end{pmatrix},
+\end{equation}
+choose weights for the new states, and design an LQR for the augmented system. The resulting law $\symbf u = -K_x\vx - K_\xi\symbf\xi$ is a multivariable PI controller. At any equilibrium $\dot{\symbf\xi} = 0$, so $C\vx = \symbf y_{ref}$: zero steady-state error by construction, whatever the constant disturbance.\tip{Integrate only what you want to hold exactly. Every integrator is a state that can wind up and a pole that slows the loop.}
+
+There is a condition. The augmented system must be controllable, or no gain can stabilise it.
+
+\begin{theorem}[When integral action is possible]
+\label{thm:lqi-rank}
+The augmented pair of \cref{eq:lqi-general} is controllable if and only if $(A, B)$ is controllable and
+\begin{equation*}
+  \operatorname{rank}\begin{pmatrix} A & B\\ C & 0\end{pmatrix} = n + q ,
+\end{equation*}
+where $n$ is the number of states and $q$ the number of integrated outputs. In words: the plant must have no zero at $s = 0$ from the inputs to those outputs, and at least as many inputs as integrated outputs. (Franklin, Powell and Emami-Naeini, 2019, ch.~7.)
+\end{theorem}
+
+For the drone, $\begin{psmallmatrix} A & B\\ C & 0\end{psmallmatrix} = \begin{psmallmatrix} 0 & 1 & 0\\ 0 & 0 & 1/m\\ 1 & 0 & 0\end{psmallmatrix}$ has the determinant $1/m \ne 0$: rank 3. Integrating the \emph{velocity} instead would fail if the plant could not hold a constant velocity error-free — and asking for two integrated outputs with one thrust always fails: one input cannot hold two outputs at two independent constants.
+
+\begin{example}[A space telescope against sunlight]
+\label{ex:lqi-sat}
+A small space telescope with $J = \SI{1000}{kg.m^2}$ about one axis is pointed by a reaction wheel. Sunlight pressing unevenly on its solar panels produces a nearly constant torque of $\tau_d = \SI{1e-4}{N.m}$. The pointing law is an LQR with $k_1 = \SI{10}{N.m/rad}$, and the requirement is one arcsecond ($\SI{4.8e-6}{rad}$).
+
+\textbf{Step 1 — the droop.} At rest the position gain must cancel the torque: $\theta = \tau_d/k_1 = \SI{1e-5}{rad} = 2.1$ arcseconds. The requirement is missed by a factor of two.
+
+\textbf{Step 2 — a stiffer LQR?} It would need $k_1 > \SI{21}{N.m/rad}$, and every increase of the gain also amplifies the noise of the star tracker (\lessonref{les:noise}).
+
+\textbf{Step 3 — LQI.} With an integral state the steady pointing error is zero, whatever $\tau_d$ is. The integral settles at the value that makes the wheel push back with exactly $\tau_d$.
+
+\textbf{Step 4 — the bill.} A wheel that pushes with a constant torque speeds up: its angular momentum grows by $\tau_d$ per second, $\SI{1e-4}{N.m} \times \SI{5700}{s} = \SI{0.57}{N.m.s}$ per orbit of 95 minutes. After some orbits the wheel reaches its top speed and saturates, and the momentum must be \enquote{dumped} by an external torque — magnetic torquers or thrusters (Lesson~IV.19). The integral has moved the disturbance from the pointing into the wheel's speed, where it can be managed.\didyouknow{Magnetic torquers are coils of wire. Driven with a current, they push against the Earth's magnetic field — a few hundredths of a newton-metre, enough to unload a wheel over an orbit.}
+\end{example}
+
+\subsection{In formal terms}
+
+\begin{theorem}[Zero steady-state error of the LQI]
+\label{thm:lqi-zero}
+Let the plant be $\dot{\vx} = A\vx + B\symbf u + \symbf d$ with a constant, unknown $\symbf d$, and let $\symbf u = -K_x\vx - K_\xi\symbf\xi$ with $\dot{\symbf\xi} = C\vx - \symbf y_{ref}$ be an LQI design for which the closed loop is asymptotically stable. Then for every constant $\symbf d$ and $\symbf y_{ref}$ the output converges, and $C\vx(t) \to \symbf y_{ref}$.
+\end{theorem}
+\begin{proof}
+The closed loop is a stable linear system driven by the constant input $(\symbf d, \symbf y_{ref})$; its state converges to the unique equilibrium (\cref{thm:spring-linear}, plus a constant particular solution). At that equilibrium $\dot{\symbf\xi} = 0$, which is the claim.
+\end{proof}
+
+The theorem needs only stability, not optimality: any stabilising gain for the augmented system removes the offset. What the Riccati equation adds is a principled choice among all of them — and, for the augmented model, the margins of \cref{thm:lqr-margins}. Those margins are for the \emph{model}: here $\hat m = 0.8$ while the drone weighs 1, so the true loop has $4/5$ of the design's gain. Since the guarantee covers any factor from $\tfrac12$ to infinity, this error is safe — the certificate earning its keep.
+
+\begin{lookahead}
+\begin{itemize}[leftmargin=1.2em]
+  \item An integrator learns a constant disturbance slowly, from the error it causes. Lesson~II.5 estimates the disturbance directly, from the motion, with an observer — and cancels it within tenths of a second.
+  \item Model predictive control carries the same integral state, or an estimated disturbance, into its prediction (Lesson~II.13).
+  \item The rank condition of \cref{thm:lqi-rank} is a statement about the \emph{zeros} of the plant; Lesson~III.2 draws them, and Lesson~III.12 extends integral action to several coupled outputs.
+  \item A satellite's reaction wheels are the integral of Example~\ref{ex:lqi-sat} made of steel; unloading them is Lesson~IV.19.
+\end{itemize}
+\end{lookahead}
+
+\begin{remember}
+\begin{itemize}
+  \item An optimal controller with a wrong model droops like a P controller: $x_{ss} = \Delta F/k_1$.
+  \item LQI adds $\xi = \int x\,\dd t$ as a state with weight $q_i$; the Riccati equation returns $k_1$, $k_2$ and $k_i$ together. For the drone $k_i = \sqrt{q_i/r}$.
+  \item The integral pole sits near $-k_i/k_1$; a heavier $q_i$ removes the offset faster and overshoots setpoint steps more (the area rule).
+  \item In general: one integrator per output to be held, possible if the plant has no zero at $s = 0$ and enough inputs.
+  \item Stability alone guarantees zero offset; optimality adds a principled choice and margins.
+\end{itemize}
+\end{remember}
+
+\begin{curiosity}{Pointing a telescope at nothing}
+\photo{hubble}{The Hubble Space Telescope, photographed from the Space Shuttle in 2009 after its last servicing mission.}
+The Hubble Space Telescope must hold its gaze on a faint galaxy for hours while it orbits the Earth every 95 minutes, passing from sunlight to shadow and back. The requirement is extraordinary: a pointing stability of about seven thousandths of an arcsecond — the angle under which a coin appears from a few hundred kilometres away.
+
+Its pointing loop works with the tools of this chapter. Gyroscopes measure the rate, star trackers and fine guidance sensors the angle; four reaction wheels supply the torque. And it fights exactly the disturbances of Example~\ref{ex:lqi-sat}: the pressure of sunlight, the faint drag of the upper atmosphere and the gravity gradient, all small, all slowly varying, all of which must be cancelled exactly, because any constant offset in torque would become a drift of the image. The wheels absorb the momentum these torques bring, and magnetic torquers, pushing against the Earth's magnetic field, slowly bleed it away.
+
+When one of Hubble's gyroscopes fails, the loop must reconstruct the missing rate from the remaining sensors — an estimation problem, the subject of the next lesson.
+\end{curiosity}
+
+\begin{exercises}
+\exercise[1] With $\hat m = \SI{0.9}{kg}$ instead of 0.8, how far does the LQR (without integral) droop? Use $k_1 = 10$.
+\answer{$0.1 \cdot 9.81/10 = \SI{9.8}{cm}$.}
+\exercise[1] What is $k_i$ for $q_i = 500$ and $r = 1$? And for $q_i = 5$, $r = 0.1$?
+\answer{$\sqrt{500} = 22.4$; $\sqrt{50} = 7.07$.}
+\exercise[1] In Example~\ref{ex:lqi-gains}, check the stability of the loop with the true mass by the Routh–Hurwitz test, and find the largest $k_i$ for which it would still be stable with $k_1 = 11.1$ and $k_2 = 5.27$.
+\answer{$k_2k_1 = 58.5 > k_i$; the limit is $k_i < k_1k_2/m = 58.5$.}
+\exercise[2]\exkind{derive} Write out the $(\xi, \xi)$ entry of the Riccati equation for the augmented system \eqref{eq:lqi-aug} and confirm that it gives $k_i = \sqrt{q_i/r}$, independently of $q_e$, $q_v$ and $\hat m$.
+\answer{$(A_a^\T P + PA_a)_{\xi\xi} = 0$ because column $\xi$ of $A_a$ is zero; $(PB_aR^{-1}B_a^\T P)_{\xi\xi} = p_{v\xi}^2/(r\hat m^2)$. So $p_{v\xi} = \hat m\sqrt{rq_i}$ and $k_i = (R^{-1}B_a^\T P)_\xi = p_{v\xi}/(r\hat m) = \sqrt{q_i/r}$.}
+\exercise[2]\exkind{derive} Use the rank condition of \cref{thm:lqi-rank} to decide whether integrating the \emph{velocity} of the drone, $C = (0\ \ 1)$, gives a controllable augmented system. Explain the answer without the theorem.
+\answer{$\begin{psmallmatrix}0 & 1 & 0\\ 0 & 0 & 1/m\\ 0 & 1 & 0\end{psmallmatrix}$ has rank 2, not 3: \emph{not} controllable. The integral of the velocity is the position minus a constant, which the augmented state already contains; the extra state is a copy and cannot be steered independently.}
+\exercise[2]\exkind{derive} In Example~\ref{ex:lqi-sat}, with $k_1 = \SI{10}{N.m/rad}$ and $J = \SI{1000}{kg.m^2}$, choose $k_2$ for $\zeta = 0.7$ and $k_i$ so that the integral pole is near $-0.1\sqrt{k_1/J}$. How long does the integral need to remove 95\,\% of the offset?
+\answer{$\omega_n = \sqrt{10/1000} = 0.1$; $k_2 = 2 \cdot 0.7 \cdot 0.1 \cdot 1000 = \SI{140}{N.m.s/rad}$. Pole near $-0.01$: $k_i \approx 0.01\,k_1 = \SI{0.1}{N.m/(rad.s)}$. $3/0.01 = \SI{300}{s}$, five minutes.}
+\exercise[2]\exkind{fly} In Lesson~II.3 switch LQI on with $q_i = 500$ and watch the step at \SI{15}{s}. Then raise \ui{Physics\then Mass} to \SI{1.3}{kg} in flight. How long does the LQI need to remove the new offset, compared with $q_i = 5$?
+\answer{With $q_i = 500$ the gains are about $(19.4,\ 6.4,\ 22)$: the new offset (a peak of \SI{13}{cm}) is 95\,\% gone in under \SI{2}{s}, and a \SI{1}{m} step overshoots by about a third. With $q_i = 5$ the peak is \SI{26}{cm} and the integral pole near $-0.22$ needs about \SI{14}{s}.}
+\exercise[2]\exkind{code} In \src{src/control/lqr.ts} find the conditional integration of \texttt{xi}. Under which two conditions does it stop, and why does the condition use the sign of the state $e = y - r$ rather than of the error $r - y$?
+\answer{It freezes while the unclamped command exceeds the maximum thrust with $e < 0$ (too low, pushing further up) or is below zero with $e > 0$ (too high, pushing further down). The controller's state convention is the deviation $e = y - r$, the opposite sign of Part~I's error.}
+\exercise[3]\exkind{derive} The area rule for the LQI. Show that after a setpoint step from equilibrium with an unchanged load, $\int_{t_0}^\infty x\,\dd t = 0$ for the LQI. What does this imply about the step responses of \cref{fig:lqi-runs}, and why does the heavier $q_i$ overshoot more?
+\answer{Before and after, the integral contribution $-k_i\xi$ must carry the same load, so $\xi(\infty) = \xi(t_0)$ and $\int x\,\dd t = 0$: the negative area of the climb must be repaid by a positive one above the setpoint. A larger $k_i$ repays the same area faster, hence with a larger peak.}
+\end{exercises}

@@ -160,3 +160,65 @@ def lqr_cost():
     b.set_xlabel("$r$", loc="right")
     b.grid(True, which="major", axis="both")
     save(f, "lqr_cost")
+
+
+# ─── Lesson II.3 ───────────────────────────────────────────────────────────
+def _lqi_gains(qi, mh=0.8, dt=0.004):
+    from scipy.linalg import solve_discrete_are as dare
+    A = np.array([[0, 1, 0], [0, 0, 0], [1, 0, 0.0]])
+    B = np.array([[0], [1 / mh], [0.0]])
+    M = np.zeros((4, 4))
+    M[:3, :3] = A * dt
+    M[:3, 3:] = B * dt
+    E_ = expm(M)
+    Ad, Bd = E_[:3, :3], E_[:3, 3:]
+    Q = np.diag([100, 10, qi]) * dt
+    R = np.array([[dt]])
+    P = dare(Ad, Bd, Q, R)
+    return np.linalg.solve(R + Bd.T @ P @ Bd, Bd.T @ P @ Ad)[0]
+
+
+def _lqi_model(d, k, t0=5.0, t1=30.0, m=1.0, mh=0.8, g=9.81, step_at=15.0, dt=0.001):
+    """The linear loop with the true mass, started from the flown state at t0."""
+    i = int(np.argmin(abs(d.t.values - t0)))
+    r = d["sp.y"].values[i]
+    x, v = d["pos.y"].values[i] - r, d["vel.y"].values[i]
+    xi = -d["alt.part.int"].values[i] / k[2] if k[2] else 0.0
+    T, Y = [], []
+    t = t0
+    while t <= t1:
+        if abs(t - step_at) < dt / 2:
+            r += 1.0
+            x -= 1.0
+        u = -(k[0] * x + k[1] * v + k[2] * xi)
+        a = (u - (m - mh) * g) / m
+        v += a * dt
+        x += v * dt
+        xi += x * dt
+        T.append(t)
+        Y.append(x + r)
+        t += dt
+    return np.array(T), np.array(Y)
+
+
+@fig
+def lqi_runs():
+    f, a = plt.subplots(figsize=(TEXT_W, 64 * MM))
+    runs = [("lqi-lqr", 0, C["err"], "LQR, no integral"), ("lqi-lqi", 5, C["meas"], "LQI, $q_i = 5$"),
+            ("lqi-lqi-q50", 50, C["I"], "LQI, $q_i = 50$")]
+    for name, qi, col, lab in runs:
+        d = win(load(name), 2, 30)
+        a.plot(d.t, d["pos.y"], color=col, lw=1.2, label=lab)
+        k = _lqi_gains(qi) if qi else np.r_[load(name)["lqr.k1"].iloc[-1], load(name)["lqr.k2"].iloc[-1], 0.0]
+        tm, ym = _lqi_model(load(name), k)
+        a.plot(tm, ym, color=C["ink"], lw=0.6, ls=(0, (3, 2)))
+    d = win(load("lqi-lqr"), 2, 30)
+    a.plot(d.t, d["sp.y"], color=C["sp"], lw=0.8, ls=(0, (4, 2.5)))
+    a.text(9.5, 1.86, "droop $1.96\\,$N$\\,/\\,k_1 = 19.8$ cm", fontsize=6.4, color=C["err"])
+    a.legend(loc="upper left", handlelength=1.2)
+    a.set_xlim(2, 30)
+    a.set_ylim(1.7, 3.3)
+    a.set_title("A model that believes $\\hat m = 0.8$ kg, a drone of 1 kg")
+    a.set_ylabel("altitude  [m]")
+    xlab_time(a)
+    save(f, "lqi_runs")

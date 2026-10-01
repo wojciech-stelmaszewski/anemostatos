@@ -1,6 +1,7 @@
 import type { Params } from '@/sim/params';
 import { AdrcController } from './adrc';
 import { AltitudeController } from './altitude';
+import { FaultTolerantController } from './fault';
 import { CascadeController } from './cascade';
 import { WithAltitudeKalman } from './estimated';
 import { L1AdaptiveController } from './l1ac';
@@ -20,6 +21,7 @@ export const controllerKey = (p: Params): string => {
     l3.inner,
     l3.compensation,
     l3.safety,
+    p.control.fault.enabled,
   ].join('|');
 };
 
@@ -43,6 +45,8 @@ export function makeController(p: Params): Controller {
     case 2:
       return new PointMassController();
     case 3:
-      return new CascadeController(p);
+      return p.control.fault.enabled && p.control.l3.outer === 'pid-cascade'
+        ? new FaultTolerantController(p)
+        : new CascadeController(p);
   }
 }

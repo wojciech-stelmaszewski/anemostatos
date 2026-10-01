@@ -82,6 +82,12 @@ const turnExcess = (p: Params): number => {
   return (Math.hypot(1, a / GRAVITY) - 1) * 100;
 };
 
+/** When lesson III.27 takes the propeller off motor 2, s. */
+const ROTOR_LOSS_S = 5;
+/** Spin rate on three rotors: the yaw torque of two diagonal motors carrying m·g, over the drag. */
+const spinRate = (p: Params): number =>
+  (p.drone.torqueCoeff * p.drone.mass * GRAVITY) / p.drone.yawDamping;
+
 /** Half the peak-to-peak swing of the altitude over the last `seconds`. */
 const swing = (sim: Simulation, seconds: number): number => {
   const { series } = sim.telemetry.window(['pos.y'], sim.t - seconds);
@@ -974,6 +980,94 @@ export const PART_THREE: Lesson[] = [
           middle of a manoeuvre has nothing to learn from. And a gate cannot help in a turn that
           never ends. For that the filter needs to know the acceleration itself, from a velocity
           measurement, which is what a navigation filter adds (lesson III.24).
+        </Notice>
+      </>
+    ),
+  },
+  {
+    id: '3motors',
+    n: 27,
+    part: 3,
+    chapter: J,
+    title: 'Three rotors left',
+    level: 3,
+    chart: 'fault',
+    loop: 'pos.x',
+    setup: (p) => {
+      calm(p);
+      p.setpoint.y = 5;
+      p.drone.yawDamping = 0.012;
+    },
+    events: (sim) => setAt(sim, ROTOR_LOSS_S, 'drone.motorEfficiency', [1, 0, 1, 1]),
+    predict: {
+      label: 'Spin rate on three rotors',
+      unit: 'rad/s',
+      truth: spinRate,
+      tolerance: 0.1,
+    },
+    goal: {
+      text: 'Predict how fast the drone will spin once it has given up yaw. Then make it survive the loss of motor 2: from 10 s after the fault, stay within 0.5 m of the setpoint for 10 seconds.',
+      check: ({ sim, prediction }) => {
+        if (prediction == null)
+          return 'first the prediction: which yaw torque is left over, and what drag balances it?';
+        const truth = spinRate(sim.params);
+        if (Math.abs(prediction - truth) / truth > 0.1)
+          return 'not within 10 %: two diagonal motors carry the weight, and their yaw torques add';
+        if (sim.state.crashed) return 'crashed: press R to fly again';
+        const from = ROTOR_LOSS_S + 10;
+        if (sim.t < from + 10) return sim.t < ROTOR_LOSS_S ? 'hovering…' : 'flying on three…';
+        const { series } = sim.telemetry.window(
+          ['pos.x', 'pos.y', 'pos.z', 'sp.x', 'sp.y', 'sp.z'],
+          from,
+        );
+        let worst = 0;
+        for (let i = 0; i < series[0]!.length; i++)
+          worst = Math.max(
+            worst,
+            Math.hypot(
+              series[0]![i]! - series[3]![i]!,
+              series[1]![i]! - series[4]![i]!,
+              series[2]![i]! - series[5]![i]!,
+            ),
+          );
+        return worst < 0.5 || `largest position error ${worst.toFixed(2)} m`;
+      },
+    },
+    solution: (p) => {
+      p.control.fault.enabled = true;
+      p.control.fault.leadLag = true;
+    },
+    body: (
+      <>
+        <p>
+          At five seconds motor 2 loses its propeller. Four motors set four things: the thrust and
+          three torques. The matrix that maps motor thrusts to those four, the{' '}
+          <b>control effectiveness</b>, has rank 4. With one column gone its rank is 3, and the info
+          card says so: there is no setting of the three remaining motors that holds thrust, roll,
+          pitch and yaw at once. The cascade insists on all four and flips.
+        </p>
+        <p>
+          The way out is to give one of them up. Keep the thrust and the direction of the thrust
+          axis (two angles of tilt), and let the yaw torque be whatever is left [Mueller 2014]. Two
+          diagonal motors then carry the weight, their yaw torques add, and the drone spins until
+          the rotor drag balances them:
+        </p>
+        <M display>{'\\Omega \\approx \\frac{c_\\tau\\, m g}{k_{yaw}}'}</M>
+        <Try>
+          Compute <M>{'\\Omega'}</M> and enter it: each newton of rotor thrust brings{' '}
+          <M>{'c_\\tau = 0.016'}</M> N·m of yaw torque, the drone weighs 1 kg, and the yaw damping
+          is in <b>Rotor loss</b>. Then switch on <b>Rotor loss → Fault-tolerant mode</b> and press{' '}
+          <b>R</b>. It still falls. In a body that spins at <M>{'\\Omega'}</M>, a torque that should
+          stay fixed in space has to turn at <M>{'\\Omega'}</M>, and motors that lag by{' '}
+          <M>{'\\tau'}</M> deliver it turned back by <M>{'\\arctan(\\Omega\\tau)'}</M>. Find the
+          setting that commands it ahead.
+        </Try>
+        <Notice>
+          This flies on a knife edge. Every lag in the loop becomes a rotation of the torque: 10 ms
+          of sensor delay is 7° at this spin rate, 20 ms brings the drone down, and so do motors
+          slower than the controller believes. That is why the law leads by the sensor delay as
+          well, why research controllers for this case are designed in the spinning frame, and why a
+          drone with more yaw drag (bigger, slower rotors) is easier to save: it spins slower.
         </Notice>
       </>
     ),

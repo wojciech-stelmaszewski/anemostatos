@@ -31,6 +31,7 @@ const EXTRA: { value: ExtraChart; label: string }[] = [
   { value: 'spectrum', label: 'spectrum' },
   { value: 'attitude', label: 'attitude estimate' },
   { value: 'dispersion', label: 'Monte Carlo campaign' },
+  { value: 'fault', label: 'after a rotor loss' },
 ];
 /** What can stand in the motor chart's place. */
 const SECOND: { value: AnalysisChart | 'motors'; label: string }[] = [
@@ -39,6 +40,10 @@ const SECOND: { value: AnalysisChart | 'motors'; label: string }[] = [
   { value: 'nyquist', label: 'Nyquist plot' },
   { value: 'poles', label: 'pole map' },
   { value: 'covariance', label: 'filter uncertainty' },
+];
+/** After a rotor loss: how far the thrust axis is from where it should point. */
+const FAULT: SeriesSpec[] = [
+  { key: 'fault.tiltErr', label: 'thrust-axis error', color: SIGNAL.error, width: 2 },
 ];
 /** How far the attitude filter's "up" is from the true one, next to the tilt itself. */
 const ATTITUDE: SeriesSpec[] = [
@@ -267,6 +272,13 @@ export function ChartsPanel() {
           analysisChart(extra)
         ) : extra === 'phase' ? (
           <PhasePortrait meta={meta} />
+        ) : extra === 'fault' ? (
+          <TimeChart
+            title="Thrust axis: error from its target"
+            unit="°"
+            series={FAULT}
+            includeZero
+          />
         ) : extra === 'attitude' ? (
           <TimeChart
             title="Attitude estimate (shaded: accelerometer ignored)"

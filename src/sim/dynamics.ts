@@ -143,7 +143,8 @@ export function stepDynamics(
     const w = s.omega;
     const Iw = v3(I.x * w.x, I.y * w.y, I.z * w.z);
     const gyro = cross(w, Iw);
-    const rhs = sub(sub(tau, gyro), scale(w, p.angularDamping));
+    const damp = v3(w.x * p.angularDamping, w.y * p.yawDamping, w.z * p.angularDamping);
+    const rhs = sub(sub(tau, gyro), damp);
     s.omega = add(w, v3((rhs.x / I.x) * dt, (rhs.y / I.y) * dt, (rhs.z / I.z) * dt));
     s.q = qIntegrate(s.q, s.omega, dt);
   } else if (level === 2) {

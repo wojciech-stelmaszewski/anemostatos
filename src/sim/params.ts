@@ -22,6 +22,11 @@ export interface DroneParams {
   inertia: { x: number; y: number; z: number };
   torqueCoeff: number;
   angularDamping: number;
+  /**
+   * Rotational drag about the up-axis, N·m·s/rad. The drag of spinning rotors makes it larger than
+   * about the other axes on a real drone; it sets how fast a drone that has lost a rotor spins.
+   */
+  yawDamping: number;
   crashSpeed: number;
   /** Fraction of the commanded thrust each motor actually delivers (faults, worn props). */
   motorEfficiency: [number, number, number, number];
@@ -75,6 +80,22 @@ export interface SensorParams {
    * from the gyro and the accelerometer (docs/analysis.md §3.4).
    */
   attitude: 'truth' | 'complementary' | 'mahony';
+}
+
+/** Flight after the loss of a rotor (src/control/fault.ts, lesson III.27). */
+export interface FaultParams {
+  /** Switch to the three-motor law when a motor is lost (L3, PID cascade). */
+  enabled: boolean;
+  /** Position PID of the three-motor law: 1/s², 1/s, 1/s³. */
+  posKp: number;
+  posKd: number;
+  posKi: number;
+  /** Reduced attitude, 1/s, and body-rate, 1/s, gains. */
+  attKp: number;
+  rateKp: number;
+  maxTiltDeg: number;
+  /** Command the torque ahead of the motor lag in the spinning body. */
+  leadLag: boolean;
 }
 
 /** Settings of the attitude filters (src/estimation/attitude.ts). */
@@ -161,6 +182,7 @@ export interface ControlParams {
   model: ModelParams;
   gyroFilter: GyroFilterParams;
   ahrs: AhrsParams;
+  fault: FaultParams;
   l1: { kind: L1Kind; estimator: L1Estimator };
   /** L1 LQR / LQI (docs/beyond-pid.md §4). Cost weights of J = Σ (q·x² + r·u²)·dt. */
   lqr: {
@@ -352,6 +374,7 @@ export const defaultParams = (): Params => ({
     inertia: { x: 0.0082, y: 0.0149, z: 0.0082 },
     torqueCoeff: 0.016,
     angularDamping: 0.002,
+    yawDamping: 0.002,
     crashSpeed: 3,
     motorEfficiency: [1, 1, 1, 1],
     rotorDrag: 0,
@@ -395,6 +418,16 @@ export const defaultParams = (): Params => ({
     model: { mass: 1.0, inertiaScale: 1, motorTau: 0.03, imuYawDeg: 0 },
     gyroFilter: { lpfHz: 0, notch: 'off', notchHz: 110, notchQ: 4 },
     ahrs: { tau: 1, kp: 1, ki: 0.3, gate: 0.05 },
+    fault: {
+      enabled: false,
+      posKp: 2,
+      posKd: 2.5,
+      posKi: 0.3,
+      attKp: 8,
+      rateKp: 40,
+      maxTiltDeg: 30,
+      leadLag: false,
+    },
     l1: { kind: 'pid', estimator: 'none' },
     lqr: { qPos: 100, qVel: 10, qInt: 5, r: 1, integral: false, lagState: false },
     adrc: { wc: 3, wo: 15 },

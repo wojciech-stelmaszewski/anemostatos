@@ -1,0 +1,225 @@
+\lesson{II.2}{Pay for what you want}{Stop choosing gains. Say what an error costs and what thrust costs, and let one equation find the best gains there are.}{1}{lqr}{Part II · Beyond PID}
+\label{les:lqr}
+
+\lead{\setupcard{\setuprow{Level}{L1}\setuprow{Controller}{LQR with $q_e = 100$, $q_v = 10$, $r = 10$}\setuprow{Ghost}{the PD of Part~I, $K_p = 10$, $K_d = 7$}\setuprow{Setpoint}{a square wave of $\pm\SI{0.5}{m}$}\setuprow{Goal}{settle within \SI{1.5}{s}, overshoot below 2\,\%, no more peak thrust than the PD}}%
+Tuning a PID is haggling with three knobs. This lesson replaces the haggling by a statement of preferences: how much a metre of error costs, how much a metre per second of speed, how much a newton of thrust. A cost function adds them up over the whole flight, and an equation named after Jacopo Riccati returns the gains that make the total as small as it can be. The result is a $K_p$ and a $K_d$ — the same controller as before, chosen by a principle instead of by trial.}
+
+\section{A cost instead of knobs}
+
+The state of the drone, measured from the setpoint, is $\vx = (x, v)$ with $x = y - r$ (\lessonref{les:state}). Any controller produces some motion $\vx(t)$ and some thrust above hover, $u(t) = T - mg$. Price the whole flight:
+\begin{equation}\label{eq:lqr-J}
+  J = \int_0^\infty \big(q_e\,x^2 + q_v\,v^2 + r\,u^2\big)\,\dd t = \int_0^\infty \big(\vx^\T Q\,\vx + r\,u^2\big)\,\dd t, \qquad Q = \begin{pmatrix} q_e & 0\\ 0 & q_v\end{pmatrix} .
+\end{equation}
+Each term charges for something one does not want: being away from the setpoint, moving fast, pushing hard. The squares make large deviations disproportionately expensive and do not care about the sign.\tip{Why squares? They are smooth, they punish large errors more than small ones, and they make the answer a linear feedback. Other costs give other — usually nonlinear — controllers.}
+
+\begin{definition}{Linear–quadratic regulator}
+For a linear plant $\dot{\vx} = A\vx + B\symbf u$ and the cost $J = \int_0^\infty(\vx^\T Q\vx + \symbf u^\T R\,\symbf u)\,\dd t$ with $Q \succeq 0$ and $R \succ 0$, the \term{linear–quadratic regulator} (LQR) is the controller that makes $J$ smallest from every initial state.
+\end{definition}
+
+That such a controller exists, and what it looks like, is the content of one theorem.
+
+\begin{theorem}[The LQR]
+\label{thm:lqr-care}
+Let $(A, B)$ be controllable and let $Q = C^\T C$ with $(A, C)$ observable. Then the algebraic Riccati equation
+\begin{equation}\label{eq:lqr-care}
+  A^\T P + PA - PBR^{-1}B^\T P + Q = 0
+\end{equation}
+has exactly one solution $P \succ 0$. The controller that minimises $J$ is the linear state feedback
+\begin{equation}\label{eq:lqr-K}
+  \symbf u = -K\vx, \qquad K = R^{-1}B^\T P ,
+\end{equation}
+the closed loop $\dot{\vx} = (A - BK)\vx$ is asymptotically stable, and the smallest cost is $J_{min} = \vx_0^\T P\vx_0$. (Kálmán, 1960; Anderson and Moore, 1990, ch.~3.)
+\end{theorem}
+
+Two remarks before the calculation. The optimal controller is \emph{linear} and \emph{static}: nobody assumed that, it comes out. And the same $K$ is optimal for \emph{every} initial state; the matrix $P$ prices them all at once.\recall{Positive definite: $\vx^\T P\vx > 0$ for every $\vx \ne 0$ (Appendix~G). Here it is the price of starting at $\vx$.}\didyouknow{Riccati studied his equation in 1724, as a problem in pure analysis. It waited 236 years for Kálmán to find what it was for.}
+
+\begin{example}[The Riccati equation of the drone, by hand]
+\label{ex:lqr-derive}
+Solve \cref{eq:lqr-care} for $A = \begin{psmallmatrix}0 & 1\\ 0 & 0\end{psmallmatrix}$, $B = \begin{psmallmatrix}0\\ 1/m\end{psmallmatrix}$, $Q = \diag(q_e, q_v)$ and $R = r$.
+
+\textbf{Step 1 — the unknowns.} $P = \begin{psmallmatrix}p_1 & p_2\\ p_2 & p_3\end{psmallmatrix}$. With $B^\T P = \tfrac1m(p_2\ \ p_3)$, \cref{eq:lqr-K} gives $K = \tfrac{1}{rm}(p_2\ \ p_3)$.
+
+\textbf{Step 2 — the four terms.} $A^\T P = \begin{psmallmatrix}0 & 0\\ p_1 & p_2\end{psmallmatrix}$, and $PA$ is its transpose. $PBR^{-1}B^\T P = \dfrac{1}{rm^2}\begin{psmallmatrix}p_2^2 & p_2p_3\\ p_2p_3 & p_3^2\end{psmallmatrix}$.
+
+\textbf{Step 3 — three equations.} Entry $(1,1)$: $-p_2^2/(rm^2) + q_e = 0$. Entry $(1,2)$: $p_1 - p_2p_3/(rm^2) = 0$. Entry $(2,2)$: $2p_2 - p_3^2/(rm^2) + q_v = 0$.
+
+\textbf{Step 4 — solve from the top.} $p_2 = m\sqrt{rq_e}$ (the positive root: $P$ must be positive definite). Then $p_3 = m\sqrt{r\,(q_v + 2p_2)}$, and $p_1$ follows from the middle equation.
+
+\textbf{Step 5 — the gains.}
+\begin{equation}\label{eq:lqr-gains}
+  k_1 = \frac{p_2}{rm} = \sqrt{\frac{q_e}{r}}, \qquad k_2 = \frac{p_3}{rm} = \sqrt{\frac{q_v}{r} + 2m\,k_1} .
+\end{equation}
+$k_1$ multiplies the position: it is a $K_p$. $k_2$ multiplies the velocity: it is a $K_d$ on the measurement. \emph{The LQR does not replace the PD — it tunes it.}
+
+\textbf{Step 6 — the lesson's numbers} ($m = 1$, $q_e = 100$, $q_v = 10$). For $r = 10$: $k_1 = 3.16$, $k_2 = 2.71$. For $r = 1$: $k_1 = 10$, $k_2 = 5.48$. For $r = 0.1$: $k_1 = 31.6$, $k_2 = 12.8$. The simulator, which solves the discrete version at \SI{250}{Hz}, shows $3.15$ and $2.70$, $9.89$ and $5.44$, $30.8$ and $12.5$.
+\end{example}
+
+The formulas read like a sentence. Make thrust cheaper ($r$ smaller) and both gains rise; only ratios of the weights matter, because multiplying $q_e$, $q_v$ and $r$ by the same number leaves \cref{eq:lqr-gains} unchanged. And with $q_v = 0$ the closed loop $ms^2 + k_2s + k_1$ has $\zeta = k_2/(2\sqrt{mk_1}) = \sqrt{2mk_1}/(2\sqrt{mk_1}) = 1/\sqrt2$, whatever $q_e$ and $r$ are: a penalty on position alone always gives $\zeta = 0.71$, the \enquote{best compromise} of \lessonref{les:damper}, which the cost discovers by itself.\tip{To make the LQR calmer, raise $q_v$. To make it faster, lower $r$. To make it stiffer without changing the damping much, raise $q_e$ and $q_v$ together.}
+
+\section{The experiment}
+
+The lesson starts with $r = 10$ and a hand-tuned PD as the ghost. The goal asks for something the ghost cannot do: settle within \SI{1.5}{s} where it needs \SI{2.3}{s}, without overshoot and without asking more of the motors.
+
+\simfig{lqr_runs}{The same step for the PD ghost and three thrust costs. Top: altitude; the grey band is $\pm2$\,\% of the step. Bottom: thrust. With $r = 1$ the LQR has the ghost's $K_p$, hence its peak thrust, and settles \SI{0.85}{s} sooner. With $r = 0.1$ it is faster still, but the thrust runs into the motor limit.}{fig:lqr-runs}
+
+\begin{example}[Why $r = 1$ beats the ghost]
+\label{ex:lqr-goal}
+Compare the LQR with $r = 1$ with the PD ($K_p = 10$, $K_d = 7$) on the step of \cref{fig:lqr-runs}.
+
+\textbf{Step 1 — the peak thrust.} At the instant of a step only the position term acts: $mg + k_1 \cdot \SI{1}{m}$. Both have $k_1 = K_p = 10$: \SI{19.8}{N} each. The simulator measures 19.7 and \SI{19.8}{N}.
+
+\textbf{Step 2 — the damping.} PD: $\zeta = 7/(2\sqrt{10}) = 1.11$, slightly overdamped, with a slow pole at $-2$. LQR: $\zeta = 5.48/(2\sqrt{10}) = 0.87$, poles $-2.74 \pm 1.58j$.
+
+\textbf{Step 3 — the price.} An overshoot of $e^{-\pi \cdot 0.87/0.5} = 0.4\,\%$ for the LQR: invisible, and well within the goal.
+
+\textbf{Step 4 — the settling.} The overdamped PD crawls in along its slow pole: $\ln 50/2 \approx \SI{2}{s}$ plus the start, \SI{2.33}{s} in the simulator. The LQR's pair decays with $e^{-2.74t}$: \SI{1.48}{s} in the simulator, with 0.09\,\% overshoot. Goal met.
+
+\textbf{Step 5 — what the LQR knew.} Nothing that a good hand-tuner could not have found. But it found it from a statement of preferences, in one step, and — as the next example shows — it found the \emph{best} gains for those preferences.
+\end{example}
+
+\section{What \enquote{optimal} buys}
+
+\begin{example}[The cost of a step, for every PD]
+\label{ex:lqr-cost}
+For the step $\vx_0 = (1, 0)$ and the weights $q_e = 100$, $q_v = 10$, $r = 1$, compute the cost $J$ of the LQR and of three PD tunes.
+
+\textbf{Step 1 — the LQR.} By \cref{thm:lqr-care}, $J_{min} = \vx_0^\T P\vx_0 = p_1$. From Example~\ref{ex:lqr-derive}: $p_2 = 10$, $p_3 = 5.48$, $p_1 = p_2p_3 = 54.8$.
+
+\textbf{Step 2 — any other gain.} For a fixed $K$ the cost is quadratic in $\vx_0$ too: $J = \vx_0^\T P_K\vx_0$, where $P_K$ solves the \emph{Lyapunov} equation $(A - BK)^\T P_K + P_K(A - BK) + Q + K^\T RK = 0$ (along the closed loop, $\frac{\dd}{\dd t}\vx^\T P_K\vx = -(\vx^\T Q\vx + ru^2)$; integrate from 0 to $\infty$).
+
+\textbf{Step 3 — three PDs.} Solving it as in Example~\ref{ex:G-P}: the ghost $(10, 7)$ costs 56.4; the critical $(10, 6.3)$ 55.3; the goal tune of \lessonref{les:state}, $(20, 8)$, 63.8.
+
+\textbf{Step 4 — the picture} (\cref{fig:lqr-cost}, left). Over the whole plane of gains the cost has one minimum, and it is the LQR. The ghost is close — a good hand-tune usually is — but the fast tune of Lesson~II.1 is far: by these weights it pays too much thrust for its speed. \enquote{Optimal} is always optimal \emph{for a cost}; change the weights and the minimum moves.\pitfall[-75pt]{\enquote{Optimal} is not \enquote{best}. It is best for the cost you wrote down — and a cost that forgets the noise, the lag or a limit can make an optimal controller a poor one.}
+\end{example}
+
+\simfig{lqr_cost}{Left: the cost of a \SI{1}{m} step for every PD in the plane of $K_p$ and $K_d$, computed from the Lyapunov equation of Example~\ref{ex:lqr-cost}. The LQR sits at the minimum. Right: the LQR gains as the thrust cost $r$ changes, from \cref{eq:lqr-gains} (lines), and the discrete gains the simulator computes at \SI{250}{Hz} (dots).}{fig:lqr-cost}
+
+\subsection{Choosing the weights}
+The weights are not physical constants; they are a design language. A common first guess, \emph{Bryson's rule}, takes each weight as one over the square of the largest value one would accept:
+\begin{equation}\label{eq:lqr-bryson}
+  q_i = \frac{1}{x_{i,max}^2}, \qquad r = \frac{1}{u_{max}^2} .
+\end{equation}
+For the drone, \enquote{\SI{10}{cm} of error, \SI{1}{m/s} of speed and \SI{5}{N} of extra thrust are acceptable} gives $q_e = 100$, $q_v = 1$, $r = 0.04$, hence $k_1 = 50$, $k_2 = 11.2$ and poles $-5.6 \pm 4.3j$. A starting point, to be adjusted in flight.\pitfall{Large ratios of the weights mean large gains. Every gain the Riccati equation returns must still pass the tests of Part~I: the motor limits, the lag (\lessonref{les:edge}), the noise on the velocity (\lessonref{les:noise}). The cost knows none of them unless they are in the model.}
+
+\screen[0 0 495 998]{lqr}{Lesson II.2 in the app. The info card shows the gains the Riccati equation returned — a $K_p$ and a $K_d$ — and the closed-loop poles; the grey ghost is the PD of Part~I.}{fig:lqr-screen}
+
+\begin{inapp}
+\begin{itemize}[leftmargin=1.2em]
+  \item The controller is \src{src/control/lqr.ts}. The function \texttt{designLqr} builds the model, discretises it exactly at the controller's period (\texttt{c2d} in \src{src/math/mat.ts}, Appendix~D) and solves the discrete Riccati equation by iteration (\texttt{dlqr} in \src{src/math/riccati.ts}).
+  \item The weights are \param{control.lqr.qPos}, \param{qVel} and \param{r}; the switch is \ui{Controller\then L1 controller\then LQR}. The gains are recomputed only when a weight, the model or the rate changes.
+  \item The info card lists the gains, the closed-loop poles (the eigenvalues of the discrete $A - BK$, converted with $s = \ln z/\Delta t$) and the dominant $\omega_n$ and $\zeta$.
+  \item The ghost is flown headlessly when the lesson starts, with the same seed; the goal compares the peak thrust with the ghost's.
+\end{itemize}
+\end{inapp}
+
+\begin{trythis}
+\begin{enumerate}
+  \item Lower $r$ from 10 to 1, then to 0.1. Watch the gains, the poles and the thrust. At 0.1 the motors saturate on every step.
+  \item With $r = 1$, raise $q_v$ to 100. What happens to $k_2$, to the poles, to the settling time?
+  \item Multiply all three weights by ten. Nothing changes — why?
+\end{enumerate}
+\predict{with $q_v = 0$ and any $q_e$ and $r$, what overshoot will every step have?}
+\end{trythis}
+
+\section{The engineer's view: why optimal control scales}
+
+\subsection{Preferences scale; knobs do not}
+For two states the LQR is a convenient way to find two gains. Its real value appears with more. The quadrotor of \lessonref{les:cascade} has twelve states and four motors; its full state feedback has 48 gains. Nobody can tune 48 knobs by hand, and a cascade is the classical way around the problem: split the system so that each loop has one or two. The LQR goes the other way. One writes down a $12 \times 12$ diagonal $Q$ and a $4 \times 4$ diagonal $R$ — sixteen numbers with a meaning — and the Riccati equation returns all 48 gains at once, with the couplings between the axes taken into account.\didyouknow{The first great users of the LQR were the aerospace programmes of the 1960s. Today it is the default first design for every new multi-input plant, from satellites to wind turbines.}
+
+\subsection{The guaranteed margins}
+Hand-tuned loops are stable if the tuner was careful. LQR loops come with a certificate.
+
+\begin{theorem}[Robustness of the LQR]
+\label{thm:lqr-margins}
+For a single-input LQR with $R = r > 0$, and the loop broken at the plant input, $L(s) = K(s\Id - A)^{-1}B$:
+\begin{enumerate}[label=(\roman*)]
+  \item $|1 + L(j\omega)| \ge 1$ at every frequency;
+  \item hence the closed loop stays stable if the gain is multiplied by any factor between $\tfrac12$ and $\infty$, and the phase margin is at least $60^\circ$.
+\end{enumerate}
+(Kálmán, 1964; Safonov and Athans, 1977; Anderson and Moore, 1990, ch.~5.)
+\end{theorem}
+
+Statement (i) says that the Nyquist curve never enters the unit disc around $-1$ (Appendix~C); the margins follow by geometry. For the drone with $r = 1$, $L(s) = (k_1 + k_2s)/s^2$; its gain is one at $\omega_c = \SI{5.75}{rad/s}$, where the phase is $-180^\circ + \arctan(5.48 \cdot 5.75/10) = -107.6^\circ$: a margin of $72^\circ$.
+
+The certificate has fine print. It holds where the loop is broken: at the plant's input, for a model that is exact, with the \emph{whole} state measured. The motor lag is outside the model, and it eats into the margin as in \lessonref{les:slow}. And when the state is estimated instead of measured, the guarantee disappears entirely — a famous result of 1978, and the subject of Lesson~III.10.
+
+\begin{example}[Balancing on two wheels]
+\label{ex:lqr-segway}
+A self-balancing scooter keeps its rider upright by accelerating its wheels. Model the rider as an inverted pendulum with the centre of mass $L = \SI{0.8}{m}$ above the axle: the tilt $\theta$ obeys $\ddot\theta = (g/L)\,\theta - a/L$, where $a$ is the acceleration of the base. Design an LQR with Bryson's rule for $3^\circ$ of tilt, \SI{0.5}{rad/s} of tilt rate and \SI{2}{m/s^2} of acceleration.
+
+\textbf{Step 1 — the plant.} $\vx = (\theta, \omega)$, $A = \begin{psmallmatrix}0 & 1\\ g/L & 0\end{psmallmatrix}$, $B = \begin{psmallmatrix}0\\ -1/L\end{psmallmatrix}$. The eigenvalues of $A$ are $\pm\sqrt{g/L} = \pm3.50$: without control the rider falls with $e^{3.5t}$, doubling the tilt every \SI{0.2}{s}.
+
+\textbf{Step 2 — the weights.} $q_\theta = 1/0.052^2 = 370$ (with $3^\circ = \SI{0.052}{rad}$; Bryson's rule is approximate, take 400), $q_\omega = 1/0.5^2 = 4$, $r = 1/2^2 = 0.25$.
+
+\textbf{Step 3 — solve.} The Riccati equation, solved numerically, gives $K = (-51.0,\ -9.9)$: the base accelerates by \SI{51}{m/s^2} per radian of tilt and \SI{9.9}{m/s^2} per radian per second, \emph{towards} the side the rider leans to.
+
+\textbf{Step 4 — the closed loop.} Poles $-6.2 \pm 3.7j$: stable, $\zeta = 0.86$. The loop crosses unity gain at \SI{12.4}{rad/s} with $67^\circ$ of phase margin, and stays stable if the gain falls to 0.19 of its design value — further than the guaranteed $\tfrac12$.
+
+\textbf{Step 5 — read it.} The plant is unstable, which a PD tuned by feel handles poorly. The LQR does not notice the difference: the same equation, the same certificate. Every self-balancing robot, scooter and rocket on its engine (Lesson~IV.7) begins with a model like this one.\innumbers{An unstable pole at $+3.5$ doubles the tilt every $\ln 2/3.5 = \SI{0.2}{s}$. A human reacts in about the same time — which is why balancing by hand is hard and by computer easy.}
+\end{example}
+
+\subsection{In formal terms}
+
+\begin{theorem}[Optimality through completing the square]
+\label{thm:lqr-proof}
+Under the hypotheses of \cref{thm:lqr-care}, for every input $\symbf u(t)$ that brings the state to zero,
+\begin{equation*}
+  J = \vx_0^\T P\vx_0 + \int_0^\infty (\symbf u + K\vx)^\T R\,(\symbf u + K\vx)\,\dd t .
+\end{equation*}
+\end{theorem}
+\begin{proof}
+Along any trajectory, $\frac{\dd}{\dd t}(\vx^\T P\vx) = \vx^\T(A^\T P + PA)\vx + 2\symbf u^\T B^\T P\vx$. Replace $A^\T P + PA$ by $PBR^{-1}B^\T P - Q$ from \cref{eq:lqr-care} and $B^\T P$ by $RK$: the right-hand side becomes $(\symbf u + K\vx)^\T R(\symbf u + K\vx) - \vx^\T Q\vx - \symbf u^\T R\symbf u$. Integrate from 0 to $\infty$; the left side gives $-\vx_0^\T P\vx_0$, since $\vx \to 0$. Rearrange.
+\end{proof}
+
+The proof is the whole theory in one line. The integral is non-negative and is zero exactly when $\symbf u = -K\vx$ at every instant; so no input does better than the LQR, and the LQR achieves $\vx_0^\T P\vx_0$. Existence and uniqueness of the positive definite $P$, and the stability of $A - BK$, are where the hypotheses on controllability and observability are needed (Appendix~I).
+
+The simulator uses the \emph{discrete} version. For $\vx_{k+1} = A_d\vx_k + B_du_k$ and $J = \sum(\vx_k^\T Q_d\vx_k + u_k^\T R_du_k)$ the gain is $K = (R_d + B_d^\T PB_d)^{-1}B_d^\T PA_d$ with $P$ from the discrete Riccati equation $P = Q_d + A_d^\T PA_d - A_d^\T PB_d\,K$. At \SI{250}{Hz} its gains differ from the continuous ones by about one per cent (Example~\ref{ex:lqr-derive}, Step~6); at low rates the discrete design is the right one, because it knows about the hold.
+
+\begin{lookahead}
+\begin{itemize}[leftmargin=1.2em]
+  \item The LQR has no integral and droops under a wrong model. Lesson~II.3 adds one, as a state.
+  \item The LQR needs the whole state. When it is estimated by the Kalman filter of Lesson~II.4 the combination is called LQG, and Lesson~III.10 shows that its margins can be arbitrarily small.
+  \item With limits on the thrust the cost cannot simply be minimised by a fixed gain. Model predictive control (Lesson~II.13) minimises the same quadratic cost over a finite horizon, with the limits as constraints, at every sample.
+  \item The guaranteed margins are a robustness property; Lessons~III.11–III.14 ask how large a model error any controller can survive. The cost itself returns in Part~IV as the starting point of optimal control — Pontryagin's principle and dynamic programming (IV.1–IV.3), of which the LQR is the one case with a closed-form answer.
+\end{itemize}
+\end{lookahead}
+
+\begin{remember}
+\begin{itemize}
+  \item The LQR minimises $\int(\vx^\T Q\vx + \symbf u^\T R\symbf u)\,\dd t$; the answer is the state feedback $\symbf u = -K\vx$, $K = R^{-1}B^\T P$, with $P$ from the Riccati equation.
+  \item For the drone: $k_1 = \sqrt{q_e/r}$ (a $K_p$), $k_2 = \sqrt{q_v/r + 2mk_1}$ (a $K_d$). With $q_v = 0$ the damping is always $1/\sqrt2$.
+  \item Only ratios of the weights matter. Bryson's rule: one over the square of the acceptable size.
+  \item An LQR loop has at least $60^\circ$ of phase margin and a gain margin from $\tfrac12$ to infinity — for the exact model, with the full state measured.
+  \item The value of the method is scale: sixteen meaningful weights instead of 48 knobs.
+\end{itemize}
+\end{remember}
+
+\begin{curiosity}{Balancing on two wheels}
+\photo{segway}{A self-balancing scooter of 2006. Gyroscopes and accelerometers measure the tilt; a feedback loop drives the wheels under the rider's centre of mass, hundreds of times per second.}
+When the self-balancing scooter was unveiled in 2001, it was sold as a revolution in transport. It was not one — but as a piece of control engineering it is a small masterpiece, and a perfect picture of this lesson.
+
+A person standing on two coaxial wheels is an inverted pendulum, and an inverted pendulum falls: tilted by a degree, it is tilted by two a fifth of a second later (Example~\ref{ex:lqr-segway}). The machine catches the fall by moving the wheels under the centre of mass. Leaning forward makes it accelerate forward, and to keep the lean it must keep accelerating — which is how the rider steers its speed simply by leaning. The controller sees two numbers, the tilt and its rate, and multiplies each by a gain. Choosing those gains well is precisely the problem the LQR solves.
+
+The inverted pendulum on a cart has been the standard laboratory experiment of control courses since the 1960s, because it is the simplest machine that cannot stand without feedback. Two-wheeled robots, rockets balancing on their engines and walking robots are all its descendants.
+\end{curiosity}
+
+\begin{exercises}
+\exercise[1] With $q_e = 100$, $q_v = 10$ and $m = \SI{1}{kg}$, which thrust cost $r$ gives $k_1 = 20$? What is then $k_2$, and the damping ratio?
+\answer{$r = q_e/k_1^2 = 0.25$; $k_2 = \sqrt{40 + 40} = 8.94$; $\zeta = 8.94/(2\sqrt{20}) = 1.0$.}
+\exercise[1] Show that multiplying $q_e$, $q_v$ and $r$ by the same factor $c$ leaves the gains unchanged. What happens to $P$ and to $J_{min}$?
+\answer{\Cref{eq:lqr-gains} contains only ratios. $P$ and $J_{min}$ are multiplied by $c$.}
+\exercise[1] Use Bryson's rule for an error of \SI{20}{cm}, a speed of \SI{2}{m/s} and \SI{10}{N} of extra thrust. Find the gains and the poles.
+\answer{$q_e = 25$, $q_v = 0.25$, $r = 0.01$: $k_1 = 50$, $k_2 = \sqrt{25 + 100} = 11.2$; poles $-5.6 \pm 4.3j$ — the same as in the text, because the ratios are the same.}
+\exercise[2]\exkind{derive} Complete Example~\ref{ex:lqr-derive}: find $p_1$ and show that $P$ is positive definite. Then compute $J_{min}$ for a step of \SI{0.5}{m}.
+\answer{$p_1 = p_2p_3/(rm^2) = m\,k_1k_2 \cdot r$; for the lesson with $r = 1$: $p_1 = 54.8$. Minors: $p_1 > 0$, $p_1p_3 - p_2^2 = 54.8 \cdot 5.48 - 100 = 200 > 0$. $J_{min} = 0.25\,p_1 = 13.7$.}
+\exercise[2]\exkind{derive} Show that with $q_v = 0$ the LQR of the drone has $\zeta = 1/\sqrt2$ for every $q_e$ and $r$, and find the overshoot after a step. What does $q_v > 0$ do to $\zeta$?
+\answer{$\zeta = k_2/(2\sqrt{mk_1}) = \sqrt{2mk_1}/(2\sqrt{mk_1}) = 1/\sqrt2$; overshoot $e^{-\pi} = 4.3\,\%$. A positive $q_v$ raises $k_2$ and hence $\zeta$.}
+\exercise[2]\exkind{derive} Verify the margins of \cref{thm:lqr-margins} for the drone with $r = 1$: find the crossover frequency of $L(s) = (10 + 5.48s)/s^2$, the phase margin, and show that $|1 + L(j\omega)| \ge 1$ at $\omega = \SI{3}{rad/s}$.
+\answer{$\omega^4 = 100 + 30\omega^2$: $\omega_c = 5.75$; phase $-180 + 72.4$, margin $72.4^\circ$. At $\omega = 3$: $L = (10 + 16.4j)/(-9) = -1.11 - 1.83j$, $|1 + L| = |-0.11 - 1.83j| = 1.83 \ge 1$.}
+\exercise[2]\exkind{fly} In Lesson~II.2 set $r = 1$ and then switch \ui{Model the motor lag} on (\param{control.lqr.lagState}). What do the gains and the poles become, and does the step response change?
+\answer{The gains become $(9.89,\ 5.72,\ 0.16)$: $k_2$ rises a little to make up for the lag, and a small third gain feeds back the actual thrust. The poles are $-2.74 \pm 1.59j$ and $-33.2$, the motor. The step hardly changes: at $r = 1$ the loop is far from the edge of \lessonref{les:edge}. The lag state matters at small $r$, where the gains are large.}
+\exercise[2]\exkind{code} In \src{src/control/lqr.ts}, \texttt{designLqr} scales the weights by $\Delta t$ before calling \texttt{dlqr}. Why does the discrete cost need that factor to approximate the continuous one? What would change in the gains without it?
+\answer{$\sum(\vx_k^\T Q\vx_k + ru_k^2)\Delta t$ approximates $\int(\dots)\,\dd t$. Scaling $Q$ and $R$ by the same factor leaves $K$ unchanged, so the gains would be the same; only $P$, the cost, would be off by $1/\Delta t$.}
+\exercise[3]\exkind{derive} The cost of a PD. For the PD $(K_p, K_d)$ with $m = 1$, write $W = Q + rK^\T K$ and solve the Lyapunov equation $(A - BK)^\T P_K + P_K(A - BK) + W = 0$ by hand: show that $p_{12} = w_{11}/(2K_p)$, $p_{22} = (2p_{12} + w_{22})/(2K_d)$ and $p_{11} = K_pp_{22} + K_dp_{12} - w_{12}$. Evaluate the cost of the step $(1, 0)$ for the ghost $(10, 7)$ and compare with the LQR's 54.8.
+\answer{The three entries of the matrix equation give the three formulas in turn. For $(10, 7)$ with $q_e = 100$, $q_v = 10$, $r = 1$: $w_{11} = 200$, $w_{12} = 70$, $w_{22} = 59$; $p_{12} = 10$, $p_{22} = 5.64$, $p_{11} = 56.4 + 70 - 70 = 56.4$. The ghost pays 3\,\% more than the optimum.}
+\end{exercises}

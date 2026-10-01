@@ -88,3 +88,75 @@ def state_thrusters():
     a.set_xlabel("pointing error  [degrees]", loc="right")
     a.set_ylabel("rate  [degrees/s]")
     save(f, "state_thrusters")
+
+
+# ─── Lesson II.2 ───────────────────────────────────────────────────────────
+@fig
+def lqr_runs():
+    runs = [("lqr-pd", "PD ghost: $K_p = 10$, $K_d = 7$", C["ghost"]), ("lqr-r10", "LQR, $r = 10$", C["FF"]),
+            ("lqr-r1", "LQR, $r = 1$", C["meas"]), ("lqr-r0.1", "LQR, $r = 0.1$", C["D"])]
+    f, (a, b) = plt.subplots(2, 1, figsize=(TEXT_W, 76 * MM), sharex=True, gridspec_kw=dict(hspace=0.3, height_ratios=[1.3, 1]))
+    for name, lab, col in runs:
+        d = win(load(name), 15.5, 20)
+        a.plot(d.t - 16, d["pos.y"], color=col, lw=1.3 if "ghost" in lab else 1.1, label=lab)
+        b.plot(d.t - 16, d["alt.u"], color=col, lw=1.3 if "ghost" in lab else 1.1)
+    d = win(load("lqr-pd"), 15.5, 20)
+    a.plot(d.t - 16, d["sp.y"], color=C["sp"], lw=0.8, ls=(0, (4, 2.5)))
+    a.axhspan(2.48, 2.52, color=C["mist"], lw=0, zorder=0)
+    a.legend(loc="lower right", handlelength=1.2)
+    a.set_title("One upward step of 1 m")
+    a.set_ylabel("altitude  [m]")
+    b.axhline(24.4, color=C["err"], lw=0.6, ls=(0, (2, 2)))
+    b.text(3.2, 22.6, "motor limit 24.4 N", fontsize=6.3, color=C["err"])
+    b.set_title("Thrust")
+    b.set_ylabel("N")
+    b.set_xlim(-0.5, 4)
+    xlab_time(b, "time after the step  [s]")
+    save(f, "lqr_runs")
+
+
+@fig
+def lqr_cost():
+    """Formula: the cost of a 1 m step over the plane of PD gains; LQR gains against r."""
+    from scipy.linalg import solve_continuous_lyapunov as lyap
+    A = np.array([[0.0, 1.0], [0.0, 0.0]])
+    B = np.array([[0.0], [1.0]])
+    Q = np.diag([100.0, 10.0])
+    x0 = np.array([1.0, 0.0])
+    kp = np.linspace(2, 30, 120)
+    kd = np.linspace(1, 16, 120)
+    J = np.empty((len(kd), len(kp)))
+    for i, d_ in enumerate(kd):
+        for j, p_ in enumerate(kp):
+            K = np.array([[p_, d_]])
+            Acl = A - B @ K
+            PK = lyap(Acl.T, -(Q + K.T @ K))
+            J[i, j] = x0 @ PK @ x0
+    f, (a, b) = plt.subplots(1, 2, figsize=(TEXT_W, 62 * MM), gridspec_kw=dict(wspace=0.32))
+    lev = [55, 56, 58, 62, 70, 85, 110, 150]
+    cs = a.contour(kp, kd, J, levels=lev, colors=[C["faint"]], linewidths=0.6)
+    a.clabel(cs, fmt="%d", fontsize=5.6, inline_spacing=2)
+    a.plot(10, 5.477, "o", color=C["meas"], ms=4, zorder=5)
+    a.text(10.8, 4.6, "LQR  (54.8)", fontsize=6.4, color=C["meas"])
+    a.plot(10, 7, "o", color=C["ink"], ms=3.2, zorder=5)
+    a.text(10.8, 7.3, "PD ghost  (56.4)", fontsize=6.4, color=C["ink"])
+    a.plot(20, 8, "s", color=C["P"], ms=3, zorder=5)
+    a.text(20.8, 8.2, "II.1 goal  (63.8)", fontsize=6.4, color=C["P"])
+    a.grid(False)
+    a.set_title("Cost of a 1 m step, $q_e = 100$, $q_v = 10$, $r = 1$")
+    a.set_xlabel("$K_p$", loc="right")
+    a.set_ylabel("$K_d$")
+    r = np.geomspace(0.05, 30, 200)
+    k1 = np.sqrt(100 / r)
+    k2 = np.sqrt(10 / r + 2 * k1)
+    b.loglog(r, k1, color=C["P"], lw=1.2, label="$k_1 = \\sqrt{q_e/r}$")
+    b.loglog(r, k2, color=C["D"], lw=1.2, label="$k_2 = \\sqrt{q_v/r + 2k_1}$")
+    for name, rr in (("lqr-r10", 10), ("lqr-r1", 1), ("lqr-r0.1", 0.1)):
+        d = load(name)
+        b.plot(rr, d["lqr.k1"].iloc[-1], "o", color=C["P"], ms=3)
+        b.plot(rr, d["lqr.k2"].iloc[-1], "o", color=C["D"], ms=3)
+    b.legend(loc="upper right")
+    b.set_title("Gains against the thrust cost")
+    b.set_xlabel("$r$", loc="right")
+    b.grid(True, which="major", axis="both")
+    save(f, "lqr_cost")

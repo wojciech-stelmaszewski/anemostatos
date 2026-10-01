@@ -1,6 +1,7 @@
 import { criticalDiveSpeed } from '@/analysis/attraction';
 import { analyseRateLoop, type RateLoopAnalysis } from '@/analysis/mimo';
 import { aliasHz, ghostRate, motorJitter } from '@/analysis/spectrum';
+import { cleanRunsNeeded, finishedCampaign, passRateBound } from '@/analysis/dispersion';
 import {
   bandwidthHz,
   closedLoopPoles,
@@ -30,6 +31,7 @@ const F = 'F · The loop as a filter';
 const G = 'G · Stability and structure';
 const H = 'H · Robust by construction';
 const I = 'I · The real loop';
+const J = 'J · When things break, and how we know';
 const TWO_PI = 2 * Math.PI;
 
 const calm = (p: Params) => {
@@ -971,6 +973,85 @@ export const PART_THREE: Lesson[] = [
           middle of a manoeuvre has nothing to learn from. And a gate cannot help in a turn that
           never ends. For that the filter needs to know the acceleration itself, from a velocity
           measurement, which is what a navigation filter adds (lesson III.24).
+        </Notice>
+      </>
+    ),
+  },
+  {
+    id: 'montecarlo',
+    n: 29,
+    part: 3,
+    chapter: J,
+    title: 'One flight proves nothing',
+    level: 3,
+    chart: 'dispersion',
+    loop: 'att.roll',
+    setup: (p) => {
+      p.wind.gustsPerMinute = 10;
+      p.wind.gustAmpMin = 2;
+      p.wind.gustAmpMax = 6;
+      p.wind.turbSigma = 0.8;
+    },
+    predict: {
+      label: 'Clean runs for 99 % at 95 % confidence',
+      unit: 'runs',
+      truth: () => cleanRunsNeeded(0.99),
+      tolerance: 0.05,
+    },
+    goal: {
+      text: 'Predict how many flights without a single failure show a pass rate of 99 % with 95 % confidence. Then retune the cascade until a campaign of 300 flights has no failure at all.',
+      check: ({ sim, prediction }) => {
+        if (prediction == null)
+          return 'first the prediction: if the true pass rate were 99 %, how likely are N clean flights in a row?';
+        if (Math.abs(prediction - cleanRunsNeeded(0.99)) / cleanRunsNeeded(0.99) > 0.05)
+          return 'not within 5 %: find N with 0.99^N = 0.05';
+        const runs = finishedCampaign(sim.params);
+        if (!runs) return 'press Fly 300 with this tune and wait for the campaign to finish';
+        const failed = runs.filter((r) => !r.passed).length;
+        const bound = passRateBound(runs.length - failed, runs.length);
+        return (
+          failed === 0 ||
+          `${failed} of ${runs.length} failed: pass rate ≥ ${(bound * 100).toFixed(1)} % with 95 % confidence`
+        );
+      },
+    },
+    solution: (p) => {
+      p.control.l3.attKpRP = 5;
+    },
+    body: (
+      <>
+        <p>
+          The drone you have flown all along hovers in gusts. It flies well, and the rate loop has
+          45° of phase margin. But you know its mass to within 20 %, its motors' lag to within a
+          factor of two, its sensor delay to within 50 ms, its gyro bias to within 2 °/s, and
+          nothing about tomorrow's wind. A single flight checks one combination.
+        </p>
+        <p>
+          A <b>Monte Carlo campaign</b> flies the scenario again and again, each time with the
+          uncertain values drawn at random from their ranges, and counts the failures. A flight
+          fails if it crashes or if its body rate still exceeds 300 °/s in its last five seconds.
+          Gusts never take it above about 140 °/s; an unstable loop takes it past 500 °/s.
+        </p>
+        <p>
+          A count is not yet a guarantee. If the true failure rate were 1 %, a run of <M>{'N'}</M>{' '}
+          clean flights would still happen with probability <M>{'0.99^N'}</M>. The statement "at
+          least 99 % with 95 % confidence" needs <M>{'N'}</M> large enough that{' '}
+          <M>{'0.99^N \\le 0.05'}</M>: roughly <M>{'3/N'}</M> is the failure rate that <M>{'N'}</M>{' '}
+          clean runs can rule out.
+        </p>
+        <Try>
+          Compute <M>{'N'}</M> and enter it. Press <b>Fly 300</b> and watch the points arrive: one
+          per flight, placed by its motor lag and its sensor delay. Find where the crosses sit, and
+          think which loop that corner hurts. Then change one gain and fly the same 300 drones
+          again: every campaign draws the same values, so only your change differs.
+        </Try>
+        <Notice>
+          The failures are not spread at random: they sit where slow motors meet a late sensor, the
+          two things that eat phase. The nominal flight never goes there, and a test pilot might not
+          either. This is how launch vehicles and landers are cleared for flight [Hanson 2010]:
+          requirements become pass rates with confidence bounds, and thousands of dispersed
+          simulations find the corners. A clean campaign proves the corners you dispersed, and
+          nothing about the ones you did not.
         </Notice>
       </>
     ),

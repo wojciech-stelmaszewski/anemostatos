@@ -3,6 +3,7 @@ import { controllerKey } from '@/control/registry';
 import { useParams } from '@/store/params';
 import { sim, useUi, type AnalysisChart, type ExtraChart } from '@/store/sim';
 import { BodeChart } from '@/ui/analysis/BodeChart';
+import { DispersionChart } from '@/ui/analysis/DispersionChart';
 import { MimoChart } from '@/ui/analysis/MimoChart';
 import { NyquistChart } from '@/ui/analysis/NyquistChart';
 import { PoleMap } from '@/ui/analysis/PoleMap';
@@ -29,6 +30,7 @@ const EXTRA: { value: ExtraChart; label: string }[] = [
   { value: 'mimo', label: 'two channels at once' },
   { value: 'spectrum', label: 'spectrum' },
   { value: 'attitude', label: 'attitude estimate' },
+  { value: 'dispersion', label: 'Monte Carlo campaign' },
 ];
 /** What can stand in the motor chart's place. */
 const SECOND: { value: AnalysisChart | 'motors'; label: string }[] = [
@@ -62,6 +64,8 @@ const analysisChart = (kind: string) =>
     <MimoChart />
   ) : kind === 'spectrum' ? (
     <SpectrumChart />
+  ) : kind === 'dispersion' ? (
+    <DispersionChart />
   ) : kind === 'covariance' ? (
     <TimeChart title="Filter uncertainty: 1σ of each state (log scale)" series={COVARIANCE} logY />
   ) : null;
@@ -105,7 +109,8 @@ export function ChartsPanel() {
     extra === 'poles' ||
     extra === 'lyapunov' ||
     extra === 'mimo' ||
-    extra === 'spectrum';
+    extra === 'spectrum' ||
+    extra === 'dispersion';
   const ctrlKey = useParams((s) => controllerKey(s.params));
   const loopOptions = useMemo(
     () => loopsFor(useParams.getState().params).map((l) => ({ value: l.id, label: l.name })),

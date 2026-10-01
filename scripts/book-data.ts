@@ -565,6 +565,15 @@ add({
   },
 });
 add({
+  name: 'kalman-nobias',
+  seconds: 30,
+  setup: (p) => {
+    noisySensors(p);
+    p.control.l1.estimator = 'kalman';
+    p.control.kalman.biasSigma = 0;
+  },
+});
+add({
   name: 'kalman-distrust',
   seconds: 30,
   setup: (p) => {

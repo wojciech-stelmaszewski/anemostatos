@@ -1,0 +1,225 @@
+\lesson{II.4}{Trust issues}{Two sensors, each wrong in its own way. A model that says how they should agree, and a filter that weighs every reading by how much it deserves to be believed.}{1}{kalman}{Part II · Beyond PID}
+\label{les:kalman}
+
+\lead{\setupcard{\setuprow{Level}{L1}\setuprow{Controller}{the default PID, unchanged}\setuprow{Altimeter}{\SI{5}{cm} of noise, 50 readings per second}\setuprow{Accelerometer}{\SI{0.3}{m/s^2} of noise and a bias of \SI{0.2}{m/s^2}}\setuprow{Goal}{RMS error below \SI{2}{cm} and thrust jitter below \SI{1.5}{N}}}%
+The drone now carries a cheap barometer: five centimetres of noise, and a new reading only every twenty milliseconds. The PID of Part~I differentiates that staircase, and its D term turns every step into a kick of the motors. A filter would trade the noise for delay, as in \lessonref{les:noise}. This lesson does better with a second sensor and a model. The accelerometer is smooth and fast but, integrated, it drifts; the barometer is noisy but does not drift. The Kalman filter predicts with the one, corrects with the other, and weighs the two by numbers it keeps track of itself: its own uncertainty.}
+
+\section{Two sensors, two kinds of error}
+
+The question of the second half of Part~II — \emph{how to know the state} (\lessonref{les:state}) — becomes concrete here. The PID needs the altitude and the vertical speed. Two sensors offer partial and imperfect answers.
+
+\begin{itemize}
+  \item The \textbf{barometer} measures the altitude, with an error of \SI{5}{cm} that is new at every reading, fifty times per second. Its average is right; each reading is not.
+  \item The \textbf{accelerometer} measures the specific force, from which the acceleration follows by subtracting gravity (Prelude). It reads at the controller's rate, with \SI{0.3}{m/s^2} of noise — and with a \emph{bias} of \SI{0.2}{m/s^2}: a constant error that does not average out.
+\end{itemize}
+
+Integrate the accelerometer twice to get the altitude, and the noise becomes a random walk while the bias becomes a parabola: \SI{0.2}{m/s^2} for ten seconds is \SI{2}{m/s} of velocity error and \SI{10}{m} of altitude error. Differentiate the barometer to get the speed, and the noise is divided by $\Delta t$ (\lessonref{les:noise}): $\sqrt2 \cdot 0.05/0.02 = \SI{3.5}{m/s}$ at the barometer's rate. Each sensor is good exactly where the other is bad — the accelerometer over short times, the barometer over long ones.\innumbers{A phone's barometer resolves about \SI{10}{cm} of height; its accelerometer drifts by metres within seconds when integrated. Together they tell which floor of a building you are on.}\recall{Appendix~E: a quantity obtained by integrating noise is a random walk; its error grows like $\sqrt t$, and a bias makes it grow like $t^2$.}
+
+\section{The Kalman filter}
+
+The filter keeps an estimate of the state and of how uncertain that estimate is. For the altitude it uses three states — the altitude $y$, the vertical speed $v$ and the accelerometer's bias $b$ —
+\begin{equation}
+  \hat{\vx} = (\hat y,\ \hat v,\ \hat b)^\T, \qquad P = \operatorname{Cov}(\vx - \hat{\vx}) ,
+\end{equation}
+and it alternates two steps.
+
+\paragraph{Predict, at every controller sample.} Use the measured specific force $a_m$, corrected by the estimated bias, as the acceleration, and move the estimate forward by one period $\Delta t$ with the laws of constant acceleration (Appendix~D):
+\begin{equation}\label{eq:kalman-predict}
+  \hat{\vx}^- = F\hat{\vx} + G\,(a_m - g), \qquad
+  F = \begin{pmatrix} 1 & \Delta t & -\tfrac12\Delta t^2\\ 0 & 1 & -\Delta t\\ 0 & 0 & 1\end{pmatrix}, \quad
+  G = \begin{pmatrix}\tfrac12\Delta t^2\\ \Delta t\\ 0\end{pmatrix} .
+\end{equation}
+The minus signs in $F$ subtract the bias from the measured acceleration. The uncertainty grows, by \cref{eq:E-prop}:
+\begin{equation}\label{eq:kalman-Ppredict}
+  P^- = F P F^\T + Q ,
+\end{equation}
+where $Q$ is the covariance of what the prediction cannot know: the accelerometer's noise, entering like an acceleration, and a slow random walk of the bias.
+
+\paragraph{Correct, whenever a barometer reading $z$ arrives.} Compare it with the predicted altitude, $H\hat{\vx}^-$ with $H = (1\ \ 0\ \ 0)$. The difference, the \term{innovation}, is the news in the reading. Move the estimate towards it by a gain:
+\begin{equation}\label{eq:kalman-update}
+  K = P^-H^\T\big(HP^-H^\T + R\big)^{-1}, \qquad
+  \hat{\vx} = \hat{\vx}^- + K\,(z - H\hat{\vx}^-), \qquad
+  P = (\Id - KH)\,P^- ,
+\end{equation}
+with $R = \sigma_z^2$ the variance of the barometer.
+
+That is the whole filter. The gain $K$ is not tuned; it is computed, at every reading, from the two uncertainties that meet there.\tip{Read the gain as a percentage: how much of the surprise in a reading the filter believes. Here 8\,\%. Close to 100\,\% means the model is weak, close to 0 that the sensor is.}
+
+\begin{example}[One reading, by hand]
+\label{ex:kalman-one}
+In steady flight the filter predicts the altitude with $\sigma^- = \SI{1.49}{cm}$. A barometer reading with $\sigma_z = \SI{5}{cm}$ arrives, \SI{5}{cm} above the prediction. What does the filter do?
+
+\textbf{Step 1 — the gain for the altitude.} With only the altitude in view, \cref{eq:kalman-update} is the weighted average of \cref{thm:E-fuse}: $K_y = \sigma^{-2}/(\sigma^{-2} + \sigma_z^2) = 2.22/(2.22 + 25) = 0.082$.
+
+\textbf{Step 2 — the new estimate.} $\hat y$ moves up by $0.082 \cdot \SI{5}{cm} = \SI{0.41}{cm}$. The reading is believed to eight per cent.
+
+\textbf{Step 3 — the new uncertainty.} $1/\sigma^2 = 1/2.22 + 1/25$: $\sigma = \SI{1.43}{cm}$. Better than either source alone — and only slightly better than the prediction, which was already good.
+
+\textbf{Step 4 — the other two states.} The full gain, computed with the $3 \times 3$ covariance, is $K = (0.081,\ 0.171\,\si{s^{-1}},\ -0.136\,\si{s^{-2}})$. The same \SI{5}{cm} of news also raises the speed estimate by \SI{0.86}{cm/s} and lowers the bias estimate by \SI{0.68}{cm/s^2}. A reading of the altitude corrects the velocity and the bias, because the covariance knows how errors in them would have shown up in the altitude: an altitude that comes out higher than predicted is evidence that the drone was rising faster, and that the accelerometer overestimated the downward pull less than assumed.
+
+\textbf{Step 5 — check.} The simulator's filter reports $\sigma_y = \SI{1.45}{cm}$ on average and is, in truth, off by \SI{1.31}{cm} RMS (\cref{fig:kalman-runs}).
+\end{example}
+
+\simfig{kalman_runs}{Three seconds of the lesson. Top: the truth, the barometer's held readings, and the Kalman estimate with its own $\pm2\sigma$ band. The estimate follows the truth through the staircase of readings. Bottom: the thrust of the same PID fed by the raw sensors (red) and by the filter (blue).}{fig:kalman-runs}
+
+\begin{example}[What the filter buys]
+\label{ex:kalman-buys}
+Compare the PID with raw sensors and with the filter over the last ten seconds of the lesson.
+
+\textbf{Step 1 — raw sensors.} The D term differentiates a staircase that jumps every \SI{20}{ms} by several centimetres: thrust jitter of \SI{11.3}{N} RMS from one sample to the next, and an RMS altitude error of \SI{9.8}{cm}.
+
+\textbf{Step 2 — with the filter.} The same gains, fed with $\hat y$ and $\hat v$: jitter \SI{1.33}{N}, error \SI{1.35}{cm}. Goal met.
+
+\textbf{Step 3 — the bias.} The filter's estimate of the accelerometer's bias settles at \SI{0.203}{m/s^2}; the truth is 0.2. Without that state the filter would take the bias for a real acceleration: its prediction would run away between readings, the corrections would have to pull it back every time, and the velocity estimate would carry a permanent error.
+
+\textbf{Step 4 — the honesty check.} The filter claims $\sigma_y = \SI{1.45}{cm}$ and is off by \SI{1.31}{cm} RMS; it claims $\sigma_v = \SI{0.039}{m/s}$ and is off by 0.027. Its self-assessment is right, slightly pessimistic. A filter whose $\sigma$ matches its real errors is called \term{consistent}, and only a consistent filter's $\pm2\sigma$ band can be trusted.\pitfall{A filter can be wrong and certain. Check consistency on real data: about 95\,\% of the true errors must fall inside the $\pm2\sigma$ band. If far fewer do, $Q$ or $R$ is too small.}
+\end{example}
+
+\section{A filter is a trust setting}
+
+The two numbers the filter must be told — how noisy the accelerometer is ($Q$) and how noisy the barometer is ($R$) — are statements of trust, and only their ratio matters for the estimate. Tell it the wrong ones and it believes the wrong sensor.
+
+\simfig{kalman_trust}{The estimation error (blue) and the filter's own $\pm2\sigma$ band (shaded) for three assumed barometer noises; the true noise is \SI{5}{cm}. Over-trusting the barometer (left) narrows the band and passes its noise into the estimate and the thrust. Distrusting it (right) widens the band far beyond the real error.}{fig:kalman-trust}
+
+\begin{example}[Over-trust and distrust]
+\label{ex:kalman-trust}
+The filter is told $\sigma_z = \SI{5}{mm}$ instead of \SI{5}{cm}, and then \SI{50}{cm}. Predict the effect, and check it in \cref{fig:kalman-trust}.
+
+\textbf{Step 1 — over-trust.} With $R$ a hundred times too small the gain for the altitude approaches one: every reading is believed almost entirely. The estimate inherits the barometer's noise, the D term differentiates it again, and the thrust jitters: \SI{3.4}{N}. The filter believes itself to \SI{0.23}{cm} and is wrong by \SI{1.9}{cm}: inconsistent, over-confident.
+
+\textbf{Step 2 — distrust.} With $R$ a hundred times too large the gain falls: each reading moves the estimate by a fraction of a per cent, the accelerometer carries the estimate almost alone, and the bias state keeps it from drifting. The thrust is calmer still (\SI{0.58}{N}) and the error, here, even slightly smaller (\SI{1.16}{cm}) — but the filter claims $\sigma = \SI{9.5}{cm}$: inconsistent the other way, and slow to notice anything the accelerometer cannot see, such as a bias that begins to change.
+
+\textbf{Step 3 — the lesson.} The best \emph{estimate} need not come from the true noise values, because the estimate is judged here by how calm it makes the controller. The best \emph{filter} — one whose uncertainty can be believed — does.
+\end{example}
+
+\subsection{The steady filter is a pair of filters}
+With constant $Q$ and $R$ the covariance settles, and so does the gain. The filter then becomes a fixed linear filter, and it can be read like one.
+
+\begin{example}[Where the two sensors hand over]
+\label{ex:kalman-bandwidth}
+Find the frequency below which the filter follows the barometer and above which it follows the accelerometer.
+
+\textbf{Step 1 — the steady gains.} Iterating \cref{eq:kalman-Ppredict,eq:kalman-update} with the lesson's numbers gives $K = (0.081,\ 0.171,\ -0.136)$ at every reading.
+
+\textbf{Step 2 — the error dynamics.} Between two readings the estimation error evolves with $F^5$ (five predictions), and at a reading it is multiplied by $(\Id - KH)$. The eigenvalues of $(\Id - KH)F^5$ are $0.972 \pm 0.034j$ and $0.972$; per period of \SI{20}{ms} that is, by $s = \ln z/\Delta t$, $-1.40 \pm 1.73j$ and $-1.44$.
+
+\textbf{Step 3 — read it.} Estimation errors decay with a time constant of about \SI{0.7}{s}, at a natural frequency of about \SI{2.2}{rad/s} (\SI{0.35}{Hz}). Changes of altitude slower than that are taken from the barometer; faster ones from the accelerometer.
+
+\textbf{Step 4 — a formula.} For a double integrator with acceleration noise of intensity $q$ and position noise of intensity $r_c$ (Appendix~E: $q = \sigma_a^2\Delta t = 10^{-3}$, $r_c = \sigma_z^2\Delta t_z = 5 \times 10^{-5}$), the continuous steady filter has the poles of $s^2 + \sqrt2\,\omega s + \omega^2$ with $\omega = (q/r_c)^{1/4} = 20^{1/4} = \SI{2.1}{rad/s}$. The damping $1/\sqrt2$ is no accident: it is the LQR of Lesson~II.2 with $q_v = 0$, seen in a mirror (\cref{thm:kalman-duality}).
+\end{example}
+
+This is what engineers call a \term{complementary filter}: a low-pass filter on one sensor and a high-pass filter on the other, with crossover where the two are equally trustworthy. The Kalman filter computes the crossover from the noise figures, carries the bias along, and tells how good the result is.\didyouknow{Complementary filters predate Kalman's paper: aircraft instruments combined a slow, steady sensor with a fast, drifting one by a pair of fixed filters long before computers flew.}
+
+\screen[0 0 495 998]{kalman}{Lesson II.4 in the app with the Kalman filter on. The estimate-versus-truth chart (bottom right) shows the barometer's staircase, the estimate and the filter's $\pm2\sigma$ band around the true altitude.}{fig:kalman-screen}
+
+\begin{inapp}
+\begin{itemize}[leftmargin=1.2em]
+  \item The switch is \ui{Controller\then State estimate\then Kalman filter} (\param{control.l1.estimator = 'kalman'}). The filter sits in front of \emph{any} L1 controller — PID, LQR, ADRC — which then reads $\hat y$ and $\hat v$ instead of the sensors (\src{src/control/estimated.ts}).
+  \item The filter is \src{src/estimation/kalman.ts}: \texttt{AltitudeKalman} builds $F$, $G$ and $Q$ as in \cref{eq:kalman-predict}, and the generic \texttt{KalmanFilter} does the arithmetic, with the covariance update in the \emph{Joseph form} $(\Id - KH)P^-(\Id - KH)^\T + KRK^\T$, which stays symmetric and positive definite despite rounding.
+  \item The assumptions are \param{control.kalman.accSigma}, \param{posSigma} and \param{biasSigma}; the truth they should match is \param{sensors.accNoise}, \param{posNoise}, \param{posRateHz} and \param{accBias}.
+  \item The chart \ui{estimate vs truth} draws the band from the telemetry channels \texttt{est.y.hi} and \texttt{est.y.lo}, $\hat y \pm 2\sigma_y$.
+\end{itemize}
+\end{inapp}
+
+\begin{trythis}
+\begin{enumerate}
+  \item Watch the D term and the motors with the raw sensors. Then switch the Kalman filter on.
+  \item Set \ui{Assumed position $\sigma$} to \SI{0.005}{m}, then \SI{0.5}{m}. Watch the band, the estimate and the thrust.
+  \item Set \ui{Bias drift} to zero. Is the bias still learned? Then change \param{sensors.accBias} to \SI{0.5}{m/s^2} in flight, and watch how quickly the filter notices.
+\end{enumerate}
+\predict{if the barometer's noise doubles to \SI{10}{cm} and the filter is told so, by what factor does the crossover frequency of Example~\ref{ex:kalman-bandwidth} change?}
+\end{trythis}
+
+\section{The engineer's view: estimation is half of control}
+
+\subsection{What \enquote{optimal} means here}
+The Kalman filter is the best estimator there is — under assumptions. If the system is linear, the noises are white, Gaussian and of known covariance, then its estimate is the conditional mean of the state given every measurement so far, and no estimator, linear or not, has a smaller mean squared error. If the noises are white but not Gaussian, it is still the best \emph{linear} estimator. If they are coloured, biased or of unknown size, it is merely a good filter — and the art of applying it is to add states until the assumptions hold: a bias is not white noise, so it became a state.
+
+\subsection{The mirror image of the LQR}
+The covariance recursion \eqref{eq:kalman-Ppredict}–\eqref{eq:kalman-update} is a Riccati equation, and not by coincidence the same one as the LQR's, with the roles exchanged.
+
+\begin{theorem}[Duality]
+\label{thm:kalman-duality}
+The steady-state Kalman gain of the system $(F, H)$ with the noise covariances $Q$ and $R$ is the transpose of the LQR gain of the system $(F^\T, H^\T)$ with the weights $Q$ and $R$; the steady prior covariance of the filter is the LQR's cost matrix $P$. Observability of $(F, H)$ plays the part of controllability. (Kálmán, 1960; Anderson and Moore, 1979, ch.~4.)
+\end{theorem}
+
+Everything known about the LQR therefore transfers, mirrored: for the double integrator the filter's poles are those of the LQR with position cost only, damping $1/\sqrt2$, which Example~\ref{ex:kalman-bandwidth} found. Designing a controller and designing an estimator are one mathematical problem solved twice.\recall{Lesson~II.2: with $q_v = 0$ the LQR of the drone always has $\zeta = 1/\sqrt2$. Here the filter, its mirror image, has the same damping.}
+
+\subsection{What the filter cannot do}
+The filter estimates only what the measurements can reveal. If the altimeter itself had a bias, the filter would see only the sum of the altitude and that bias, and no amount of data would separate them. The app can add that bias as a fourth state (\param{control.kalman.altBiasState}); its uncertainty then never shrinks, and the info card reports \enquote{3 of 4 states observable}. Lesson~III.9 makes this exact.
+
+\begin{example}[Navigating a ship between fixes]
+\label{ex:kalman-ship}
+A ship estimates its position along its course by dead reckoning — speed times time — whose error grows like a random walk with a standard deviation of \SI{0.3}{nautical\ miles} per hour. Once an hour a position fix with an error of \SI{0.5}{nm} is taken. How good is the position just before and just after a fix, in the long run?
+
+\textbf{Step 1 — the model.} Scalar: $x_{k+1} = x_k + w_k$ with $\operatorname{Var}w = q = 0.09$ per hour; fixes $z = x + n$ with $R = 0.25$.
+
+\textbf{Step 2 — the steady state.} Just before a fix the variance is $P^-$, just after it $P^+ = P^-R/(P^- + R)$, and one hour later $P^- = P^+ + q$. Eliminating $P^+$: $P^{-2} - qP^- - qR = 0$, so $P^- = \tfrac12\big(q + \sqrt{q^2 + 4qR}\big) = 0.202$.
+
+\textbf{Step 3 — numbers.} Before a fix $\sigma^- = \sqrt{0.202} = \SI{0.45}{nm}$; after it $\sigma^+ = \SI{0.33}{nm}$; the gain is $K = 0.45$.
+
+\textbf{Step 4 — read it.} The uncertainty is a sawtooth between 0.33 and \SI{0.45}{nm}: always better than the fix alone (0.5), and bounded, which dead reckoning alone is not. Every navigation system — of ships, of aircraft with satellite navigation and inertial sensors, of the drone — has this sawtooth, at its own time scale.
+\end{example}
+
+\subsection{In formal terms}
+
+\begin{theorem}[The Kalman filter]
+\label{thm:kalman-filter}
+Let $\vx_{k+1} = F\vx_k + G\symbf u_k + \symbf w_k$ and $\symbf z_k = H\vx_k + \symbf n_k$, where $\vx_0$, $\symbf w_k$ and $\symbf n_k$ are independent and Gaussian, $\symbf w_k$ and $\symbf n_k$ with mean zero and covariances $Q$ and $R \succ 0$. Then the recursion \eqref{eq:kalman-predict}–\eqref{eq:kalman-update}, started from the mean and covariance of $\vx_0$, produces the conditional mean $\hat{\vx}_k = \mathbb{E}[\vx_k \mid \symbf z_0, \dots, \symbf z_k]$ and the conditional covariance $P_k$. Without the Gaussian assumption it produces the linear estimator of smallest mean squared error. (Kalman, 1960; Anderson and Moore, 1979, ch.~3.)
+\end{theorem}
+
+\begin{theorem}[The steady-state filter]
+\label{thm:kalman-steady}
+If $(F, H)$ is detectable and $(F, Q^{1/2})$ is stabilisable, $P_k$ converges, from every initial covariance, to the unique positive semidefinite solution of the discrete Riccati equation, and the steady error dynamics $(\Id - KH)F$ are asymptotically stable. (Anderson and Moore, 1979, ch.~4.)
+\end{theorem}
+
+The hypotheses fail in instructive ways. Without the bias random walk ($Q_{bb} = 0$) the bias is a constant the filter can still learn, but its variance then shrinks towards zero and the filter becomes ever more certain of it — and blind to a bias that changes later. With an unobservable state the covariance of that state never converges to anything useful. And with a wrong $R$ the filter converges, but to the wrong trust (Example~\ref{ex:kalman-trust}).
+
+\begin{lookahead}
+\begin{itemize}[leftmargin=1.2em]
+  \item An LQR fed by a Kalman filter is the LQG controller. Its margins can be arbitrarily small (Lesson~III.10), and observability decides what can be estimated at all (III.9).
+  \item An observer that also estimates the \emph{disturbance} is the next lesson: ADRC treats everything it does not know as one more state.
+  \item The attitude of a drone is estimated from gyroscopes and accelerometers in the same spirit, first by a complementary filter (Lesson~III.22), then by a Kalman filter on rotations (III.23); for a nonlinear model the filter is linearised at every step (the extended Kalman filter, III.24).
+  \item In Part~IV the filter navigates: inertial navigation with satellite fixes (IV.26), the unscented and particle filters for strongly nonlinear problems (IV.27, IV.28), and smoothing after the fact (IV.29).
+\end{itemize}
+\end{lookahead}
+
+\begin{remember}
+\begin{itemize}
+  \item Predict with the model and the fast sensor: $\hat{\vx}^- = F\hat{\vx} + G\symbf u$, $P^- = FPF^\T + Q$. Correct with the slow one: $K = P^-H^\T(HP^-H^\T + R)^{-1}$.
+  \item The gain is computed, not tuned: it weighs the prediction and the reading by their uncertainties. A reading of one state corrects the others through the covariance.
+  \item Biases become states. Only the ratio of $Q$ to $R$ shapes the estimate; only the right values make $\sigma$ honest.
+  \item The steady filter is a complementary filter; for the altitude it hands over from barometer to accelerometer near \SI{2}{rad/s}.
+  \item The Kalman filter is the LQR's mirror image: the same Riccati equation, with observability in place of controllability.
+\end{itemize}
+\end{remember}
+
+\begin{curiosity}{From a seminar in Baltimore to the Moon}
+\photopair{apolloimu}{The inertial measurement unit of the Apollo guidance system: three gyroscopes and three accelerometers on a stabilised platform.}{kalman}{Rudolf Kálmán, 1930–2016.}{48mm}
+Rudolf Kálmán published his filter in 1960, in a paper that most engineers of the time found hard to read. One who read it at once was Stanley Schmidt, at NASA's Ames Research Center, who was looking for a way to navigate a spacecraft to the Moon. Kálmán visited Ames that autumn, and within a year Schmidt's group had turned the paper into a working navigation filter — and, because the equations of orbital motion are not linear, had invented the \emph{extended} Kalman filter on the way, linearising the model around the current estimate at every step.
+
+The Apollo guidance computer ran such a filter. Its inertial platform supplied the fast, smooth, drifting part of the information — exactly the role of the accelerometer in this lesson — and star sightings by the astronauts and radar ranges the slow, accurate corrections. Ground tracking provided a second, independent estimate, compared before every major burn (Lesson~II.1).
+
+Today the same filter runs in every phone, car and aircraft that knows where it is. Kálmán, characteristically, was more interested in the mathematics than in its uses: the duality of estimation and control, which he saw in 1960, was for him the real discovery.
+\end{curiosity}
+
+\begin{exercises}
+\exercise[1] A prediction with $\sigma = \SI{3}{cm}$ meets a reading with $\sigma = \SI{5}{cm}$. Find the gain and the posterior $\sigma$. Which source would you trust more if the reading had $\sigma = \SI{1}{cm}$?
+\answer{$K = 9/34 = 0.26$, $\sigma = 1/\sqrt{1/9 + 1/25} = \SI{2.57}{cm}$. With \SI{1}{cm}: $K = 9/10 = 0.9$ — the reading.}
+\exercise[1] An accelerometer with a bias of \SI{0.2}{m/s^2} is integrated twice from rest, without any correction. How far off is the altitude after \SI{1}{s}, \SI{10}{s} and one minute?
+\answer{$\tfrac12bt^2$: \SI{0.1}{m}, \SI{10}{m}, \SI{360}{m}.}
+\exercise[1] In Example~\ref{ex:kalman-ship}, how good is the position just before a fix if fixes are taken every two hours?
+\answer{$q = 0.18$: $P^- = \tfrac12(0.18 + \sqrt{0.0324 + 0.18}) = 0.320$; $\sigma^- = \SI{0.57}{nm}$, $\sigma^+ = \SI{0.37}{nm}$.}
+\exercise[2]\exkind{derive} Derive the matrix $Q$ of \src{src/estimation/kalman.ts}: an acceleration error $w$, constant over one step and of variance $\sigma_a^2$, changes the altitude by $\tfrac12w\Delta t^2$ and the speed by $w\Delta t$. Write the covariance of that change.
+\answer{With $\symbf g = (\tfrac12\Delta t^2,\ \Delta t)^\T$: $Q = \sigma_a^2\symbf g\symbf g^\T = \sigma_a^2\begin{psmallmatrix}\Delta t^4/4 & \Delta t^3/2\\ \Delta t^3/2 & \Delta t^2\end{psmallmatrix}$, plus the bias' random walk $\sigma_b^2\Delta t$ in the third diagonal entry.}
+\exercise[2]\exkind{derive} Using the duality and \cref{eq:lqr-gains}, show that the steady continuous filter for a double integrator, with acceleration noise $q$ and position noise $r_c$, has the poles of $s^2 + \sqrt2\,\omega s + \omega^2$, $\omega = (q/r_c)^{1/4}$. Apply it to the barometer with \SI{10}{cm} of noise.
+\answer{The dual LQR has $q_e = q$, $q_v = 0$, $r = r_c$, $m = 1$: $k_1 = \sqrt{q/r_c} = \omega^2$, $k_2 = \sqrt{2k_1} = \sqrt2\,\omega$. With \SI{10}{cm}, $r_c$ is four times larger: $\omega$ falls by $4^{1/4} = \sqrt2$, to \SI{1.5}{rad/s}.}
+\exercise[2]\exkind{derive} In Example~\ref{ex:kalman-one}, explain the sign of the bias correction: why does a reading \emph{above} the prediction lower the estimated bias?
+\answer{The prediction uses $a_m - g - \hat b$. If the drone is higher than predicted, the true acceleration was larger than $a_m - g - \hat b$, so the bias subtracted was too large: $\hat b$ should decrease. The covariance between altitude and bias errors is negative, and so is $K_b$.}
+\exercise[2]\exkind{fly} In Lesson~II.4 set the bias drift to zero and wait. Is the bias learned? Then raise \param{sensors.accBias} to \SI{0.5}{m/s^2} in flight. What happens, and why does a non-zero drift help?
+\answer{The constant bias is still learned (0.20 within a few seconds), and the filter becomes ever more certain of it ($\sigma_b$ shrinks to \SI{0.006}{m/s^2}). After the change it adapts only very slowly: it believes the bias cannot move. A non-zero drift keeps $\sigma_b$ from collapsing, so new evidence keeps counting.}
+\exercise[2]\exkind{code} \src{src/estimation/kalman.ts} updates the covariance in the Joseph form. Show that for the optimal $K$ it equals $(\Id - KH)P^-$, and explain why the longer form is used anyway.
+\answer{Expand: $(\Id - KH)P^-(\Id - KH)^\T + KRK^\T = (\Id - KH)P^- - (\Id - KH)P^-H^\T K^\T + KRK^\T$; with $K(HP^-H^\T + R) = P^-H^\T$ the last two terms cancel. The Joseph form is a sum of a congruence and a positive semidefinite term, so rounding cannot make $P$ lose symmetry or positive definiteness.}
+\exercise[3]\exkind{derive} Fusion bandwidth and the D term. The PID's D term reads $\hat v$. Using the steady filter of Example~\ref{ex:kalman-bandwidth} as a second-order system with $\omega \approx \SI{2.2}{rad/s}$, estimate the phase lag that the barometer path adds at the altitude loop's crossover, \SI{7}{rad/s}, and explain why the accelerometer path removes most of it.
+\answer{A pure low-pass of that bandwidth would lag by more than $90^\circ$ at \SI{7}{rad/s} — fatal. But at \SI{7}{rad/s} the estimate comes from the accelerometer, integrated, which tracks the motion without lag: the complementary pair passes the true motion with almost no delay, and only the noise is shaped. Hence the filter calms the thrust without the delay a plain low-pass would cost.}
+\end{exercises}

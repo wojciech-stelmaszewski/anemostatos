@@ -222,3 +222,51 @@ def lqi_runs():
     a.set_ylabel("altitude  [m]")
     xlab_time(a)
     save(f, "lqi_runs")
+
+
+# ─── Lesson II.4 ───────────────────────────────────────────────────────────
+@fig
+def kalman_runs():
+    f, (a, b) = plt.subplots(2, 1, figsize=(TEXT_W, 82 * MM), sharex=True, gridspec_kw=dict(hspace=0.3, height_ratios=[1.3, 1]))
+    t0, t1 = 20, 23
+    d = win(load("kalman-kalman"), t0, t1)
+    a.fill_between(d.t, d["est.y.lo"], d["est.y.hi"], color=C["meas"], alpha=0.15, lw=0, label="estimate $\\pm 2\\sigma$")
+    a.plot(d.t, d["meas.y"], color=C["faint"], lw=0.8, drawstyle="steps-post", label="barometer (50 Hz, $\\sigma$ = 5 cm)")
+    a.plot(d.t, d["pos.y"], color=C["ink"], lw=1.1, label="truth")
+    a.plot(d.t, d["est.y"], color=C["meas"], lw=1.1, label="Kalman estimate")
+    a.legend(loc="upper right", ncol=2, fontsize=6.2)
+    a.set_ylim(1.84, 2.2)
+    a.set_title("What the controller is told")
+    a.set_ylabel("altitude  [m]")
+    for name, col, lab in (("kalman-none", C["err"], "raw sensor"), ("kalman-kalman", C["meas"], "Kalman filter")):
+        d = win(load(name), t0, t1)
+        b.plot(d.t, d["alt.u"], color=col, lw=0.8, label=lab)
+    b.legend(loc="upper right", ncol=2)
+    b.set_title("Thrust, same PID, same gains")
+    b.set_ylabel("N")
+    b.set_xlim(t0, t1)
+    xlab_time(b)
+    save(f, "kalman_runs")
+
+
+@fig
+def kalman_trust():
+    f, axs = plt.subplots(1, 3, figsize=(TEXT_W, 52 * MM), sharey=True, gridspec_kw=dict(wspace=0.12))
+    runs = [("kalman-overtrust", "assumed $\\sigma$ = 5 mm"), ("kalman-kalman", "assumed $\\sigma$ = 5 cm (true)"),
+            ("kalman-distrust", "assumed $\\sigma$ = 50 cm")]
+    for a, (name, lab) in zip(axs, runs):
+        d = win(load(name), 20, 30)
+        s = d["est.sigma.y"]
+        a.fill_between(d.t, -200 * s, 200 * s, color=C["meas"], alpha=0.15, lw=0)
+        a.plot(d.t, 100 * (d["est.y"] - d["pos.y"]), color=C["meas"], lw=0.7)
+        a.axhline(0, color=C["faint"], lw=0.5)
+        e = d["est.y"] - d["pos.y"]
+        u = d["alt.u"].values
+        a.set_title(lab, fontsize=7.2)
+        a.text(0.03, 0.04, f"error {100 * np.sqrt((e**2).mean()):.1f} cm RMS\nthrust jitter {np.sqrt((np.diff(u)**2).mean()):.1f} N",
+               transform=a.transAxes, fontsize=6.2, color=C["ink"])
+        a.set_xlim(20, 30)
+        a.set_ylim(-6, 6)
+        xlab_time(a)
+    axs[0].set_ylabel("estimate $-$ truth  [cm]")
+    save(f, "kalman_trust")

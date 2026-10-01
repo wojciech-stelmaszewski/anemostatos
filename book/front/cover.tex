@@ -1,17 +1,16 @@
 % ---------------------------------------------------------------- cover -----
-% Black and centred: the picture full bleed behind everything (book/tools/cover/: the simulator's own
-% drone model, leaning into a 5 m/s wind over its set-point at the end of the flight of lesson I.13,
-% with the path it flew and the streamlines of the wind), a red ribbon in the corner, a line in
-% spaced capitals, the title, the editor, a band.
+% Black and centred: a red ribbon in the corner, a line in spaced capitals, the title with its Greek
+% marks, the emblem (book/tools/cover_emblem.py: a feedback loop standing in the streamlines of the
+% wind), the editor, a band.
 \thispagestyle{empty}
 \begin{tikzpicture}[remember picture, overlay]
   \fill[night] (current page.south west) rectangle (current page.north east);
-  \node[inner sep=0pt] at ($(current page.north)+(0,-153mm)$)
-    {\includegraphics[width=\paperwidth]{figures/out/cover_art.jpg}};
+  \node[inner sep=0pt] at ($(current page.north)+(0,-152mm)$)
+    {\includegraphics[width=\paperwidth]{figures/out/cover_emblem.pdf}};
   \node[anchor=north, inner sep=0pt, text=accent] at ($(current page.north)+(0,-30mm)$)
     {\sanscaps\addfontfeatures{LetterSpace=32}\small A COURSE IN FEEDBACK CONTROL};
   \node[anchor=north, inner sep=0pt, text=nighttext] at ($(current page.north)+(0,-42mm)$)
-    {\sansdisplay\addfontfeatures{LetterSpace=4}\fontsize{60}{60}\selectfont ANEMOSTATOS};
+    {\sansdisplay\addfontfeatures{LetterSpace=4}\fontsize{60}{60}\selectfont \greektitle};
   % the ribbon across the top left corner
   \fill[coverred] ($(current page.north west)+(0,-13mm)$) -- ($(current page.north west)+(13mm,0)$)
     -- ($(current page.north west)+(34mm,0)$) -- ($(current page.north west)+(0,-34mm)$) -- cycle;
@@ -65,7 +64,7 @@ opposite job: it makes the draught; ours stands in it.)
 \begin{center}
 \vspace*{34mm}
 {\sanscaps\addfontfeatures{LetterSpace=32}\small\color{accent}A COURSE IN FEEDBACK CONTROL}\par\vspace{9mm}
-{\sansdisplay\addfontfeatures{LetterSpace=4}\fontsize{44}{48}\selectfont ANEMOSTATOS}\par\vspace{6mm}
+{\sansdisplay\addfontfeatures{LetterSpace=4}\fontsize{44}{48}\selectfont \greektitle}\par\vspace{6mm}
 {\displayserif\itshape\fontsize{13}{18}\selectfont\color{muted} From PID to learning, with the simulator of the same name}\par
 \vspace{26mm}
 \begin{minipage}{112mm}\centering\sffamily\small\color{muted}\linespread{1.2}\selectfont

@@ -61,6 +61,11 @@
 \definecolor{nighttext}{HTML}{E6E9EF}
 \definecolor{nightmuted}{HTML}{9AA3B2}
 \definecolor{coverred}{HTML}{C8202F}         % the ribbon on the cover
+% The title in capitals with the marks of ἀνεμόστατος: a smooth breathing over the A, an acute over
+% the O. Not how Greek is written, but the name is Greek and the marks say so.
+% The breathing is drawn, a thin ")" the weight of the acute: the apostrophes of Fira are teardrops.
+\newcommand{\psilimark}{\tikz[line width=0.036em, line cap=round]\draw (0,0) arc[start angle=112, end angle=-78, radius=0.11em];}
+\newcommand{\greektitle}{{\ooalign{A\cr\hidewidth\raisebox{0.765em}{\psilimark}\hidewidth\cr}}NEMÓSTATOS}
 \definecolor{deepblue}{HTML}{2F5D8A}
 \definecolor{bluesoft}{HTML}{F1F5FA}
 \definecolor{warn}{HTML}{C9453E}

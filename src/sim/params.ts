@@ -3,7 +3,7 @@ import { defaultGains, type PidGains } from '@/control/pid';
 export type Level = 1 | 2 | 3;
 
 /** Controller families selectable per level (docs/beyond-pid.md §3.2). Part II adds more. */
-export type L1Kind = 'pid' | 'lqr' | 'adrc' | 'mpc' | 'l1ac';
+export type L1Kind = 'pid' | 'lqr' | 'adrc' | 'mpc' | 'l1ac' | 'hinf';
 /** State estimator in front of the L1 controller. */
 export type L1Estimator = 'none' | 'kalman';
 export type L3Outer = 'pid-cascade' | 'geometric' | 'mpc' | 'mppi' | 'policy';
@@ -211,7 +211,20 @@ export interface ControlParams {
     integral: boolean;
     /** Model the motor lag as a third state. */
     lagState: boolean;
+    /**
+     * Estimate the state from the altimeter alone with a steady-state Kalman filter (LQG),
+     * instead of reading velocity and thrust from the sensors.
+     */
+    observer: boolean;
+    /** The filter's assumed process noise at the thrust input, N, and altimeter noise, m. */
+    kfQ: number;
+    kfR: number;
   };
+  /**
+   * H∞ loop shaping (src/control/hinf.ts): the weight W(s) = k·(s + ωᵢ)/s · (s/ω_z + 1)/(s/ω_p + 1)
+   * (the lead is off while ω_z is 0) and γ/γ_min.
+   */
+  hinf: { k: number; wi: number; wz: number; wp: number; gammaFactor: number };
   /** L3 INDI (rate stage and acceleration compensation). */
   indi: {
     /** α_des = K·(ω_sp − ω), 1/s. */
@@ -449,7 +462,18 @@ export const defaultParams = (): Params => ({
     },
     fdi: { nisWindow: 10, nisThreshold: 45, nisLow: 0, cusumDrift: 0.02, cusumThreshold: 0.02 },
     l1: { kind: 'pid', estimator: 'none' },
-    lqr: { qPos: 100, qVel: 10, qInt: 5, r: 1, integral: false, lagState: false },
+    lqr: {
+      qPos: 100,
+      qVel: 10,
+      qInt: 5,
+      r: 1,
+      integral: false,
+      lagState: false,
+      observer: false,
+      kfQ: 0.1,
+      kfR: 0.02,
+    },
+    hinf: { k: 15, wi: 1, wz: 0, wp: 0, gammaFactor: 1.05 },
     adrc: { wc: 3, wo: 15 },
     l1ac: { as: 20, filterHz: 5, wc: 3 },
     residual: { forgetting: 0.995, filterHz: 10 },

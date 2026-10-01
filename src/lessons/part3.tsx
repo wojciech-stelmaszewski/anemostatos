@@ -90,6 +90,24 @@ const ROTOR_LOSS_S = 5;
 const spinRate = (p: Params): number =>
   (p.drone.torqueCoeff * p.drone.mass * GRAVITY) / p.drone.yawDamping;
 
+/** RMS change of the total thrust command between telemetry samples over the last seconds, N. */
+const thrustJitter = (sim: Simulation, seconds: number): number => {
+  const keys = ['motorCmd.1', 'motorCmd.2', 'motorCmd.3', 'motorCmd.4'];
+  const { series } = sim.telemetry.window(keys, sim.t - seconds);
+  const n = series[0]!.length;
+  let sq = 0;
+  let c = 0;
+  for (let i = 1; i < n; i++) {
+    const u = series.reduce((s, x) => s + x[i]!, 0);
+    const v = series.reduce((s, x) => s + x[i - 1]!, 0);
+    if (Number.isFinite(u - v)) {
+      sq += (u - v) ** 2;
+      c++;
+    }
+  }
+  return c ? Math.sqrt(sq / c) : 0;
+};
+
 /** Half the peak-to-peak swing of the altitude over the last `seconds`. */
 const swing = (sim: Simulation, seconds: number): number => {
   const { series } = sim.telemetry.window(['pos.y'], sim.t - seconds);
@@ -574,6 +592,80 @@ export const PART_THREE: Lesson[] = [
     ),
   },
   {
+    id: 'lqg',
+    n: 10,
+    part: 3,
+    chapter: G,
+    title: 'Optimal plus optimal ≠ robust',
+    level: 1,
+    chart: 'bode',
+    chart2: 'nyquist',
+    setup: (p) => {
+      calm(p);
+      p.control.l1.kind = 'lqr';
+      p.control.lqr = { ...p.control.lqr, lagState: true, observer: true, kfQ: 0.3, kfR: 0.02 };
+      p.sensors.posNoise = 0.02;
+    },
+    goal: {
+      text: 'Keep the Kalman filter, and get the margins back: at least 45° of phase margin and 10 dB of gain margin, with the thrust jitter from the altimeter noise below 0.15 N.',
+      check: ({ sim }) => {
+        const p = sim.params;
+        if (p.control.l1.kind !== 'lqr' || !p.control.lqr.observer)
+          return 'keep the LQR with its Kalman filter: the point is to fix the pair';
+        const m = marginsOf(p);
+        if (!m) return 'this lesson needs the linear model of the loop';
+        if (sim.t < 12) return 'flying…';
+        const jitter = thrustJitter(sim, 6);
+        const gmDb = 20 * Math.log10(m.gm);
+        return (
+          (m.pmDeg >= 45 && gmDb >= 10 && jitter < 0.15) ||
+          `PM ${m.pmDeg.toFixed(0)}° · GM ${gmDb.toFixed(1)} dB · thrust jitter ${jitter.toFixed(2)} N`
+        );
+      },
+    },
+    solution: (p) => {
+      p.control.lqr.kfQ = 4;
+    },
+    body: (
+      <>
+        <p>
+          An LQR with the motor lag as a state, fed by sensors for velocity and thrust, has the
+          margins the theory promises: more than 60° of phase margin and a gain margin that is
+          infinite upwards. Here it gets no such sensors. A <b>Kalman filter</b> estimates velocity
+          and thrust from the altimeter and from the commands it sends, and the LQR acts on the
+          estimate. The filter is optimal for its noise model, the LQR for its cost: this is{' '}
+          <b>LQG</b>, the separation principle in action.
+        </p>
+        <p>
+          Optimal estimate, optimal control, and the margins are gone: 35° and 9 dB. In 1978 Doyle
+          published a three-line paper with the title <i>Guaranteed margins for LQG regulators</i>{' '}
+          and the abstract: "There are none." The filter predicts the drone with the same model the
+          controller uses. When the drone does something the model did not expect, the estimate
+          follows late, and a late estimate in the loop is a delay.
+        </p>
+        <p>
+          The cure is to make the filter trust the model less: assume an unknown force at the thrust
+          input. As that assumed noise grows, the loop at the plant input tends back to the LQR's
+          own, the <b>loop transfer recovery</b> of Doyle and Stein (1981):
+        </p>
+        <M display>{'q \\to \\infty:\\quad L_{LQG}(j\\omega) \\to L_{LQR}(j\\omega)'}</M>
+        <Try>
+          Read PM and GM on the Bode chart and watch how far the Nyquist curve passes from −1. Then
+          raise <b>LQR → Filter: process noise at the input</b> step by step, and watch the motor
+          chart: the altimeter is noisy, and a filter that follows it more passes more of the noise
+          to the motors.
+        </Try>
+        <Notice>
+          Full recovery is not on offer: the recovered loop is as fast and as noise-sensitive as a
+          controller that reads the altimeter directly, and a sampled plant with three poles has a
+          zero outside the unit circle that LTR cannot cancel. The design is a trade between margin
+          and noise, chosen on purpose. Optimality of the parts says nothing about the robustness of
+          the whole.
+        </Notice>
+      </>
+    ),
+  },
+  {
     id: 'smallgain',
     n: 11,
     part: 3,
@@ -732,6 +824,90 @@ export const PART_THREE: Lesson[] = [
           above the dashed curve, a loop-at-a-time test is reporting margins that the vehicle does
           not have. This is why flight-control clearance asks for multi-loop margins, and why the
           alignment of an inertial unit is calibrated rather than assumed.
+        </Notice>
+      </>
+    ),
+  },
+  {
+    id: 'hinf',
+    n: 13,
+    part: 3,
+    chapter: H,
+    title: 'Design for the worst',
+    level: 1,
+    chart: 'bode',
+    bode: 'robust',
+    chart2: 'nyquist',
+    setup: (p) => {
+      calm(p);
+      smallSteps(p);
+      p.control.l1.kind = 'hinf';
+      p.control.hinf = { k: 200, wi: 0.5, wz: 0, wp: 0, gammaFactor: 1.05 };
+    },
+    goal: {
+      text: 'With H∞ loop shaping, beat every PID tune: pass the robust-stability test of the family of III.11 with a crossover of at least 3.2 Hz.',
+      check: ({ sim }) => {
+        const p = sim.params;
+        if (p.control.l1.kind !== 'hinf') return 'this lesson is about the H∞ controller';
+        const worst = worstWT(p);
+        const m = marginsOf(p);
+        if (worst === null || !m) return 'no linear model';
+        const fc = m.wc / TWO_PI;
+        return (
+          (worst < 1 && fc >= 3.2) ||
+          `largest |W·T| ${worst.toFixed(2)} · crossover ${fc.toFixed(2)} Hz`
+        );
+      },
+    },
+    solution: (p) => {
+      p.control.hinf.wz = 5;
+      p.control.hinf.wp = 50;
+    },
+    body: (
+      <>
+        <p>
+          In lesson III.11 you tuned a PID by hand until the whole family of drones passed the
+          small-gain test, and the loop slowed down to about 2.8 Hz. Among more than a hundred PID
+          tunes, none passes it faster. <b>H∞ loop shaping</b> [Glover 1989] designs the other way
+          round, in two steps.
+        </p>
+        <p>
+          <b>Shape.</b> Choose a weight <M>{'W(s)'}</M> so that the shaped plant{' '}
+          <M>{'G_s = G\\,W'}</M> has the loop you want: high gain at low frequency, low gain at high
+          frequency, crossing 0 dB where you need it. Here <M>{'W(s) = k\\,(s + \\omega_i)/s'}</M>,
+          and nothing else is chosen by hand.
+        </p>
+        <p>
+          <b>Robustify.</b> Two Riccati equations give, in closed form, the controller{' '}
+          <M>{'K_s'}</M> that keeps <M>{'G_s'}</M> stable for the largest perturbation of its
+          normalised coprime factors:
+        </p>
+        <M display>
+          {
+            '\\varepsilon_{max} = \\frac{1}{\\gamma_{min}},\\qquad \\gamma_{min} = \\sqrt{1 + \\rho(XZ)}'
+          }
+        </M>
+        <p>
+          The weight alone, a PI on a double integrator, cannot even stabilise the drone.{' '}
+          <M>{'K_s'}</M> adds the phase lead around crossover, and the info card shows{' '}
+          <M>{'\\varepsilon_{max}'}</M>: above 0.25 is a good design, and it guarantees about{' '}
+          <M>{'2\\arcsin\\varepsilon_{max}'}</M> of phase margin.
+        </p>
+        <Try>
+          The weight crosses near 2 Hz and ε_max is 0.31, yet the family test fails: a double
+          integrator falls at −40 dB per decade, and a loop that steep has little room for the delay
+          of the light, late drones. Raise <b>Shape: gain k</b> and watch ε_max and the test get
+          worse. Then give the shape the slope a good loop has at crossover, −20 dB per decade: a
+          lead in the weight, <b>from ω_z</b> below the crossover <b>up to ω_p</b> well above it.
+          Press <b>Fly 60 members</b> to see the family fly.
+        </Try>
+        <Notice>
+          H∞ is not magic. It is optimal against the uncertainty it is told about (perturbations of
+          the coprime factors), not against yours (a heavier drone, a slower motor, a late sensor).
+          The shape is where the engineer tells it what matters; the guarantee comes for free. With
+          a good shape the same method reaches 3.5 Hz, where no PID passes the test. The method
+          has flown in helicopter and jump-jet flight-control research, among others on a Bell 205
+          and the VAAC Harrier.
         </Notice>
       </>
     ),

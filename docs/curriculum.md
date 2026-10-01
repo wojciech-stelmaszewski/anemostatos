@@ -36,11 +36,11 @@ Three principles hold throughout:
 | ---------------------------- | ------------ | -------------------------------------- | --------------------------- | --------------- | ------------------------------------ |
 | I. The PID controller        | 1–14         | Quadrotor, levels L1–L3                | done (M0–M6)                | written; see §5 | [roadmap.md](roadmap.md)             |
 | II. Beyond PID               | II.1–II.21   | Quadrotor                              | done (M7–M12)               | not written     | [beyond-pid.md](beyond-pid.md)       |
-| III. Why it works            | III.1–III.30 | Quadrotor                              | 16 of 30 done; rest planned | not written     | [analysis.md](analysis.md)           |
+| III. Why it works            | III.1–III.30 | Quadrotor                              | 18 of 30 done; rest planned | not written     | [analysis.md](analysis.md)           |
 | IV. Aerospace GNC            | IV.1–IV.29   | Quadrotor, rocket, aircraft, satellite | planned (M19–M25)           | not written     | [aerospace-gnc.md](aerospace-gnc.md) |
 | V. From whiteboard to flight | V.1–V.6      | All                                    | planned (M26)               | not written     | [aerospace-gnc.md](aerospace-gnc.md) |
 
-One hundred lessons. Fifty-one exist in the app today.
+One hundred lessons. Fifty-three exist in the app today.
 
 Each part asks a different question:
 
@@ -148,7 +148,7 @@ chapter that needs a new symbol adds it to that table.
 
 | Volume | Parts | Title                                                    | State                                   |
 | ------ | ----- | -------------------------------------------------------- | --------------------------------------- |
-| 1      | I–II  | _Anemostatos_ — from PID to learning | Part I written, Part II not yet         |
+| 1      | I–II  | _Anemostatos_ — from PID to learning                     | Part I written, Part II not yet         |
 | 2      | III   | analysis, robustness and the real loop                   | after the app's Part III                |
 | 3      | IV–V  | aerospace guidance, navigation and control, and practice | after the app's Parts IV–V              |
 | —      | all   | solutions to the exercises                               | collected by `\answer` during the build |

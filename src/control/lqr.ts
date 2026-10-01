@@ -1,4 +1,4 @@
-import { c2d, diag, eigenvalues, mul, sub, toContinuous, type Mat } from '@/math/mat';
+import { c2d, diag, eigenvalues, mul, sub, toContinuous, transpose, type Mat } from '@/math/mat';
 import { dlqr } from '@/math/riccati';
 import { clamp } from '@/math/util';
 import { idleActuation, type Actuation } from '@/sim/dynamics';
@@ -61,6 +61,71 @@ export function designLqr(p: Params, dt: number): Design {
   return { key, k, names, poles, converged: res.converged };
 }
 
+/**
+ * The steady-state Kalman filter of the LQG option and the matrices of the loop it closes, at
+ * controller period T. The model is the LQR's own, in absolute altitude: x = (y, v, [T]).
+ *   x̂ = x̂⁻ + M·(y − x̂⁻₁)            correction with the altimeter (gain M)
+ *   u = −K·(x̂ − (r, 0, …))          the LQR on the estimate
+ *   x̂⁻⁺ = A·x̂ + B·u                 prediction with the command just sent
+ * The filter assumes process noise of σ = kfQ newtons entering with the thrust, and altimeter
+ * noise of σ = kfR metres. More process noise: a faster filter that trusts the model less.
+ */
+export function lqgMatrices(p: Params, T: number): LqgMatrices {
+  const c = p.control.lqr;
+  const key = JSON.stringify([c, p.control.model.mass, p.control.model.motorTau, T]);
+  const hit = lqgCache.get(key);
+  if (hit) return hit;
+  const out = lqgDesign(p, T);
+  if (lqgCache.size > 64) lqgCache.clear();
+  lqgCache.set(key, out);
+  return out;
+}
+
+interface LqgMatrices {
+  abk: Mat;
+  m: number[];
+  kk: number[];
+  kr: { b: number[]; d: number };
+  ad: Mat;
+  bd: number[];
+}
+const lqgCache = new Map<string, LqgMatrices>();
+
+function lqgDesign(p: Params, T: number): LqgMatrices {
+  const c = p.control.lqr;
+  const m = Math.max(p.control.model.mass, 0.05);
+  const tau = Math.max(p.control.model.motorTau, 1e-3);
+  const n = c.lagState ? 3 : 2;
+  const a: Mat = Array.from({ length: n }, () => new Array<number>(n).fill(0));
+  const b: Mat = Array.from({ length: n }, () => [0]);
+  a[0]![1] = 1;
+  if (c.lagState) {
+    a[1]![2] = 1 / m;
+    a[2]![2] = -1 / tau;
+    b[2]![0] = 1 / tau;
+  } else b[1]![0] = 1 / m;
+  const d = c2d(a, b, T);
+  const kk = designLqr({ ...p, control: { ...p.control, lqr: { ...c, integral: false } } }, T).k;
+  // Kalman: the dual Riccati equation gives the predicted covariance P; M = P·Cᵀ/(C·P·Cᵀ + R).
+  const qn = d.b.map((ri) => d.b.map((rj) => ri[0]! * rj[0]! * c.kfQ ** 2));
+  for (let i = 0; i < n; i++) qn[i]![i] = qn[i]![i]! + 1e-12;
+  const ct = Array.from({ length: n }, (_, i) => [i === 0 ? 1 : 0]);
+  const pk = dlqr(transpose(d.a), ct, qn, [[Math.max(c.kfR, 1e-6) ** 2]], 200000).p;
+  const s0 = pk[0]![0]! + Math.max(c.kfR, 1e-6) ** 2;
+  const mGain = pk.map((row) => row[0]! / s0);
+  // A − B·K, applied to the corrected estimate.
+  const abk = d.a.map((row, i) => row.map((v, j) => v - d.b[i]![0]! * kk[j]!));
+  return {
+    abk,
+    m: mGain,
+    kk,
+    /** How the reference enters: u gains k₁·r, the prediction B·k₁·r. */
+    kr: { b: d.b.map((r) => r[0]! * kk[0]!), d: kk[0]! },
+    ad: d.a,
+    bd: d.b.map((r) => r[0]!),
+  };
+}
+
 const fmtPole = (s: { re: number; im: number }) =>
   s.im === 0
     ? s.re.toFixed(2)
@@ -85,6 +150,8 @@ export class LqrController implements Controller {
   /** Model-based estimate of the actual thrust when motor telemetry is unavailable. */
   private thrustEst = 0;
   private lastCmd = 0;
+  /** LQG: the filter's predicted state (y, v, [T]) for the next fix, or null before the first. */
+  private xPred: number[] | null = null;
   private last: LoopTerms = {
     setpoint: 0,
     measurement: 0,
@@ -100,6 +167,7 @@ export class LqrController implements Controller {
     this.xi = 0;
     this.thrustEst = 0;
     this.lastCmd = 0;
+    this.xPred = null;
     this.last = { ...this.last, parts: this.partsFor(null, [0, 0, 0, 0], 0) };
   }
 
@@ -152,8 +220,24 @@ export class LqrController implements Controller {
       : this.thrustEst;
 
     const sp = input.setpoint.pos.y;
-    const e = m.pos.y - sp; // state convention: deviation from the setpoint
-    const x = [e, m.vel.y, thrust - ff, this.xi];
+    let e = m.pos.y - sp; // state convention: deviation from the setpoint
+    let x = [e, m.vel.y, thrust - ff, this.xi];
+    if (c.observer && !c.integral) {
+      // LQG: velocity and thrust come from the filter, which sees only the altimeter.
+      const g = lqgMatrices(p, dt);
+      const n = g.ad.length;
+      const pred = this.xPred ?? [m.pos.y, 0, 0].slice(0, n);
+      const innov = m.pos.y - pred[0]!;
+      const xh = pred.map((v, i) => v + g.m[i]! * innov);
+      e = xh[0]! - sp;
+      x = [e, xh[1]!, n > 2 ? xh[2]! : 0, 0];
+      const u = -g.kk.reduce((s, k, i) => s + k * (i === 0 ? e : xh[i]!), 0);
+      // The prediction uses the command as the motors will get it: clamped like the output.
+      const uSent = clamp(u + ff, 0, tMax) - ff;
+      this.xPred = g.ad.map(
+        (row, i) => row.reduce((s, a, j) => s + a * xh[j]!, 0) + g.bd[i]! * uSent,
+      );
+    }
     this.design = d;
     const parts = this.partsFor(p, x, ff);
     const unsaturated = parts.reduce((s, q) => s + q.value, 0);

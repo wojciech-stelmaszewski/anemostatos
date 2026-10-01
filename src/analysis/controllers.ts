@@ -2,7 +2,8 @@
 // update rule, written as a discrete state-space system at the controller's sample period.
 // They hold while nothing saturates. Inputs, in order: measured altitude, measured velocity,
 // measured thrust (deviation from hover), reference. Output: the thrust command (deviation).
-import { designLqr } from '@/control/lqr';
+import { designHinf, hinfControllerLti } from '@/control/hinf';
+import { designLqr, lqgMatrices } from '@/control/lqr';
 import type { PidGains } from '@/control/pid';
 import { periodSteps } from '@/control/types';
 import { PHYS_DT } from '@/engine/simulation';
@@ -72,6 +73,28 @@ export function pidLti(g: PidGains, T: number): Lti {
 /** LQR / LQI of src/control/lqr.ts: u = −K·(e, v, [T], [ξ]) with e = y − r. */
 function lqrModel(p: Params, T: number): Lti {
   const c = p.control.lqr;
+  if (c.observer) {
+    // LQG: the filter state x̂⁻ (predicted before the fix). The fix corrects it, the LQR acts on
+    // the corrected estimate, and the prediction runs the model forward with that command.
+    const { abk, m, kk, kr } = lqgMatrices(p, T);
+    const n = abk.length;
+    const imc = abk.map((_, i) =>
+      abk.map((__, j) => (i === j ? 1 : 0) - m[i]! * (j === 0 ? 1 : 0)),
+    );
+    const a = abk.map((row) =>
+      imc[0]!.map((_, j) => row.reduce((s, v, k) => s + v * imc[k]![j]!, 0)),
+    );
+    const bY = abk.map((row) => row.reduce((s, v, k) => s + v * m[k]!, 0));
+    const cRow = imc[0]!.map((_, j) => -kk.reduce((s, v, k) => s + v * imc[k]![j]!, 0));
+    const dY = -kk.reduce((s, v, k) => s + v * m[k]!, 0);
+    return {
+      a,
+      b: Array.from({ length: n }, (_, i) => [bY[i]!, 0, 0, kr.b[i]!]),
+      c: [cRow],
+      d: [[dY, 0, 0, kr.d]],
+      dt: T,
+    };
+  }
   const k = designLqr(p, T).k;
   const k1 = k[0]!;
   const k2 = k[1]!;
@@ -129,6 +152,7 @@ function adrcModel(p: Params, T: number): Lti {
  */
 export function l1ControllerModel(p: Params): Lti | null {
   if (p.sim.level !== 1 || p.control.l1.estimator !== 'none') return null;
+  if (p.control.l1.kind === 'lqr' && p.control.lqr.observer && p.control.lqr.integral) return null;
   const { T } = controlPeriod(p);
   switch (p.control.l1.kind) {
     case 'pid':
@@ -137,6 +161,12 @@ export function l1ControllerModel(p: Params): Lti | null {
       return lqrModel(p, T);
     case 'adrc':
       return adrcModel(p, T);
+    case 'hinf': {
+      // Inputs (y, r) of the design spread over the four inputs of the loop: (y, v, F, r).
+      const g = hinfControllerLti(designHinf(p, T));
+      const wide = (r: number[]) => [r[0]!, 0, 0, r[1]!];
+      return { ...g, b: g.b.map(wide), d: g.d.map(wide) };
+    }
     default:
       return null;
   }

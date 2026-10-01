@@ -2,6 +2,7 @@ import type { Params } from '@/sim/params';
 import { AdrcController } from './adrc';
 import { AltitudeController } from './altitude';
 import { FaultTolerantController } from './fault';
+import { HinfController } from './hinf';
 import { CascadeController } from './cascade';
 import { WithAltitudeKalman } from './estimated';
 import { L1AdaptiveController } from './l1ac';
@@ -39,7 +40,9 @@ export function makeController(p: Params): Controller {
               ? new MpcAltitudeController()
               : kind === 'l1ac'
                 ? new L1AdaptiveController()
-                : new AltitudeController();
+                : kind === 'hinf'
+                  ? new HinfController()
+                  : new AltitudeController();
       return p.control.l1.estimator === 'kalman' ? new WithAltitudeKalman(c) : c;
     }
     case 2:

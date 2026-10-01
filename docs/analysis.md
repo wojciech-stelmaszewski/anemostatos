@@ -2,8 +2,8 @@
 
 > **Status (2026-10-01):** M13 (the foundations) and the first pass of M14
 > (lessons III.1–III.5), M15 (III.7, III.9), M16 (III.11, III.12), M17
-> (III.20–III.22) and M18 (III.27–III.30) are implemented: all thirteen
-> **must** lessons and Chapter J complete. §5 lists what was built and where
+> (III.20–III.22) and M18 (III.27–III.30) are implemented, with III.10 and III.13
+> of the second pass: all thirteen **must** lessons and Chapter J complete. §5 lists what was built and where
 > it differs from this plan. The second passes of M14–M17 are planned.
 > Milestones in [roadmap.md](roadmap.md) point here.
 > Extended on 2026-09-30 from 20 to 30 lessons, so that Parts I–III together
@@ -635,7 +635,24 @@ $S$/$T$ measurement, `shaping.ts` (lead/lag, notch on L1), spectrum chart.
 - Lessons carry their plan number (`n`), so the panel shows III.7 and
   III.9 although III.6 and III.8 do not exist yet.
 
-**Still to build:** III.8 (describing functions) and III.10 (LQG margins).
+**Built (2026-10-01): III.10.**
+
+- The LQR takes an option `lqr.observer`: a steady-state Kalman filter
+  (current-estimator form, the dual Riccati equation of `riccati.ts`)
+  estimates (y, v, T) from the altimeter and the command, with assumed
+  process noise `kfQ` at the thrust input and altimeter noise `kfR`. Its
+  linear model joins the loop models, so Bode, Nyquist and the margins are
+  live, and it matches a flown sweep within 2 %.
+- With sensors the LQR has 72° and an infinite gain margin; with the filter
+  (kfQ = 0.3 N) 35° and 9 dB. Raising kfQ recovers them (LTR): 46° at 3 N,
+  62° at 100 N. The plan's "slightly heavier drone oscillates" does not
+  happen: the lost margin is at the plant input, and a heavier drone only
+  lowers the loop gain. The lesson's trade is noise instead: with 2 cm of
+  altimeter noise the thrust jitter grows from 0.01 N to 0.24 N as kfQ goes
+  from 0.3 to 10 N. The goal (PM ≥ 45°, GM ≥ 10 dB, jitter < 0.15 N) leaves
+  a window of kfQ ≈ 3–5 N.
+
+**Still to build:** III.8 (describing functions).
 
 Lyapunov overlay and region-of-attraction grid; `describing.ts` and the
 $-1/N(A)$ overlay; altimeter-bias state and altimeter-dropout event for
@@ -677,7 +694,24 @@ the Kalman filter; covariance chart; LQG margin measurement.
   student predicts the 21 ms, then repairs the loop by telling the
   controller the angle.
 
-**Still to build:** III.13–III.17 (H∞, μ, sliding mode, backstepping, MRAC).
+**Built (2026-10-01): III.13.**
+
+- `math/care.ts` solves the continuous Riccati equation by the matrix sign
+  function of the Hamiltonian; `control/hinf.ts` is the Glover–McFarlane
+  design: the shaped plant G·W, the two equations, γ_min = √(1 + ρ(XZ)),
+  the central controller at γ = 1.05·γ_min, discretised (Tustin) at the
+  controller rate. W is a PI times an optional lead; the PI integrator is
+  run explicitly so that it can be held on the ground. L1 kind `hinf`.
+- The plan compared H∞ with lesson III.6, which does not exist yet; the
+  lesson compares it with the PID of III.11 instead. On a 108-tune grid
+  the fastest PID that passes the family test crosses at 2.84 Hz.
+- A PI weight alone gives ε_max ≈ 0.31 and fails the family test from
+  about 2 Hz: a −40 dB/decade shape is the wrong one. With a lead in the
+  weight (5 → 50 rad/s) ε_max is 0.41 and the loop passes at 3.5 Hz. The
+  lesson's goal is ≥ 3.2 Hz with |W·T| < 1. The measured phase margin is
+  within a few degrees of 2·arcsin ε_max.
+
+**Still to build:** III.14–III.17 (μ, sliding mode, backstepping, MRAC).
 
 First pass: `uncertainty.ts`, the dispersion block and `montecarlo.ts`
 (shared with M18), `svd.ts`, `disk.ts`, the two-axis torque probe and the

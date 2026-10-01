@@ -1,22 +1,22 @@
 % ---------------------------------------------------------------- cover -----
-% Black, centred and spare: a line in spaced capitals, the title, the rosette
-% (book/tools/cover_rosette.py: phase portraits of a damped oscillator), the editor, a band.
+% Black, centred and spare: a line in spaced capitals, the title, the picture
+% (book/tools/cover_art.py: step responses flown by the simulator, closing on the set-point), the editor, a band.
 \thispagestyle{empty}
 \begin{tikzpicture}[remember picture, overlay]
   \fill[night] (current page.south west) rectangle (current page.north east);
-  \node[anchor=north, inner sep=0pt, text=covertealtext] at ($(current page.north)+(0,-30mm)$)
+  \node[anchor=north, inner sep=0pt, text=accent] at ($(current page.north)+(0,-30mm)$)
     {\sanscaps\addfontfeatures{LetterSpace=32}\small A COURSE IN FEEDBACK CONTROL};
   \node[anchor=north, inner sep=0pt, text=nighttext] at ($(current page.north)+(0,-42mm)$)
     {\sansdisplay\addfontfeatures{LetterSpace=4}\fontsize{60}{60}\selectfont ANEMOSTATOS};
   \node[anchor=north, inner sep=0pt, text=nightmuted] at ($(current page.north)+(0,-71mm)$)
     {\displayserif\itshape\fontsize{20}{24}\selectfont Riding on the wind};
   \node[inner sep=0pt] at ($(current page.center)+(0,-6mm)$)
-    {\includegraphics[width=138mm]{figures/out/cover_rosette.jpg}};
+    {\includegraphics[width=186mm]{figures/out/cover_art.jpg}};
   \node[anchor=north, inner sep=0pt, text=nightmuted] at ($(current page.south)+(0,62mm)$)
     {\sanscaps\addfontfeatures{LetterSpace=24}\scriptsize IDEA AND EDITING};
   \node[anchor=north, inner sep=0pt, text=nighttext] at ($(current page.south)+(0,55mm)$)
     {\sansdisplay\addfontfeatures{LetterSpace=4}\fontsize{21}{24}\selectfont WOJCIECH STELMASZEWSKI};
-  \fill[coverteal] ($(current page.south west)+(0,13mm)$) rectangle ($(current page.south east)+(0,27mm)$);
+  \fill[accent] ($(current page.south west)+(0,13mm)$) rectangle ($(current page.south east)+(0,27mm)$);
   \node[anchor=west, inner sep=0pt, text=night] at ($(current page.south west)+(16mm,20mm)$)
     {\sanscaps\addfontfeatures{LetterSpace=20}\scriptsize FROM PID TO LEARNING};
   \node[anchor=east, inner sep=0pt, text=night] at ($(current page.south east)+(-16mm,20mm)$)

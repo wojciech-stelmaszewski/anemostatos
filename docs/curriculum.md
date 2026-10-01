@@ -36,11 +36,11 @@ Three principles hold throughout:
 | ---------------------------- | ------------ | -------------------------------------- | --------------------------- | --------------- | ------------------------------------ |
 | I. The PID controller        | 1–14         | Quadrotor, levels L1–L3                | done (M0–M6)                | written; see §5 | [roadmap.md](roadmap.md)             |
 | II. Beyond PID               | II.1–II.21   | Quadrotor                              | done (M7–M12)               | not written     | [beyond-pid.md](beyond-pid.md)       |
-| III. Why it works            | III.1–III.30 | Quadrotor                              | 12 of 30 done; rest planned | not written     | [analysis.md](analysis.md)           |
+| III. Why it works            | III.1–III.30 | Quadrotor                              | 14 of 30 done; rest planned | not written     | [analysis.md](analysis.md)           |
 | IV. Aerospace GNC            | IV.1–IV.29   | Quadrotor, rocket, aircraft, satellite | planned (M19–M25)           | not written     | [aerospace-gnc.md](aerospace-gnc.md) |
 | V. From whiteboard to flight | V.1–V.6      | All                                    | planned (M26)               | not written     | [aerospace-gnc.md](aerospace-gnc.md) |
 
-One hundred lessons. Forty-seven exist in the app today.
+One hundred lessons. Forty-nine exist in the app today.
 
 Each part asks a different question:
 
@@ -83,7 +83,7 @@ teaches each item. "App" says whether the lessons exist in the simulator.
 | Filtering of real sensors     | Vibration, notch and RPM-tracking filters, anti-alias filters                                    | 8, III.20, III.21                 | partly  |
 | System identification         | Least squares, relay tuning, frequency-domain identification with coherence                      | III.25, III.26                    | planned |
 | Fault detection and tolerance | Residual tests, redundancy and voting, control after actuator loss                               | II.7, III.27, III.28, V.4         | partly  |
-| Verification                  | Monte Carlo campaigns, pass rates with confidence, worst cases, requirements and budgets         | III.29, III.30, V.1, V.2, V.6     | planned |
+| Verification                  | Monte Carlo campaigns, pass rates with confidence, worst cases, requirements and budgets         | III.29, III.30, V.1, V.2, V.6     | partly  |
 | Flight dynamics               | Trim, linearisation, longitudinal modes, stability augmentation, handling qualities              | IV.11, IV.12                      | planned |
 | Gain scheduling               | Point designs, interpolation, hidden coupling                                                    | IV.13, IV.14                      | planned |
 | Launch vehicles               | Thrust-vector control, conditional stability, bending, slosh                                     | IV.7–IV.10                        | planned |

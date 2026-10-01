@@ -19,6 +19,7 @@ import { GRAVITY, type Params } from '@/sim/params';
 import { Notice, Try } from './Bits';
 import { M } from './Math';
 import { setAt } from './script';
+import { ReportPanel } from '@/ui/arena/ReportPanel';
 import type { Lesson } from './types';
 
 /**
@@ -851,7 +852,7 @@ export const PART_THREE: Lesson[] = [
           on, but the commands cost current, heat and bearings.
         </p>
         <p>There are three ways to keep the tone out of the loop:</p>
-        <ul>
+        <ul className="list-disc space-y-0.5 pl-4">
           <li>
             a <b>low-pass</b>, which removes everything above its cutoff and delays everything below
             it;
@@ -1052,6 +1053,69 @@ export const PART_THREE: Lesson[] = [
           requirements become pass rates with confidence bounds, and thousands of dispersed
           simulations find the corners. A clean campaign proves the corners you dispersed, and
           nothing about the ones you did not.
+        </Notice>
+      </>
+    ),
+  },
+  {
+    id: 'report',
+    n: 30,
+    part: 3,
+    chapter: J,
+    title: 'The robustness report card',
+    level: 3,
+    body: (
+      <>
+        <p>
+          Part II ended with a table of RMS errors, and the controllers that won it were the clever
+          ones. An engineer who has to sign off a flight control system asks other questions first.
+          How much gain and phase can the loop lose before it goes unstable? How much delay? How
+          much does it amplify disturbances at its worst frequency? And how many of the vehicles it
+          might really be will fly?
+        </p>
+        <p>
+          The report card asks them of every controller in the course, with the tools of Part III
+          and without trusting any model:
+        </p>
+        <ul className="list-disc space-y-0.5 pl-4">
+          <li>
+            a <b>probe sweep</b> with the loop broken at the plant input (the thrust for L1, the
+            roll torque for L3) gives <b>PM</b>, <b>GM</b>, the <b>delay margin</b> and{' '}
+            <M>{'\\|S\\|_\\infty'}</M>, measured even for MPC and the neural policy;
+          </li>
+          <li>
+            a <b>Monte Carlo campaign</b> of 50 flights gives a pass rate and the rate it proves
+            with 95 % confidence: the plant family of III.11 for L1, the dispersions of III.29 for
+            L3;
+          </li>
+          <li>
+            the <b>RMS error in gusts</b> is the column Part II ranked them by.
+          </li>
+        </ul>
+        <p>
+          A ▲ marks a controller below the classical requirement of 6 dB of gain margin and 45° of
+          phase margin. Flight control specifications have asked for these numbers for decades,
+          because they buy room for everything the model leaves out.
+        </p>
+        <ReportPanel />
+        <Try>
+          Build the card. In each table find the controller with the best RMS and read its delay
+          margin and its Monte Carlo row. Then find the ones whose margins cannot be measured at
+          all, and ask what else could show that they are safe.
+        </Try>
+        <Notice>
+          The winners of Part II won by being fast, and speed is paid for in margin. L1 adaptive
+          holds the altitude to 6 mm in gusts and tolerates a fifth of the delay the PID does. INDI,
+          with geometric control or MPC on top, has the best RMS among the quadrotors, about 35° of
+          phase margin, and loses a third of the dispersed flights, because it cancels the drone's
+          dynamics with measurements that a slow motor and a late sensor make wrong. The Part I
+          cascade is six times worse in gusts and among the hardest to break. MPPI and the neural
+          policy have no margins at all: a sweep assumes a loop that is linear and does not change,
+          and a planner that samples random trajectories or a network with saturations is neither.
+          For them the Monte Carlo row is the only evidence, which is why certifying learned
+          controllers is still an open problem. None of these is "the best". A real design chooses
+          its place on the trade, states the margins and the pass rate it guarantees, and proves
+          them. That is Part III in one table.
         </Notice>
       </>
     ),

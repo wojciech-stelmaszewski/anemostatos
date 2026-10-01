@@ -1,9 +1,10 @@
 # Part III — Why It Works
 
-> **Status (2026-09-30):** M13 (the foundations) and the first pass of M14
-> (lessons III.1–III.5), of M15 (III.7, III.9), of M16 (III.11, III.12) and
-> of M17 (III.20–III.22) are implemented; §5 lists what was built and where
-> it differs from this plan. The rest of M14–M17 and M18 are planned.
+> **Status (2026-10-01):** M13 (the foundations) and the first pass of M14
+> (lessons III.1–III.5), M15 (III.7, III.9), M16 (III.11, III.12), M17
+> (III.20–III.22) and M18 (III.29, III.30) are implemented: all thirteen
+> **must** lessons. §5 lists what was built and where it differs from this
+> plan. The second passes of M14–M18 are planned.
 > Milestones in [roadmap.md](roadmap.md) point here.
 > Extended on 2026-09-30 from 20 to 30 lessons, so that Parts I–III together
 > cover the analysis and robustness material of a graduate control course
@@ -745,6 +746,44 @@ the relay probe and the coherence estimate; linear models of the L3 rate
 loop (PID and INDI).
 
 ### M18 — Chapter J and the report card (III.27–III.30)
+
+**First pass built (2026-10-01): III.29 and III.30.**
+
+- `analysis/dispersion.ts`: a campaign flies one scenario $N$ times with
+  mass, motor lag, sensor delay, gyro bias and the wind's seed drawn
+  anew, in slices. Every tune flies the same draws (common random
+  numbers), so a retune is compared on the same 300 drones. The
+  dispersions are fixed in code rather than a `dispersion` block of the
+  parameters; one set serves both lessons.
+- A flight fails if it crashes or still exceeds 300 °/s of body rate in
+  its last five seconds. The plan's position limit in gusts failed most
+  flights for reasons no tune could change (the wind); the rate limit sits
+  in a wide gap: gusts stay below 140 °/s, unstable loops pass 500 °/s.
+- Pass rates carry a one-sided Clopper–Pearson bound; `cleanRunsNeeded`
+  gives 299 for 99 % at 95 %.
+- The **dispersion view** places every flight by two of its drawn values,
+  passed or failed. It replaces the plan's envelope and histogram: the
+  lesson is about where the failures sit.
+- III.29: the default cascade fails about 7 % of 300 gusty hovers, all
+  where motors slower than 25 ms meet a sensor later than 30 ms; the
+  rate-loop model agrees with the flights on at least 295 of 300.
+  Attitude Kp 5 flies the same 300 without a failure. The goal reads the
+  finished campaign of the current tune, so its test lives in
+  `tests/dispersion.test.ts`.
+- `analysis/report.ts` builds the **report card**: for every L1
+  controller and every L3 entry of the arena, PM, GM (the smaller of up
+  and down), delay margin and $\|S\|_\infty$ from a probe sweep at the
+  plant input, a 50-flight campaign (the III.11 family for L1, the III.29
+  dispersions for L3) and the RMS error in gusts. `make report` prints it
+  and writes [report.md](report.md); lesson III.30 builds it in the
+  browser (about four minutes). It is a lesson panel, not a column of the
+  arena, and `make bench` is unchanged.
+- The measured margins of the two PID loops match the models within
+  1.5°. MPPI and the neural policy fly, yet the sweep gives them negative
+  margins: they are not linear time-invariant loops, so the card shows a
+  dash and only the Monte Carlo row speaks for them.
+
+**Still to build:** III.27 (three rotors) and III.28 (fault detection).
 
 First pass: the dispersion view, Monte Carlo campaigns in the arena, the
 robustness report card, and `make bench` printing margins and pass rates

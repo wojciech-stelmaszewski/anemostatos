@@ -138,20 +138,22 @@ motor lag.
 
 **Part III — Why it works** (the third semester, being built; plan in [docs/analysis.md](docs/analysis.md)):
 
-| #      | Lesson                     | Level | What you learn                                                                   |
-| ------ | -------------------------- | ----- | -------------------------------------------------------------------------------- |
-| III.1  | The drone as a filter      | L1    | frequency response and the Bode plot; bandwidth, measured by flying sines        |
-| III.2  | Poles tell the story       | L1    | the pole map of the whole loop; damping ratio; a root locus drawn by hand        |
-| III.3  | How far from the edge?     | L1    | gain and phase margins on the Bode and Nyquist plots                             |
-| III.4  | Delay is a phase thief     | L1    | delay costs phase: predict the delay that destabilises the loop, then check it   |
-| III.5  | The waterbed               | L1    | sensitivity and Bode's integral: what is rejected here is amplified there        |
-| III.7  | Energy that only goes down | L1    | a Lyapunov function, what it proves, and the far larger region that really works |
-| III.9  | What the filter can't see  | L1    | observability: a state no data can reveal, and a filter honest about it          |
-| III.11 | How wrong can I be?        | L1    | a family of plants, the small-gain test, and sixty drones flown to check it      |
-| III.12 | One loop at a time lies    | L3    | roll and pitch as one loop: singular values, eigen-loops and the disk margin     |
-| III.20 | Ghost frequencies          | L3    | aliasing: rotor vibration sampled too slowly becomes a wobble no filter removes  |
-| III.21 | Notch the noise            | L3    | low-pass, notch and RPM-tracking notch: what each costs in phase margin          |
-| III.22 | Where is up?               | L3    | attitude from gyro and accelerometer: complementary and Mahony filters in a turn |
+| #      | Lesson                     | Level | What you learn                                                                      |
+| ------ | -------------------------- | ----- | ----------------------------------------------------------------------------------- |
+| III.1  | The drone as a filter      | L1    | frequency response and the Bode plot; bandwidth, measured by flying sines           |
+| III.2  | Poles tell the story       | L1    | the pole map of the whole loop; damping ratio; a root locus drawn by hand           |
+| III.3  | How far from the edge?     | L1    | gain and phase margins on the Bode and Nyquist plots                                |
+| III.4  | Delay is a phase thief     | L1    | delay costs phase: predict the delay that destabilises the loop, then check it      |
+| III.5  | The waterbed               | L1    | sensitivity and Bode's integral: what is rejected here is amplified there           |
+| III.7  | Energy that only goes down | L1    | a Lyapunov function, what it proves, and the far larger region that really works    |
+| III.9  | What the filter can't see  | L1    | observability: a state no data can reveal, and a filter honest about it             |
+| III.11 | How wrong can I be?        | L1    | a family of plants, the small-gain test, and sixty drones flown to check it         |
+| III.12 | One loop at a time lies    | L3    | roll and pitch as one loop: singular values, eigen-loops and the disk margin        |
+| III.20 | Ghost frequencies          | L3    | aliasing: rotor vibration sampled too slowly becomes a wobble no filter removes     |
+| III.21 | Notch the noise            | L3    | low-pass, notch and RPM-tracking notch: what each costs in phase margin             |
+| III.22 | Where is up?               | L3    | attitude from gyro and accelerometer: complementary and Mahony filters in a turn    |
+| III.29 | One flight proves nothing  | L3    | Monte Carlo: 300 dispersed flights, the failing corner, a pass rate with confidence |
+| III.30 | The robustness report card | L1–L3 | margins, Monte Carlo and RMS for every controller: fast is not robust               |
 
 ## Run it
 
@@ -165,16 +167,17 @@ cd anemostatos
 make dev        # installs dependencies on first run, opens http://localhost:5173
 ```
 
-| Target                        | What it does                                          |
-| ----------------------------- | ----------------------------------------------------- |
-| `make dev`                    | start the simulator with hot reload                   |
-| `make check`                  | lint + typecheck + unit tests                         |
-| `make test`                   | unit tests only (physics, PID, closed loops, lessons) |
-| `make build` / `make preview` | production build and a local preview of it            |
-| `make bench`                  | run the controller arena and print the table (≈ 30 s) |
-| `make train`                  | retrain the neural policy of lesson II.20 (≈ 2 min)   |
-| `make book`                   | build the course book (needs LuaLaTeX)                |
-| `make`                        | list all targets                                      |
+| Target                        | What it does                                                     |
+| ----------------------------- | ---------------------------------------------------------------- |
+| `make dev`                    | start the simulator with hot reload                              |
+| `make check`                  | lint + typecheck + unit tests                                    |
+| `make test`                   | unit tests only (physics, PID, closed loops, lessons)            |
+| `make build` / `make preview` | production build and a local preview of it                       |
+| `make bench`                  | run the controller arena and print the table (≈ 30 s)            |
+| `make report`                 | build the robustness report card, write docs/report.md (≈ 4 min) |
+| `make train`                  | retrain the neural policy of lesson II.20 (≈ 2 min)              |
+| `make book`                   | build the course book (needs LuaLaTeX)                           |
+| `make`                        | list all targets                                                 |
 
 ## Controls
 

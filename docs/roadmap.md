@@ -131,7 +131,7 @@ lessons (III.1–III.30). Gap audit, design and lesson plan:
 | M15 ◐     | Chapter G: Lyapunov, describing functions, observability, LQG — lessons III.7–III.10                                    |
 | M16 ◐     | Chapter H: uncertainty, small gain, MIMO margins, H∞, μ, sliding mode, backstepping, MRAC — lessons III.11–III.17       |
 | M17 ◐     | Chapter I: sampling, quantisation, vibration, notch filters, attitude filters, MEKF, EKF, sysid — lessons III.18–III.26 |
-| M18       | Chapter J: rotor loss, fault detection, Monte Carlo verification, robustness report card — lessons III.27–III.30        |
+| M18 ◐     | Chapter J: rotor loss, fault detection, Monte Carlo verification, robustness report card — lessons III.27–III.30        |
 
 Build order: M13, then the thirteen **must** lessons across M14–M18
 (III.1–4, 7, 9, 11, 12, 20–22, 29, 30). The remaining lessons follow in a

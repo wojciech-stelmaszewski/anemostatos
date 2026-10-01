@@ -7,7 +7,7 @@ node_modules: package.json
 	$(NPM) install
 	@touch node_modules
 
-.PHONY: help install dev test test-watch lint typecheck format check build preview clean train bench book book-data book-figures
+.PHONY: help install dev test test-watch lint typecheck format check build preview clean train bench report book book-data book-figures
 
 help: ## Show this help
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  \033[36m%-11s\033[0m %s\n", $$1, $$2}'
@@ -47,6 +47,9 @@ train: node_modules ## Train the neural-network policy (lesson II.20), a few min
 
 bench: node_modules ## Run the controller arena and print the results table
 	$(NODE_TS) scripts/bench.ts
+
+report: node_modules ## Build the robustness report card (lesson III.30), several minutes; writes docs/report.md
+	$(NODE_TS) scripts/report.ts --write
 
 LATEX := lualatex -interaction=nonstopmode -halt-on-error -output-directory=build
 

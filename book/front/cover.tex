@@ -1,22 +1,25 @@
 % ---------------------------------------------------------------- cover -----
-% Black, centred and spare: a red ribbon in the corner, a line in spaced capitals, the title, the picture
-% (book/tools/cover_art.py: a real flight of the simulator, the quadrotor brought back over its set-point
-% and standing in the wind), the editor, a band.
+% Black and centred: the picture full bleed behind everything (book/tools/cover/: the simulator's own
+% drone model, leaning into a 5 m/s wind over its set-point at the end of the flight of lesson I.13,
+% with the path it flew and the streamlines of the wind), a red ribbon in the corner, a line in
+% spaced capitals, the title, the editor, a band.
 \thispagestyle{empty}
 \begin{tikzpicture}[remember picture, overlay]
   \fill[night] (current page.south west) rectangle (current page.north east);
+  \node[inner sep=0pt] at ($(current page.north)+(0,-153mm)$)
+    {\includegraphics[width=\paperwidth]{figures/out/cover_art.jpg}};
   \node[anchor=north, inner sep=0pt, text=accent] at ($(current page.north)+(0,-30mm)$)
     {\sanscaps\addfontfeatures{LetterSpace=32}\small A COURSE IN FEEDBACK CONTROL};
   \node[anchor=north, inner sep=0pt, text=nighttext] at ($(current page.north)+(0,-42mm)$)
     {\sansdisplay\addfontfeatures{LetterSpace=4}\fontsize{60}{60}\selectfont ANEMOSTATOS};
-  \node[inner sep=0pt] at ($(current page.center)+(0,-2mm)$)
-    {\includegraphics[width=152mm]{figures/out/cover_art.jpg}};
   % the ribbon across the top left corner
-  \fill[coverred] ($(current page.north west)+(0,-15mm)$) -- ($(current page.north west)+(15mm,0)$)
-    -- ($(current page.north west)+(39mm,0)$) -- ($(current page.north west)+(0,-39mm)$) -- cycle;
-  \node[rotate=45, text=white, align=center, inner sep=0pt, font=\sffamily\fontsize{6.6}{7.6}\selectfont]
-    at ($(current page.north west)+(16.3mm,-16.3mm)$)
-    {Every figure in this book\\flown in the\\{\sansmedium\fontsize{8.5}{10}\selectfont SIMULATOR}};
+  \fill[coverred] ($(current page.north west)+(0,-13mm)$) -- ($(current page.north west)+(13mm,0)$)
+    -- ($(current page.north west)+(34mm,0)$) -- ($(current page.north west)+(0,-34mm)$) -- cycle;
+  \node[rotate=45, text=white, align=center, inner sep=0pt]
+    at ($(current page.north west)+(12.2mm,-12.2mm)$)
+    {{\sanscaps\addfontfeatures{LetterSpace=6}\fontsize{7.4}{9.6}\selectfont EVERY FIGURE}\\
+     {\sanscaps\addfontfeatures{LetterSpace=6}\fontsize{7.4}{9.6}\selectfont FLOWN IN THE}\\[1.5mm]
+     {\sansmedium\bfseries\addfontfeatures{LetterSpace=3}\fontsize{15.5}{16}\selectfont SIMULATOR}};
   \node[anchor=north, inner sep=0pt, text=nightmuted] at ($(current page.south)+(0,62mm)$)
     {\sanscaps\addfontfeatures{LetterSpace=24}\scriptsize IDEA AND EDITING};
   \node[anchor=north, inner sep=0pt, text=nighttext] at ($(current page.south)+(0,55mm)$)

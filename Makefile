@@ -53,10 +53,10 @@ report: node_modules ## Build the robustness report card (lesson III.30), severa
 
 LATEX := lualatex -interaction=nonstopmode -halt-on-error -output-directory=build
 
-book: ## Build the book into book/anemostatos-riding-on-the-wind.pdf (needs LuaLaTeX)
+book: ## Build the book into book/anemostatos.pdf (needs LuaLaTeX)
 	mkdir -p book/build
 	cd book && $(LATEX) main.tex > build/latex.out && $(LATEX) main.tex > build/latex.out || (tail -30 build/latex.out; exit 1)
-	cp book/build/main.pdf book/anemostatos-riding-on-the-wind.pdf
+	cp book/build/main.pdf book/anemostatos.pdf
 	@grep -c "undefined" book/build/main.log | xargs -I{} echo "book: {} lines mention undefined references (see book/build/main.log)"
 
 book-data: node_modules ## Fly every experiment of the book and record its telemetry (a few minutes)

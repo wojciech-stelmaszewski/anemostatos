@@ -1,6 +1,7 @@
 % ---------------------------------------------------------------- cover -----
-% Black, centred and spare: a line in spaced capitals, the title, the picture
-% (book/tools/cover_art.py: step responses flown by the simulator, closing on the set-point), the editor, a band.
+% Black, centred and spare: a red ribbon in the corner, a line in spaced capitals, the title, the picture
+% (book/tools/cover_art.py: a real flight of the simulator, the quadrotor brought back over its set-point
+% and standing in the wind), the editor, a band.
 \thispagestyle{empty}
 \begin{tikzpicture}[remember picture, overlay]
   \fill[night] (current page.south west) rectangle (current page.north east);
@@ -8,10 +9,14 @@
     {\sanscaps\addfontfeatures{LetterSpace=32}\small A COURSE IN FEEDBACK CONTROL};
   \node[anchor=north, inner sep=0pt, text=nighttext] at ($(current page.north)+(0,-42mm)$)
     {\sansdisplay\addfontfeatures{LetterSpace=4}\fontsize{60}{60}\selectfont ANEMOSTATOS};
-  \node[anchor=north, inner sep=0pt, text=nightmuted] at ($(current page.north)+(0,-71mm)$)
-    {\displayserif\itshape\fontsize{20}{24}\selectfont Riding on the wind};
-  \node[inner sep=0pt] at ($(current page.center)+(0,-6mm)$)
-    {\includegraphics[width=186mm]{figures/out/cover_art.jpg}};
+  \node[inner sep=0pt] at ($(current page.center)+(0,-2mm)$)
+    {\includegraphics[width=152mm]{figures/out/cover_art.jpg}};
+  % the ribbon across the top left corner
+  \fill[coverred] ($(current page.north west)+(0,-15mm)$) -- ($(current page.north west)+(15mm,0)$)
+    -- ($(current page.north west)+(39mm,0)$) -- ($(current page.north west)+(0,-39mm)$) -- cycle;
+  \node[rotate=45, text=white, align=center, inner sep=0pt, font=\sffamily\fontsize{6.6}{7.6}\selectfont]
+    at ($(current page.north west)+(16.3mm,-16.3mm)$)
+    {Every figure in this book\\flown in the\\{\sansmedium\fontsize{8.5}{10}\selectfont SIMULATOR}};
   \node[anchor=north, inner sep=0pt, text=nightmuted] at ($(current page.south)+(0,62mm)$)
     {\sanscaps\addfontfeatures{LetterSpace=24}\scriptsize IDEA AND EDITING};
   \node[anchor=north, inner sep=0pt, text=nighttext] at ($(current page.south)+(0,55mm)$)
@@ -48,10 +53,7 @@ The same \emph{-stat} lives on in the workshop: the \emph{thermostat} holds a ro
 something still, which is a fair one-word definition of a controller. An \emph{anemostatos} holds \emph{itself}
 still against the wind: the quadrotor of this book, hovering through the gusts. (In Polish, \emph{anemostat}
 already names a humbler thing, the round grille in an office ceiling that spreads the air. Same roots,
-opposite job: it makes the draught; ours stands in it.)\par\medskip
-And the subtitle? The Greeks needed no machines to ride the wind. Hermes had golden sandals that carried
-him over the sea and the boundless earth \emph{ἅμα πνοιῇς ἀνέμοιο}, “together with the breath of the wind”
-(\emph{Odyssey} 5.46). Standing in the wind is the name; riding on it is what feedback makes possible.
+opposite job: it makes the draught; ours stands in it.)
 \end{minipage}
 \clearpage
 
@@ -61,7 +63,6 @@ him over the sea and the boundless earth \emph{ἅμα πνοιῇς ἀνέμο
 \vspace*{34mm}
 {\sanscaps\addfontfeatures{LetterSpace=32}\small\color{accent}A COURSE IN FEEDBACK CONTROL}\par\vspace{9mm}
 {\sansdisplay\addfontfeatures{LetterSpace=4}\fontsize{44}{48}\selectfont ANEMOSTATOS}\par\vspace{6mm}
-{\displayserif\itshape\fontsize{20}{25}\selectfont Riding on the wind}\par\vspace{4mm}
 {\displayserif\itshape\fontsize{13}{18}\selectfont\color{muted} From PID to learning, with the simulator of the same name}\par
 \vspace{26mm}
 \begin{minipage}{112mm}\centering\sffamily\small\color{muted}\linespread{1.2}\selectfont
@@ -81,7 +82,7 @@ where the idea lives, and ends with a story of the same idea at work in the real
 \thispagestyle{empty}
 \vspace*{\fill}
 \noindent\begin{minipage}{118mm}\sffamily\footnotesize\color{muted}\linespread{1.25}\selectfont
-\textbf{\color{ink}Anemostatos: Riding on the wind} — a course in feedback control, with the simulator of the same name.\par\medskip
+\textbf{\color{ink}Anemostatos} — a course in feedback control, with the simulator of the same name.\par\medskip
 Idea and editing: Wojciech Stelmaszewski. How the book and the simulator were made is told in the
 \hyperref[ch:colophon]{colophon}.\par\medskip
 The simulator, its lessons and the source code referenced throughout this book live at

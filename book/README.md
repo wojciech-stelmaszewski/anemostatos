@@ -1,4 +1,4 @@
-# Anemostatos: Riding on the wind — the book
+# Anemostatos — the book
 
 The course book that goes with the simulator. One chapter per lesson, with
 the same numbers and titles as the lesson panel of the app. The plan of the
@@ -11,7 +11,7 @@ Opus 5.5.
 ## Build
 
 ```sh
-make book           # LuaLaTeX, two passes → book/anemostatos-riding-on-the-wind.pdf
+make book           # LuaLaTeX, two passes → book/anemostatos.pdf
 ```
 
 It needs a TeX distribution with LuaLaTeX and the Libertinus and Fira

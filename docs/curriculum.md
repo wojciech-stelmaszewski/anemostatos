@@ -5,7 +5,7 @@
 > map of the whole programme; the part plans hold the detail.
 
 Anemostatos is one course in two forms: the simulator, and the book
-_Anemostatos: Riding on the wind_. This page says what the course is meant to teach, what it covers
+_Anemostatos_. This page says what the course is meant to teach, what it covers
 today, what is still missing, and in which order the missing pieces get
 built.
 
@@ -148,7 +148,7 @@ chapter that needs a new symbol adds it to that table.
 
 | Volume | Parts | Title                                                    | State                                   |
 | ------ | ----- | -------------------------------------------------------- | --------------------------------------- |
-| 1      | I–II  | _Anemostatos: Riding on the wind_ — from PID to learning | Part I written, Part II not yet         |
+| 1      | I–II  | _Anemostatos_ — from PID to learning | Part I written, Part II not yet         |
 | 2      | III   | analysis, robustness and the real loop                   | after the app's Part III                |
 | 3      | IV–V  | aerospace guidance, navigation and control, and practice | after the app's Parts IV–V              |
 | —      | all   | solutions to the exercises                               | collected by `\answer` during the build |

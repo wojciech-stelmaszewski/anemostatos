@@ -5,9 +5,10 @@ from rest and spiralling into the origin, where the controller wants it. One pet
 trajectories (several damping ratios, several release points) together with its mirror image; the
 petal is repeated eight times around the centre, like the pattern in a kaleidoscope.
 
-    python3 book/tools/cover_rosette.py   →   book/figures/out/cover_rosette.png
+    python3 book/tools/cover_rosette.py   →   book/figures/out/cover_rosette.jpg
 """
 
+from io import BytesIO
 from pathlib import Path
 
 import matplotlib
@@ -17,10 +18,12 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 from matplotlib.collections import LineCollection  # noqa: E402
 from matplotlib.colors import LinearSegmentedColormap  # noqa: E402
+from PIL import Image  # noqa: E402
 
-OUT = Path(__file__).resolve().parent.parent / "figures" / "out" / "cover_rosette.png"
+OUT = Path(__file__).resolve().parent.parent / "figures" / "out" / "cover_rosette.jpg"
 
 PETALS = 8
+NIGHT = "#0B0E13"  # the cover's black (colour `night` in the book style), so no transparency is needed
 # from the rim to the centre: deep indigo, teal, sea green, pale olive, and the app's orange at rest
 CMAP = LinearSegmentedColormap.from_list(
     "rosette", ["#2B2F5E", "#2E6F8E", "#3FA7A0", "#8CC9A0", "#D8E3A0", "#F2B24C", "#E8661A"])
@@ -46,7 +49,7 @@ def segments(x, y):
 
 
 def main():
-    fig = plt.figure(figsize=(8, 8), dpi=300)
+    fig = plt.figure(figsize=(8, 8), dpi=240, facecolor=NIGHT)
     ax = fig.add_axes([0, 0, 1, 1])
     ax.set_xlim(-1.08, 1.08)
     ax.set_ylim(-1.08, 1.08)
@@ -86,7 +89,9 @@ def main():
     for k, c in enumerate(["#2B2F5E", "#34407A", "#2E6F8E"]):
         rr = envelope(fold) * (1.0 - 0.012 * k)
         ax.plot(rr * np.cos(th), rr * np.sin(th), color=c, lw=1.1 - 0.3 * k, alpha=0.9)
-    fig.savefig(OUT, transparent=True)
+    buf = BytesIO()
+    fig.savefig(buf, format="png", facecolor=NIGHT)
+    Image.open(buf).convert("RGB").save(OUT, quality=90, optimize=True)
     print(f"wrote {OUT}")
 
 

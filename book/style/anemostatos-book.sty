@@ -205,6 +205,24 @@
   \end{scope}
 }
 
+% ---------------------------------------------------------------- chapter quotes
+% Every chapter may open with a quotation (book/front/quotes.tex). The key is the chapter's label
+% (1, II.2, A) or, for an unlabelled chapter, its title. Every quotation there is checked against
+% its source; a translation from another language says so.
+% \chapterquote{key}{quotation}{author}{source}
+\newcommand{\chapterquote}[4]{\csdef{anem@quote@#1}{\anem@printquote{#2}{#3}{#4}}}
+\newcommand{\anem@quote}[1]{\ifcsdef{anem@quote@#1}{\csuse{anem@quote@#1}}{}}
+\newcommand{\anem@printquote}[3]{%
+  \par\vspace*{-1mm}%
+  \noindent\hfill\begin{minipage}{104mm}\raggedleft
+    {\displayserif\itshape\fontsize{10.6}{14.2}\selectfont\color{ink}#1\par}%
+    \vspace{2.2mm}%
+    {\sanscaps\scriptsize\color{accent}#2\par}%
+    \vspace{0.6mm}%
+    {\sffamily\scriptsize\color{muted}#3\par}%
+  \end{minipage}\par
+  \vspace{7mm}}
+
 % ---------------------------------------------------------------- lesson opener
 % \lesson{label}{title}{subtitle}{level}{app id}{part tag}
 \newcommand{\lessonlevelname}[1]{%
@@ -239,6 +257,7 @@
       {\ttfamily\footnotesize\color{nightmuted}lesson id \color{accent}'#5'};
   \end{tikzpicture}%
   \vspace*{73mm}%
+  \anem@quote{#1}%
   \@afterindentfalse\@afterheading
 }
 
@@ -265,6 +284,7 @@
       {\sansthin\fontsize{40}{40}\selectfont #1};}
   \end{tikzpicture}%
   \vspace*{55mm}%
+  \ifstrempty{#1}{\anem@quote{#2}}{\anem@quote{#1}}%
   \@afterindentfalse\@afterheading
 }
 

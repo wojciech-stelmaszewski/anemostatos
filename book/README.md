@@ -58,6 +58,11 @@ book/
 
 - Every time series is flown by the simulator. No plot is drawn from a
   formula alone unless the caption says so.
+- Every chapter opens with a quotation from a mathematician or physicist,
+  kept in `front/quotes.tex` under the chapter's label (`\chapterquote`).
+  A new lesson needs one. Only real quotations, checked word for word against
+  the source text (a scan or the full text of the edition named), with the
+  source given; translations say so. Famous lines are often misquoted.
 - Signal colours are the app's colours (`style/anemostatos-book.sty`).
 - A number attributed to the simulator comes from an experiment in
   `scripts/book-data.ts`. Figures that draw a formula over a flight live in

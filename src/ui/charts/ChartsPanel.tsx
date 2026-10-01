@@ -32,6 +32,7 @@ const EXTRA: { value: ExtraChart; label: string }[] = [
   { value: 'attitude', label: 'attitude estimate' },
   { value: 'dispersion', label: 'Monte Carlo campaign' },
   { value: 'fault', label: 'after a rotor loss' },
+  { value: 'fdi', label: 'fault detection' },
 ];
 /** What can stand in the motor chart's place. */
 const SECOND: { value: AnalysisChart | 'motors'; label: string }[] = [
@@ -41,6 +42,9 @@ const SECOND: { value: AnalysisChart | 'motors'; label: string }[] = [
   { value: 'poles', label: 'pole map' },
   { value: 'covariance', label: 'filter uncertainty' },
 ];
+/** The two tests of the fault monitor (lesson III.28). */
+const NIS: SeriesSpec[] = [{ key: 'fdi.nis', label: 'NIS', color: SIGNAL.measurement, width: 2 }];
+const CUSUM: SeriesSpec[] = [{ key: 'fdi.cusum', label: 'CUSUM', color: SIGNAL.error, width: 2 }];
 /** After a rotor loss: how far the thrust axis is from where it should point. */
 const FAULT: SeriesSpec[] = [
   { key: 'fault.tiltErr', label: 'thrust-axis error', color: SIGNAL.error, width: 2 },
@@ -115,7 +119,8 @@ export function ChartsPanel() {
     extra === 'lyapunov' ||
     extra === 'mimo' ||
     extra === 'spectrum' ||
-    extra === 'dispersion';
+    extra === 'dispersion' ||
+    extra === 'fdi';
   const ctrlKey = useParams((s) => controllerKey(s.params));
   const loopOptions = useMemo(
     () => loopsFor(useParams.getState().params).map((l) => ({ value: l.id, label: l.name })),
@@ -243,7 +248,37 @@ export function ChartsPanel() {
         {/* An analysis view needs height: it takes the whole right column, both rows. */}
         {tall ? (
           <div className="row-span-2 min-h-0">
-            {extra === 'lyapunov' ? <PhasePortrait meta={meta} lyapunov /> : analysisChart(extra)}
+            {extra === 'lyapunov' ? (
+              <PhasePortrait meta={meta} lyapunov />
+            ) : extra === 'fdi' ? (
+              <div className="flex h-full min-h-0 flex-col gap-1.5">
+                <div className="min-h-0 flex-1">
+                  <TimeChart
+                    title="Altimeter: NIS over the window (shaded: alarm)"
+                    series={NIS}
+                    shadeKey="fdi.altAlarm"
+                    includeZero
+                    hlines={() => [
+                      { value: sim.params.control.fdi.nisThreshold, label: 'high' },
+                      { value: sim.params.control.fdi.nisLow, label: 'low' },
+                    ]}
+                  />
+                </div>
+                <div className="min-h-0 flex-1">
+                  <TimeChart
+                    title="Motors: largest CUSUM"
+                    unit="N·m·s"
+                    series={CUSUM}
+                    includeZero
+                    hlines={() => [
+                      { value: sim.params.control.fdi.cusumThreshold, label: 'alarm' },
+                    ]}
+                  />
+                </div>
+              </div>
+            ) : (
+              analysisChart(extra)
+            )}
           </div>
         ) : (
           <InfoCard meta={meta} />

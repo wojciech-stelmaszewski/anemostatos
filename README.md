@@ -152,6 +152,8 @@ motor lag.
 | III.20 | Ghost frequencies          | L3    | aliasing: rotor vibration sampled too slowly becomes a wobble no filter removes     |
 | III.21 | Notch the noise            | L3    | low-pass, notch and RPM-tracking notch: what each costs in phase margin             |
 | III.22 | Where is up?               | L3    | attitude from gyro and accelerometer: complementary and Mahony filters in a turn    |
+| III.27 | Three rotors left          | L3    | losing a rotor: rank 4 → 3, give up yaw, spin, and lead the lag                     |
+| III.28 | Notice that it broke       | L3    | fault detection: a two-sided χ² test, a CUSUM that names the motor, in time         |
 | III.29 | One flight proves nothing  | L3    | Monte Carlo: 300 dispersed flights, the failing corner, a pass rate with confidence |
 | III.30 | The robustness report card | L1–L3 | margins, Monte Carlo and RMS for every controller: fast is not robust               |
 

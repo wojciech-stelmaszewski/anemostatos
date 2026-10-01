@@ -31,6 +31,8 @@ export class FaultTolerantController implements Controller {
   private held: Actuation = idleActuation();
   private integral = v3();
   private last = { tilt: 0, spin: 0, thrust: 0, err: 0 };
+  /** The position loop's terms per axis, for the charts once the three-motor law flies. */
+  private posTerms: Record<'x' | 'y' | 'z', LoopTerms> | null = null;
 
   constructor(p: Params) {
     this.cascade = new CascadeController(p);
@@ -45,6 +47,7 @@ export class FaultTolerantController implements Controller {
     this.lost = -1;
     this.held = idleActuation();
     this.integral = v3();
+    this.posTerms = null;
   }
 
   resetIntegrators(): void {
@@ -53,7 +56,8 @@ export class FaultTolerantController implements Controller {
   }
 
   /** The motor the fault source reports as lost, or −1. */
-  private source(p: Params): number {
+  private source(p: Params, input: ControlInput): number {
+    if (p.control.fault.source === 'monitor') return input.fdi?.motor ?? -1;
     const eff = p.drone.motorEfficiency;
     for (let i = 0; i < 4; i++) if (eff[i]! < 0.5) return i;
     return -1;
@@ -61,7 +65,7 @@ export class FaultTolerantController implements Controller {
 
   tick(input: ControlInput): Actuation {
     const P = input.params;
-    if (this.lost < 0) this.lost = this.source(P);
+    if (this.lost < 0) this.lost = this.source(P, input);
     if (this.lost < 0) return this.cascade.tick(input);
 
     const f = P.control.fault;
@@ -81,6 +85,26 @@ export class FaultTolerantController implements Controller {
       clamp(this.integral.z, -iLim, iLim),
     );
     let a = add(add(scale(ep, f.posKp), scale(s.vel, -f.posKd)), scale(this.integral, f.posKi));
+    const sp = input.setpoint.pos;
+    const terms = (k: 'x' | 'y' | 'z'): LoopTerms => {
+      const p = f.posKp * ep[k];
+      const d = -f.posKd * s.vel[k];
+      const i = f.posKi * this.integral[k];
+      return {
+        setpoint: sp[k],
+        measurement: s.pos[k],
+        error: ep[k],
+        parts: [
+          { key: 'p', label: 'P', value: p, like: 'p' },
+          { key: 'i', label: 'I', value: i, like: 'i' },
+          { key: 'd', label: 'D (on velocity)', value: d, like: 'd' },
+        ],
+        unsaturated: p + i + d,
+        output: p + i + d,
+        saturated: false,
+      };
+    };
+    this.posTerms = { x: terms('x'), y: terms('y'), z: terms('z') };
     a = add(a, v3(0, GRAVITY, 0));
     a = v3(a.x, Math.max(a.y, 0.3 * GRAVITY), a.z);
     const hMax = a.y * Math.tan((f.maxTiltDeg * Math.PI) / 180);
@@ -132,7 +156,15 @@ export class FaultTolerantController implements Controller {
   }
 
   loops(): Record<string, LoopTerms> {
-    return this.cascade.loops();
+    const cascade = this.cascade.loops();
+    if (!this.posTerms) return cascade;
+    // After the fault the cascade no longer runs: its position loops would stand still.
+    return {
+      ...cascade,
+      'pos.x': this.posTerms.x,
+      'pos.y': this.posTerms.y,
+      'pos.z': this.posTerms.z,
+    };
   }
 
   extras(): Record<string, number> {

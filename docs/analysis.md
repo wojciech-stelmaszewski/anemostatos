@@ -2,9 +2,9 @@
 
 > **Status (2026-10-01):** M13 (the foundations) and the first pass of M14
 > (lessons III.1–III.5), M15 (III.7, III.9), M16 (III.11, III.12), M17
-> (III.20–III.22) and M18 (III.29, III.30) are implemented: all thirteen
-> **must** lessons. §5 lists what was built and where it differs from this
-> plan. The second passes of M14–M18 are planned.
+> (III.20–III.22) and M18 (III.27–III.30) are implemented: all thirteen
+> **must** lessons and Chapter J complete. §5 lists what was built and where
+> it differs from this plan. The second passes of M14–M17 are planned.
 > Milestones in [roadmap.md](roadmap.md) point here.
 > Extended on 2026-09-30 from 20 to 30 lessons, so that Parts I–III together
 > cover the analysis and robustness material of a graduate control course
@@ -783,7 +783,43 @@ loop (PID and INDI).
   margins: they are not linear time-invariant loops, so the card shows a
   dash and only the Monte Carlo row speaks for them.
 
-**Still to build:** III.27 (three rotors) and III.28 (fault detection).
+**Built (2026-10-01): III.27 and III.28.** M18 is complete.
+
+- The prototype of §7 confirmed the risk: with `angularDamping` 0.002 a
+  drone on three rotors spins at 78 rad/s and cannot be held. A separate
+  `drone.yawDamping` (default 0.002, so nothing earlier changes) stands for
+  the rotor drag in yaw; the lessons use 0.012, a spin of 13 rad/s, which
+  the student predicts as $c_\tau m g / k_{yaw}$.
+- `control/fault.ts`: the cascade until the fault, then a position PID,
+  a reduced-attitude law on the direction of the thrust axis with the
+  gyroscopic coupling cancelled, and an exact solve for thrust and the
+  two torques on the three working motors. Yaw is given up. In the spinning
+  body every lag turns the torque, so the law commands it ahead by
+  $\arctan(\Omega\tau_m) + \Omega\,\tau_{delay}$; without that lead it
+  falls, which is the second step of III.27. It holds within 0.15 m for any
+  motor lost, survives 10 ms of sensor delay and falls at 20 ms: the
+  lesson says so. INDI was not needed; a design in the spinning frame
+  [Mueller 2014] would widen the margin and is left for later.
+- The info card shows the rank of the control effectiveness, 4 then 3.
+- `estimation/fdi.ts`: a fault monitor with two tests. The altimeter: a
+  vertical Kalman filter (the L1 filter, now reporting its NIS) and the
+  NIS summed over a window. The plan's one-sided test cannot see a stuck
+  sensor: the filter believes it and follows it. The test is two-sided:
+  a stuck sensor has stopped being noisy and its NIS sum falls below the
+  lower χ² tail. The motors: the torque the gyro shows against the torque
+  the rotor telemetry promises, filtered alike, and a CUSUM per motor
+  along its arm, which also isolates the motor.
+- `sensors.posStuck` repeats the last fix at the sensor's rate and calls it
+  fresh. III.28 samples position at 20 Hz: at 1 kHz a window of fixes
+  spans milliseconds, the innovations are correlated and the sum is not
+  χ².
+- The monitor can report the lost motor to the fault-tolerant mode
+  (`control.fault.source`). The rotor loss is a cliff: told within 40 ms
+  the drone loses under a metre, within 80 ms it reaches the ground. The
+  goal asks for 50 ms and no drop below 3 m, and the stuck sensor within
+  1 s, with no false alarm in the healthy minutes. The plan's motor at
+  60 % became the propeller loss of III.27, so that the two lessons form
+  one chain: detect, isolate, reconfigure.
 
 First pass: the dispersion view, Monte Carlo campaigns in the arena, the
 robustness report card, and `make bench` printing margins and pass rates

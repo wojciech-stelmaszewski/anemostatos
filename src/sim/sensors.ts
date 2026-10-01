@@ -169,8 +169,12 @@ export class Sensors {
       pos = clone(this.heldPos); // sample-and-hold between position fixes
       posFresh = false;
     } else {
-      pos = noisy(truth.pos, p.posNoise);
-      pos.y += p.altBias;
+      if (p.posStuck && this.lastPos) {
+        pos = clone(this.lastPos); // a new fix, at the usual rate, that repeats the old one
+      } else {
+        pos = noisy(truth.pos, p.posNoise);
+        pos.y += p.altBias;
+      }
       if (p.posRateHz > 0) {
         this.heldPos = clone(pos);
         this.nextPosT = (Math.floor(t * p.posRateHz + 1e-6) + 1) / p.posRateHz;

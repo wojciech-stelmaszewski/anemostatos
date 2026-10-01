@@ -2,6 +2,7 @@ import type { Vec3 } from '@/math/vec3';
 import type { Actuation } from '@/sim/dynamics';
 import type { Params } from '@/sim/params';
 import type { Measurement } from '@/sim/sensors';
+import type { FdiState } from '@/estimation/fdi';
 import type { PidTerms } from './pid';
 
 export interface Setpoint {
@@ -27,6 +28,8 @@ export interface ControlInput {
    * setpoint if there is no plan). Lets predictive controllers look ahead.
    */
   preview?: (tau: number) => Vec3;
+  /** The fault monitor's verdict, if the simulation runs one (L3). */
+  fdi?: FdiState;
 }
 
 /** One named additive contribution to a loop's output (P, I, D, −K·x, −f̂/b₀, …). */

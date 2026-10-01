@@ -19,6 +19,7 @@ import { zoneDistance } from '@/sim/world';
 import { Wind } from '@/sim/wind';
 import { probeSignal } from './probe';
 import { profileOffset, zeroReference, type Reference } from './reference';
+import { FaultMonitor } from '@/estimation/fdi';
 import { Tap } from './tap';
 import { Telemetry } from './telemetry';
 
@@ -70,6 +71,8 @@ export class Simulation {
   telemetry = new Telemetry(HISTORY_SECONDS * TELEMETRY_HZ);
   /** The last eight seconds of the gyro and one motor command at the physics rate, for spectra. */
   tap = new Tap();
+  /** The fault monitor of the flight computer (L3, lesson III.28). */
+  fdi = new FaultMonitor();
   /** A frozen earlier run, overlaid on the charts for comparison. */
   ghost: { telemetry: Telemetry; label: string } | null = null;
   /** A lesson's script: run after every reset to (re)schedule its events. */
@@ -182,6 +185,7 @@ export class Simulation {
     this.armed = true;
     this.measurement = null;
     this.tap.reset();
+    this.fdi.reset();
     this.script?.(this);
     for (const fn of this.resetListeners) fn();
   }
@@ -341,6 +345,7 @@ export class Simulation {
         stepIndex: this.stepIndex,
         sense: () => (this.measurement = this.sensors.read(p.sensors, dt, this.t)),
         preview: (tau) => this.previewAt(tau, exact),
+        fdi: this.level === 3 ? this.fdi.state : undefined,
       });
       // Measured only for display; wall-clock time never feeds back into the simulation.
       this.cpuSum += performance.now() - t0;
@@ -349,6 +354,23 @@ export class Simulation {
       this.actuation = idleActuation();
     }
     if (probing) this.injectProbe(probeIn);
+    if (this.level === 3 && this.measurement) {
+      const s = p.sensors;
+      this.fdi.update(
+        this.measurement,
+        this.measurement.q,
+        p.drone,
+        {
+          accSigma: Math.max(s.accNoise, 0.05),
+          posSigma: Math.max(s.posNoise, 0.005),
+          biasSigma: 0.01,
+        },
+        p.control.fdi,
+        GRAVITY,
+        dt,
+        this.armed && !this.state.landed && !this.takingOff,
+      );
+    }
     if (this.level === 3) {
       const deg = 180 / Math.PI;
       const seen = this.measurement?.omega.x ?? 0;
@@ -436,6 +458,13 @@ export class Simulation {
     tl.set('wind.speed', length(this.wind.velocity));
     tl.set('gust', length(this.wind.gustVelocity));
     tl.set('drag.y', this.forces.drag.y);
+    if (this.level === 3) {
+      const f = this.fdi.state;
+      tl.set('fdi.nis', f.nis);
+      tl.set('fdi.altAlarm', f.altAlarm ? 1 : 0);
+      tl.set('fdi.cusum', Math.max(...f.cusum));
+      tl.set('fdi.motor', f.motor + 1);
+    }
     if (this.level === 3 && this.params.sensors.attitude !== 'truth') {
       const f = this.sensors.ahrs;
       tl.set('ahrs.err', tiltError(s.q, f.q) * DEG);

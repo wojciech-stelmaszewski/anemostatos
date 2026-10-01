@@ -7,6 +7,8 @@ import { add, eye, mul, mulAll, solve, sub, transpose, type Mat } from '@/math/m
 export class KalmanFilter {
   x: Mat;
   p: Mat;
+  /** Normalised innovation squared of the last scalar update, νᵀS⁻¹ν (NaN before any). */
+  nis = NaN;
 
   constructor(x0: Mat, p0: Mat) {
     this.x = x0;
@@ -24,6 +26,7 @@ export class KalmanFilter {
     const ht = transpose(h);
     const innovation = sub(z, mul(h, this.x));
     const s = add(mulAll(h, this.p, ht), r);
+    if (s.length === 1) this.nis = innovation[0]![0]! ** 2 / s[0]![0]!;
     // K = P Hᵀ S⁻¹, computed as (S⁻¹ H P)ᵀ since S and P are symmetric.
     const k = transpose(solve(s, mul(h, this.p)));
     this.x = add(this.x, mul(k, innovation));
@@ -80,6 +83,11 @@ export class AltitudeKalman {
   /** 1σ of state i: 0 altitude, 1 velocity, 2 accelerometer bias, 3 altimeter bias. */
   sigma(i: 0 | 1 | 2 | 3): number {
     return i < this.dim ? this.kf.sigma(i) : NaN;
+  }
+
+  /** Normalised innovation squared of the last altimeter fix. */
+  get nis(): number {
+    return this.kf.nis;
   }
   /** Number of states: 3, or 4 with the altimeter bias. */
   get states(): number {

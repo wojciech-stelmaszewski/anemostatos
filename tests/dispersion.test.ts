@@ -53,7 +53,8 @@ describe('a Monte Carlo campaign of lesson III.29', () => {
   beforeAll(() => {
     nominal = runDispersionCampaign(setup());
     retuned = runDispersionCampaign(tuned);
-  }, 240_000);
+    // Two campaigns of 300 flights: about a minute alone, several on a busy machine.
+  }, 900_000);
 
   it('the nominal flight passes, and a few per cent of the campaign does not', () => {
     const sim = new Simulation(setup());

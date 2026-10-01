@@ -82,6 +82,8 @@ const turnExcess = (p: Params): number => {
   return (Math.hypot(1, a / GRAVITY) - 1) * 100;
 };
 
+/** The faults of lesson III.28 and the end of its flight, s. */
+const FDI = { stuck: 20, unstuck: 25, healthyAgain: 28, rotor: 40, end: 44 };
 /** When lesson III.27 takes the propeller off motor 2, s. */
 const ROTOR_LOSS_S = 5;
 /** Spin rate on three rotors: the yaw torque of two diagonal motors carrying m·g, over the drag. */
@@ -1068,6 +1070,113 @@ export const PART_THREE: Lesson[] = [
           slower than the controller believes. That is why the law leads by the sensor delay as
           well, why research controllers for this case are designed in the spinning frame, and why a
           drone with more yaw drag (bigger, slower rotors) is easier to save: it spins slower.
+        </Notice>
+      </>
+    ),
+  },
+  {
+    id: 'fdi',
+    n: 28,
+    part: 3,
+    chapter: J,
+    title: 'Notice that it broke',
+    level: 3,
+    chart: 'fdi',
+    loop: 'pos.y',
+    setup: (p) => {
+      p.setpoint.y = 5;
+      p.sensors.posNoise = 0.03;
+      p.sensors.accNoise = 0.3;
+      p.sensors.gyroNoise = 0.5;
+      p.sensors.posRateHz = 20;
+      p.drone.yawDamping = 0.012;
+      p.control.fault = { ...p.control.fault, enabled: true, leadLag: true, source: 'monitor' };
+      p.control.fdi = {
+        nisWindow: 10,
+        nisThreshold: 45,
+        nisLow: 0,
+        cusumDrift: 0.02,
+        cusumThreshold: 0.2,
+      };
+    },
+    events: (sim) => {
+      setAt(sim, FDI.stuck, 'sensors.posStuck', true);
+      setAt(sim, FDI.unstuck, 'sensors.posStuck', false);
+      setAt(sim, FDI.rotor, 'drone.motorEfficiency', [1, 0, 1, 1]);
+    },
+    goal: {
+      text: 'Tune the fault monitor so that it flags the stuck position sensor within 1 s, names the lost motor within 50 ms, raises no false alarm in the healthy minutes, and the drone never drops below 3 m.',
+      check: ({ sim }) => {
+        if (sim.state.crashed) return 'crashed: the rotor loss was found too late. Press R';
+        if (sim.t < FDI.end) return sim.t < FDI.stuck ? 'healthy flight…' : 'faults coming…';
+        const { t, series } = sim.telemetry.window(['fdi.altAlarm', 'fdi.motor'], 0);
+        const first = (k: number, from: number, to: number) => {
+          for (let i = 0; i < t.length; i++)
+            if (t[i]! >= from && t[i]! < to && series[k]![i]! > 0) return t[i]!;
+          return NaN;
+        };
+        // Healthy: after take-off until the sensor sticks, and from when the jump back to the
+        // truth has left the window until the rotor goes.
+        const falseAlt = Math.min(
+          first(0, 3, FDI.stuck) || Infinity,
+          first(0, FDI.healthyAgain, FDI.rotor) || Infinity,
+        );
+        if (Number.isFinite(falseAlt))
+          return `false alarm on the altimeter at ${falseAlt.toFixed(1)} s`;
+        const falseMotor = first(1, 0, FDI.rotor);
+        if (Number.isFinite(falseMotor)) return `false motor alarm at ${falseMotor.toFixed(1)} s`;
+        const alt = first(0, FDI.stuck, FDI.unstuck);
+        if (!(alt - FDI.stuck <= 1))
+          return Number.isNaN(alt)
+            ? 'the stuck sensor was never flagged'
+            : `stuck sensor flagged after ${(alt - FDI.stuck).toFixed(2)} s`;
+        const motor = first(1, FDI.rotor, FDI.end);
+        if (!(motor - FDI.rotor <= 0.05))
+          return `rotor loss named after ${((motor - FDI.rotor) * 1000).toFixed(0)} ms`;
+        const heights = sim.telemetry.window(['pos.y'], FDI.rotor).series[0]!;
+        const low = Math.min(...heights.filter((v) => !Number.isNaN(v)));
+        return low >= 3 || `the drone dropped to ${low.toFixed(1)} m before it recovered`;
+      },
+    },
+    solution: (p) => {
+      p.control.fdi.nisLow = 0.8;
+      p.control.fdi.cusumThreshold = 0.008;
+    },
+    body: (
+      <>
+        <p>
+          Two faults are on the way. At 20 s the position sensor sticks: it keeps sending fixes, all
+          the same, and says they are fresh. At 40 s motor 2 loses its propeller, and the
+          fault-tolerant mode of III.27 can save the drone only if someone tells it which motor,
+          fast. Here that someone is a <b>fault monitor</b> with two tests.
+        </p>
+        <p>
+          <b>The altimeter.</b> A Kalman filter predicts each fix from the accelerometer. If the
+          sensor is healthy, the normalised innovations <M>{'\\nu^2/S'}</M> are independent and
+          their sum over <M>{'N'}</M> fixes follows a <M>{'\\chi^2_N'}</M> distribution: mean{' '}
+          <M>{'N'}</M>, rarely far from it. Too large means the sensor or the filter is wrong.
+        </p>
+        <p>
+          <b>The motors.</b> The gyro shows how the body accelerates; the motor telemetry says what
+          torque the rotors should make. A propeller that is gone leaves a torque missing in the
+          direction of its arm. A <b>CUSUM</b> per motor adds up that residual, minus a drift that
+          absorbs the noise, and calls the motor lost when the sum passes a threshold.
+        </p>
+        <Try>
+          Watch both charts through the whole flight. The stuck sensor is not flagged: the filter
+          believes it and follows it, so its innovations do not grow. What does change? Then the
+          rotor goes, the CUSUM crosses its line late, and the drone falls a long way before the
+          fault-tolerant mode takes over. Tune <b>Fault monitor</b>, press <b>R</b>, and look for
+          false alarms in the healthy minutes as you lower the thresholds.
+        </Try>
+        <Notice>
+          A stuck sensor betrays itself by being too quiet: the innovations of a sensor that has
+          stopped being noisy are too small for its noise, and the χ² test has a lower tail as well
+          as an upper one. Every threshold is a trade between the delay to detect and the rate of
+          false alarms, and the numbers are not free: a test on each of 20 fixes a second is 72 000
+          tests an hour, so a one-in-a-thousand false alarm rings more than once a minute. The time
+          to detect is part of the design: named within 40 ms, the rotor loss costs the drone less
+          than a metre of height; within 80 ms, all five.
         </Notice>
       </>
     ),

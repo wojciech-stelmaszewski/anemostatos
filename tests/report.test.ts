@@ -15,7 +15,8 @@ describe('the robustness report card', () => {
 
   beforeAll(() => {
     rows = buildReport([pick(1, 'pid'), pick(3, 'pid'), pick(3, 'geo-indi'), pick(3, 'policy')]);
-  }, 120_000);
+    // About fifteen seconds alone; much longer on a busy machine.
+  }, 600_000);
 
   it('the measured margins of the PID loops are the ones the models predict', () => {
     // L1: the altitude loop of lessons III.1–III.4.

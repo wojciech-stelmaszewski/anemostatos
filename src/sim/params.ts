@@ -67,6 +67,8 @@ export interface SensorParams {
   motorFeedback: boolean;
   /** The position sensor delivers no new fixes (the last one is held). */
   posDropout: boolean;
+  /** The position sensor is stuck: it repeats its last fix and says it is fresh. */
+  posStuck: boolean;
   /** The gyro is mounted rotated about the body's up-axis by this angle, degrees (L3). */
   imuYawDeg: number;
   /** Sample rate of the gyro and accelerometer, Hz; readings are held in between. 0 = every step. */
@@ -96,6 +98,20 @@ export interface FaultParams {
   maxTiltDeg: number;
   /** Command the torque ahead of the motor lag in the spinning body. */
   leadLag: boolean;
+  /** Who says which motor is lost: the truth (an oracle) or the fault monitor's CUSUM. */
+  source: 'oracle' | 'monitor';
+}
+
+/** The fault monitor (src/estimation/fdi.ts, lesson III.28). */
+export interface FdiParams {
+  /** NIS of the altimeter summed over this many fixes, and its alarm level. */
+  nisWindow: number;
+  nisThreshold: number;
+  /** Alarm also when the NIS sum is too small: a sensor that has stopped being noisy. */
+  nisLow: number;
+  /** CUSUM of the motor torque residual: tolerated deviation, N·m, and alarm level, N·m·s. */
+  cusumDrift: number;
+  cusumThreshold: number;
 }
 
 /** Settings of the attitude filters (src/estimation/attitude.ts). */
@@ -183,6 +199,7 @@ export interface ControlParams {
   gyroFilter: GyroFilterParams;
   ahrs: AhrsParams;
   fault: FaultParams;
+  fdi: FdiParams;
   l1: { kind: L1Kind; estimator: L1Estimator };
   /** L1 LQR / LQI (docs/beyond-pid.md §4). Cost weights of J = Σ (q·x² + r·u²)·dt. */
   lqr: {
@@ -405,6 +422,7 @@ export const defaultParams = (): Params => ({
     posRateHz: 0,
     motorFeedback: true,
     posDropout: false,
+    posStuck: false,
     imuYawDeg: 0,
     imuRateHz: 0,
     aaFilterHz: 0,
@@ -427,7 +445,9 @@ export const defaultParams = (): Params => ({
       rateKp: 40,
       maxTiltDeg: 30,
       leadLag: false,
+      source: 'oracle',
     },
+    fdi: { nisWindow: 10, nisThreshold: 45, nisLow: 0, cusumDrift: 0.02, cusumThreshold: 0.02 },
     l1: { kind: 'pid', estimator: 'none' },
     lqr: { qPos: 100, qVel: 10, qInt: 5, r: 1, integral: false, lagState: false },
     adrc: { wc: 3, wo: 15 },

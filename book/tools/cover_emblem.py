@@ -3,14 +3,14 @@
 The loop is the block diagram of the book bent into a circle: the reference r comes in from the
 left to the summing junction, the forward path runs over the top through the plant (a quadrotor,
 seen from above), the output y is picked off on the right and the feedback path, in orange, runs
-back underneath to the minus sign. Around it the wind is drawn as the exact streamlines of
-potential flow past a cylinder, psi = U y (1 - a^2 / r^2): they part ahead of the loop and close
-behind it, and the dividing streamline is the signal itself, r on the way in and y on the way out.
+back underneath to the minus sign. Around it the wind is drawn as a delicate vector field, the
+exact velocity of potential flow past a cylinder: it slows ahead of the loop, hurries past its
+sides and closes behind it, and the dividing streamline is the signal itself, r on the way in
+and y on the way out.
 
     python3 book/tools/cover_emblem.py   →   book/figures/out/cover_emblem.pdf
 """
 
-import contourpy
 import numpy as np
 
 from figlib import OUT, plt
@@ -27,26 +27,34 @@ WIND = "#7D93B5"
 ACCENT = "#E8661A"
 
 
-def streamlines(ax):
-    x = np.linspace(-6, W + 6, 900)
-    y = np.linspace(-6, H + 6, 720)
-    X, Y = np.meshgrid(x, y)
-    xr, yr = X - CX, Y - CY
-    r2 = np.maximum(xr**2 + yr**2, 1e-6)
-    psi = yr * (1 - A**2 / r2)
-    psi[r2 < A**2] = np.nan
-    gen = contourpy.contour_generator(x, y, psi)
-    step = 5.2
-    for k in range(-15, 16):
-        if k == 0:
-            continue
-        level = k * step
-        for line in gen.lines(level):
-            # fainter far from the loop, so the eye goes to the middle
-            d = abs(level) / (15 * step)
-            alpha = 0.62 * (1 - d) ** 1.6 + 0.08
-            ax.plot(line[:, 0], line[:, 1], color=WIND, lw=0.42, alpha=alpha, solid_capstyle="round",
-                    zorder=1)
+def vector_field(ax):
+    """The wind as a delicate vector field: a short thin arrow on every node of a staggered grid,
+    pointing along the flow, as long as the wind is fast. The velocity of potential flow past a
+    cylinder is u - iv = U (1 - a^2 / z^2), with z measured from the centre of the loop."""
+    step = 5.4
+    pts = []
+    for j, yy in enumerate(np.arange(-2, H + 2, step * np.sqrt(3) / 2)):
+        for xx in np.arange(-2 + (step / 2) * (j % 2), W + 2, step):
+            pts.append((xx, yy))
+    P = np.array(pts)
+    z = (P[:, 0] - CX) + 1j * (P[:, 1] - CY)
+    r = np.abs(z)
+    keep = (r > A + 2.0) & ~((np.abs(P[:, 1] - CY) < 2.4) & (np.abs(P[:, 0] - CX) > A))
+    P, z, r = P[keep], z[keep], r[keep]
+    w = 1 - A**2 / z**2                       # u - iv, for U = 1
+    u, v = w.real, -w.imag
+    length = 3.1                              # mm for the free-stream wind
+    # fainter far from the loop, so the eye goes to the middle
+    alpha = 0.16 + 0.62 * np.exp(-(((r - A) / 62) ** 2))
+    # and dissolving towards the top and bottom of the band, so the field has no edge
+    edge = np.clip(np.minimum(P[:, 1], H - P[:, 1]) / 26, 0, 1)
+    alpha *= edge * edge * (3 - 2 * edge)
+    rgba = np.zeros((len(P), 4))
+    rgba[:, :3] = [int(WIND[i:i + 2], 16) / 255 for i in (1, 3, 5)]
+    rgba[:, 3] = alpha
+    ax.quiver(P[:, 0], P[:, 1], u * length, v * length, color=rgba, angles="xy", scale_units="xy",
+              scale=1, pivot="mid", units="xy", width=0.13, headwidth=4.2, headlength=4.6,
+              headaxislength=4.0, minshaft=1.5, zorder=1)
     # the dividing streamline is the signal: r in, y out
     ax.plot([-6, CX - R - J], [CY, CY], color=INK, lw=0.7, zorder=3)
     ax.plot([CX + R, W + 6], [CY, CY], color=INK, lw=0.7, zorder=3)
@@ -97,7 +105,7 @@ def main():
     fig.patch.set_alpha(0)
     ax.patch.set_alpha(0)
 
-    streamlines(ax)
+    vector_field(ax)
 
     # the loop: forward path over the top (through the plant), feedback underneath in orange
     gap = np.degrees(15.0 / R)          # room for the quadrotor at the top

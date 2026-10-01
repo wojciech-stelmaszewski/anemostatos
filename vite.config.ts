@@ -13,7 +13,9 @@ export default defineConfig({
   test: {
     include: ['tests/**/*.test.ts'],
     environment: 'node',
-    // Lesson tests fly tens of simulated seconds of MPC; the 5 s default is too tight when files run in parallel.
-    testTimeout: 30_000,
+    // Lesson tests fly tens of simulated seconds of MPC, Monte Carlo campaigns and sweeps. Alone
+    // the slowest takes about 15 s; on a loaded machine, with files in parallel, several times that.
+    // A timeout is not a failed assertion, so the limit is generous.
+    testTimeout: 120_000,
   },
 });

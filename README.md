@@ -153,6 +153,10 @@ motor lag.
 | III.11 | How wrong can I be?           | L1    | a family of plants, the small-gain test, and sixty drones flown to check it                             |
 | III.12 | One loop at a time lies       | L3    | roll and pitch as one loop: singular values, eigen-loops and the disk margin                            |
 | III.13 | Design for the worst          | L1    | H∞ loop shaping: choose the shape, two Riccati equations give the margin ε_max                          |
+| III.14 | Uncertainty has structure     | L1    | μ with a disk per parameter: more pessimistic than one disk, but it says which range costs the margin   |
+| III.15 | Slide to the target           | L1    | sliding mode: rejects any load below k, chatters; a boundary layer trades chatter for a predictable sag |
+| III.16 | One step at a time            | L1    | backstepping through the motor lag: gains with a Lyapunov proof; slow motors no PD can handle           |
+| III.17 | Learning can diverge          | L1    | MRAC: the Lyapunov law adapts, then drifts when the delay it ignored is there; σ-modification stops it  |
 | III.18 | How slow can you go?          | L3    | loop rate and phase: each halving costs more; jitter as half a delay; a motor rate limit                |
 | III.19 | The computer cannot count     | L1    | a quantised altimeter: the drone rests between two steps and dithers, as a describing function predicts |
 | III.20 | Ghost frequencies             | L3    | aliasing: rotor vibration sampled too slowly becomes a wobble no filter removes                         |

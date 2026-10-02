@@ -1,10 +1,9 @@
 # Part III — Why It Works
 
-> **Status (2026-10-01):** M13 (the foundations) and the first pass of M14
-> (lessons III.1–III.5), M15 (III.7, III.9), M16 (III.11, III.12), M17
-> (III.20–III.22) and M18 (III.27–III.30) are implemented, with III.10 and III.13
-> of the second pass: all thirteen **must** lessons and Chapter J complete. §5 lists what was built and where
-> it differs from this plan. The second passes of M14–M17 are planned.
+> **Status (2026-10-02):** Part III is complete in the app: all thirty lessons,
+> M13–M18. §5 lists what each milestone built and where it differs from this
+> plan; where a claim of the plan did not hold in the simulator, the lesson
+> teaches what the numbers showed instead.
 > Milestones in [roadmap.md](roadmap.md) point here.
 > Extended on 2026-09-30 from 20 to 30 lessons, so that Parts I–III together
 > cover the analysis and robustness material of a graduate control course
@@ -748,7 +747,54 @@ the Kalman filter; covariance chart; LQG margin measurement.
   lesson's goal is ≥ 3.2 Hz with |W·T| < 1. The measured phase margin is
   within a few degrees of 2·arcsin ε_max.
 
-**Still to build:** III.14–III.17 (μ, sliding mode, backstepping, MRAC).
+**Built (2026-10-02, by parallel agents): III.14–III.17.** M16 is complete.
+
+- III.14 (`analysis/mu.ts`): the family of III.11 split into three loop
+  factors (mass, motor lag, sensor delay), each with its own weight; an
+  upper bound of complex μ by diagonal scaling, and of mixed μ with the
+  mass as a real parameter (D–G scaling); the truth from a 7 × 7 × 4 grid.
+  The plan's claim ("the small-gain test rejects a design that every
+  sampled plant flies; μ accepts it") does not hold for this family: the
+  small-gain test of III.11 measures its weight on the real members and
+  is nearly exact, while a disk per parameter is a poor fit to the arc of
+  a delay. At Kp 30, Kd 25: small gain 1.11, complex μ 1.99, mixed μ 1.71,
+  the grid 0.92 of the ranges. The lesson teaches what structure buys
+  instead: which uncertainty costs the margin. Removing the sensor delay
+  gives mixed μ 0.86 (a guarantee) and a true margin of 2.27 ranges;
+  removing the mass (1.34) or the motor lag (1.08) does not. At Kp 20,
+  Kd 20 the small-gain test even points at the wrong parameter. The lower
+  bound is the first unstable member on the grid, not a Monte Carlo worst
+  case; no synthesis. New chart `mu`.
+- III.15 (`control/smc.ts`, L1 kind `smc`): s = ė + λe,
+  u = m̂(g + λė) + k·sat(s/φ). Inside the boundary layer it is a PD
+  (Kp = kλ/φ, Kd = k/φ + m̂λ) with a linear model; with φ = 0 it is
+  measured only. Payload +300 g at 12 s, default gusts, k 6 N, λ 3: φ = 0
+  holds 0.23 cm RMS with 5.2 N of thrust jitter (the default PID: 14.7 cm);
+  φ = 0.05 gives 0.79 cm and 0.05 N. A prediction the plan did not have:
+  the sag under the payload, F·φ/(kλ) = 0.82 cm, flown 0.82 cm (3.27 cm at
+  φ = 0.2, as predicted). k below the payload's 2.9 N lets it sink 2 m.
+  The phase portrait draws the sliding line and the boundary layer.
+- III.16 (`control/backstepping.ts`, L1 kind `backstepping`): three steps
+  through the motor lag, V = ½Σzᵢ², V̇ = −Σkᵢzᵢ²; linear, so it has a
+  model (within 0.6 % of a flown sweep). The plan's "backstepping
+  overshoots less on a large step" is moot with the default motors (no
+  design overshoots) and the chain is linear, so backstepping is a state
+  feedback like the LQR with the lag state. The lesson uses slow motors
+  (τ 0.15 s), where the third link matters: no PD/PID of a 36-tune grid
+  meets overshoot < 2 %, settling < 1.6 s and PM ≥ 45° together;
+  backstepping 4/4/15 does (about 82°, 1.52 s, no overshoot). The
+  Lyapunov guarantee holds without saturation, which the lesson says.
+- III.17 (`control/mrac.ts`, L1 kind `mrac`): reference model
+  ÿ = kp(r − y) − kd·ẏ, three parameters, the Lyapunov law with P from
+  AᵀP + PA = −I, σ-modification on the two feedback gains only (on the
+  hover parameter, whose regressor is the constant 1, it made the drone
+  sag 25–30 cm), the hover parameter with its own rate. Model mass 0.7 kg
+  against 1.0, 20 ms of sensor delay, a 2 Hz sine of 0.1 m: within 0.6 cm
+  of the model for 4 s, then the velocity gain drifts past 120 (ideal 6),
+  the motors saturate over 60 % of the time and the error passes 10 cm.
+  It does not crash as the plan said. σ = 0.01 holds the gain under 6 and
+  the error under 5 cm. The goal requires γ ≥ 10 000, so the fix is σ, not
+  slower adaptation. New chart `mrac` (the adapted parameters).
 
 First pass: `uncertainty.ts`, the dispersion block and `montecarlo.ts`
 (shared with M18), `svd.ts`, `disk.ts`, the two-axis torque probe and the

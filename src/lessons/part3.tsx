@@ -1,4 +1,5 @@
 import { criticalDiveSpeed } from '@/analysis/attraction';
+import { dragLimitCycle } from '@/analysis/describing';
 import { analyseRateLoop, type RateLoopAnalysis } from '@/analysis/mimo';
 import { aliasHz, ghostRate, motorJitter } from '@/analysis/spectrum';
 import { cleanRunsNeeded, finishedCampaign, passRateBound } from '@/analysis/dispersion';
@@ -144,6 +145,9 @@ const thrustJitter = (sim: Simulation, seconds: number): number => {
   }
   return c ? Math.sqrt(sq / c) : 0;
 };
+
+/** The target loop shape of lesson III.6. */
+const SHAPE = { fcLoHz: 1.8, fcHiHz: 2.2, pmDeg: 45, lowHz: 0.1, lowDb: 40 };
 
 /** Half the peak-to-peak swing of the altitude over the last `seconds`. */
 const swing = (sim: Simulation, seconds: number): number => {
@@ -490,6 +494,92 @@ export const PART_THREE: Lesson[] = [
     ),
   },
   {
+    id: 'shaping',
+    n: 6,
+    part: 3,
+    chapter: F,
+    title: 'Shape the loop',
+    level: 1,
+    chart: 'bode',
+    chart2: 'nyquist',
+    bodeTarget: SHAPE,
+    setup: (p) => {
+      calm(p);
+      smallSteps(p);
+      p.control.alt = { ...p.control.alt, kp: 20, iOn: false, dOn: false };
+    },
+    goal: {
+      text: 'Bend the loop into the target: cross 0 dB between 1.8 and 2.2 Hz with at least 45° of phase margin, and keep |L| above 40 dB at 0.1 Hz. The PID keeps only its P term.',
+      check: ({ sim }) => {
+        const p = sim.params;
+        if (p.control.l1.kind !== 'pid') return 'this lesson shapes the PID loop';
+        if (p.control.alt.dOn || p.control.alt.iOn)
+          return 'no D and no I: shape it with the stages';
+        const m = l1Loop(p);
+        const r = marginsOf(p);
+        if (!m || !r) return 'no linear model';
+        if (!isLoopStable(m)) return 'the loop is unstable';
+        const fc = r.wc / TWO_PI;
+        const low = 20 * Math.log10(cabs(loopGain(m, TWO_PI * SHAPE.lowHz)));
+        return (
+          (fc >= SHAPE.fcLoHz &&
+            fc <= SHAPE.fcHiHz &&
+            r.pmDeg >= SHAPE.pmDeg &&
+            low >= SHAPE.lowDb) ||
+          `crossover ${fc.toFixed(2)} Hz · PM ${r.pmDeg.toFixed(0)}° · |L(0.1 Hz)| ${low.toFixed(1)} dB`
+        );
+      },
+    },
+    solution: (p) => {
+      p.control.alt.kp = 22;
+      p.control.shaping = {
+        ...p.control.shaping,
+        leadZHz: 0.25,
+        leadPHz: 16,
+        lagZHz: 0.15,
+        lagPHz: 0.03,
+      };
+    },
+    body: (
+      <>
+        <p>
+          The PID has three knobs and each moves the whole Bode plot at once. Classical design works
+          the other way round: decide what the loop should look like, then add small blocks that
+          bend the curve where it is wrong. The shaded areas are the target: cross 0 dB in the blue
+          window, keep the phase out of the red box there, keep the gain above the red floor at low
+          frequency, where the gusts are.
+        </p>
+        <p>The blocks, each a ratio of two first-order factors:</p>
+        <M display>
+          {
+            '\\text{lead } \\frac{s/\\omega_z + 1}{s/\\omega_p + 1}\\ (\\omega_z < \\omega_p), \\qquad \\text{lag } \\frac{s + \\omega_z}{s + \\omega_p}\\ (\\omega_p < \\omega_z)'
+          }
+        </M>
+        <p>
+          A lead adds phase between its corners, at most{' '}
+          <M>{'\\arcsin\\frac{\\alpha - 1}{\\alpha + 1}'}</M> at their geometric mean, with{' '}
+          <M>{'\\alpha = \\omega_p/\\omega_z'}</M>, and raises the gain above them by{' '}
+          <M>{'\\alpha'}</M>. A lag raises the gain below its corners by{' '}
+          <M>{'\\omega_z/\\omega_p'}</M> and costs a little phase above them.
+        </p>
+        <Try>
+          The P term alone gives a loop that does not even settle: the drone bounces (lesson III.8
+          says how far). Add a <b>Loop shaping → Lead</b> around the crossover and watch the phase
+          lift out of the red box. The lead raises the gain too: move <b>Kp</b> until the curve
+          crosses in the window. Then add a <b>Lag</b> a decade below the crossover to lift the
+          low-frequency gain above the floor, and see what it costs in phase.
+        </Try>
+        <Notice>
+          This is how most flight-control laws were designed for half a century: a gain, a lead, a
+          lag, a notch, each chosen on a Bode plot. The trade is visible at once. A wide lead buys
+          phase with high-frequency gain (sensor noise goes to the motors), a deep lag buys
+          disturbance rejection with phase at crossover. H∞ loop shaping (lesson III.13) keeps the
+          idea of a target shape and lets two Riccati equations choose the phase.
+        </Notice>
+      </>
+    ),
+  },
+  {
     id: 'lyapunov',
     n: 7,
     part: 3,
@@ -561,6 +651,81 @@ export const PART_THREE: Lesson[] = [
           <i>guarantee</i>, not the boundary. Everything between blue and orange works, without a
           proof. Watch a fast dive cross the grey ellipses <i>outwards</i>: while the thrust is
           saturated, <M>V</M> rises.
+        </Notice>
+      </>
+    ),
+  },
+  {
+    id: 'describing',
+    n: 8,
+    part: 3,
+    chapter: G,
+    title: 'The bounce, predicted',
+    level: 1,
+    chart: 'describing',
+    chart2: 'poles',
+    setup: (p) => {
+      calm(p);
+      p.control.alt = { ...p.control.alt, iOn: false, dOn: false };
+    },
+    events: (sim) => setAt(sim, 6, 'setpoint.y', 3),
+    predict: {
+      label: 'Limit-cycle amplitude (altitude)',
+      unit: 'm',
+      truth: (p) => dragLimitCycle(p)?.altitude ?? NaN,
+      tolerance: 0.1,
+    },
+    goal: {
+      text: 'Predict, within 10 %, the amplitude of the bounce that lesson I.2 never got rid of. Then watch it settle there.',
+      check: ({ sim, prediction }) => {
+        const c = dragLimitCycle(sim.params);
+        if (!c) return 'no crossing: no limit cycle to predict';
+        if (prediction == null)
+          return 'read the crossing, invert the describing function of the drag, enter the amplitude';
+        const off = Math.abs(prediction - c.altitude) / c.altitude;
+        return (
+          off <= 0.1 ||
+          'not within 10 %: N = 1/|G|, velocity amplitude 3πN/(8c), altitude = velocity/(2πf)'
+        );
+      },
+    },
+    solution: () => {},
+    body: (
+      <>
+        <p>
+          Lesson I.2 left the drone bouncing on a pure P controller. The pole map shows why it
+          cannot settle: behind a lagging motor the loop has a pair of poles just right of the axis,
+          so every bounce grows a little. Yet it does not grow without end. Something stops it at
+          the same height every time, and that something is nonlinear: the air drag,{' '}
+          <M>{'f = -c\\,v|v|'}</M>, which is nothing for small motions and grows with the square of
+          the speed.
+        </p>
+        <p>
+          A <b>describing function</b> replaces a nonlinearity driven by a sine of amplitude{' '}
+          <M>{'A'}</M> by its gain at that frequency. For the quadratic drag it is
+        </p>
+        <M display>{'N(A) = \\frac{8\\,c\\,A}{3\\pi}'}</M>
+        <p>
+          a damping that grows with the amplitude. A steady oscillation needs the drag to take out
+          exactly what the loop puts in, per cycle: <M>{'1 + N(A)\\,G(j\\omega) = 0'}</M>, where{' '}
+          <M>{'G'}</M> is the loop as the drag sees it (force in, vertical velocity out, controller
+          in place). Graphically: the Nyquist curve of <M>{'G'}</M> meets the locus{' '}
+          <M>{'-1/N(A)'}</M>, here the negative real axis. The crossing gives the frequency, and its
+          distance from the origin the amplitude.
+        </p>
+        <Try>
+          Read where the curve crosses the real axis and at which frequency. Invert the describing
+          function for the velocity amplitude (<M>{'c'}</M> is <b>Physics → Vertical drag</b>),
+          divide by <M>{'2\\pi f'}</M> for the height, and enter it. Then raise <b>Kp</b> to 40 and
+          compare the prediction with the bounce.
+        </Try>
+        <Notice>
+          At Kp = 10 the prediction is right to the millimetre. At Kp = 40 it says 0.91 m and the
+          drone bounces 0.67 m: the thrust swing now hits the motors' limits, a second nonlinearity
+          the single describing function does not see. The method also assumes the loop filters out
+          the harmonics the nonlinearity makes, which it does here. When a guarantee is needed
+          rather than a prediction, the circle criterion bounds a nonlinearity by a sector and gives
+          stability without that assumption [Khalil 2002].
         </Notice>
       </>
     ),

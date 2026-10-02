@@ -24,7 +24,8 @@ export type ExtraChart =
   | 'fault'
   | 'fdi'
   | 'heading'
-  | 'nav';
+  | 'nav'
+  | 'describing';
 /** The analysis views of Part III, which can also take the place of the motor chart. */
 export type AnalysisChart = 'bode' | 'nyquist' | 'poles' | 'covariance';
 /**
@@ -32,6 +33,16 @@ export type AnalysisChart = 'bode' | 'nyquist' | 'poles' | 'covariance';
  * sensitivity S, or ln|S| on a linear frequency axis (the waterbed view).
  */
 export type BodeView = 'loop' | 'ref' | 'sens' | 'waterbed' | 'robust';
+
+/** A loop shape to aim at: a crossover window, a phase margin, and a floor at low frequency. */
+export interface BodeTarget {
+  fcLoHz: number;
+  fcHiHz: number;
+  pmDeg: number;
+  /** |L| must stay above lowDb at frequencies up to lowHz. */
+  lowHz: number;
+  lowDb: number;
+}
 
 export type CameraMode = 'orbit' | 'follow' | 'side' | 'top';
 
@@ -53,6 +64,8 @@ interface UiStore {
   /** A second analysis view, shown instead of the motor chart (docs/analysis.md §3.6). */
   secondChart: AnalysisChart | null;
   bodeView: BodeView;
+  /** A target loop shape drawn on the open-loop Bode plot (lesson III.6), or null. */
+  bodeTarget: BodeTarget | null;
   /** The number a student entered before running a lesson that asks for a prediction. */
   prediction: number | null;
   camera: CameraMode;
@@ -67,6 +80,7 @@ interface UiStore {
   setExtraChart: (c: ExtraChart) => void;
   setSecondChart: (c: AnalysisChart | null) => void;
   setBodeView: (v: BodeView) => void;
+  setBodeTarget: (t: BodeTarget | null) => void;
   setPrediction: (v: number | null) => void;
   setCamera: (c: CameraMode) => void;
   toggleOverlay: (k: keyof Overlays) => void;
@@ -81,6 +95,7 @@ export const useUi = create<UiStore>((set) => ({
   extraChart: 'wind',
   secondChart: null,
   bodeView: 'loop',
+  bodeTarget: null,
   prediction: null,
   camera: 'follow',
   overlays: {
@@ -107,6 +122,7 @@ export const useUi = create<UiStore>((set) => ({
   setExtraChart: (extraChart) => set({ extraChart }),
   setSecondChart: (secondChart) => set({ secondChart }),
   setBodeView: (bodeView) => set({ bodeView }),
+  setBodeTarget: (bodeTarget) => set({ bodeTarget }),
   setPrediction: (prediction) => set({ prediction }),
   setCamera: (camera) => set({ camera }),
   toggleOverlay: (k) => set((s) => ({ overlays: { ...s.overlays, [k]: !s.overlays[k] } })),

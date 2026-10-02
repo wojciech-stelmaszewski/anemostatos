@@ -259,6 +259,18 @@ export interface ControlParams {
     kfR: number;
   };
   /**
+   * Loop-shaping stages after the L1 PID (src/analysis/shaping.ts): a lead from leadZHz to leadPHz,
+   * a lag from lagZHz down to lagPHz, a notch at notchHz. A stage is off while its first number is 0.
+   */
+  shaping: {
+    leadZHz: number;
+    leadPHz: number;
+    lagZHz: number;
+    lagPHz: number;
+    notchHz: number;
+    notchQ: number;
+  };
+  /**
    * H∞ loop shaping (src/control/hinf.ts): the weight W(s) = k·(s + ωᵢ)/s · (s/ω_z + 1)/(s/ω_p + 1)
    * (the lead is off while ω_z is 0) and γ/γ_min.
    */
@@ -521,6 +533,7 @@ export const defaultParams = (): Params => ({
       kfQ: 0.1,
       kfR: 0.02,
     },
+    shaping: { leadZHz: 0, leadPHz: 0, lagZHz: 0, lagPHz: 0, notchHz: 0, notchQ: 2 },
     hinf: { k: 15, wi: 1, wz: 0, wp: 0, gammaFactor: 1.05 },
     adrc: { wc: 3, wo: 15 },
     l1ac: { as: 20, filterHz: 5, wc: 3 },

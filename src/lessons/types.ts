@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import type { Simulation } from '@/engine/simulation';
 import type { StepMetrics } from '@/engine/metrics';
 import type { Level, Params } from '@/sim/params';
-import type { AnalysisChart, BodeView, ExtraChart } from '@/store/sim';
+import type { AnalysisChart, BodeTarget, BodeView, ExtraChart } from '@/store/sim';
 
 export interface GoalContext {
   sim: Simulation;
@@ -54,6 +54,8 @@ export interface Lesson {
   chart2?: AnalysisChart;
   /** Which response the Bode chart shows (default: the open loop). */
   bode?: BodeView;
+  /** A target loop shape on the open-loop Bode plot. */
+  bodeTarget?: BodeTarget;
   /** Ask for a number before the run; the goal's check receives it. */
   predict?: Prediction;
   goal?: { text: string; check: (ctx: GoalContext) => boolean | string };

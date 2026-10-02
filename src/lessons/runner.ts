@@ -20,6 +20,7 @@ export function startLesson(lesson: Lesson): void {
   ui.setExtraChart(lesson.chart ?? 'wind');
   ui.setSecondChart(lesson.chart2 ?? null);
   ui.setBodeView(lesson.bode ?? 'loop');
+  ui.setBodeTarget(lesson.bodeTarget ?? null);
   ui.setPrediction(null);
   ui.setLesson(lesson.id);
   if (ui.paused) ui.setPaused(false);

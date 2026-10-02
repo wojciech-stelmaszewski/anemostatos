@@ -3,6 +3,7 @@ import { controllerKey } from '@/control/registry';
 import { useParams } from '@/store/params';
 import { sim, useUi, type AnalysisChart, type ExtraChart } from '@/store/sim';
 import { BodeChart } from '@/ui/analysis/BodeChart';
+import { DescribingChart } from '@/ui/analysis/DescribingChart';
 import { DispersionChart } from '@/ui/analysis/DispersionChart';
 import { MimoChart } from '@/ui/analysis/MimoChart';
 import { NyquistChart } from '@/ui/analysis/NyquistChart';
@@ -35,6 +36,7 @@ const EXTRA: { value: ExtraChart; label: string }[] = [
   { value: 'fdi', label: 'fault detection' },
   { value: 'heading', label: 'heading estimate' },
   { value: 'nav', label: 'navigation filter' },
+  { value: 'describing', label: 'describing function' },
 ];
 /** What can stand in the motor chart's place. */
 const SECOND: { value: AnalysisChart | 'motors'; label: string }[] = [
@@ -88,6 +90,8 @@ const analysisChart = (kind: string) =>
     <MimoChart />
   ) : kind === 'spectrum' ? (
     <SpectrumChart />
+  ) : kind === 'describing' ? (
+    <DescribingChart />
   ) : kind === 'dispersion' ? (
     <DispersionChart />
   ) : kind === 'covariance' ? (
@@ -136,7 +140,8 @@ export function ChartsPanel() {
     extra === 'spectrum' ||
     extra === 'dispersion' ||
     extra === 'fdi' ||
-    extra === 'nav';
+    extra === 'nav' ||
+    extra === 'describing';
   const ctrlKey = useParams((s) => controllerKey(s.params));
   const loopOptions = useMemo(
     () => loopsFor(useParams.getState().params).map((l) => ({ value: l.id, label: l.name })),

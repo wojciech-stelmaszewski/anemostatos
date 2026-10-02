@@ -5,7 +5,7 @@ import type { RobustTest } from '@/analysis/uncertainty';
 import { cabs, type Complex } from '@/math/complex';
 import { logspace, unwrapPhase } from '@/math/margins';
 import { useParams } from '@/store/params';
-import { useUi, type BodeView } from '@/store/sim';
+import { useUi, type BodeTarget, type BodeView } from '@/store/sim';
 import { Button } from '@/ui/components/button';
 import { Select } from '@/ui/components/select';
 import { ChartCard } from './ChartCard';
@@ -285,6 +285,7 @@ function drawBode(
   view: BodeView,
   level: number,
   probeHz: number | null,
+  target: BodeTarget | null = null,
 ) {
   const f = data.fHz;
   const curve = view === 'loop' ? data.l : view === 'ref' ? data.yr : data.s;
@@ -431,6 +432,31 @@ function drawBode(
     notes.push(['probe', X(probeHz) + 4, h - BOTTOM - 8]);
   }
 
+  // The target shape (lesson III.6): a floor at low frequency, a crossover window, a phase line.
+  if (view === 'loop' && target) {
+    ctx.save();
+    ctx.fillStyle = 'rgba(230,103,103,0.12)';
+    const xl = Math.max(x0, X(F_MIN));
+    const xr = Math.min(x1, X(target.lowHz));
+    // Forbidden: below the floor at low frequency.
+    ctx.fillRect(xl, yMag(target.lowDb), xr - xl, TOP + paneH - yMag(target.lowDb));
+    // Forbidden: crossing outside the window, and too little phase inside it.
+    ctx.fillStyle = 'rgba(57,135,229,0.14)';
+    ctx.fillRect(X(target.fcLoHz), TOP, X(target.fcHiHz) - X(target.fcLoHz), paneH);
+    ctx.fillStyle = 'rgba(230,103,103,0.12)';
+    const yLim = yPh(-180 + target.pmDeg);
+    ctx.fillRect(
+      X(target.fcLoHz),
+      yLim,
+      X(target.fcHiHz) - X(target.fcLoHz),
+      TOP + 2 * paneH + GAP - yLim,
+    );
+    ctx.restore();
+    notes.push([`|L| ≥ ${target.lowDb} dB`, xl + 4, yMag(target.lowDb) + 9]);
+    notes.push([`cross here`, X(target.fcLoHz) + 3, TOP + 9]);
+    notes.push([`PM ≥ ${target.pmDeg}°`, X(target.fcLoHz) + 3, yLim + 9]);
+  }
+
   // The model.
   const line = (ys: number[], y: (v: number) => number, top: number) => {
     ctx.save();
@@ -495,6 +521,7 @@ export function BodeChart() {
   const level = useParams((s) => s.params.sim.level);
   const view = useUi((s) => s.bodeView);
   const setView = useUi((s) => s.setBodeView);
+  const target = useUi((s) => s.bodeTarget);
   const probeHz = useParams((s) =>
     s.params.probe.point !== 'none' && s.params.probe.signal === 'sine'
       ? s.params.probe.freqHz
@@ -520,8 +547,8 @@ export function BodeChart() {
           ? rt
             ? drawRobust(frame, rt)
             : undefined
-          : drawBode(frame, data, measured, view, level, probeHz),
-    [data, measured, level, view, wb, probeHz, rt],
+          : drawBode(frame, data, measured, view, level, probeHz, target),
+    [data, measured, level, view, wb, probeHz, rt, target],
   );
 
   const failed = flown.filter((t) => !t.stable).length;

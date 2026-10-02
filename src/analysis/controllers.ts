@@ -8,7 +8,8 @@ import type { PidGains } from '@/control/pid';
 import { periodSteps } from '@/control/types';
 import { PHYS_DT } from '@/engine/simulation';
 import { esoMatrices } from '@/estimation/eso';
-import type { Lti } from '@/math/lti';
+import { series, type Lti } from '@/math/lti';
+import { shapingLti } from './shaping';
 import { lowPassAlpha } from '@/math/util';
 import type { Params } from '@/sim/params';
 
@@ -155,8 +156,11 @@ export function l1ControllerModel(p: Params): Lti | null {
   if (p.control.l1.kind === 'lqr' && p.control.lqr.observer && p.control.lqr.integral) return null;
   const { T } = controlPeriod(p);
   switch (p.control.l1.kind) {
-    case 'pid':
-      return pidLti(p.control.alt, T);
+    case 'pid': {
+      const pid = pidLti(p.control.alt, T);
+      const st = shapingLti(p, T);
+      return st ? series(pid, st) : pid;
+    }
     case 'lqr':
       return lqrModel(p, T);
     case 'adrc':

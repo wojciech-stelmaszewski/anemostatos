@@ -1,0 +1,195 @@
+\lesson{II.5}{Everything is a disturbance}{Keep the crudest model there is, call everything it leaves out one unknown force, estimate that force like a state — and subtract it.}{1}{adrc}{Part II · Beyond PID}
+\label{les:adrc}
+
+\lead{\setupcard{\setuprow{Level}{L1}\setuprow{Controller}{ADRC with $\omega_c = \SI{3}{rad/s}$, $\omega_o = \SI{15}{rad/s}$}\setuprow{Ghost}{the default PID}\setuprow{Wind}{on, as in Lesson~1}\setuprow{Event}{at $t = \SI{12}{s}$ a payload of \SI{300}{g} lands on the drone}\setuprow{Chart}{the disturbance force, true and estimated}}%
+The integral term learns a load only after the load has pushed the drone off its setpoint, and it learns slowly. Active disturbance rejection control turns the problem round. It keeps the simplest model there is — thrust accelerates mass — and lumps everything else, the wind, the drag, a wrong mass, a payload, into a single unknown force. An observer estimates that force from the motion, as if it were one more state, and the controller subtracts it. When the payload lands, the PID needs two seconds and drops \SI{28}{cm}; ADRC needs half a second and drops ten.}
+
+\section{One model, one unknown}
+
+Write Newton's law of the drone with the controller's belief $\hat m$ and gather the rest:
+\begin{equation}\label{eq:adrc-model}
+  \ddot y = b_0\,(u - u_{known}) + f, \qquad b_0 = \frac{1}{\hat m}, \qquad u_{known} = \hat m g .
+\end{equation}
+The term $u_{known}$ is the feedforward of Part~I. Everything else that accelerates the drone is $f$, the \term{total disturbance}: the drag, the wind, the error in $\hat m$, the motor lag, a payload. If the model were perfect and the air still, $f$ would be zero. It never is, and ADRC does not care why.
+
+The idea is to treat $f$ like a state. Not knowing how it will change, assume the simplest thing — that it stays constant, $\dot f = 0$ — and append it to the state of the plant. The \term{extended state}
+\begin{equation}\label{eq:adrc-ext}
+  \vx = \begin{pmatrix} y\\ v\\ f\end{pmatrix}, \qquad
+  \dot{\vx} = \underbrace{\begin{pmatrix} 0 & 1 & 0\\ 0 & 0 & 1\\ 0 & 0 & 0\end{pmatrix}}_{A}\vx
+  + \underbrace{\begin{pmatrix} 0\\ b_0\\ 0\end{pmatrix}}_{B}(u - u_{known}) ,
+  \qquad y = \underbrace{\begin{pmatrix} 1 & 0 & 0\end{pmatrix}}_{C}\vx ,
+\end{equation}
+is a chain of three integrators: $f$ integrates into the velocity, the velocity into the altitude. Only the altitude is measured. The other two states must be reconstructed — and the third one is the disturbance.\recall{Lesson~II.4: a bias became a state of the Kalman filter. Here the whole of the unknown becomes a state.}
+
+\section{The extended state observer}
+
+An \term{observer} is a copy of the model that runs alongside the plant and is steered towards the measurements. With the estimate $\hat{\vx} = (\hat y, \hat v, \hat f)$:
+\begin{equation}\label{eq:adrc-eso}
+  \dot{\hat{\vx}} = A\hat{\vx} + B\,(u - u_{known}) + L\,(y - \hat y), \qquad
+  L = \begin{pmatrix} 3\omega_o\\ 3\omega_o^2\\ \omega_o^3\end{pmatrix} .
+\end{equation}
+The first two terms are the model; the last pushes the copy towards the measured altitude, with three gains. Their particular values place all three poles of the observer at $-\omega_o$, as the next example shows. The single number $\omega_o$, the \term{observer bandwidth}, says how quickly the observer believes the sensor.
+
+\begin{example}[How fast the observer sees a new force]
+\label{ex:adrc-eso}
+The estimation error $\symbf e = \vx - \hat{\vx}$ obeys $\dot{\symbf e} = (A - LC)\,\symbf e$ when $f$ is constant (subtract \cref{eq:adrc-eso} from \cref{eq:adrc-ext}). Find its poles, and how long $\hat f$ needs to follow a sudden step of $f$, for $\omega_o = \SI{15}{rad/s}$.
+
+\textbf{Step 1 — the matrix.} $A - LC = \begin{pmatrix} -3\omega_o & 1 & 0\\ -3\omega_o^2 & 0 & 1\\ -\omega_o^3 & 0 & 0\end{pmatrix}$, a companion matrix (Appendix~A) of the polynomial
+\begin{equation*}
+  s^3 + 3\omega_os^2 + 3\omega_o^2s + \omega_o^3 = (s + \omega_o)^3 .
+\end{equation*}
+Three poles at $-\omega_o$.
+
+\textbf{Step 2 — the response of $\hat f$.} From $f$ to $\hat f$ the observer is the transfer function $\omega_o^3/(s + \omega_o)^3$, three equal lags in series. Its response to a unit step (Appendix~C, partial fractions) is
+\begin{equation*}
+  \hat f(t)/f = 1 - e^{-\omega_ot}\big(1 + \omega_ot + \tfrac12\omega_o^2t^2\big) .
+\end{equation*}
+
+\textbf{Step 3 — times.} The bracket reaches 50\,\% at $\omega_ot = 2.67$, 90\,\% at 5.32 and 98\,\% at 7.52. With $\omega_o = 15$: \SI{0.18}{s}, \SI{0.35}{s} and \SI{0.50}{s}.
+
+\textbf{Step 4 — check} (\cref{fig:adrc-payload}, bottom). The payload adds \SI{2.94}{N} of weight. \SI{0.3}{s} after it lands the simulator's estimate shows 79\,\% of it, after \SI{0.5}{s} 98\,\%. Half a second, where the integral of the PID, with its time constant $K_p/K_i = \SI{12.5}{s}$, needs many seconds.
+\end{example}
+
+\section{Cancel, then control}
+
+With $\hat f$ known, the control law subtracts it and controls what is left — a clean double integrator — with a PD whose two poles are placed at $-\omega_c$:
+\begin{equation}\label{eq:adrc-law}
+  u = u_{known} + \frac{\omega_c^2\,(r - \hat y) - 2\omega_c\,\hat v - \hat f}{b_0} .
+\end{equation}
+If the estimates were exact, inserting \cref{eq:adrc-law} into \cref{eq:adrc-model} would give $\ddot y = \omega_c^2(r - y) - 2\omega_c\dot y$: the loop $(s + \omega_c)^2$, critically damped by design, whatever $f$ is. In the units of Part~I the PD part has $K_p = \omega_c^2\hat m = \SI{9}{N/m}$ and $K_d = 2\omega_c\hat m = \SI{6}{N.s/m}$ — a slightly softer spring than the default PID's.
+
+Two knobs remain, both in radians per second and both with a meaning: how fast the loop should respond, $\omega_c$, and how fast the observer should believe the sensor, $\omega_o$. The model is a single number, $b_0$.\tip{A rule of thumb from the ADRC literature: $\omega_o$ three to ten times $\omega_c$. The observer must be quicker than the loop it serves — but not so quick that it believes the noise (Lesson~II.6).}
+
+\begin{example}[The payload, predicted]
+\label{ex:adrc-payload}
+The drone hovers with $\hat m = \SI{1}{kg}$ when its mass becomes \SI{1.3}{kg}. Predict the largest altitude error for ADRC and for the PID ghost.
+
+\textbf{Step 1 — the push.} The feedforward still supplies \SI{9.81}{N}; the weight is now \SI{12.75}{N}. The drone accelerates downwards at $2.94/1.3 = \SI{2.26}{m/s^2}$ until the controllers react.
+
+\textbf{Step 2 — the PID.} Its P and D terms resist immediately, its integral slowly. The linear loop with the new mass, integrated numerically, sinks to \SI{27.3}{cm} below the setpoint \SI{1.92}{s} after the event, and recovers over tens of seconds.
+
+\textbf{Step 3 — ADRC.} For the first fraction of a second $\hat f$ lags behind, and the PD part of \cref{eq:adrc-law} alone resists. Once $\hat f$ has caught up (Example~\ref{ex:adrc-eso}) the disturbance is cancelled and the loop returns as $(s + \omega_c)^2$. The linear model of plant, observer and law: \SI{10.1}{cm} at \SI{0.58}{s}.
+
+\textbf{Step 4 — check} (\cref{fig:adrc-payload}). The simulator, with the wind blowing: ADRC \SI{10.6}{cm} after \SI{0.55}{s}; PID \SI{27.7}{cm} after \SI{1.98}{s}.
+
+\textbf{Step 5 — the wrong $b_0$.} After the payload the true $b = 1/1.3$, not $b_0 = 1$. ADRC does not notice: the difference $(b - b_0)\,u$ is just another part of $f$, estimated and cancelled with the rest.
+\end{example}
+
+\simfig{adrc_payload}{The payload lands at $t = 0$. Top: the altitude error of the PID ghost and of ADRC on the same wind, and the linear model of Example~\ref{ex:adrc-payload} in calm air (dashed). Bottom: the true disturbance force, which the simulator knows, and the observer's estimate, which follows it within half a second.}{fig:adrc-payload}
+
+\begin{keyidea}[Ignorance as a state]
+An observer can estimate anything that leaves a trace in the measurements. ADRC applies this to its own ignorance: whatever the model leaves out becomes one state, estimated from the motion and cancelled. The price is a model of how that unknown evolves — here only \enquote{it changes slowly} — and a bandwidth that must be chosen with the noise and the actuators in mind.
+\end{keyidea}
+
+\screen[0 0 495 998]{adrc}{Lesson II.5 in the app. The disturbance chart (bottom right) draws the true disturbance force and the observer's estimate on top of each other; the contributions chart shows the new part \enquote{$-\hat f/b_0$} taking over the payload's weight.}{fig:adrc-screen}
+
+\begin{inapp}
+\begin{itemize}[leftmargin=1.2em]
+  \item The switch is \ui{Controller\then L1 controller\then ADRC}; the bandwidths are \param{control.adrc.wc} and \param{control.adrc.wo}, and $b_0 = 1/\hat m$ comes from \param{control.model.mass}.
+  \item The observer is \src{src/estimation/eso.ts}, discretised exactly at the loop's rate with the matrix exponential (Appendix~D), so that high bandwidths remain numerically stable. The controller is \src{src/control/adrc.ts}.
+  \item The observer is fed the thrust that was \emph{applied}, after the motor limits. Fed the command instead, it would interpret the thrust it did not get as a disturbance and wind up — ADRC's form of anti-windup (\lessonref{les:windup}).
+  \item The true disturbance is recorded by the simulator as $\hat m\dot v - T + \hat mg$, the force the nominal model cannot explain (telemetry \texttt{dist.y}); the estimate is converted to the same definition (\texttt{est.dist.y}).
+\end{itemize}
+\end{inapp}
+
+\begin{trythis}
+\begin{enumerate}
+  \item Watch the payload land, first on the ghost, then on ADRC. Compare the dips and the disturbance chart.
+  \item Set \ui{Assumed mass} to \SI{0.6}{kg}. ADRC hardly changes — why?
+  \item Switch the gravity feedforward off. The observer learns gravity itself as one more disturbance.
+\end{enumerate}
+\predict{with $\omega_o = 30$ instead of 15, how long does $\hat f$ need to reach 90\,\% of a new force?}
+\end{trythis}
+
+\section{The engineer's view: disturbance observers}
+
+\subsection{An integrator in disguise}
+The observer state $\hat f$ is driven by $\omega_o^3(y - \hat y)$: it is an integrator of a measurement error. ADRC therefore contains integral action — it must, by the internal model principle (\cref{thm:integral-imp}), since it removes constant loads — but the integrator is placed where it can act fast. The PID's integral sees only the position error, which a load produces slowly, through two integrations of the plant. The observer's integral sees the \emph{innovation}, the difference between where the model says the drone should be and where it is, which appears at once.
+
+Written out as a transfer function from $y$ and $r$ to $u$, linear ADRC is a fixed linear controller of fourth order with a pole at $s = 0$: a PID with built-in filters, tuned by two bandwidths. Its advantage is not that it can do what no linear controller can, but that its two numbers mean something and its model is one number.
+
+\subsection{What the total disturbance includes}
+Everything — including what should not be there. The motor lag is in $f$, and so are the effects of the controller's own sampling. Lumping a lag into a \enquote{disturbance} that is assumed to vary slowly works only while the observer is slow compared with the lag; the next lesson finds where that stops. And sensor noise, though not a force, reaches $\hat f$ through the innovation: the observer cannot tell a jumpy altimeter from a jumpy drone.
+
+\begin{example}[A motor drive with an unknown load]
+\label{ex:adrc-drive}
+ADRC was born in industrial motion control. An electric motor with the inertia $J = \SI{0.01}{kg.m^2}$ holds a speed; at some moment a load torque of \SI{0.5}{N.m} is applied to its shaft. Design a first-order ADRC with $\omega_c = \SI{50}{rad/s}$ and $\omega_o = \SI{200}{rad/s}$, and compare with a proportional speed controller of the same bandwidth.
+
+\textbf{Step 1 — the model.} $\dot\omega = b_0u + f$ with $b_0 = 1/J = 100$ and $u$ the motor torque; the load is part of $f$: $f = -0.5/0.01 = \SI{-50}{rad/s^2}$.
+
+\textbf{Step 2 — the observer.} Two states, $(\hat\omega, \hat f)$, with $L = (2\omega_o,\ \omega_o^2)$: both poles at $-200$.
+
+\textbf{Step 3 — the law.} $u = \big(\omega_c(r - \hat\omega) - \hat f\big)/b_0$: a first-order loop with the pole $-50$ once $f$ is cancelled.
+
+\textbf{Step 4 — the dip.} Simulating plant and observer: the speed dips by \SI{0.32}{rad/s}, \SI{3}{ms} after the load appears, and returns to the setpoint within tens of milliseconds.
+
+\textbf{Step 5 — the alternative.} A proportional controller $u = \omega_cJ\,(r - \omega)$ has the same loop bandwidth and settles \SI{1}{rad/s} low for as long as the load stays, $0.5/(50 \cdot 0.01)$. Adding a PI would remove the offset in a few loop time constants; the observer removes it within a few observer time constants, four times faster here. This is why ADRC found its first large market in servo drives, where loads change abruptly and no model of them exists.
+\end{example}
+
+\subsection{In formal terms}
+
+\begin{theorem}[Convergence of the extended state observer]
+\label{thm:adrc-eso}
+Let the plant be \cref{eq:adrc-ext} with a disturbance $f$ whose derivative is bounded, $|\dot f| \le D$, and let the observer be \cref{eq:adrc-eso}. Then the estimation error obeys $\dot{\symbf e} = (A - LC)\,\symbf e + (0,\ 0,\ \dot f)^\T$, the matrix $A - LC$ has all three eigenvalues at $-\omega_o$, and after an initial transient that decays as $e^{-\omega_ot}$ the disturbance error satisfies $|f - \hat f| \le c\,D/\omega_o$ for a constant $c$ that does not depend on $\omega_o$. For constant $f$ the error tends to zero.
+\end{theorem}
+\begin{proof}
+Subtract the observer from the plant. The characteristic polynomial of $A - LC$ is $(s + \omega_o)^3$ (Example~\ref{ex:adrc-eso}). The input $\dot f$ reaches $f - \hat f$ through the transfer function $s(s^2 + 3\omega_os + 3\omega_o^2)/(s + \omega_o)^3$, which for a bounded input has a bounded output of the order of $1/\omega_o$ times the bound. See Gao (2003) and Guo and Zhao (2011) for the full argument.
+\end{proof}
+
+\begin{theorem}[Zero steady-state error of ADRC]
+\label{thm:adrc-zero}
+If the closed loop of \cref{eq:adrc-model,eq:adrc-eso,eq:adrc-law} is asymptotically stable and $f$ and $r$ are constant, then $y \to r$, for every $b_0 \ne 0$.
+\end{theorem}
+\begin{proof}
+At an equilibrium all derivatives vanish. The last row of \cref{eq:adrc-eso} gives $\omega_o^3(y - \hat y) = 0$, so $\hat y = y$. The first row then gives $\hat v = 0$, and the second $\hat f + b_0(u - u_{known}) = 0$. Inserting \cref{eq:adrc-law}: $\omega_c^2(r - \hat y) - 2\omega_c\hat v - \hat f + \hat f = 0$, so $y = \hat y = r$.
+\end{proof}
+
+The proof never used the value of $b_0$, nor that $\hat f$ equals the true $f$: the equilibrium is exact even with a wrong model. What a wrong $b_0$ affects is the transient and, if far enough off, the stability; ADRC tolerates errors in $b_0$ of a factor of about two in practice, and much more in one direction than in the other.
+
+\begin{lookahead}
+\begin{itemize}[leftmargin=1.2em]
+  \item How large $\omega_o$ may be, with sensor noise and the motor lag: the next lesson.
+  \item An accelerometer measures the push directly, without waiting for it to move the drone: incremental dynamic inversion (Lessons~II.7 and II.8) is a disturbance observer with the observer replaced by a sensor.
+  \item Adaptive control estimates the parameters of the model rather than a lumped force (Lessons~II.18 and II.19); L1 adaptive control (II.18) is, under the hood, a disturbance observer with a filter.
+  \item ADRC's equivalent linear controller can be analysed with the tools of Part~III: its margins (III.3) and its robustness to the model error in $b_0$ (III.11). A disturbance observer of a different kind, built into a nonlinear design, returns in sliding mode control (III.15).
+\end{itemize}
+\end{lookahead}
+
+\begin{remember}
+\begin{itemize}
+  \item ADRC keeps only $\ddot y = b_0(u - u_{known}) + f$ and calls everything else the total disturbance $f$.
+  \item The extended state observer estimates $(y, v, f)$ from the altitude; with $L = (3\omega_o, 3\omega_o^2, \omega_o^3)$ its poles are all at $-\omega_o$. A step in $f$ is 90\,\% seen after $5.3/\omega_o$.
+  \item The law subtracts $\hat f$ and places the loop at $(s + \omega_c)^2$. Two knobs with a meaning: $\omega_c$ and $\omega_o$.
+  \item The observer must be fed the applied input. Its $\hat f$ is an integrator of the innovation — fast integral action.
+  \item Constant disturbances leave no error, whatever $b_0$ is.
+\end{itemize}
+\end{remember}
+
+\begin{curiosity}{A controller from Beijing in your motor drive}
+When the Chinese mathematician Han Jingqing published the ideas of active disturbance rejection in the 1990s, he presented them as a challenge to the model-based control theory of his time: if a controller can estimate whatever its model gets wrong, perhaps it needs hardly any model at all. His original design was nonlinear, with functions that switched shape near zero, and it had many parameters. It was hard to analyse and hard to tune, and it spread slowly.
+
+The turn came in 2003, when Zhiqiang Gao at Cleveland State University showed that a linear version — the one of this lesson — loses little, and that all its gains follow from two bandwidths. Engineers who would never tune nine coefficients could set two frequencies. A start-up commercialised the method for motor control, and around 2013 it reached the motor-control processors of a large semiconductor manufacturer, where it runs today in washing machines, pumps and industrial drives whose owners have never heard its name.
+
+The idea itself is older and more general than ADRC. Disturbance observers were in use in Japanese motion control from the 1980s, and every Kalman filter that carries a bias state is one. What ADRC added was the radical step of calling \emph{everything} a disturbance — and a tuning so simple that the radical step became practical.
+\end{curiosity}
+
+\begin{exercises}
+\exercise[1] For $\omega_c = 3$ and $\hat m = 1$, what are the equivalent $K_p$ and $K_d$ of the ADRC law? And for $\omega_c = 5$?
+\answer{$K_p = \omega_c^2\hat m = 9$, $K_d = 2\omega_c\hat m = 6$; for $\omega_c = 5$: 25 and 10.}
+\exercise[1] Write the observer gains $L$ for $\omega_o = 10$, 15 and 30 rad/s.
+\answer{$(30, 300, 1000)$; $(45, 675, 3375)$; $(90, 2700, 27000)$.}
+\exercise[1] How long does $\hat f$ need to reach 90\,\% of a step in $f$ for $\omega_o = 30$? Compare with the PID's integral time $K_p/K_i$.
+\answer{$5.32/30 = \SI{0.18}{s}$, against \SI{12.5}{s}.}
+\exercise[2]\exkind{derive} Show that the gains $L = (3\omega_o, 3\omega_o^2, \omega_o^3)$ give $\det(s\Id - A + LC) = (s + \omega_o)^3$, and find the gains that would place the poles at $-\omega_o$, $-2\omega_o$ and $-3\omega_o$.
+\answer{For $L = (l_1, l_2, l_3)$ the polynomial is $s^3 + l_1s^2 + l_2s + l_3$; compare coefficients with $(s + \omega_o)^3$. For the other set: $(s + \omega_o)(s + 2\omega_o)(s + 3\omega_o) = s^3 + 6\omega_os^2 + 11\omega_o^2s + 6\omega_o^3$, so $L = (6\omega_o, 11\omega_o^2, 6\omega_o^3)$.}
+\exercise[2]\exkind{derive} Derive the step response of $\omega_o^3/(s + \omega_o)^3$ by partial fractions (or from the table of Appendix~C) and confirm the 50, 90 and 98\,\% times of Example~\ref{ex:adrc-eso}.
+\answer{$\frac{\omega_o^3}{s(s + \omega_o)^3} = \frac1s - \frac{1}{s + \omega_o} - \frac{\omega_o}{(s + \omega_o)^2} - \frac{\omega_o^2}{(s + \omega_o)^3}$, which transforms back to $1 - e^{-\omega_ot}(1 + \omega_ot + \tfrac12\omega_o^2t^2)$. Solving for the levels gives $\omega_ot = 2.67$, 5.32, 7.52.}
+\exercise[2]\exkind{derive} Repeat Step~5 of Example~\ref{ex:adrc-drive} for a PI speed controller $u = J(\omega_c e + \tfrac14\omega_c^2\int e)$ (a double pole at $-\omega_c/2$). How large is the dip after the load torque, roughly, and how long does the error take to vanish?
+\answer{The loop $\dot e = -\omega_c e - \tfrac14\omega_c^2\int e + 50$ has the poles $-25$ (double). The dip is of the order of $50/\omega_c = \SI{1}{rad/s}$ (more than three times ADRC's), and the error decays as $t\,e^{-25t}$: about \SI{0.25}{s} to vanish.}
+\exercise[2]\exkind{fly} In Lesson~II.5, set the assumed mass to 0.6 and then to \SI{2}{kg}, and watch the payload event. In which direction is ADRC more sensitive to a wrong $b_0$, and why?
+\answer{$\hat m = 2$ ($b_0$ too small by half) makes the law push twice as hard: the loop becomes faster and more oscillatory; far beyond it, unstable. $\hat m = 0.6$ ($b_0$ too large) makes it gentler and slower but stays stable. Over-estimating the mass is the dangerous direction: it is an over-estimate of the loop gain.}
+\exercise[2]\exkind{code} In \src{src/control/adrc.ts} the observer is updated with \texttt{this.applied - this.known} before the law is computed. What would change if the unclamped command were used instead, during a long saturation such as the climb of \lessonref{les:windup}?
+\answer{The observer would believe the drone received thrust it did not get, see the drone accelerate less than expected, and attribute the difference to $f$: $\hat f$ would grow (wind up) for as long as the saturation lasted, and the law would then subtract a large, wrong $\hat f$ after it — an overshoot like the PID's windup.}
+\exercise[3]\exkind{derive} The equivalent linear controller. Show that, from the measurement $y$ to the command $u$ (with $r = 0$), linear ADRC is a transfer function with a pole at $s = 0$, and explain in a sentence why it must have one.
+\answer{Combining \cref{eq:adrc-eso,eq:adrc-law} and eliminating $\hat{\vx}$ gives $u = -C_{eq}(s)\,y$ with $C_{eq}$ a ratio of polynomials; the determinant of the closed observer–law system has the factor $s$, because at $s = 0$ a constant $\hat f$ with zero innovation is possible (Theorem~\ref{thm:adrc-zero}). It must have one by the internal model principle: it removes constant loads.}
+\end{exercises}

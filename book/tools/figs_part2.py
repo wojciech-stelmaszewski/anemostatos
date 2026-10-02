@@ -270,3 +270,46 @@ def kalman_trust():
         xlab_time(a)
     axs[0].set_ylabel("estimate $-$ truth  [cm]")
     save(f, "kalman_trust")
+
+
+# ─── Lesson II.5 ───────────────────────────────────────────────────────────
+def _adrc_payload_model(wo=15.0, wc=3.0, T=8.0, dt=1e-4):
+    """Linear model of the payload event: drone of 1.3 kg, controller model of 1 kg."""
+    y = v = 0.0
+    z = np.zeros(3)
+    L = np.array([3 * wo, 3 * wo**2, wo**3])
+    out = []
+    for k in range(int(T / dt)):
+        u = wc * wc * (-z[0]) - 2 * wc * z[1] - z[2] + 9.81
+        a = (u - 1.3 * 9.81) / 1.3
+        inn = y - z[0]
+        z = z + np.array([z[1] + L[0] * inn, z[2] + (u - 9.81) + L[1] * inn, L[2] * inn]) * dt
+        v += a * dt
+        y += v * dt
+        out.append((k * dt, y, -z[2] + 0.0))
+    return np.array(out)
+
+
+@fig
+def adrc_payload():
+    f, (a, b) = plt.subplots(2, 1, figsize=(TEXT_W, 80 * MM), sharex=True, gridspec_kw=dict(hspace=0.3))
+    t0 = 12
+    for name, col, lab in (("adrc-pid", C["ghost"], "PID ghost"), ("adrc-adrc", C["meas"], "ADRC")):
+        d = win(load(name), 10, 20)
+        a.plot(d.t - t0, 100 * (d["pos.y"] - d["sp.y"]), color=col, lw=1.3 if "ghost" in lab else 1.1, label=lab)
+    m = _adrc_payload_model()
+    a.plot(m[:, 0], 100 * m[:, 1], color=C["ink"], lw=0.6, ls=(0, (3, 2)), label="model, calm air")
+    a.axvline(0, color=C["faint"], lw=0.6)
+    a.text(0.1, 7, "300 g payload lands", fontsize=6.4, color=C["muted"])
+    a.legend(loc="lower right", ncol=3)
+    a.set_ylabel("altitude error  [cm]")
+    a.set_title("A payload, two controllers")
+    d = win(load("adrc-adrc"), 10, 20)
+    b.plot(d.t - t0, d["dist.y"], color=C["ink"], lw=1.0, label="true disturbance force")
+    b.plot(d.t - t0, d["est.dist.y"], color=C["meas"], lw=1.1, ls=(0, (4, 2)), label="ESO estimate")
+    b.legend(loc="upper right")
+    b.set_ylabel("N")
+    b.set_title("What the observer sees")
+    b.set_xlim(-2, 8)
+    xlab_time(b, "time after the payload lands  [s]")
+    save(f, "adrc_payload")

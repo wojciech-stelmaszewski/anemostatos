@@ -2,6 +2,7 @@ import type { Params } from '@/sim/params';
 import { AdrcController } from './adrc';
 import { AltitudeController } from './altitude';
 import { FaultTolerantController } from './fault';
+import { BacksteppingController } from './backstepping';
 import { HinfController } from './hinf';
 import { MracController } from './mrac';
 import { SlidingModeController } from './smc';
@@ -48,7 +49,9 @@ export function makeController(p: Params): Controller {
                     ? new SlidingModeController()
                     : kind === 'mrac'
                       ? new MracController()
-                      : new AltitudeController();
+                      : kind === 'backstepping'
+                        ? new BacksteppingController()
+                        : new AltitudeController();
       return p.control.l1.estimator === 'kalman' ? new WithAltitudeKalman(c) : c;
     }
     case 2:

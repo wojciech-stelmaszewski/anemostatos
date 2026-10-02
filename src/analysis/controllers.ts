@@ -2,6 +2,7 @@
 // update rule, written as a discrete state-space system at the controller's sample period.
 // They hold while nothing saturates. Inputs, in order: measured altitude, measured velocity,
 // measured thrust (deviation from hover), reference. Output: the thrust command (deviation).
+import { backsteppingGains } from '@/control/backstepping';
 import { designHinf, hinfControllerLti } from '@/control/hinf';
 import { designLqr, lqgMatrices } from '@/control/lqr';
 import type { PidGains } from '@/control/pid';
@@ -125,6 +126,26 @@ function lqrModel(p: Params, T: number): Lti {
   };
 }
 
+/**
+ * u = −k_e·(y − r) − k_v·v − k_T·T with T read from motor telemetry, or, without it, from the
+ * controller's model of the motors (as in the LQR with the lag state).
+ */
+function lqrLikeModel(p: Params, T: number, k: [number, number, number]): Lti {
+  const [k1, k2, k3] = k;
+  if (p.sensors.motorFeedback) return { a: [], b: [], c: [[]], d: [[-k1, -k2, -k3, k1]], dt: T };
+  const al = 1 - Math.exp(-T / Math.max(p.control.model.motorTau, 1e-3));
+  // States: est, uPrev.   u = −k1·e − k2·v − k3·est⁺
+  const cRow = [-k3 * (1 - al), -k3 * al];
+  const dRow = [-k1, -k2, 0, k1];
+  return {
+    a: [[1 - al, al], cRow],
+    b: [[0, 0, 0, 0], dRow],
+    c: [cRow],
+    d: [dRow],
+    dt: T,
+  };
+}
+
 /** Linear ADRC of src/control/adrc.ts: the observer runs first, fed with the previous command. */
 function adrcModel(p: Params, T: number): Lti {
   const { wc, wo } = p.control.adrc;
@@ -172,6 +193,11 @@ export function l1ControllerModel(p: Params): Lti | null {
       const g = c.k / c.phi;
       const mHat = p.control.model.mass;
       return gain([[-g * c.lambda, -(g + mHat * c.lambda), 0, g * c.lambda]], T);
+    }
+    case 'backstepping': {
+      // A linear state feedback, like the LQR with the lag state, on (e, v, T).
+      const g = backsteppingGains(p);
+      return lqrLikeModel(p, T, [g.kE, g.kV, g.kT]);
     }
     case 'hinf': {
       // Inputs (y, r) of the design spread over the four inputs of the loop: (y, v, F, r).

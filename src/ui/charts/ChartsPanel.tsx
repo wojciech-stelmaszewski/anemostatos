@@ -6,6 +6,7 @@ import { BodeChart } from '@/ui/analysis/BodeChart';
 import { DescribingChart } from '@/ui/analysis/DescribingChart';
 import { DispersionChart } from '@/ui/analysis/DispersionChart';
 import { MimoChart } from '@/ui/analysis/MimoChart';
+import { MuChart } from '@/ui/analysis/MuChart';
 import { NyquistChart } from '@/ui/analysis/NyquistChart';
 import { PoleMap } from '@/ui/analysis/PoleMap';
 import { SpectrumChart } from '@/ui/analysis/SpectrumChart';
@@ -37,6 +38,7 @@ const EXTRA: { value: ExtraChart; label: string }[] = [
   { value: 'heading', label: 'heading estimate' },
   { value: 'nav', label: 'navigation filter' },
   { value: 'mrac', label: 'MRAC parameters' },
+  { value: 'mu', label: 'μ analysis' },
   { value: 'describing', label: 'describing function' },
 ];
 /** What can stand in the motor chart's place. */
@@ -93,6 +95,8 @@ const analysisChart = (kind: string) =>
     <NyquistChart />
   ) : kind === 'poles' ? (
     <PoleMap />
+  ) : kind === 'mu' ? (
+    <MuChart />
   ) : kind === 'mimo' ? (
     <MimoChart />
   ) : kind === 'spectrum' ? (
@@ -148,7 +152,8 @@ export function ChartsPanel() {
     extra === 'dispersion' ||
     extra === 'fdi' ||
     extra === 'nav' ||
-    extra === 'describing';
+    extra === 'describing' ||
+    extra === 'mu';
   const ctrlKey = useParams((s) => controllerKey(s.params));
   const loopOptions = useMemo(
     () => loopsFor(useParams.getState().params).map((l) => ({ value: l.id, label: l.name })),

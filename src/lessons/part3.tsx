@@ -1,5 +1,6 @@
 import { criticalDiveSpeed } from '@/analysis/attraction';
 import { dragLimitCycle } from '@/analysis/describing';
+import { muAnalysis } from '@/analysis/mu';
 import { analyseRateLoop, type RateLoopAnalysis } from '@/analysis/mimo';
 import { aliasHz, ghostRate, motorJitter } from '@/analysis/spectrum';
 import { quantisationCycle, ratePm } from '@/analysis/quantisation';
@@ -178,6 +179,30 @@ const thrustJitter = (sim: Simulation, seconds: number): number => {
 
 /** The target loop shape of lesson III.6. */
 const SHAPE = { fcLoHz: 1.8, fcHiHz: 2.2, pmDeg: 45, lowHz: 0.1, lowDb: 40 };
+
+/** Peak of the mixed-μ bound for the family of `p`, cached per family (lesson III.14). */
+let muCache: { key: string; peak: number } | null = null;
+const mixedMuPeak = (p: Params): number => {
+  const key = JSON.stringify([p.control, p.drone, p.sensors, p.uncertainty]);
+  if (muCache?.key !== key) muCache = { key, peak: muAnalysis(p, 1, 70)?.peakMuMixed ?? Infinity };
+  return muCache.peak;
+};
+/** Lesson III.16: motors this slow make the third link of the chain matter. */
+const SLOW_MOTOR = 0.15;
+/** Overshoot (fraction) and 2 % settling time of a step of the altitude setpoint from y0 to y1 at t0. */
+const stepResult = (sim: Simulation, t0: number, y0: number, y1: number) => {
+  const { t, series } = sim.telemetry.window(['pos.y'], t0);
+  const size = y1 - y0;
+  let peak = -Infinity;
+  let settle = 0;
+  for (let i = 0; i < t.length; i++) {
+    const y = series[0]![i]!;
+    if (!Number.isFinite(y)) continue;
+    peak = Math.max(peak, y);
+    if (Math.abs(y - y1) > 0.02 * Math.abs(size)) settle = t[i]! - t0;
+  }
+  return { overshoot: (peak - y1) / size, settle };
+};
 
 /** Half the peak-to-peak swing of the altitude over the last `seconds`. */
 const swing = (sim: Simulation, seconds: number): number => {
@@ -1147,6 +1172,307 @@ export const PART_THREE: Lesson[] = [
     ),
   },
   {
+    id: 'mu',
+    n: 14,
+    part: 3,
+    chapter: H,
+    title: 'Uncertainty has structure',
+    level: 1,
+    chart: 'mu',
+    chart2: 'bode',
+    bode: 'robust',
+    setup: (p) => {
+      calm(p);
+      smallSteps(p);
+      p.control.alt = { ...p.control.alt, kp: 30, kd: 25 };
+    },
+    goal: {
+      text: 'Keep the fast tune (Kp 30, Kd 25). You can afford to measure one of the three uncertain quantities exactly: set its range to zero and leave the other two as they are, so that mixed μ guarantees every member of the family.',
+      check: ({ sim }) => {
+        const p = sim.params;
+        if (p.control.l1.kind !== 'pid' || p.control.alt.kp !== 30 || p.control.alt.kd !== 25)
+          return 'keep the PID at Kp 30, Kd 25: the point is to know the drone better, not to slow it';
+        const u = p.uncertainty;
+        const zero = [u.massPct === 0, u.tauFactor <= 1, u.delayMs === 0];
+        const kept = [u.massPct === 30, u.tauFactor === 2, u.delayMs === 20];
+        const n0 = zero.filter(Boolean).length;
+        if (n0 !== 1 || !zero.every((z, i) => z || kept[i]))
+          return 'set exactly one range to zero (mass 0 %, motor lag factor 1, or delay 0 ms) and leave the others';
+        const mix = mixedMuPeak(p);
+        return (
+          mix < 1 || `mixed μ peaks at ${mix.toFixed(2)}: that measurement does not buy a guarantee`
+        );
+      },
+    },
+    solution: (p) => {
+      p.uncertainty.delayMs = 0;
+    },
+    body: (
+      <>
+        <p>
+          This tune is fast, and the family of lesson III.11 has members it does not keep: the
+          small-gain test fails, and so do a few drones. The team can afford one measurement: weigh
+          the drone, time the motors, or measure the sensor's latency, and remove that one
+          uncertainty. Which one is worth it?
+        </p>
+        <p>
+          The small-gain test cannot tell: it lumps the three into one disk around the nominal loop.
+          But they are not one thing. The mass changes only the loop's gain, the delay only its
+          phase, the motor lag a bit of both; each is a factor of its own,{' '}
+          <M>{'L = L_0\\,(1 + W_m\\delta_m)(1 + W_\\tau\\delta_\\tau)(1 + W_d\\delta_d)'}</M>, and
+          the three <M>{'\\delta'}</M> are independent. Closing the loop around{' '}
+          <M>{'\\Delta = \\mathrm{diag}(\\delta_m, \\delta_\\tau, \\delta_d)'}</M> gives a 3 × 3
+          matrix <M>{'M(j\\omega)'}</M>, and the family is guaranteed stable when its{' '}
+          <b>structured singular value</b> stays below one:
+        </p>
+        <M display>
+          {'\\mu_\\Delta(M) \\le \\min_D \\bar\\sigma(D M D^{-1}) < 1 \\ \\text{for all } \\omega'}
+        </M>
+        <p>
+          The chart shows three answers. μ with one complex disk per parameter is <i>more</i>{' '}
+          pessimistic than the lumped test: a disk lets the mass rotate the signal and the delay
+          amplify it, and three such disks can conspire. Mixed μ knows that the mass is a real
+          number, and is tighter, though here still above the lumped test.
+        </p>
+        <Try>
+          Set each range to zero in turn in <b>Uncertainty</b>, put the others back, and watch the
+          three peaks. Then fly the family (<b>Fly 60 members</b> on the Bode chart) for the one you
+          choose.
+        </Try>
+        <Notice>
+          The lumped test barely moves whichever range you remove: one disk cannot say which
+          parameter costs the margin. The structured bound can. Removing the delay takes the true
+          margin from 0.92 to 2.3 times the ranges; removing the mass, to 1.4; the motor lag, to
+          1.0. On the same tune at lower gains the lumped test would even have pointed at the mass.
+          Structure does not make an analysis less conservative by itself; it says where the
+          conservatism, and the risk, come from.
+        </Notice>
+      </>
+    ),
+  },
+  {
+    id: 'smc',
+    n: 15,
+    part: 3,
+    chapter: H,
+    title: 'Slide to the target',
+    level: 1,
+    chart: 'phase',
+    setup: (p) => {
+      p.control.l1.kind = 'smc';
+      p.control.smc = { lambda: 3, k: 6, phi: 0 };
+    },
+    events: (sim) => setAt(sim, PAYLOAD.at, 'drone.mass', 1 + PAYLOAD.kg),
+    predict: {
+      label: 'Sag after the payload with φ = 0.05 m/s',
+      unit: 'cm',
+      truth: (p) => smcSag(p, 0.05),
+      tolerance: 0.15,
+    },
+    goal: {
+      text: 'Predict the sag a boundary layer of 0.05 m/s leaves under the payload. Then stop the chatter (thrust jitter below 0.3 N) while keeping the altitude within 3 cm RMS from 14 s on, through the gusts and the payload.',
+      check: ({ sim, prediction }) => {
+        if (sim.params.control.l1.kind !== 'smc')
+          return 'this lesson is about the sliding-mode controller';
+        if (prediction == null)
+          return 'first the prediction: inside the layer the law is a PD — what is its Kp?';
+        const truth = smcSag(sim.params, 0.05);
+        if (Math.abs(prediction - truth) / truth > 0.15)
+          return 'not within 15 %: the payload weighs 0.3·g newtons, and Kp = k·λ/φ';
+        if (sim.t < 25) return sim.t < PAYLOAD.at ? 'hovering in gusts…' : 'carrying the payload…';
+        const jitter = thrustJitter(sim, 6);
+        const rms = hoverRms(sim, 14, sim.t);
+        return (
+          (jitter < 0.3 && rms < 0.03) ||
+          `thrust jitter ${jitter.toFixed(2)} N · altitude RMS ${(rms * 100).toFixed(1)} cm`
+        );
+      },
+    },
+    solution: (p) => {
+      p.control.smc.phi = 0.05;
+    },
+    body: (
+      <>
+        <p>
+          A <b>sliding-mode</b> controller chooses a line in the phase plane,
+        </p>
+        <M display>{'s = \\dot e + \\lambda e = 0,'}</M>
+        <p>
+          along which the error dies as <M>{'e^{-\\lambda t}'}</M>, and then drives the state onto
+          it with everything it has:
+        </p>
+        <M display>{'u = \\hat m\\,(g + \\lambda\\,\\dot e) + k\\,\\mathrm{sign}(s)'}</M>
+        <p>
+          The first term would keep <M>{'s'}</M> constant if the model were right. The second pushes
+          towards the line with a force <M>{'k'}</M>. Any disturbance force smaller than{' '}
+          <M>{'k'}</M> cannot push the state off the line again: once on it, the drone slides to the
+          target whatever the wind or the weight. The phase portrait draws the line.
+        </p>
+        <Try>
+          At 12 s the drone picks up 300 g, 2.9 N it was not designed for. Watch the altitude: the
+          sliding mode barely notices. Now look at the motor chart. Then set{' '}
+          <b>Sliding mode → Switching force k</b> to 2 N, below the payload's weight, and press{' '}
+          <b>R</b>. Back at 6 N, give the law a <b>Boundary layer φ</b>: inside{' '}
+          <M>{'|s| < \\varphi'}</M> the sign becomes a slope, and the law is a PD with{' '}
+          <M>{'K_p = k\\lambda/\\varphi'}</M>.
+        </Try>
+        <Notice>
+          With φ = 0 the sign flips on every sample: the thrust jumps by ±6 N 250 times a second.
+          The motors smooth it into a buzz, but a real motor and its battery would not thank you.
+          This is <b>chatter</b>, the price of a discontinuous law on a sampled, lagging plant. The
+          boundary layer removes it at the price of a steady error, k·λ/φ newtons per metre, which
+          an integral would remove in turn. With k below the disturbance the guarantee is gone, and
+          the drone sinks almost two metres before the law and the ground stop it.
+        </Notice>
+      </>
+    ),
+  },
+  {
+    id: 'backstepping',
+    n: 16,
+    part: 3,
+    chapter: H,
+    title: 'One step at a time',
+    level: 1,
+    chart: 'bode',
+    setup: (p) => {
+      calm(p);
+      p.drone.motorTau = SLOW_MOTOR;
+      p.control.model.motorTau = SLOW_MOTOR;
+    },
+    events: (sim) => {
+      setAt(sim, 10, 'setpoint.y', 3);
+    },
+    goal: {
+      text: 'With motors that lag by 0.15 s: climb 1 m (at 10 s) with less than 2 % overshoot, settled within 2 % in 1.6 s, and keep at least 45° of phase margin.',
+      check: ({ sim }) => {
+        const m = marginsOf(sim.params);
+        if (!m) return 'this lesson needs a controller with a linear model';
+        if (sim.t < 13) return 'climbing at 10 s…';
+        const r = stepResult(sim, 10, 2, 3);
+        const ok = r.overshoot < 0.02 && r.settle < 1.6 && m.pmDeg >= 45;
+        return (
+          ok ||
+          `overshoot ${(r.overshoot * 100).toFixed(1)} % · settled in ${r.settle.toFixed(2)} s · PM ${m.pmDeg.toFixed(0)}°`
+        );
+      },
+    },
+    solution: (p) => {
+      p.control.l1.kind = 'backstepping';
+      p.control.backstepping = { k1: 4, k2: 4, k3: 15 };
+    },
+    body: (
+      <>
+        <p>
+          These motors take 0.15 s to follow a command, five times longer than before. The loop is a
+          chain of three integrators: thrust becomes acceleration, acceleration velocity, velocity
+          height. A PD controller pushes on the first link and hopes the lag will not matter. Here
+          it does: the fast PD tunes overshoot by 6 to 24 %, the well-damped ones are slow, and no
+          PD or PID tune on a grid of 36 meets this lesson's goal.
+        </p>
+        <p>
+          <b>Backstepping</b> designs down the chain, one step at a time. Pretend the velocity is a
+          control and choose the velocity that would bring the height home,{' '}
+          <M>{'\\alpha_1 = -k_1 e'}</M>. Then the thrust that would make the velocity follow{' '}
+          <M>{'\\alpha_1'}</M>, and at last the command that makes the thrust follow that. Each
+          step's error <M>{'z_i'}</M> enters a Lyapunov function, and the cross terms are chosen to
+          cancel:
+        </p>
+        <M display>
+          {
+            'V = \\tfrac12(z_1^2 + z_2^2 + z_3^2), \\qquad \\dot V = -k_1 z_1^2 - k_2 z_2^2 - k_3 z_3^2 \\le 0'
+          }
+        </M>
+        <p>
+          The proof of stability comes with the design. The last step uses the measured thrust
+          (motor telemetry), which a PD controller ignores.
+        </p>
+        <Try>
+          Try to meet the goal with the PID first. Then switch <b>Altitude controller</b> to{' '}
+          <b>backstepping</b> and choose the three step gains. The info card shows the law it ends
+          in.
+        </Try>
+        <Notice>
+          For this linear chain the recursive design ends in an ordinary state feedback on height,
+          velocity and thrust, the same kind of law as the LQR with the lag state: what backstepping
+          adds is a way to choose the gains with a proof attached. The proof holds while the motors
+          can do what is asked. Backstepping comes into its own on chains that are not linear, where
+          no transfer function exists, and it is the core of many spacecraft and missile autopilots.
+        </Notice>
+      </>
+    ),
+  },
+  {
+    id: 'mrac',
+    n: 17,
+    part: 3,
+    chapter: H,
+    title: 'Learning can diverge',
+    level: 1,
+    chart: 'mrac',
+    setup: (p) => {
+      calm(p);
+      p.control.l1.kind = 'mrac';
+      p.control.model.mass = 0.7;
+      p.control.mrac = { ...p.control.mrac, gamma: 20000, gammaG: 50, sigma: 0 };
+      p.sensors.delayMs = 20;
+      p.setpoint.profile = 'sine';
+      p.setpoint.profileAmplitude = 0.1;
+      p.setpoint.profilePeriod = 0.5;
+    },
+    goal: {
+      text: 'Keep the fast adaptation (γ at least 10 000) and stop the drift: from 30 s on, the drone must follow the reference model within 5 cm RMS.',
+      check: ({ sim }) => {
+        const c = sim.params.control;
+        if (c.l1.kind !== 'mrac') return 'this lesson is about MRAC';
+        if (c.mrac.gamma < 10000)
+          return 'keep γ at 10 000 or more: a slow adaptation hides the problem, it does not solve it';
+        if (sim.t < 40) return 'adapting…';
+        const { series } = sim.telemetry.window(['mrac.err'], 30);
+        const e = series[0]!.filter((v) => !Number.isNaN(v));
+        const rms = Math.sqrt(e.reduce((a, v) => a + v * v, 0) / Math.max(e.length, 1));
+        return rms < 0.05 || `model-following error ${(rms * 100).toFixed(1)} cm RMS`;
+      },
+    },
+    solution: (p) => {
+      p.control.mrac.sigma = 0.01;
+    },
+    body: (
+      <>
+        <p>
+          <b>Model-reference adaptive control</b> does not need to know the mass. It chooses a
+          reference model, the loop it wants (<M>{'\\ddot y_m = k_p(r - y_m) - k_d\\dot y_m'}</M>),
+          and adapts three numbers <M>{'\\hat\\theta'}</M> until the drone behaves like it. The
+          adaptation law comes out of a Lyapunov function [Ioannou 1996]:
+        </p>
+        <M display>{'\\dot{\\hat\\theta} = -\\Gamma\\,w\\,(B^\\top P x)'}</M>
+        <p>
+          with <M>{'x'}</M> the error between drone and model. The proof says the error goes to zero
+          for any adaptation gain <M>{'\\Gamma'}</M>, however large. The controller believes the
+          drone weighs 0.7 kg; it weighs 1.0 kg. The ideal gains are{' '}
+          <M>{'\\theta^* = m\\,(k_p, k_d, g) = (9, 6, 9.8)'}</M>.
+        </p>
+        <Try>
+          Watch the first seconds: the drone follows the model to a few millimetres, as the proof
+          promises. Then watch the velocity gain on the chart. Set <b>Sensors → Delay</b> to 0 and
+          press <b>R</b>. Then, with the delay back at 20 ms, try <b>MRAC → σ-modification</b>.
+        </Try>
+        <Notice>
+          The proof assumed a plant without delay and with instant motors. With 20 ms of delay the
+          velocity gain drifts from 4 to over 140, twenty times its ideal, and the motors spend 80 %
+          of the time at their limits: the error that the law was proven to remove grows to 15 cm.
+          Without the delay the gain still drifts (to about 55, nine times its ideal), but the
+          motors can follow. This is the Rohrs counterexample of 1985 on a drone: nothing in the
+          Lyapunov argument stops the parameters from wandering in directions the error does not
+          see, until the dynamics the proof ignored are excited. σ-modification pulls the gains back
+          towards the first guess and keeps them there, at the price of following the model a little
+          less exactly. The filter of L1 adaptive control in lesson II.18 is the same repair, made
+          in a different place.
+        </Notice>
+      </>
+    ),
+  },
+  {
     id: 'rate',
     n: 18,
     part: 3,
@@ -1288,153 +1614,6 @@ export const PART_THREE: Lesson[] = [
           see; only resolution can. The same reasoning covers a quantised motor command or a
           fixed-point computation: a quantiser in a loop with an integrator makes a limit cycle, and
           the describing function says how large.
-        </Notice>
-      </>
-    ),
-  },
-  {
-    id: 'smc',
-    n: 15,
-    part: 3,
-    chapter: H,
-    title: 'Slide to the target',
-    level: 1,
-    chart: 'phase',
-    setup: (p) => {
-      p.control.l1.kind = 'smc';
-      p.control.smc = { lambda: 3, k: 6, phi: 0 };
-    },
-    events: (sim) => setAt(sim, PAYLOAD.at, 'drone.mass', 1 + PAYLOAD.kg),
-    predict: {
-      label: 'Sag after the payload with φ = 0.05 m/s',
-      unit: 'cm',
-      truth: (p) => smcSag(p, 0.05),
-      tolerance: 0.15,
-    },
-    goal: {
-      text: 'Predict the sag a boundary layer of 0.05 m/s leaves under the payload. Then stop the chatter (thrust jitter below 0.3 N) while keeping the altitude within 3 cm RMS from 14 s on, through the gusts and the payload.',
-      check: ({ sim, prediction }) => {
-        if (sim.params.control.l1.kind !== 'smc')
-          return 'this lesson is about the sliding-mode controller';
-        if (prediction == null)
-          return 'first the prediction: inside the layer the law is a PD — what is its Kp?';
-        const truth = smcSag(sim.params, 0.05);
-        if (Math.abs(prediction - truth) / truth > 0.15)
-          return 'not within 15 %: the payload weighs 0.3·g newtons, and Kp = k·λ/φ';
-        if (sim.t < 25) return sim.t < PAYLOAD.at ? 'hovering in gusts…' : 'carrying the payload…';
-        const jitter = thrustJitter(sim, 6);
-        const rms = hoverRms(sim, 14, sim.t);
-        return (
-          (jitter < 0.3 && rms < 0.03) ||
-          `thrust jitter ${jitter.toFixed(2)} N · altitude RMS ${(rms * 100).toFixed(1)} cm`
-        );
-      },
-    },
-    solution: (p) => {
-      p.control.smc.phi = 0.05;
-    },
-    body: (
-      <>
-        <p>
-          A <b>sliding-mode</b> controller chooses a line in the phase plane,
-        </p>
-        <M display>{'s = \\dot e + \\lambda e = 0,'}</M>
-        <p>
-          along which the error dies as <M>{'e^{-\\lambda t}'}</M>, and then drives the state onto
-          it with everything it has:
-        </p>
-        <M display>{'u = \\hat m\\,(g + \\lambda\\,\\dot e) + k\\,\\mathrm{sign}(s)'}</M>
-        <p>
-          The first term would keep <M>{'s'}</M> constant if the model were right. The second pushes
-          towards the line with a force <M>{'k'}</M>. Any disturbance force smaller than{' '}
-          <M>{'k'}</M> cannot push the state off the line again: once on it, the drone slides to the
-          target whatever the wind or the weight. The phase portrait draws the line.
-        </p>
-        <Try>
-          At 12 s the drone picks up 300 g, 2.9 N it was not designed for. Watch the altitude: the
-          sliding mode barely notices. Now look at the motor chart. Then set{' '}
-          <b>Sliding mode → Switching force k</b> to 2 N, below the payload's weight, and press{' '}
-          <b>R</b>. Back at 6 N, give the law a <b>Boundary layer φ</b>: inside{' '}
-          <M>{'|s| < \\varphi'}</M> the sign becomes a slope, and the law is a PD with{' '}
-          <M>{'K_p = k\\lambda/\\varphi'}</M>.
-        </Try>
-        <Notice>
-          With φ = 0 the sign flips on every sample: the thrust jumps by ±6 N 250 times a second.
-          The motors smooth it into a buzz, but a real motor and its battery would not thank you.
-          This is <b>chatter</b>, the price of a discontinuous law on a sampled, lagging plant. The
-          boundary layer removes it at the price of a steady error, k·λ/φ newtons per metre, which
-          an integral would remove in turn. With k below the disturbance the guarantee is gone, and
-          the drone sinks almost two metres before the law and the ground stop it.
-        </Notice>
-      </>
-    ),
-  },
-  {
-    id: 'mrac',
-    n: 17,
-    part: 3,
-    chapter: H,
-    title: 'Learning can diverge',
-    level: 1,
-    chart: 'mrac',
-    setup: (p) => {
-      calm(p);
-      p.control.l1.kind = 'mrac';
-      p.control.model.mass = 0.7;
-      p.control.mrac = { ...p.control.mrac, gamma: 20000, gammaG: 50, sigma: 0 };
-      p.sensors.delayMs = 20;
-      p.setpoint.profile = 'sine';
-      p.setpoint.profileAmplitude = 0.1;
-      p.setpoint.profilePeriod = 0.5;
-    },
-    goal: {
-      text: 'Keep the fast adaptation (γ at least 10 000) and stop the drift: from 30 s on, the drone must follow the reference model within 5 cm RMS.',
-      check: ({ sim }) => {
-        const c = sim.params.control;
-        if (c.l1.kind !== 'mrac') return 'this lesson is about MRAC';
-        if (c.mrac.gamma < 10000)
-          return 'keep γ at 10 000 or more: a slow adaptation hides the problem, it does not solve it';
-        if (sim.t < 40) return 'adapting…';
-        const { series } = sim.telemetry.window(['mrac.err'], 30);
-        const e = series[0]!.filter((v) => !Number.isNaN(v));
-        const rms = Math.sqrt(e.reduce((a, v) => a + v * v, 0) / Math.max(e.length, 1));
-        return rms < 0.05 || `model-following error ${(rms * 100).toFixed(1)} cm RMS`;
-      },
-    },
-    solution: (p) => {
-      p.control.mrac.sigma = 0.01;
-    },
-    body: (
-      <>
-        <p>
-          <b>Model-reference adaptive control</b> does not need to know the mass. It chooses a
-          reference model, the loop it wants (<M>{'\\ddot y_m = k_p(r - y_m) - k_d\\dot y_m'}</M>),
-          and adapts three numbers <M>{'\\hat\\theta'}</M> until the drone behaves like it. The
-          adaptation law comes out of a Lyapunov function [Ioannou 1996]:
-        </p>
-        <M display>{'\\dot{\\hat\\theta} = -\\Gamma\\,w\\,(B^\\top P x)'}</M>
-        <p>
-          with <M>{'x'}</M> the error between drone and model. The proof says the error goes to zero
-          for any adaptation gain <M>{'\\Gamma'}</M>, however large. The controller believes the
-          drone weighs 0.7 kg; it weighs 1.0 kg. The ideal gains are{' '}
-          <M>{'\\theta^* = m\\,(k_p, k_d, g) = (9, 6, 9.8)'}</M>.
-        </p>
-        <Try>
-          Watch the first seconds: the drone follows the model to a few millimetres, as the proof
-          promises. Then watch the velocity gain on the chart. Set <b>Sensors → Delay</b> to 0 and
-          press <b>R</b>. Then, with the delay back at 20 ms, try <b>MRAC → σ-modification</b>.
-        </Try>
-        <Notice>
-          The proof assumed a plant without delay and with instant motors. With 20 ms of delay the
-          velocity gain drifts from 4 to over 140, twenty times its ideal, and the motors spend 80 %
-          of the time at their limits: the error that the law was proven to remove grows to 15 cm.
-          Without the delay the gain still drifts (to about 55, nine times its ideal), but the
-          motors can follow. This is the Rohrs counterexample of 1985 on a drone: nothing in the
-          Lyapunov argument stops the parameters from wandering in directions the error does not
-          see, until the dynamics the proof ignored are excited. σ-modification pulls the gains back
-          towards the first guess and keeps them there, at the price of following the model a little
-          less exactly. The filter of L1 adaptive control in lesson II.18 is the same repair, made
-          in a different place.
         </Notice>
       </>
     ),

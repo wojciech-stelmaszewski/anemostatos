@@ -617,3 +617,37 @@ def minsnap_square():
     b.set_ylabel("deg/s")
     b.set_xlabel("time in the lap [s]", loc="right")
     save(f, "minsnap_square")
+
+
+@fig
+def mpc_ceiling():
+    f, (a, b) = plt.subplots(2, 1, figsize=(TEXT_W, 80 * MM), sharex=True, gridspec_kw=dict(hspace=0.25, height_ratios=[1.4, 1]))
+    for tag, col, lab in (("pid", C["ghost"], "PID"), ("mpc", C["meas"], "MPC")):
+        d = win(load(f"mpc-{tag}"), 7, 21)
+        a.plot(d.t - 8, d["pos.y"], color=col, lw=1.2 if tag == "pid" else 1.0, label=lab)
+        b.plot(d.t - 8, d["thrust"], color=col, lw=1.0 if tag == "pid" else 0.9, label=lab)
+    a.axhspan(4, 4.3, color=C["sat"], alpha=0.8, lw=0)
+    a.axhline(4, color=C["err"], lw=0.7)
+    a.text(10.2, 4.06, "ceiling", fontsize=6.2, color=C["err"])
+    a.axhline(3.95, color=C["sp"], lw=0.6, ls=(0, (3, 2)))
+    a.set_ylim(1.9, 4.25)
+    a.set_title("Altitude after the set-point jumps to 3.95 m")
+    a.set_ylabel("m")
+    a.legend(loc="lower right")
+    ins = a.inset_axes([0.35, 0.12, 0.3, 0.5])
+    for tag, col in (("pid", C["ghost"]), ("mpc", C["meas"])):
+        d = win(load(f"mpc-{tag}"), 9, 21)
+        ins.plot(d.t - 8, d["pos.y"], color=col, lw=0.9)
+    ins.axhline(4, color=C["err"], lw=0.7)
+    ins.axhline(3.95, color=C["sp"], lw=0.6, ls=(0, (3, 2)))
+    ins.set_ylim(3.88, 4.06)
+    ins.set_xlim(1, 13)
+    ins.tick_params(labelsize=5.5)
+    b.axhline(4 * 6.1, color=C["faint"], lw=0.5, ls=(0, (2, 2)))
+    b.text(10.2, 22.2, "4 × 6.1 N", fontsize=6.0, color=C["muted"])
+    b.set_xlim(-1, 13)
+    b.set_ylim(0, 26)
+    b.set_title("Total thrust")
+    b.set_ylabel("N")
+    b.set_xlabel("time after the jump [s]", loc="right")
+    save(f, "mpc_ceiling")

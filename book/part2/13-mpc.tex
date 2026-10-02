@@ -1,0 +1,171 @@
+\lesson{II.13}{Look before you leap}{A PID learns about a limit by hitting it. A controller that predicts can plan around the limit before it gets there.}{1}{mpc}{Part II · Beyond PID}
+\label{les:mpc}
+
+\lead{\setupcard{\setuprow{Level}{L1}\setuprow{Controller}{the PID altitude loop of Part~I}\setuprow{Scene}{a ceiling at \SI{4}{m}; no wind}\setuprow{Event}{at $t = \SI{8}{s}$ the set-point jumps from 2 to \SI{3.95}{m}, five centimetres below the ceiling}\setuprow{Goal}{reach \SI{3.95}{m} within \SI{5}{cm} without ever touching the ceiling}}%
+Back to the vertical axis of Part~I, now with a ceiling. The set-point jumps to five centimetres below it, and the PID does what Part~I taught us to expect: it overshoots by nine centimetres and spends eight and a half seconds above the line while its integral unwinds. No gain fixes this, because nothing in the PID knows there is a ceiling. Model predictive control does. At every step it computes the best thrust for the next second with the ceiling and the motors' range written into the problem, applies the first move, and plans again. It reaches \SI{3.95}{m} in under a second and a half and never crosses \SI{3.95}{m} at all.}
+
+\section{Limits that a formula cannot see}
+
+The controllers of Part~I and of chapters A--C are formulas: a state goes in, an input comes out. A limit enters them only afterwards, by clipping: the thrust is clamped to the motors' range, and an anti-windup scheme repairs the integral when that happens (\lessonref{les:windup}). A limit on the \emph{state} — a ceiling, a wall, a speed — does not enter them at all. The drone discovers it by crossing it.\recall{Lesson~I.6: anti-windup stops the integral from growing while the thrust is clamped. It repairs the consequences of a limit; it does not anticipate the limit.}
+
+\begin{example}[The PID and the ceiling]
+\label{ex:mpc-pid}
+Explain the PID's flight after the jump (\cref{fig:mpc-ceiling}).
+
+\textbf{Step 1 — the rise.} The error of \SI{1.95}{m} asks for $K_p \cdot 1.95 = \SI{19.5}{N}$ above the feedforward: the thrust rises to \SI{23.6}{N}, near the motors' \SI{24.4}{N}. The drone climbs at up to \SI{2.2}{m/s}.
+
+\textbf{Step 2 — the overshoot.} During the climb the integral collects the error's area, \SI{1.3}{m.s} by the time the drone first reaches \SI{3.95}{m}, and holds about $K_i \cdot 1.3 \approx \SI{1}{N}$ of extra thrust when the drone arrives. That is the overshoot of Part~I's integral (\lessonref{les:integral}): the drone passes \SI{3.95}{m}, crosses the ceiling \SI{2.4}{s} after the jump and peaks at \SI{4.04}{m}.
+
+\textbf{Step 3 — the slow return.} The excess thrust can only leave the integral as fast as the integral can unwind, against an error of a few centimetres. The drone is above \SI{4}{m} for \SI{8.5}{s}, and within \SI{5}{cm} of the set-point only after \SI{10.9}{s}.
+
+\textbf{Step 4 — read it.} Lowering $K_i$ would shrink the overshoot and lengthen the return; raising $K_d$ would slow the climb. Any tuning trades one for the other. None of them uses the information that matters: the ceiling is at \SI{4}{m}.
+\end{example}
+\pitfall{A set-point a few centimetres below a hard limit is a common request — a camera close to a ceiling, a gripper close to a table. A controller that overshoots must then be given a set-point further away, and the task suffers.}
+
+\section{Plan, apply the first move, plan again}
+
+\begin{definition}{Model predictive control}
+At every sampling instant, \term{model predictive control} (MPC) measures the state, predicts the plant's response over a horizon of $N$ steps for every sequence of inputs, chooses the sequence that minimises a cost subject to the constraints, applies the \emph{first} input of that sequence, and repeats the whole computation at the next instant (\term{receding horizon}).
+\end{definition}
+
+For the altitude, with $u$ the thrust above the hover feedforward, the model is the double integrator $\ddot y = u/\hat m$. The simulator plans $N = 50$ steps of $\Delta t = \SI{20}{ms}$ — one second — and solves
+\begin{equation}\label{eq:mpc-qp}
+  \begin{aligned}
+  &\min_{u_0, \dots, u_{N-1}} \sum_{k=1}^{N} \Big(q_p\,(y_k - r_k)^2 + q_v\,(v_k - \dot r_k)^2\Big) + \sum_{k=0}^{N-1} r_u\,u_k^2\\
+  &\text{subject to}\quad -\hat mg \le u_k \le T_{max} - \hat mg,\qquad y_k \le y_{ceil} - \delta ,
+  \end{aligned}
+\end{equation}
+with $q_p = 50$, $q_v = 5$, $r_u = 0.05$ and a margin $\delta = \SI{3}{cm}$.\tip{Only the ratios of the weights matter: multiplying all of them by ten gives the same plan. Here $q_p/r_u = 1000$: a metre of error costs as much as \SI{32}{N} of extra thrust.}
+
+\begin{example}[Predictions are linear in the inputs]
+\label{ex:mpc-condense}
+Write the predicted altitudes $y_1$ and $y_2$ as functions of $u_0$ and $u_1$, for an input held constant over each step.
+
+\textbf{Step 1 — one step.} With $u_0$ held for $\Delta t$, the drone accelerates at $b u_0$, $b = 1/\hat m$: $y_1 = y_0 + \Delta t\,v_0 + \tfrac12 b\Delta t^2 u_0$, and $v_1 = v_0 + b\Delta t\,u_0$.
+
+\textbf{Step 2 — two steps.} $y_2 = y_1 + \Delta t\,v_1 + \tfrac12 b\Delta t^2 u_1 = y_0 + 2\Delta t\,v_0 + b\Delta t^2(\tfrac32 u_0 + \tfrac12 u_1)$.
+
+\textbf{Step 3 — the pattern.} $y_k = y_0 + k\Delta t\,v_0 + \sum_{j<k} b\Delta t^2(k - j - \tfrac12)\,u_j$: the prediction is the free motion plus a matrix $G$ times the input sequence, $\vec y = \bar{\vec y} + G\vec u$. These are exactly the entries of \texttt{gp} in \src{src/control/mpc.ts}.
+
+\textbf{Step 4 — consequence.} The cost of \cref{eq:mpc-qp} is then quadratic in $\vec u$ and the constraints are linear in $\vec u$: a \term{quadratic program} (QP) of 50 variables and 100 constraints, with a unique solution, solved here in 5 to 30 iterations of the ADMM method (Stellato et al., 2020).
+\end{example}
+\innumbers{50 variables and 100 constraints, 30 iterations of a dense method: well under a millisecond on a laptop, every \SI{20}{ms}.}
+
+\simfig{mpc_ceiling}{The jump to \SI{3.95}{m}, five centimetres below the ceiling. Top: the altitude, with the last centimetres enlarged. The PID (grey) overshoots into the ceiling and stays there for \SI{8.5}{s}; MPC (blue) stops on the set-point. Bottom: the thrust. MPC uses the full \SI{24.4}{N} for a quarter of a second, then brakes harder than the PID, early.}{fig:mpc-ceiling}
+
+\begin{example}[What the plan does]
+\label{ex:mpc-plan}
+Read the MPC flight (\cref{fig:mpc-ceiling}) as a plan.
+
+\textbf{Step 1 — full thrust.} For \SI{0.25}{s} the thrust is at the motors' limit, \SI{24.4}{N}: an upward acceleration of $24.4 - 9.81 = \SI{14.6}{m/s^2}$. The speed reaches \SI{3.5}{m/s} — faster than the PID ever climbs.
+
+\textbf{Step 2 — braking, early.} At \SI{2.5}{m}, still \SI{1.4}{m} below the target, the plan cuts the thrust to \SI{4.2}{N}: a deceleration of \SI{5.6}{m/s^2}. From \SI{3.5}{m/s} that stops the drone in $3.5^2/(2 \cdot 5.6) = \SI{1.1}{m}$ — at about \SI{3.6}{m}. The remaining approach is gentle, and the drone settles within \SI{5}{cm} of the set-point after \SI{1.4}{s}.
+
+\textbf{Step 3 — never above the set-point.} The highest altitude reached is \SI{3.950}{m}. The ceiling constraint never became active: the tracking cost alone, with a model that knows what braking costs, chose an approach without overshoot.
+
+\textbf{Step 4 — why it knows.} Every \SI{20}{ms} the plan is recomputed from the measured state. The braking that starts at \SI{2.5}{m} is not a rule; it is the first move of a one-second plan that, from that state, reaches \SI{3.95}{m} with the least cost.
+\end{example}
+
+\begin{keyidea}[The constraint is part of the question]
+A PID computes an input and then asks whether it is allowed. MPC asks for the best input \emph{among those that are allowed}, over a future it predicts. Limits on the input and on the state are handled in the same way, and the controller acts on them before they are reached.
+\end{keyidea}
+\didyouknow{The receding horizon is how people drive: you plan the next few seconds of the road, act on the first part of the plan, and plan again as the road unfolds.}
+
+\screen[0 0 495 998]{mpc}{Lesson II.13 in the app with MPC. The amber line beside the drone is the current plan for the next second; it bends under the ceiling before the drone gets there. The information card lists the horizon, the constraints and the iterations of the last solve.}{fig:mpc-screen}
+
+\begin{inapp}
+\begin{itemize}[leftmargin=1.2em]
+  \item The switch is \ui{Controller\then Altitude controller\then MPC} (\param{control.l1.kind = 'mpc'}); the weights and timing are \param{control.mpc.qPos}, \param{qVel}, \param{r}, \param{hz} and \param{horizon}; the ceiling is \param{world.ceiling} and the margin \param{control.mpc.margin}.
+  \item The planner is \texttt{AxisMpc} in \src{src/control/mpc.ts}: it builds the prediction matrices once, then at every step forms the QP of \cref{eq:mpc-qp} and solves it with \texttt{QpSolver} (\src{src/math/qp.ts}), warm-started from the previous solution.
+  \item The iteration cap is \param{control.mpc.iterations}: it bounds the computing time per step.
+\end{itemize}
+\end{inapp}
+
+\begin{trythis}
+\begin{enumerate}
+  \item Watch the PID hit the ceiling. Then switch to MPC and watch the plan bend before the drone arrives.
+  \item Set the set-point to \SI{4.5}{m}, above the ceiling. What does each controller do?
+  \item Lower \param{control.mpc.iterations} to 3. Does the plan still respect the ceiling?
+\end{enumerate}
+\predict{with the set-point above the ceiling, where will MPC hold the drone, and why not exactly at \SI{4}{m}?}
+\end{trythis}
+
+\section{The engineer's view: optimisation as a controller}
+
+\subsection{From refineries to rockets}
+MPC was born in the process industries in the late 1970s, where a distillation column has dozens of coupled variables, every one with limits, and time constants of minutes — plenty of time to solve an optimisation at each step (Qin and Badgwell, 2003). For decades this was its niche. Faster computers and better solvers have since brought it down to milliseconds: into cars, into power electronics, and into flight.\didyouknow{In power electronics, MPC chooses the switching state of an inverter every few tens of microseconds — among a handful of options, by enumeration.}
+
+\begin{example}[A rocket that cannot hover]
+\label{ex:mpc-rocket}
+A booster falls towards its landing pad at \SI{250}{m/s}. Suppose its single engine, at the lowest throttle it can hold, still decelerates it at $3g$ at landing mass. When must it light the engine, and what if it lights too late?
+
+\textbf{Step 1 — the stopping distance.} The deceleration is fixed between a minimum and a maximum; at the minimum, $a = 3 \cdot 9.81 = \SI{29.4}{m/s^2}$, the booster stops in $250^2/(2 \cdot 29.4) = \SI{1060}{m}$.
+
+\textbf{Step 2 — the window.} Light it higher than that and it stops in mid-air and climbs again; it cannot hover, since its least thrust exceeds its weight. Light it lower and even full throttle may not stop it in time. The burn must be planned so that velocity and altitude reach zero together.
+
+\textbf{Step 3 — the plan as an optimisation.} With the thrust bounded above \emph{and below}, the glide slope and the fuel all constrained, the descent is a constrained optimal-control problem. Açıkmeşe and Ploen (2007) showed that it can be posed as a convex problem, solved reliably in milliseconds; such solvers have guided landings since.
+
+\textbf{Step 4 — read it.} For the drone under the ceiling, a late plan costs a few centimetres. For the booster there is no second chance: the plan must remain feasible all the way down. That property — the next plan always exists — is the central question of MPC theory.
+\end{example}
+
+\subsection{In formal terms}
+
+\begin{theorem}[Unconstrained MPC is a linear feedback]
+\label{thm:mpc-linear}
+For a linear model $\vx_{k+1} = A\vx_k + B\symbf u_k$, a quadratic cost with $R \succ 0$ over a finite horizon, and no constraints, the first input of the optimal sequence is a linear function of the current state and the reference: $\symbf u_0 = -K_{N}\vx_0 + \text{(reference terms)}$. As $N \to \infty$, $K_N$ tends to the gain of the discrete-time LQR.
+\end{theorem}
+\begin{proof}
+The predictions are $\vec{\vx} = \Phi\vx_0 + \Gamma\vec{\symbf u}$, as in Example~\ref{ex:mpc-condense}. The cost is $\tfrac12\vec{\symbf u}^\T H\vec{\symbf u} + \vec{\symbf u}^\T F\vx_0 + \dots$ with $H \succ 0$, minimised at $\vec{\symbf u} = -H^{-1}F\vx_0 - \dots$, linear in $\vx_0$. For the limit: the finite-horizon cost-to-go solves the Riccati difference equation backwards from the terminal weight, and under the hypotheses of \cref{thm:lqr-care} it converges to the stationary solution (Anderson and Moore, 1990; Appendix~I).
+\end{proof}
+
+With constraints the optimiser is no longer linear but \emph{piecewise} affine: the state space splits into regions, in each of which a different set of constraints is active and the law is affine (Bemporad, Morari, Dua and Pistikopoulos, 2002). Near the set-point, with no constraint active, MPC is an LQR; far from it, it is a sequence of LQRs glued along the constraints.
+
+What the theorem does not give is stability with constraints. A receding horizon can, in principle, plan into a state from which no feasible plan exists. The standard remedy adds a \emph{terminal} cost and a terminal set to the problem, chosen so that the tail of every plan can be continued; then a plan that is feasible once stays feasible, and the optimal cost decreases from step to step like a Lyapunov function (Mayne, Rawlings, Rao and Scokaert, 2000). The simulator's MPC uses neither: its horizon is long enough for the drone's braking, which is the practical form of the same guarantee — and the subject of the next lesson.\tip{Feasibility first: if the solver may fail, decide in advance what the controller does then — keep the tail of the last plan, or fall back to a simple law.}
+
+\begin{lookahead}
+\begin{itemize}[leftmargin=1.2em]
+  \item How long the horizon must be, and what happens when it is too short, is the next lesson.
+  \item MPC for all three axes, on top of INDI, follows a trajectory in gusts in Lesson~II.15; a sampling-based optimiser that needs no QP, in Lesson~II.16.
+  \item The theory of optimal control behind MPC — dynamic programming and the maximum principle — is in Lessons~IV.1--IV.4; the QP and its solvers in Appendix~J.
+\end{itemize}
+\end{lookahead}
+
+\begin{remember}
+\begin{itemize}
+  \item MPC: predict over a horizon, optimise the inputs subject to the constraints, apply the first, repeat.
+  \item For a linear model and a quadratic cost the predictions are linear in the inputs and the problem is a QP: here 50 variables, solved in milliseconds.
+  \item State limits, such as a ceiling, enter the plan; the controller acts before they are reached.
+  \item Under the ceiling: PID \SI{8.5}{s} above \SI{4}{m}; MPC never above \SI{3.95}{m}, settled in \SI{1.4}{s}.
+  \item Unconstrained, MPC is a linear feedback that tends to the LQR; constrained, a piecewise affine one. Stability with constraints needs a feasible tail.
+\end{itemize}
+\end{remember}
+
+\begin{curiosity}{Landing on a column of fire}
+\photo{falcon9}{A Falcon 9 first stage landing on a drone ship at sea.}
+For the first sixty years of spaceflight, the first stage of a rocket was thrown away. Landing it again had been studied since the 1990s, and small demonstrators had hovered and touched down, but an orbital booster falls from the edge of space with a few percent of its fuel left, an engine that cannot throttle low enough to hover, and wind that pushes it off its path.
+
+In 2015 a Falcon 9 first stage landed upright for the first time. Its guidance, as described by Lars Blackmore, who led the work, solves an optimisation problem during the descent: from the measured state, find the thrust history that reaches the pad at zero velocity with the least fuel, subject to the engine's minimum and maximum thrust, the angle it may point, and a cone of approach. The problem is cast so that it is convex — the work of Behçet Açıkmeşe and colleagues on Mars landing — which means that a solver finds the best answer, reliably, in a time that can be bounded in advance. Solved again and again during the burn, it is model predictive control in the sense of this lesson.
+
+The drone under the ceiling and the booster above the pad face the same question: what to do now, given everything that must not happen later.
+\end{curiosity}
+
+\begin{exercises}
+\exercise[1] With the motors' \SI{24.4}{N} and a \SI{1}{kg} drone, what is the largest upward acceleration, and the largest downward one with the motors off?
+\answer{$24.4 - 9.81 = \SI{14.6}{m/s^2}$ up; $g = \SI{9.81}{m/s^2}$ down.}
+\exercise[1] How many decision variables and how many constraints does the QP of \cref{eq:mpc-qp} have with a horizon of \SI{2}{s} at \SI{50}{Hz}?
+\answer{100 inputs; 100 input bounds and 100 altitude bounds.}
+\exercise[1] A drone climbs at \SI{3}{m/s} with the motors able to brake it at \SI{9.81}{m/s^2}. How far below a ceiling must it start braking at the latest?
+\answer{$3^2/(2 \cdot 9.81) = \SI{0.46}{m}$.}
+\exercise[2]\exkind{derive} Prove the formula of Example~\ref{ex:mpc-condense}, Step 3, by induction on $k$.
+\answer{Assume it for $k$; $v_k = v_0 + b\Delta t\sum_{j<k}u_j$; $y_{k+1} = y_k + \Delta t v_k + \tfrac12 b\Delta t^2 u_k$; collect: the coefficient of $u_j$, $j < k$, grows by $b\Delta t^2$, from $(k - j - \tfrac12)$ to $(k + 1 - j - \tfrac12)$, and $u_k$ enters with $\tfrac12 b\Delta t^2$.}
+\exercise[2]\exkind{derive}\label{ex:mpc-onestep} For a horizon of one step and no constraints, minimise $q_p(y_1 - r)^2 + r_u u_0^2$ by hand and show that the result is a PD law. What are its gains?
+\answer{$y_1 = y_0 + \Delta t v_0 + \tfrac12 b\Delta t^2 u_0$. Setting the derivative to zero: $u_0 = -\frac{q_p c}{q_p c^2 + r_u}(y_0 - r + \Delta t\,v_0)$ with $c = \tfrac12 b\Delta t^2$: a P gain $k = q_pc/(q_pc^2 + r_u)$ and a D gain $k\Delta t$.}
+\exercise[2]\exkind{derive} Repeat Example~\ref{ex:mpc-rocket} for a minimum deceleration of $2g$ and a falling speed of \SI{200}{m/s}. If the ignition comes \SI{0.5}{s} late, how fast does the booster hit the pad at minimum throttle?
+\answer{Stopping distance $200^2/(2 \cdot 19.6) = \SI{1020}{m}$. Late by \SI{0.5}{s}: it has fallen $200 \cdot 0.5 + \tfrac12 g\,0.5^2 = \SI{101}{m}$ further and gained \SI{4.9}{m/s}: $v^2 = 204.9^2 - 2 \cdot 19.6 \cdot 919$, about \SI{77}{m/s} at the pad — unless the engine can throttle up.}
+\exercise[2]\exkind{fly} In Lesson~II.13 with MPC, raise \param{control.mpc.r} from 0.05 to 1. How do the climb and the settling change? Why does the drone still not touch the ceiling?
+\answer{A higher price on thrust gives a gentler climb and slower settling; the constraint is unchanged, so the plan still never crosses $y_{ceil} - \delta$.}
+\exercise[2]\exkind{code} In \texttt{AxisMpc.solve} (\src{src/control/mpc.ts}) the reference is clipped to the ceiling, \texttt{Math.min(r.y, ceiling)}, before it enters the cost. What would happen with the set-point at \SI{4.5}{m} without that clip?
+\answer{The cost would pull the plan towards \SI{4.5}{m} while the constraint holds it below \SI{3.97}{m}: the plan presses against the constraint at every step, the solver needs more iterations, and with a capped iteration count it may violate the constraint slightly. Clipping makes the reference itself feasible.}
+\exercise[3]\exkind{derive} The explicit law. For a one-step horizon with the input bound $|u_0| \le \bar u$ and no state constraint, show that the MPC law is the saturated PD of Exercise~\ref{ex:mpc-onestep}, $u_0 = \operatorname{sat}_{\bar u}(-k(e + \Delta t\,v_0))$, and sketch its three regions in the $(e, v_0)$ plane. Why is it not the same as clipping a PD designed without the bound, once the horizon is longer than one step?
+\answer{The cost is a parabola in $u_0$; its constrained minimum is the projection of the unconstrained one onto $[-\bar u, \bar u]$: the saturated law, with the regions $|k(e + \Delta t v_0)| \le \bar u$ (linear) and the two saturated ones beyond. With a longer horizon the later inputs also saturate, and the optimal first move accounts for that — it starts braking earlier than a clipped PD would (Example~\ref{ex:mpc-plan}).}
+\end{exercises}

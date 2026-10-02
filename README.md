@@ -171,7 +171,7 @@ motor lag.
 | III.29 | One flight proves nothing     | L3    | Monte Carlo: 300 dispersed flights, the failing corner, a pass rate with confidence                     |
 | III.30 | The robustness report card    | L1–L3 | margins, Monte Carlo and RMS for every controller: fast is not robust                                   |
 
-**Part IV — Aerospace GNC** (being built)
+**Part IV — Aerospace GNC** (24 of 29)
 
 | #     | Lesson                         | Level     | What you learn                                                                                                     |
 | ----- | ------------------------------ | --------- | ------------------------------------------------------------------------------------------------------------------ |
@@ -179,6 +179,8 @@ motor lag.
 | IV.2  | Full throttle, then full brake | L1        | bang-bang: one switch on the braking curve, the minimum time t*, and a lead for the motors                         |
 | IV.3  | The map of all futures         | L1        | dynamic programming: the value function as a map; exactly xᵀPx until the motors saturate                           |
 | IV.4  | Land on the last drop          | rocket    | fall, then full thrust: the suicide burn, its ignition altitude, and propellant that burns away                    |
+| IV.5  | Convex landing                 | lander    | fuel-optimal powered descent in a glide-slope cone, re-planned in flight; a dispersed campaign                     |
+| IV.6  | Plan the whole flight          | L3        | a least-time manoeuvre by transcription that uses the tilt limit fully and never saturates                         |
 | IV.7  | Balancing on a flame           | rocket    | thrust-vector control of an unstable airframe: a lower and an upper gain margin on the Nyquist chart               |
 | IV.8  | The rocket is a noodle         | rocket    | the gyro sees the bending mode and the loop sings; a notch, and where the gyro sits                                |
 | IV.9  | Fuel that moves                | rocket    | slosh near crossover eats the margin; baffles give it back                                                         |
@@ -186,14 +188,28 @@ motor lag.
 | IV.11 | Two ways to wobble             | aircraft  | the short period and the phugoid, as pole pairs and in flight; Lanchester's estimate                               |
 | IV.12 | Level 1                        | aircraft  | a pitch damper moves the short period into the level-1 handling-qualities region                                   |
 | IV.13 | One gain does not fit all      | aircraft  | a fixed gain buzzes when fast; a schedule on dynamic pressure keeps the margin                                     |
+| IV.15 | Invert the aeroplane           | aircraft  | dynamic inversion: a model error is a gain error; one design for the whole envelope                                |
+| IV.16 | The pilot in the loop          | aircraft  | a rate-limited elevator and a pilot lock into a PIO at the amplitude the describing function predicts              |
 | IV.17 | Throttle is energy             | aircraft  | total-energy control holds the speed in a climb where separate loops cannot                                        |
 | IV.18 | Point the telescope            | satellite | quaternion feedback, the shortest rotation, and a Lyapunov function that only falls                                |
 | IV.19 | Spin to turn                   | satellite | a disturbance fills the wheels; dump momentum with thrusters without losing the target                             |
 | IV.20 | On or off                      | satellite | the dead-band limit cycle of on–off thrusters and its fuel rate                                                    |
+| IV.21 | Panels that wave               | satellite | a flexible panel rings after a slew; input shaping cancels it; a tip sensor destabilises it                        |
 | IV.22 | Stars and gyros                | satellite | the MEKF fuses a slow star tracker with a drifting gyro; the bias must be a state                                  |
 | IV.24 | Aim where it will be           | L3        | pure pursuit tail-chases; proportional navigation keeps the line of sight still and hits a weaving target          |
 | IV.26 | Drift                          | L3        | an unaided inertial navigator: a gyro bias of 0.05 °/s is 38 m after 30 s, as g·b·t³/6 predicts                    |
 | IV.27 | When the tangent lies          | L3        | one range beacon: the EKF is confidently wrong, the UKF honestly unsure; a good NIS does not prove a good estimate |
+
+**Part V — From whiteboard to flight**
+
+| #   | Lesson                       | Level | What you learn                                                                |
+| --- | ---------------------------- | ----- | ----------------------------------------------------------------------------- |
+| V.1 | What does "good" mean?       | L1    | an error budget: biases add, random errors add in squares; measure each entry |
+| V.2 | The verification campaign    | L1    | requirements, dispersions, pass rates and what 20 clean flights prove         |
+| V.3 | The controller is code       | L1    | a fixed-point integrator: its dead zone, its wrap, and a back-to-back test    |
+| V.4 | Three sensors, one truth     | L1    | mid-value selection hides the first failure; a monitor survives the second    |
+| V.5 | Change controllers in flight | L1    | PID to LQI: the kick of a mismatched integrator and a bumpless transfer       |
+| V.6 | The design review            | L1    | model, margins, campaign, faults and software, checked and reported           |
 
 ## Run it
 

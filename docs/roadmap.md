@@ -151,12 +151,12 @@ V.1–V.6. Plan: [aerospace-gnc.md](aerospace-gnc.md).
 | --------- | ------------------------------------------------------------------------------------------------- |
 | M19 ✅    | Vehicle abstraction; quadrotor moved behind it with an unchanged baseline; `trim` and `linearize` |
 | M20 ✅    | Chapter K on L1 and the 1D rocket: Pontryagin, bang-bang, dynamic programming — IV.1–IV.4         |
-| M21       | Cone and nonlinear programs, 3D rocket, powered-descent guidance, collocation — IV.5–IV.6         |
+| M21 ✅    | Cone and nonlinear programs, 3D rocket, powered-descent guidance, collocation — IV.5–IV.6         |
 | M22 ✅    | Chapter L: planar rocket, thrust-vector control, bending, slosh — IV.7–IV.10                      |
 | M23 ◐     | Chapter M: aircraft, modes, augmentation, gain scheduling, PIO, energy control — IV.11–IV.17      |
 | M24 ◐     | Chapter N: satellite, reaction wheels, thrusters, flexible panel — IV.18–IV.23                    |
 | M25 ◐     | Chapter O: guidance laws, relative motion, INS, UKF, particle filter, smoother — IV.24–IV.29      |
-| M26       | Part V: budgets, campaigns, fixed-point controller, voter, mode logic, design review — V.1–V.6    |
+| M26 ✅    | Part V: budgets, campaigns, fixed-point controller, voter, mode logic, design review — V.1–V.6    |
 
 The whole course, its competence map and the order of work across the app
 and the book: [curriculum.md](curriculum.md).

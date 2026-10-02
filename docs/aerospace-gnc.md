@@ -1,9 +1,9 @@
 # Parts IV and V — Aerospace GNC and Engineering Practice
 
-> **Status (2026-10-02):** M19 (the vehicle abstraction), M20 (IV.1–IV.4)
-> and M22 (IV.7–IV.10) are built; M23 has IV.11–IV.13 and IV.17, M24 has
-> IV.18–IV.20 and IV.22, and M25 has IV.24, IV.26 and IV.27. §5 lists what was
-> built and where it differs from this plan. The rest is planned. Milestones
+> **Status (2026-10-02):** M19–M22 and M26 (all of Part V) are built; M23
+> lacks IV.14, M24 lacks IV.23, and M25 has IV.24, IV.26 and IV.27. Five
+> lessons remain, all **could**: IV.14, IV.23, IV.25, IV.28, IV.29. §5 lists
+> what was built and where it differs from this plan. Milestones
 > M19–M26 in [roadmap.md](roadmap.md) point here. Part IV depends on Part III
 > ([analysis.md](analysis.md)): its lessons use the Bode, Nyquist, pole,
 > dispersion and covariance views built there.
@@ -532,6 +532,76 @@ the live formula follow the rocket, the TVC loop and the autopilot. Still
 open: with a Part IV vehicle selected the side panel also shows the drone's
 controller, setpoint and PID groups, and a crash shows the drone's "hit the
 ground" message.
+
+### Built (2026-10-02, third round: M21, chapters M and N completed, Part V)
+
+**M21 — IV.5 and IV.6.** `math/socp.ts` is a barrier interior-point method
+with a phase I that reports infeasibility (not primal-dual); `math/nlp.ts` is
+an augmented Lagrangian with BFGS (not SQP: a dense SQP over all collocation
+states was too slow in JavaScript). `sim/vehicles/lander.ts` is a 3D
+point-mass lander with seeded dispersions, an unknown wind force and an
+engine that may deliver less than commanded.
+
+- IV.5 (`guidance/pdg.ts`, lossless convexification, final time by a scan
+  and golden section): with a 5 % weak engine and an unknown push, open loop
+  crashes 19 of 20 dispersed starts; re-planning every 0.5 s lands 19 at
+  about 0.46 m/s within 0.5 m and reports 1 infeasible (propellant). Fuel-
+  optimal re-planning alone could not absorb the weak engine: it needed a gate
+  3 m above the pad with a terminal descent law, a propellant reserve and the
+  engine efficiency measured in flight. The campaign is 20 cases, not 50. No
+  prediction.
+- IV.6 (`guidance/collocation.ts`): a dash of 6 m past a pillar, not a flip
+  through a window. The states are eliminated exactly, so the program's only
+  variables are 40 jerks and T. The student predicts the bang-bang bound
+  2√(D/a) = 1.97 s; the transcription flies 2.48 s without saturating, while
+  min-snap at 2.5 s asks 7.47 m/s² against 6.87 allowed. Min-snap flies
+  cleanly from about 2.6 s, so the gain is about 10 %, from using the limits
+  fully; the lesson says so instead of "min-snap cannot respect limits".
+
+**M23 and M24, completed (IV.15, IV.16, IV.21).**
+
+- IV.15: NDI of the pitch dynamics; a model error e divides the commanded
+  acceleration by 1 + e, a pure gain error. The student predicts the
+  bandwidth the aircraft really gets, k_q/(1 + e) = 11.4 rad/s. k_q 6, k_a 1
+  meet PM ≥ 45° and crossover ≥ 4 rad/s from 80 to 160 m/s with ±30 % error;
+  the q̄ schedule with the same error misses the crossover at 80 m/s. The
+  goal became "survive ±30 % across the envelope"; the lesson says the
+  schedule could be retuned too.
+- IV.16 (`analysis/pio.ts`): pilot gain 1, 150 ms (250 ms gave no PIO),
+  elevator 20°/s. A step does not trigger it; a startle burst does. The
+  describing function of the simulator's servo puts the onset at 7.65° of
+  command (flown: 5.6° dies out, 8.5° locks in). The student predicts the
+  slowest PIO-free rate, 52.3°/s (bisection 52.4°/s).
+- IV.21: a torsional panel on z (off by default). Shaping a step does
+  nothing, because the wheels saturate, so the slew is a profiled bang-bang
+  with feedforward and the shaper shapes the profile. The student predicts
+  the panel's free-hub frequency 0.524 Hz (the clamped 0.5 Hz fails the 5 %
+  goal with ZV; ZVD is robust). A tip sensor makes the swing grow at every
+  gain; a hub sensor never.
+
+**M26 — Part V (V.1–V.6).** `analysis/budget.ts`, `campaign.ts`,
+`software.ts`, `review.ts`; `control/part5/` (fixed point, shadow, voter,
+transfer); panels in `ui/part5/`.
+
+- V.1, V.4 and V.5 fly L1, not L3: one axis makes "biases add, random errors
+  in squares" exact and keeps campaigns fast. V.1 and V.2 use turbulence
+  only: gusts are heavy-tailed, and no 3σ requirement survives them.
+- V.1: the student predicts the wind's allocation (4.24 cm); the budget
+  predicts the all-sources flight within 5 %.
+- V.2: 20 clean flights prove 86.1 % (the prediction); the V.1 design fails
+  overshoot on slow-motor drones. The settling band is ±10 cm (±5 cm is
+  unmeetable with a ±3 cm altimeter bias).
+- V.3: signals are 32-bit; only the integrator's word and scaling are the
+  student's. The prediction is the integrator dead zone, 1.22 m.
+- V.4: B is isolated 3.2 s after its drift starts (flown within 0.15 s);
+  mid-value selection ends 50 cm off after the second failure, the monitor
+  holds 9 cm.
+- V.5: PID → LQI on L1; the kick Δm·g = 2.45 N (flown 2.43 N); bumpless
+  moves the drone under 1 cm against a 21 cm sag.
+- V.6: no PID design found passes the campaign with 45° of phase margin; the
+  way out is architectural (the altitude Kalman filter), and the review is
+  built around that. Margins are measured by probe; the model check compares
+  the measured plant with the controller's own m̂ and τ̂.
 
 **Build order.** M19 first: nothing else in Part IV can start without the
 vehicle abstraction. Then the **must** lessons across M20–M25, then Part V,

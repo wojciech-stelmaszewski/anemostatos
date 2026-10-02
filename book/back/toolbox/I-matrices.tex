@@ -27,7 +27,7 @@ Appendix~G gave the definition: $P \succ 0$ if $\vx^\T P\vx > 0$ for all $\vx \n
   \item a \emph{Cholesky factor} exists — the fastest numerically, and the test that solvers use.
 \end{itemize}
 
-\begin{theorem}[Cholesky factorisation]
+\begin{theorem}[Cholesky factorisation]\index{Cholesky factorisation}
 \label{thm:I-chol}
 A symmetric matrix $P$ is positive definite if and only if $P = LL^\T$ with $L$ lower triangular and positive on its diagonal. The factor is unique and is computed column by column:
 \begin{equation}\label{eq:I-chol}
@@ -41,7 +41,7 @@ If $P = LL^\T$ with $L$ invertible, $\vx^\T P\vx = \|L^\T\vx\|^2 > 0$ for $\vx \
 
 The block in the middle of that proof has a name of its own.
 
-\begin{theorem}[Schur complement]
+\begin{theorem}[Schur complement]\index{Schur complement}
 \label{thm:I-schur}
 For a symmetric block matrix $M = \begin{psmallmatrix}A & B\\ B^\T & C\end{psmallmatrix}$ with $A \succ 0$: $M \succ 0$ if and only if $C - B^\T A^{-1}B \succ 0$.
 \end{theorem}
@@ -64,7 +64,7 @@ Lesson~II.2 found, for $m = \SI{1}{kg}$, $q_e = 100$, $q_v = 10$, $r = 1$, the R
 \textbf{Step 4 — eigenvalues.} $3.53$ and $56.7$. The cost $\vx^\T P\vx$ of starting \SI{1}{m} low at rest is $p_{11} = 54.8$; starting at rest in place but moving at \SI{1}{m/s} costs $p_{22} = 5.5$. The ratio of the eigenvalues, 16, says that some initial states are sixteen times as expensive per unit length as others.
 \end{example}
 
-\section{Singular values}
+\section{Singular values}\index{singular value decomposition|(}
 
 Eigenvalues describe a square matrix applied to itself, again and again — the dynamics. A matrix that maps one kind of quantity to another — motor thrusts to forces and torques, inputs to outputs — is described by its singular values.
 
@@ -105,9 +105,9 @@ with the arm $d = 0.17/\sqrt2 = \SI{0.120}{m}$ and the drag-torque coefficient $
 
 \textbf{Step 4 — a caution about units.} The first row is in newtons and the others in newton-metres, so the condition number $2/0.032 = 62$ depends on the units chosen. Singular values compare directions fairly only after every quantity is scaled by what is important for it — here, for instance, by the largest torque each axis needs. Scaling is the first step of every analysis of a system with several inputs and outputs.
 \end{example}
-\pitfall{A singular value computed from a matrix with mixed units is a number without meaning. Before comparing directions, divide every input and output by a value that is important for it.}
+\pitfall{A singular value computed from a matrix with mixed units is a number without meaning. Before comparing directions, divide every input and output by a value that is important for it.}\index{singular value decomposition|)}
 
-\section{The Lyapunov equation and the Gramians}
+\section{The Lyapunov equation and the Gramians}\index{Lyapunov equation|(}
 
 Appendix~G introduced the Lyapunov equation $A^\T P + PA = -Q$ as a way to find a Lyapunov function. Its solution also has a closed form, which turns it into a tool for measuring.
 
@@ -158,9 +158,9 @@ The L1 drone ($A = \begin{psmallmatrix}0 & 1\\ 0 & 0\end{psmallmatrix}$, $B = (0
 \textbf{Step 4 — read it.} The cheapest move pushes, then brakes, symmetrically: the minimum-energy path is the cubic $x = 3t^2 - 2t^3$. Halving the time multiplies the energy by $2^3 = 8$ — the $T^3$ in $W_c$ — which is why fast manoeuvres are expensive. A Gramian with a small eigenvalue marks a direction that is controllable in principle and costly in practice; the rank test of \cref{thm:A-rank} cannot see the difference.
 \end{example}
 
-The \term{observability Gramian} $W_o(T) = \int_0^Te^{A^\T t}C^\T Ce^{At}\,\dd t$ is the mirror image: $\vx_0^\T W_o\vx_0$ is the energy of the output produced by the initial state $\vx_0$, so states with small $\vx_0^\T W_o\vx_0$ are hard to see in noisy measurements. Observability returns in Lesson~III.9; balancing the two Gramians, to find which states of a model matter, belongs to the later volumes.
+The \term{observability Gramian} $W_o(T) = \int_0^Te^{A^\T t}C^\T Ce^{At}\,\dd t$ is the mirror image: $\vx_0^\T W_o\vx_0$ is the energy of the output produced by the initial state $\vx_0$, so states with small $\vx_0^\T W_o\vx_0$ are hard to see in noisy measurements. Observability returns in Lesson~III.9; balancing the two Gramians, to find which states of a model matter, belongs to the later volumes.\index{Lyapunov equation|)}
 
-\section{The matrix inversion lemma}
+\section{The matrix inversion lemma}\index{matrix inversion lemma|(}
 
 \begin{theorem}[Woodbury identity]
 \label{thm:I-woodbury}
@@ -173,9 +173,9 @@ If $A$, $C$ and $A + UCV$ are invertible,
 Multiply the right-hand side by $A + UCV$ and collect terms: the result is $\Id$.
 \end{proof}
 
-The lemma exchanges the inverse of a large matrix for the inverse of a small one. In the Kalman filter it connects the two forms of the update: the information form $P^{-1}_+ = P^{-1}_- + H^\T R^{-1}H$, which adds what a measurement contributes, and the gain form $P_+ = P_- - P_-H^\T(HP_-H^\T + R)^{-1}HP_-$, which inverts only a matrix of the size of the measurement. For one altimeter reading, that inverse is a single division.\innumbers{A navigation filter with 15 states and a 3-axis satellite fix: the gain form inverts a $3 \times 3$ matrix, the information form a $15 \times 15$.}
+The lemma exchanges the inverse of a large matrix for the inverse of a small one. In the Kalman filter it connects the two forms of the update: the information form $P^{-1}_+ = P^{-1}_- + H^\T R^{-1}H$, which adds what a measurement contributes, and the gain form $P_+ = P_- - P_-H^\T(HP_-H^\T + R)^{-1}HP_-$, which inverts only a matrix of the size of the measurement. For one altimeter reading, that inverse is a single division.\innumbers{A navigation filter with 15 states and a 3-axis satellite fix: the gain form inverts a $3 \times 3$ matrix, the information form a $15 \times 15$.}\index{matrix inversion lemma|)}
 
-\section{The Riccati equations}
+\section{The Riccati equations}\index{Riccati equation|(}
 
 \begin{definition}{Algebraic Riccati equations}
 The \term{continuous algebraic Riccati equation} (CARE) and the \term{discrete} one (DARE) are
@@ -245,4 +245,4 @@ inversion lemma & $(A + UCV)^{-1} = A^{-1} - A^{-1}U(C^{-1} + VA^{-1}U)^{-1}VA^{
 CARE & $A^\T P + PA - PBR^{-1}B^\T P + Q = 0$; stabilising $P = X_2X_1^{-1}$ from the stable subspace of $\mathcal H$\\
 \end{tabularx}
 \end{center}
-\end{result}
+\end{result}\index{Riccati equation|)}

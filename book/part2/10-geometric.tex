@@ -4,7 +4,7 @@
 \lead{\setupcard{\setuprow{Level}{L3}\setuprow{Controller}{the cascade, with the naive Euler-angle attitude law}\setuprow{Set-point}{hover at \SI{6}{m}; no wind}\setuprow{Event}{at $t = \SI{10}{s}$ the drone is flipped by $170^\circ$ about a horizontal diagonal axis and stopped}\setuprow{Goal}{recover losing less than \SI{1.8}{m} of altitude}}%
 Something flips the drone almost upside down, six metres above the ground. Its thrust now points at the ground, and every tenth of a second it spends turning back costs height. Part~I's attitude loop worked with an error that was small; this one is not. The lesson compares three ways to compute the attitude error — from Euler angles, from a quaternion, and split into tilt and yaw — and shows that the first, the most natural to write, is the one that loses: \SI{2.6}{m} against \SI{1.4}{m}. The difference is not in the gains but in the geometry.}
 
-\section{Three numbers for a rotation}
+\section{Three numbers for a rotation}\index{attitude error}
 
 The display of the simulator describes an attitude by three angles: yaw $\psi$ about the vertical, then pitch $\theta$, then roll $\varphi$ (\cref{eq:H-euler}). An obvious attitude law subtracts them from their setpoints and commands each difference as a rate about the corresponding body axis:
 \begin{equation*}
@@ -16,7 +16,7 @@ For small errors this is Part~I's law. For a large one it makes two mistakes at 
 \label{ex:geometric-euler}
 The drone is level with zero yaw and is turned by $170^\circ$ about the horizontal axis $\hat n = (1, 0, 1)/\sqrt2$, halfway between its forward and right axes. Find its Euler angles and the command of the Euler law ($K = 8$, $K_\psi = \SI{3}{s^{-1}}$, rates limited to \SI{360}{\degree/s} per axis).
 
-\textbf{Step 1 — the quaternion.} By \cref{eq:H-q},
+\textbf{Step 1 — the quaternion.}\index{quaternion!attitude error} By \cref{eq:H-q},
 \begin{equation*}
   q = (\cos85^\circ,\ \hat n\sin85^\circ) = (0.0872,\ 0.7044,\ 0,\ 0.7044) .
 \end{equation*}

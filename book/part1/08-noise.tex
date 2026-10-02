@@ -45,7 +45,7 @@ A sinusoid $\sin\omega t$ has the derivative $\omega\cos\omega t$: a differentia
 
 \simfig{noise_bode}{The gain of a differentiator grows with frequency (red). A first-order low-pass filter caps it above the cutoff. The art is to put the cutoff above the frequencies of the motion (grey) and below those of the noise (red band).}{fig:noise-bode}
 
-\section{The filtered derivative}
+\section{The filtered derivative}\index{PID controller!filtered derivative}
 
 The standard cure is to pass the derivative through a \term{low-pass filter}, which lets slow changes through and averages fast ones away. Anemostatos uses a first-order filter with the cutoff frequency $f_c$:
 \begin{equation}\label{eq:noise-filter}

@@ -65,7 +65,7 @@ The drone swings as $x = \sin\omega t$ at $\omega = \SI{3.16}{rad/s}$. What is t
 \textbf{Step 3 — read it.} The force is $24.3\sin(\omega t + 65.7^\circ)$: a sinusoid that \emph{leads} the motion. That lead is the $+78.7^\circ$ entry of the phase budget of \lessonref{les:slow} (there at $\omega = 7$), and it is what \enquote{D anticipates} means in numbers.
 \end{example}
 
-\section{Frequency response and the Bode plot}
+\section{Frequency response and the Bode plot}\index{Bode plot|(}
 
 \Cref{thm:noise-freq} stated the central fact: a stable linear block turns $\sin\omega t$ into $|H(j\omega)|\sin(\omega t + \angle H(j\omega))$, where $H(s)$ is obtained from the block's differential equation by writing $s$ for every derivative. The function $H(j\omega)$ is the \term{frequency response}.
 
@@ -119,9 +119,9 @@ Sketch the loop transfer function of \lessonref{les:slow} without delay, $L(s) =
 
 \begin{keyidea}[The shape every good loop has]
 A steep slope at low frequencies (high gain, integrators: disturbances are rejected), a gentle slope of about \SI{20}{dB} per decade around the crossover (enough phase margin), and a steep slope again at high frequencies (noise and unmodelled lags are not amplified). Lesson~III.6 turns this picture into a design method, \emph{loop shaping}.
-\end{keyidea}
+\end{keyidea}\index{Bode plot|)}
 
-\section{Fourier series: signals that repeat}
+\section{Fourier series: signals that repeat}\index{Fourier series|(}
 
 A sinusoid is the only signal that a linear block returns with its shape unchanged. Any other periodic signal can be taken apart into sinusoids, passed through the block one by one, and put together again.
 
@@ -158,9 +158,9 @@ The amplitudes are 0.637, 0.212, 0.127, \dots: they fall only as $1/k$, which is
 \textbf{Step 5 — read it.} The loop is a \emph{low-pass filter} for its setpoint. It passes the slow components and attenuates the fast ones — which, in the time domain, is exactly the rounding of the corners in \cref{fig:damper-sweep}.
 \end{example}
 
-A saturating motor or a relay turns a sinusoid into a periodic signal that is not a sinusoid. Keeping only the fundamental of that signal, on the argument that the loop filters the harmonics away as in Step~4, is the idea of the \emph{describing function} (Lesson~III.8), and Example~\ref{ex:spring-limit} was its first use.
+A saturating motor or a relay turns a sinusoid into a periodic signal that is not a sinusoid. Keeping only the fundamental of that signal, on the argument that the loop filters the harmonics away as in Step~4, is the idea of the \emph{describing function} (Lesson~III.8), and Example~\ref{ex:spring-limit} was its first use.\index{Fourier series|)}
 
-\section{The Laplace transform: signals that start}
+\section{The Laplace transform: signals that start}\index{Laplace transform|(}
 
 The frequency response describes a block in steady oscillation. For signals that begin at $t = 0$ — a step, a gust, a drone released from rest — the tool is the Laplace transform.
 
@@ -271,9 +271,9 @@ Rederive \cref{eq:droop-ramp}: the setpoint climbs at the rate $v_r$, and the P�
 
 \begin{watchout}[Check the hypothesis of the final-value theorem]
 The limit $\lim_{s \to 0}sF(s)$ exists for many functions that have no final value. For $f = e^{t}$, $F = 1/(s - 1)$ and $sF(s) \to 0$, while $f$ grows without bound. For $f = \sin t$ the limit is again 0 and $f$ oscillates for ever. The theorem is valid only for a stable response — check the poles first.
-\end{watchout}
+\end{watchout}\index{Laplace transform|)}
 
-\section{Transfer functions and block diagrams}
+\section{Transfer functions and block diagrams}\index{block diagram|(}
 
 \begin{definition}{Transfer function, poles, zeros}
 The \term{transfer function} of a linear time-invariant block is the ratio of the Laplace transforms of its output and its input, for zero initial conditions: $G(s) = Y(s)/U(s)$. For a block described by a differential equation it is a ratio of polynomials, $G = N/D$. The roots of $D$ are its \term{poles}, the roots of $N$ its \term{zeros}.
@@ -324,9 +324,9 @@ $CS$ & noise to thrust & $ms^2\,c(s)/\Delta$ & \lessonref{les:noise}\\
 \end{center}
 \end{result}
 
-Two identities are worth keeping. First, $S + T = 1$ at every frequency: a loop cannot reject disturbances ($S$ small) and ignore sensor noise ($T$ small) at the same frequency. Second, at high frequencies $CS \approx C \approx K_ds$: the noise reaches the motors amplified by the D term, whatever the rest of the loop does.
+Two identities are worth keeping. First, $S + T = 1$ at every frequency: a loop cannot reject disturbances ($S$ small) and ignore sensor noise ($T$ small) at the same frequency. Second, at high frequencies $CS \approx C \approx K_ds$: the noise reaches the motors amplified by the D term, whatever the rest of the loop does.\index{block diagram|)}
 
-\section{The Nyquist criterion}
+\section{The Nyquist criterion}\index{Nyquist criterion|(}
 
 The Routh–Hurwitz test needs the characteristic polynomial. A loop with a delay has none, and a loop measured on a real vehicle comes as a frequency response, not as a formula. Harry Nyquist's criterion decides stability from $L(j\omega)$ alone.
 
@@ -376,4 +376,4 @@ feedback & $G/(1 + GH)$; closed-loop poles: $1 + L = 0$; $S + T = 1$\\
 Nyquist & closed-loop unstable poles $=$ clockwise encirclements of $-1$ $+$ open-loop unstable poles\\
 \end{tabularx}
 \end{center}
-\end{result}
+\end{result}\index{Nyquist criterion|)}

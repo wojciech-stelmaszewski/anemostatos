@@ -11,13 +11,16 @@ Opus 5.5.
 ## Build
 
 ```sh
-make book           # LuaLaTeX, two passes → book/anemostatos.pdf
+make book           # LuaLaTeX, three passes with the index between them → book/anemostatos.pdf
 ```
 
-It needs a TeX distribution with LuaLaTeX and the Libertinus and Fira
-fonts (TeX Live has both). The build takes about forty-five seconds per
-pass. The figures, screenshots and photographs are committed, so nothing
-else has to run first.
+It needs a TeX distribution with LuaLaTeX, `upmendex` and the Libertinus and
+Fira fonts (TeX Live has all three). The index is sorted by `upmendex` with
+`style/index.ist` after the first and the second pass; the third pass prints
+it with the page numbers of the second, which are final. The build takes
+one to two minutes per pass. The
+figures, screenshots and photographs are committed, so nothing else has to
+run first.
 
 ## Regenerate the material
 
@@ -41,12 +44,13 @@ matplotlib, numpy, pandas and Pillow.
 ```
 book/
   main.tex        the document: front matter, parts, appendices
-  style/          the design system (anemostatos-book.sty): colours, boxes, chapter openers
+  style/          the design system (anemostatos-book.sty): colours, boxes, chapter openers;
+                  the index style (index.ist) and the index forms of terms (index-terms.tex)
   front/          cover, title page, contents, technical preface, Chapter 0, Prelude
   part1/          Part I, one file per lesson
   part2/          Part II, one file per chapter (A–E)
   back/           mathematical toolbox (math.tex and one file per appendix in toolbox/),
-                  app map, reading list, photo credits, colophon
+                  app map, reading list, photo credits, index, colophon
   tikz/           diagrams
   figures/out/    plots drawn from simulator data
   screens/        screenshots of the app
@@ -102,5 +106,17 @@ book/
 - Exercises use `\exercise`, and their solutions go into `\answer{...}`
   right after them. The build collects the answers into
   `build/main.ans` for the companion volume; they are not printed here.
+- The index is made from two commands. `\term{...}` (a defined term: bold) also makes an
+  index entry, in the form the text uses; where the index form differs everywhere — a
+  plural, an adjective, a capital — map it once in `style/index-terms.tex`
+  (`\termindex{poles}{pole}`), and where it differs at one place give it there,
+  `\term[convex function]{convex}`. `\index{...}` marks a method, a person or an idea
+  that is discussed but not defined in a box: a person as `Surname, Given name`, a
+  subentry after `!` (`\index{PID controller!integral term}`), a page range with `|(` and
+  `|)` (as for a whole section). A Part II lesson that is one method from start to end is
+  input as `\indexedlesson{part2/04-kalman}{Kalman filter}`, which indexes the lesson as a
+  page range. Entries are lower case except names and abbreviations, singular, and list
+  the main discussion rather than every mention; abbreviations point to the full name
+  with `|see{...}`, collected in `back/index.tex`.
 - After a build, `book/build/main.log` lists undefined references. There
   should be none once Part II and the appendices are written.

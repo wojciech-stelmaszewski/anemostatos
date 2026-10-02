@@ -30,7 +30,7 @@ When one root is much closer to the origin than the others, it can be estimated 
 \end{equation}
 The second form keeps the $s^2$ term and inserts the first estimate into it. For the loop of \lessonref{les:droop}, $s^3 + 7s^2 + 10s + 0.8$: $-a_0/a_1 = -0.080$, which is the quasi-static $-K_i/K_p$, and the refined value is $-0.080\,(1 + 0.8 \cdot 7/100) = -0.0845$. The exact root is $-0.0850$.
 
-\section{The Routh–Hurwitz criterion}
+\section{The Routh–Hurwitz criterion}\index{Routh–Hurwitz criterion|(}
 
 \begin{definition}{Hurwitz polynomial}
 A real polynomial is called \term{Hurwitz} (or \emph{stable}) if all its roots have negative real parts.
@@ -117,7 +117,7 @@ Hurwitz found the criterion independently in 1895 in another form, which is the 
     \vdots & & & \ddots
   \end{pmatrix}.
 \end{equation}
-The polynomial is Hurwitz if and only if the determinants of the upper-left $1 \times 1$, $2 \times 2$, \dots, $n \times n$ blocks of $H$ are all positive. For $n = 3$ they are $a_2$, $a_2a_1 - a_3a_0$ and $a_0$ times the second: the conditions of \cref{thm:B-low}. The entries of Routh's first column are the ratios of successive determinants, which is why the two tests agree.
+The polynomial is Hurwitz if and only if the determinants of the upper-left $1 \times 1$, $2 \times 2$, \dots, $n \times n$ blocks of $H$ are all positive. For $n = 3$ they are $a_2$, $a_2a_1 - a_3a_0$ and $a_0$ times the second: the conditions of \cref{thm:B-low}. The entries of Routh's first column are the ratios of successive determinants, which is why the two tests agree.\index{Routh–Hurwitz criterion|)}
 
 \section{Stability with a margin}
 
@@ -140,7 +140,7 @@ The P–D loop has $p(s) = s^2 + 7s + 10$. Test $\sigma = 1$ and $\sigma = 2.5$.
 \textbf{Step 3 — compare.} The roots are $-2$ and $-5$. The slowest, $-2$, lies between the two lines, as the test says.
 \end{example}
 
-\section{The root locus}
+\section{The root locus}\index{root locus|(}
 
 The Routh test says \emph{whether} a loop is stable for a given gain. The root locus shows \emph{how} the poles move as the gain grows, and it can be sketched by rules.
 
@@ -223,7 +223,7 @@ Now keep the ratio $K_p/K_d = 10/7$ and scale both gains. How does the picture c
 
 \begin{keyidea}[Zeros attract, and the excess decides]
 Poles move towards zeros as the gain grows. The poles that find no zero leave along the asymptotes, and their number $n_p - n_z$ decides the fate of the loop at high gain: one or two can stay in the left half-plane for ever; three or more cannot (\cref{thm:edge-asymptotes}). A controller improves a loop by adding zeros in good places — which is what the D term does.
-\end{keyidea}
+\end{keyidea}\index{root locus|)}
 
 \section{The same question for sampled loops}
 

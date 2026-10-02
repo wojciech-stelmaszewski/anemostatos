@@ -2,7 +2,7 @@
 \label{les:indiwind}
 
 \lead{\setupcard{\setuprow{Level}{L3}\setuprow{Wind}{the gusty wind of Lesson~I.11, in all three directions, seed 4242}\setuprow{Controller}{the cascade}\setuprow{Ghost}{the PID cascade on the same wind}\setuprow{Goal}{an RMS position error at least 40\,\% below the ghost's, between 8 and \SI{40}{s}}}%
-The previous lesson caught a torque the moment it acted, by measuring the angular acceleration. A gust is not a torque but a force, and the cascade of Part~I catches it slowly: the force must first change the velocity, then the velocity loop must notice, then its integral must build up. This lesson applies the incremental idea one level up. The accelerometer measures the force's effect at once; the acceleration loop keeps the thrust the motors produce now and changes it by exactly the missing acceleration. On the gust challenge's wind, the RMS position error falls from \SI{22}{cm} to six.}
+The previous lesson caught a torque the moment it acted, by measuring the angular acceleration. A gust is not a torque but a force, and the cascade of Part~I catches it slowly: the force must first change the velocity, then the velocity loop must notice, then its integral must build up. This lesson applies the incremental idea one level up. The accelerometer measures the force's effect at once\index{accelerometer!in INDI}; the acceleration loop keeps the thrust the motors produce now and changes it by exactly the missing acceleration. On the gust challenge's wind, the RMS position error falls from \SI{22}{cm} to six.}
 
 \section{Why the cascade is late}
 

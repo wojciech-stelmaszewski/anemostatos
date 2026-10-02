@@ -54,7 +54,7 @@ Turn a book by $90^\circ$ about one edge and then by $90^\circ$ about another; t
 
 This is why attitude cannot be handled like position. There is no \enquote{attitude vector} whose components can be controlled by three independent loops, except approximately, for small angles, where the products of the small terms are negligible and the order stops mattering. The cascade of \lessonref{les:cascade} lives in that approximation for its error, and uses the exact description for the attitude itself.
 
-\section{Three angles, and where they fail}
+\section{Three angles, and where they fail}\index{Euler angles|(}
 
 The oldest description uses three successive rotations about coordinate axes: \term{Euler angles}. The simulator's display uses yaw $\psi$ about the vertical, then pitch $\theta$, then roll $\varphi$:
 \begin{equation}\label{eq:H-euler}
@@ -82,7 +82,7 @@ At $\theta = \pm90^\circ$ the first expression divides by zero.
 The three angle rates are rotations about three different axes: $\dot\varphi$ about the body's $x$-axis; $\dot\theta$ about the $z$-axis of the frame \emph{before} the roll, which in body coordinates is $R_x(\varphi)^\T(0, 0, 1)^\T = (0, \sin\varphi, \cos\varphi)^\T$; and $\dot\psi$ about the vertical, which in body coordinates is $R_x(\varphi)^\T R_z(\theta)^\T(0, 1, 0)^\T = (\sin\theta, \cos\varphi\cos\theta, -\sin\varphi\cos\theta)^\T$. Adding the three gives the first set. Solving its last two equations for $\dot\theta$ and $\dot\psi\cos\theta$ gives the second.
 \end{proof}
 
-At a pitch of $90^\circ$ the yaw axis and the roll axis coincide: two of the three angles describe the same rotation and one direction of rotation cannot be described at all. This is \term{gimbal lock}, named after the mechanical gimbals of gyroscope platforms, which jam in the same configuration. Near it the angle rates become enormous for ordinary body rates, and a controller built on Euler angles fails. Every set of three angles has such a singularity somewhere. A drone that may flip (Lesson~II.10) and a spacecraft that must point anywhere need a description without one.
+At a pitch of $90^\circ$ the yaw axis and the roll axis coincide: two of the three angles describe the same rotation and one direction of rotation cannot be described at all. This is \term{gimbal lock}, named after the mechanical gimbals of gyroscope platforms, which jam in the same configuration. Near it the angle rates become enormous for ordinary body rates, and a controller built on Euler angles fails. Every set of three angles has such a singularity somewhere. A drone that may flip (Lesson~II.10) and a spacecraft that must point anywhere need a description without one.\index{Euler angles|)}
 
 \section{One axis, one angle}
 
@@ -107,7 +107,7 @@ The matrix $[\hat n]_\times$, the \term{cross-product matrix}, is skew-symmetric
 
 The composition of $90^\circ$ about $x$ followed by $90^\circ$ about $z$, from the book example above, has the trace 0, so $\cos\theta = -\tfrac12$: it is a single rotation by $120^\circ$, about the diagonal $(1, 1, 1)/\sqrt3$.
 
-\section{Quaternions}
+\section{Quaternions}\index{quaternion|(}
 
 The axis and the angle are the right idea, and four numbers carry them better than three.
 
@@ -116,7 +116,7 @@ A \term{quaternion} is a pair $q = (w, \vec v)$ of a number $w$ and a vector $\v
 \begin{equation}\label{eq:H-product}
   (w_1, \vec v_1) \otimes (w_2, \vec v_2) = \big(w_1w_2 - \vec v_1 \cdot \vec v_2,\ \ w_1\vec v_2 + w_2\vec v_1 + \vec v_1 \times \vec v_2\big) .
 \end{equation}
-Its \term{conjugate} is $q^* = (w, -\vec v)$ and its norm $\|q\| = \sqrt{w^2 + x^2 + y^2 + z^2}$. A \term{unit quaternion} has the norm 1; its inverse is its conjugate.
+Its \term[quaternion!conjugate]{conjugate} is $q^* = (w, -\vec v)$ and its norm $\|q\| = \sqrt{w^2 + x^2 + y^2 + z^2}$. A \term{unit quaternion} has the norm 1; its inverse is its conjugate.
 \end{definition}
 
 The product is associative but, because of the cross product, not commutative — as it must be, if it is to describe rotations. The norm is multiplicative, $\|q_1 \otimes q_2\| = \|q_1\|\|q_2\|$, so products of unit quaternions are unit quaternions.
@@ -171,7 +171,7 @@ together $(-0.0923,\ 0.7011,\ -0.0923)$.
 
 \begin{keyidea}[Why four numbers]
 A unit quaternion has no singularity: every orientation has a quaternion, and nearby orientations have nearby quaternions. It is cheap: composing two costs sixteen multiplications, against twenty-seven for matrices, and needs no trigonometric functions. And it is easy to keep valid: rounding errors make it drift away from unit length, and dividing by its norm repairs it — whereas repairing a rotation matrix that is no longer orthogonal is a small computation of its own. The price is a redundancy: $q$ and $-q$ are the same orientation, which the attitude error below has to respect.
-\end{keyidea}
+\end{keyidea}\index{quaternion|)}
 
 \section{Kinematics: how an attitude changes}
 
@@ -192,7 +192,7 @@ followed by a division by $\|q_{k+1}\|$ to remove the rounding. This is \texttt{
 
 The alternative, an Euler step $q_{k+1} = q_k + \tfrac12h\,q_k \otimes (0, \vec\omega)$, multiplies the norm by $\sqrt{1 + (\|\vec\omega\|h/2)^2}$ at every step: for a body spinning at one turn per second and $h = \SI{1}{ms}$, by 0.5\,\% per second. A quaternion that is not of unit length scales every vector it rotates — the thrust would slowly grow. \Cref{eq:H-step} has no such drift.
 
-\section{The attitude error}
+\section{The attitude error}\index{attitude error|(}
 
 The attitude loop of \lessonref{les:cascade} needs the difference between the attitude $q$ and its setpoint $q_{sp}$. Subtracting quaternions means nothing. The difference of two orientations is the \emph{rotation that leads from one to the other}:
 \begin{equation}\label{eq:H-qe}
@@ -227,7 +227,7 @@ The thrust-vector block of \lessonref{les:cascade} knows where the thrust axis s
 \begin{equation}\label{eq:H-fromto}
   q = \frac{\big(1 + \hat a \cdot \hat b,\ \ \hat a \times \hat b\big)}{\big\|\big(1 + \hat a \cdot \hat b,\ \ \hat a \times \hat b\big)\big\|} .
 \end{equation}
-(With $\hat a \cdot \hat b = \cos\theta$ and $\|\hat a \times \hat b\| = \sin\theta$, the pair before normalising is $2\cos\tfrac\theta2$ times $(\cos\tfrac\theta2,\ \hat n\sin\tfrac\theta2)$, which is \cref{eq:H-q}.) The simulator applies it with $\hat a = (0, 1, 0)$ and composes the result with the desired yaw (\texttt{qFromTo}). The formula breaks down only for opposite vectors, where every perpendicular axis is equally short.
+(With $\hat a \cdot \hat b = \cos\theta$ and $\|\hat a \times \hat b\| = \sin\theta$, the pair before normalising is $2\cos\tfrac\theta2$ times $(\cos\tfrac\theta2,\ \hat n\sin\tfrac\theta2)$, which is \cref{eq:H-q}.) The simulator applies it with $\hat a = (0, 1, 0)$ and composes the result with the desired yaw (\texttt{qFromTo}). The formula breaks down only for opposite vectors, where every perpendicular axis is equally short.\index{attitude error|)}
 
 \section{Dynamics: what torques do}
 

@@ -64,7 +64,7 @@ The unknown has cancelled. To reach a desired acceleration $\vec\alpha_{des}$, s
 \begin{equation}\label{eq:indi-law}
   \vec\tau = \vec\tau_0 + \hat J\,\big(\vec\alpha_{des} - \dot{\vec\omega}_0\big), \qquad \vec\alpha_{des} = K\,(\vec\omega_{sp} - \vec\omega) .
 \end{equation}
-$\vec\tau_0$ is the torque the motors produce now; $\dot{\vec\omega}_0$ the angular acceleration the drone has now, from the gyroscope; $\hat J$ the only model left. The rate loop has a single gain, $K = \SI{20}{s^{-1}}$.
+$\vec\tau_0$ is the torque the motors produce now; $\dot{\vec\omega}_0$ the angular acceleration the drone has now, from the gyroscope\index{gyroscope}; $\hat J$ the only model left. The rate loop has a single gain, $K = \SI{20}{s^{-1}}$.
 \end{result}
 
 Everything that acts on the drone — the gyroscopic term, the aerodynamics, the broken prop — is inside the measured $\dot{\vec\omega}_0$ and needs no model. The law keeps what the motors already do and changes it by exactly the missing part.\tip{Read INDI as a sentence: \enquote{keep doing what you are doing, and add what is missing}. The model only says how much torque buys how much acceleration.}\recall{Euler's equation (Appendix~H): $J\dot{\vec\omega} = \vec\tau - \vec\omega \times J\vec\omega$. INDI never evaluates the cross product; the gyroscope measures its effect.}

@@ -115,7 +115,7 @@ with the signs of column $i$ of $M$.
 \textbf{Step 4 — the limits.} The largest pitch torque in hover is reached when one pair stops: $\tau_z = 4d \cdot 2.45 = \SI{1.18}{N.m}$, the value used in Example~\ref{ex:tilt-time}. When a command would push a motor beyond its range, the mixer first shifts all four together (trading collective thrust for attitude authority), then gives up yaw, then roll and pitch: attitude matters more than altitude for a few milliseconds.\didyouknow[-40pt]{The order of sacrifice is a design decision. A drone that loses a little altitude survives; one that loses its attitude does not.}
 \end{example}
 
-\section{Watching the cascade work}
+\section{Watching the cascade work}\index{quadrotor!cascade}
 
 \simfig{cascade_loops}{A \SI{1}{m} step in $x$ at $t = \SI{10}{s}$, seen by the four loops (dashed: setpoint, blue: measured). Top to bottom the time scale shrinks: the position takes seconds, the velocity about a second, the pitch a few hundred milliseconds, the pitch rate tens of milliseconds.}{fig:cascade-loops}
 

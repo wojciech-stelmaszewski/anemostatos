@@ -44,7 +44,7 @@ An equilibrium $\vx^*$ is \term{exponentially stable} if there are $c, \alpha > 
 
 For linear systems asymptotic and exponential stability are the same thing, and the region of attraction is everything (\cref{thm:spring-linear}). For nonlinear systems neither is true, and both differences matter in practice: convergence can be slower than any exponential, and it can be lost by starting too far away.
 
-\section{Lyapunov functions}
+\section{Lyapunov functions}\index{Lyapunov function|(}
 
 Aleksandr Lyapunov's idea of 1892 is to avoid solving the equation. Find a function of the state that is positive everywhere except at the equilibrium and that decreases along every solution. A quantity that is bounded below and always decreasing must come to rest, and if it can rest only at the equilibrium, the state must go there.
 
@@ -73,7 +73,7 @@ A function that satisfies (i) is a \term{Lyapunov function}. The theorem does no
 The simplest positive functions of a vector are quadratic: $V(\vx) = \vx^\T P\vx$ with a symmetric matrix $P$.
 
 \begin{definition}{Positive definite matrix}
-A symmetric matrix $P$ is \term{positive definite}, written $P \succ 0$, if $\vx^\T P\vx > 0$ for every $\vx \ne 0$. Equivalently: all its eigenvalues are positive; or all its leading principal minors (the determinants of its upper-left blocks) are positive. For every $\vx$,
+A symmetric matrix $P$ is \term[positive definite!matrix]{positive definite}, written $P \succ 0$, if $\vx^\T P\vx > 0$ for every $\vx \ne 0$. Equivalently: all its eigenvalues are positive; or all its leading principal minors (the determinants of its upper-left blocks) are positive. For every $\vx$,
 \begin{equation}\label{eq:G-rayleigh}
   \lambda_{min}(P)\,\|\vx\|^2 \le \vx^\T P\vx \le \lambda_{max}(P)\,\|\vx\|^2 .
 \end{equation}
@@ -111,7 +111,7 @@ Solve \cref{eq:G-lyapeq} for the default altitude loop, $A = \begin{psmallmatrix
 
 Compare with the energy $V = \tfrac12m\dot x^2 + \tfrac12K_px^2$ of \lessonref{les:damper}. It is also a quadratic form, with $P = \tfrac12\diag(K_p, m)$, but its derivative $-K_d\dot x^2$ is zero on the whole line $\dot x = 0$: case (i) of the theorem, not (ii). The energy is the \emph{natural} Lyapunov function and the $P$ of Example~\ref{ex:G-P} the \emph{sufficient} one. \Cref{fig:G-lyap} shows both.
 
-\simfig{tb_lyap}{Left: a trajectory of the default P–D loop (blue) crossing the level sets of two Lyapunov functions. The ellipses of $\vx^\T P\vx$ from Example~\ref{ex:G-P} (solid) are crossed inwards everywhere. The ellipses of the energy (dashed) are touched tangentially wherever the velocity is zero. Right: the swing of the drone with air drag and no damper. Dots: peaks of a numerical solution of $\ddot x + 0.25|\dot x|\dot x + 10x = 0$; line: the algebraic decay of Example~\ref{ex:G-algebraic}; dashed: an exponential for comparison.}{fig:G-lyap}
+\simfig{tb_lyap}{Left: a trajectory of the default P–D loop (blue) crossing the level sets of two Lyapunov functions. The ellipses of $\vx^\T P\vx$ from Example~\ref{ex:G-P} (solid) are crossed inwards everywhere. The ellipses of the energy (dashed) are touched tangentially wherever the velocity is zero. Right: the swing of the drone with air drag and no damper. Dots: peaks of a numerical solution of $\ddot x + 0.25|\dot x|\dot x + 10x = 0$; line: the algebraic decay of Example~\ref{ex:G-algebraic}; dashed: an exponential for comparison.}{fig:G-lyap}\index{Lyapunov function|)}
 
 \section{When the derivative is only non-positive}
 
@@ -202,7 +202,7 @@ the power of the perturbing force averaged over one period and divided by $\omeg
 
 \Cref{eq:spring-amp}, with the motor lag pumping and the drag braking, and \cref{eq:G-algebraic}, with the drag alone, are both instances. The method is justified when the amplitude changes little within one period. Its cousin for loops with a hard nonlinearity — a saturation, a relay — is the describing function of Lesson~III.8, which keeps only the fundamental of the nonlinearity's output (Appendix~C).
 
-\section{Two time scales}
+\section{Two time scales}\index{singular perturbation|(}
 
 When part of a system is much faster than the rest, the fast part can be replaced by its equilibrium. \Cref{thm:cascade-tikhonov} is the exact statement: for $\dot{\vx} = f(\vx, \symbf z)$, $\varepsilon\dot{\symbf z} = g(\vx, \symbf z)$ with an exponentially stable fast subsystem, the solution of the full system stays within $O(\varepsilon)$ of the solution of the reduced one. The lessons used it three times:
 \begin{itemize}
@@ -230,4 +230,4 @@ weak nonlinearity & average over a period: an equation for the amplitude\\
 two time scales & replace the fast part by its equilibrium; error of the order of the ratio\\
 \end{tabularx}
 \end{center}
-\end{result}
+\end{result}\index{singular perturbation|)}

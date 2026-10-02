@@ -76,7 +76,7 @@ A rough check: if the error fell linearly from 4 to 0, the area would be $\tfrac
 
 \simfig{windup_predict}{Prediction next to measurement for the run without anti-windup. Left: the altitude; dotted is the full-thrust climb \eqref{eq:windup-climb}, dashed the model of Example~\ref{ex:windup-size} (saturated climb, then the PID loop). Right: the integral; the dot marks the predicted value when the drone reaches the setpoint.}{fig:windup-predict}
 
-\section{Anti-windup}
+\section{Anti-windup}\index{anti-windup|(}
 
 The remedy is to tell the integrator about the saturation.\didyouknow{Windup was discovered on pneumatic process controllers, where the integral was a bellows slowly filling with air — and running against its end stop at every start-up of the plant.} The simulator offers four strategies (\ui{Practical details\then Anti-windup}); they are all implemented in a dozen lines of \src{src/control/pid.ts}.
 
@@ -84,7 +84,7 @@ The remedy is to tell the integrator about the saturation.\didyouknow{Windup was
 \begin{description}[leftmargin=0pt, itemsep=3pt, font=\sffamily\small\bfseries]
   \item[None.] $I_k = I_{k-1} + K_i e_k \Delta t$ always. For demonstrating the problem.
   \item[Integral limit.] Clamp $|I| \le I_{max}$. Simple but crude: the right limit depends on the load.
-  \item[Conditional integration] (\enquote{clamping}). Skip the integration step whenever the output is saturated \emph{and} the error would push it further into saturation:
+  \item[Conditional integration]\index{anti-windup!conditional integration} (\enquote{clamping}). Skip the integration step whenever the output is saturated \emph{and} the error would push it further into saturation:
   \begin{equation*}
     I_k = \begin{cases} I_{k-1} & \text{if } u > u_{max},\ e_k > 0 \ \text{ or }\ u < u_{min},\ e_k<0,\\ I_{k-1} + K_i e_k\Delta t & \text{otherwise.}\end{cases}
   \end{equation*}
@@ -96,7 +96,7 @@ The remedy is to tell the integrator about the saturation.\didyouknow{Windup was
 \end{description}
 \end{definition}
 
-\begin{example}[What back-calculation does to the integral]
+\begin{example}[What back-calculation does to the integral]\index{anti-windup!back-calculation}
 \label{ex:windup-bc}
 Follow the integral under back-calculation with $K_b = 2$ in the first instants after the step, and explain the blue curves of \cref{fig:windup}.
 
@@ -159,7 +159,7 @@ While an actuator is saturated, the loop is open: the plant receives the same in
   \item Try \ui{integral limit} with limit 10, then 3. Then make the drone heavier (\ui{Physics\then Mass} = \SI{1.2}{kg}, which the controller does not know) with the limit at 1. What goes wrong?
 \end{enumerate}
 \predict{with anti-windup off, does a bigger $K_i$ make the overshoot bigger or smaller? By how much, for $K_i = 6$? (Step~6 of Example~\ref{ex:windup-size}.)}
-\end{trythis}
+\end{trythis}\index{anti-windup|)}
 
 \section{The engineer's view: a loop that opens and closes}
 

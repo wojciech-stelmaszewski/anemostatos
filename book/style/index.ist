@@ -1,0 +1,8 @@
+% Index style for upmendex (makeindex syntax): a letter heading per group, the default "--" in page
+% ranges (hyperref splits a range at "--"). \indexletter is defined in anemostatos-book.sty.
+headings_flag 1
+heading_prefix "\n\\indexletter{"
+heading_suffix "}\n"
+symhead_positive "Symbols"
+numhead_positive "Numbers"
+group_skip "\n\\indexspace\n"

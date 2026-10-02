@@ -2,7 +2,7 @@
 \label{les:lqr}
 
 \lead{\setupcard{\setuprow{Level}{L1}\setuprow{Controller}{LQR with $q_e = 100$, $q_v = 10$, $r = 10$}\setuprow{Ghost}{the PD of Part~I, $K_p = 10$, $K_d = 7$}\setuprow{Setpoint}{a square wave of $\pm\SI{0.5}{m}$}\setuprow{Goal}{settle within \SI{1.5}{s}, overshoot below 2\,\%, no more peak thrust than the PD}}%
-Tuning a PID is haggling with three knobs. This lesson replaces the haggling by a statement of preferences: how much a metre of error costs, how much a metre per second of speed, how much a newton of thrust. A cost function adds them up over the whole flight, and an equation named after Jacopo Riccati returns the gains that make the total as small as it can be. The result is a $K_p$ and a $K_d$ — the same controller as before, chosen by a principle instead of by trial.}
+Tuning a PID is haggling with three knobs. This lesson replaces the haggling by a statement of preferences: how much a metre of error costs, how much a metre per second of speed, how much a newton of thrust. A cost function adds them up over the whole flight, and an equation named after Jacopo Riccati\index{Riccati, Jacopo}\index{Riccati equation!in the LQR} returns the gains that make the total as small as it can be. The result is a $K_p$ and a $K_d$ — the same controller as before, chosen by a principle instead of by trial.}
 
 \section{A cost instead of knobs}
 

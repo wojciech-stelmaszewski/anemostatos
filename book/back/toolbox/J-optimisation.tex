@@ -26,7 +26,7 @@ For a quadratic function $f = \tfrac12\vx^\T H\vx + \vec g^\T\vx$ with $H \succ 
 A local minimum need not be the best one. For a controller that must find \emph{the} answer, at every step, without supervision, the decisive property is convexity.
 
 \begin{definition}{Convex set and convex function}
-A set $\mathcal C$ is \term{convex} if it contains the segment between any two of its points. A function $f$ on a convex set is \term{convex} if $f(\theta\vx + (1 - \theta)\vec y) \le \theta f(\vx) + (1 - \theta)f(\vec y)$ for all $\theta \in [0, 1]$ — the chord lies above the graph. A smooth $f$ is convex exactly when $\nabla^2f \succeq 0$ everywhere.
+A set $\mathcal C$ is \term{convex} if it contains the segment between any two of its points. A function $f$ on a convex set is \term[convex function]{convex} if $f(\theta\vx + (1 - \theta)\vec y) \le \theta f(\vx) + (1 - \theta)f(\vec y)$ for all $\theta \in [0, 1]$ — the chord lies above the graph. A smooth $f$ is convex exactly when $\nabla^2f \succeq 0$ everywhere.
 \end{definition}
 
 \begin{theorem}[Local is global]
@@ -39,7 +39,7 @@ If $\vx$ were a local minimum and $f(\vec y) < f(\vx)$ for some $\vec y$, the po
 
 Which problems of the lessons are convex? A quadratic cost with $H \succeq 0$ is convex; linear constraints define convex sets (polyhedra); a ball $\|\vx\| \le c$ is convex. So the MPC of Lesson~II.13 — quadratic cost, linear dynamics, bounds on thrust and altitude — is convex, and so is the safety filter of Lesson~II.17. Two things break convexity: a nonlinear model inside the constraints, and constraints that cut a hole, such as \enquote{stay outside this pillar} or \enquote{thrust at least $T_{min}$}. For those, a solver may return a local answer, or none.\tip{Before writing a controller as an optimisation, check that the problem is convex. If it is not, decide what the controller does when the solver returns a poor local answer — because one day it will.}
 
-\section{Constraints: Lagrange and Karush--Kuhn--Tucker}
+\section{Constraints: Lagrange and Karush--Kuhn--Tucker}\index{Karush–Kuhn–Tucker conditions|(}
 
 \begin{theorem}[Lagrange multipliers]
 \label{thm:J-lagrange}
@@ -75,9 +75,9 @@ A controller asks for the horizontal acceleration $\vec u_{ref} = (3, 1)\,\si{m/
 \textbf{Step 3 — the answer.} $\vec u = (3, 1) - 2\,(1, 0.5) = (1, 0)$. Check: $\vec a^\T\vec u = 1$. The request is moved along $\vec a$, the normal of the constraint, just far enough — the shortest correction.
 
 \textbf{Step 4 — the general formula.} $\vec u = \vec u_{ref} - \max\big(0,\ (\vec a^\T\vec u_{ref} - b)/\|\vec a\|^2\big)\,\vec a$: do nothing when the request is safe, project it onto the boundary when it is not. With one constraint, the QP of a safety filter has this closed form; Lesson~II.17 derives $\vec a$ and $b$ from a barrier function.
-\end{example}
+\end{example}\index{Karush–Kuhn–Tucker conditions|)}
 
-\section{Quadratic programs}
+\section{Quadratic programs}\index{quadratic program|(}
 
 \begin{definition}{Quadratic program}
 A \term{quadratic program} (QP) is
@@ -113,9 +113,9 @@ Minimise $\tfrac12(x - 3)^2$ subject to $0 \le x \le 2$, with $\rho = 1$, starti
 
 \textbf{Step 4 — read it.} $z$ is feasible from the second iteration; $x$ approaches it from outside. A capped number of iterations therefore leaves a small violation, of the size of the last step — which is why the simulator's MPC keeps a margin of \SI{3}{cm} from the ceiling, and why its plan is clipped to the bounds before use.
 \end{example}
-\tip[-20pt]{Warm-starting ADMM from the previous step's solution is what makes it fast in MPC: the plan changes little in \SI{20}{ms}, and a handful of iterations suffice.}
+\tip[-20pt]{Warm-starting ADMM from the previous step's solution is what makes it fast in MPC: the plan changes little in \SI{20}{ms}, and a handful of iterations suffice.}\index{quadratic program|)}
 
-\section{Gradient methods}
+\section{Gradient methods}\index{gradient descent|(}
 
 When the problem is too large to factorise, or not quadratic at all, the minimiser is approached by steps downhill: $\vx_{k+1} = \vx_k - \alpha\nabla f(\vx_k)$. How fast depends on the shape of $f$.
 
@@ -133,7 +133,7 @@ For $f = \tfrac12\vx^\T H\vx + \vec g^\T\vx$, the error obeys $\vx_{k+1} - \vx^*
 
 The condition number $\kappa$ of the Hessian — a ratio of eigenvalues, as in Appendix~I — sets the pace. For $\kappa = 100$ the factor is $99/101 = 0.98$: 115 steps to reduce the error tenfold. Newton's method, $\vx_{k+1} = \vx_k - (\nabla^2f)^{-1}\nabla f$, rescales the problem so that $\kappa = 1$ and solves a quadratic in one step, at the price of a linear system per step. Scaling the variables well before optimising — metres and newtons of similar importance, as in Example~\ref{ex:I-mixer} — is often the cheapest improvement of all.\pitfall{A gradient method that converges slowly is usually badly scaled, not badly coded. Look at the condition number of the Hessian before tuning the step.}
 
-Two variants appear in the lessons. Training a policy (Lesson~II.20) uses \emph{stochastic} gradients, estimated from a few samples at a time: noisier steps, many more of them. MPPI (Lesson~II.16) needs no gradient: it samples many input sequences, weights each by $e^{-J/\lambda}$, and averages — a soft minimum that tolerates costs with holes and jumps, at the price of many evaluations.
+Two variants appear in the lessons. Training a policy (Lesson~II.20) uses \emph{stochastic} gradients, estimated from a few samples at a time: noisier steps, many more of them. MPPI (Lesson~II.16) needs no gradient: it samples many input sequences, weights each by $e^{-J/\lambda}$, and averages — a soft minimum that tolerates costs with holes and jumps, at the price of many evaluations.\index{gradient descent|)}
 
 \section{Beyond quadratic programs}
 

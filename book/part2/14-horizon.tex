@@ -20,7 +20,7 @@ Explain the flight with $T_h = \SI{0.1}{s}$ ($N = 5$).
 
 \textbf{Step 1 — the first move.} Right after the jump the error is $e = \SI{-1.95}{m}$ and the drone is at rest. The recorded first move of the plan is $u_0 = \SI{7.29}{N}$ above the hover thrust: less than half of the \SI{14.6}{N} the motors could add. Divided by the error, that is a stiffness of $k_p = 7.29/1.95 = \SI{3.74}{N/m}$.
 
-\textbf{Step 2 — the law behind it.} With no constraint active the first move is linear in the state (\cref{thm:mpc-linear}): $u_0 = -k_p e - k_d v$. Computing the gains from the prediction matrices of Example~\ref{ex:mpc-condense} for $N = 5$ gives $k_p = 3.75$ and $k_d = 7.26$: a PD controller, and a very soft one.
+\textbf{Step 2 — the law behind it.} With no constraint active the first move is linear in the state (\cref{thm:mpc-linear}): $u_0 = -k_p e - k_d v$. Computing the gains from the prediction matrices of Example~\ref{ex:mpc-condense} for $N = 5$ gives $k_p = 3.75$ and $k_d = 7.26$: a PD controller\index{PD controller!from MPC}, and a very soft one.
 
 \textbf{Step 3 — the closed loop.} On the double integrator ($\hat m = \SI{1}{kg}$) this PD gives $s^2 + 7.26s + 3.75 = 0$, with roots $s = -6.70$ and $s = \SI{-0.56}{rad/s}$. The slow root dominates: the error shrinks like $e^{-0.56t}$.
 
@@ -151,7 +151,7 @@ A car's MPC cruise control follows traffic at \SI{30}{m/s}. Assume it may brake 
 Let $(A, B)$ be stabilisable and $(A, Q^{1/2})$ detectable, $R \succ 0$, and let $K_N$ be the first-move gain of the unconstrained MPC with horizon $N$ and no terminal cost. Then $K_N \to K_\infty$, the gain of the discrete-time LQR, and there is an $N_0$ such that $A - BK_N$ has all its eigenvalues inside the unit circle for every $N \ge N_0$.
 \end{theorem}
 \begin{proof}
-The first move of the $N$-step plan is the first move of finite-horizon LQR, $K_N = (R + B^\T P_{N-1}B)^{-1}B^\T P_{N-1}A$, where $P_{N-1}$ is obtained from $P_0 = Q$ by $N-1$ steps of the Riccati difference equation. Under the hypotheses, $P_k$ converges to the stabilising solution $P$ of the discrete algebraic Riccati equation (Anderson and Moore, 1990, ch.~3), so $K_N \to K_\infty$. The eigenvalues of $A - BK$ depend continuously on $K$, and those of $A - BK_\infty$ lie strictly inside the unit circle; hence they stay inside for $K$ close enough to $K_\infty$, that is, for $N$ large enough.
+The first move of the $N$-step plan is the first move of finite-horizon LQR, $K_N = (R + B^\T P_{N-1}B)^{-1}B^\T P_{N-1}A$, where $P_{N-1}$ is obtained from $P_0 = Q$ by $N-1$ steps of the Riccati difference equation\index{Riccati equation!difference equation}. Under the hypotheses, $P_k$ converges to the stabilising solution $P$ of the discrete algebraic Riccati equation (Anderson and Moore, 1990, ch.~3), so $K_N \to K_\infty$. The eigenvalues of $A - BK$ depend continuously on $K$, and those of $A - BK_\infty$ lie strictly inside the unit circle; hence they stay inside for $K$ close enough to $K_\infty$, that is, for $N$ large enough.
 \end{proof}
 
 \begin{theorem}[The right terminal cost makes any horizon optimal]

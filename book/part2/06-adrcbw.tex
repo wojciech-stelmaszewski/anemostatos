@@ -134,7 +134,7 @@ Every estimator trades speed against noise, and every sampled loop has a speed i
 \section{The engineer's view: bandwidth is a budget}
 
 \subsection{The same trade, everywhere}
-Every feedback loop and every estimator faces the trade of this lesson, because of one identity (Appendix~C): the sensitivity $S$ and the complementary sensitivity $T$ add up to one at every frequency. Where a loop rejects disturbances ($S$ small) it must pass the sensor's signal faithfully ($T \approx 1$) — noise included. The bandwidth of a loop is the frequency up to which it believes its sensor. The Kalman filter of \lessonref{les:kalman} computed that frequency from the noise figures; here it is chosen by hand, and the score shows what the choice costs.
+Every feedback loop and every estimator faces the trade of this lesson, because of one identity (Appendix~C): the sensitivity $S$ and the complementary sensitivity $T$\index{complementary sensitivity function} add up to one at every frequency. Where a loop rejects disturbances ($S$ small) it must pass the sensor's signal faithfully ($T \approx 1$) — noise included. The bandwidth of a loop is the frequency up to which it believes its sensor. The Kalman filter of \lessonref{les:kalman} computed that frequency from the noise figures; here it is chosen by hand, and the score shows what the choice costs.
 
 \subsection{Three limits on a bandwidth}
 \begin{itemize}

@@ -1,0 +1,158 @@
+\toolchapter{J}{Optimisation}{Part II computes its controllers by minimising something. What a minimum is, when it is unique, and how a computer finds one fast enough to fly.}
+\label{app:optim}
+
+\lead{\usedcard{\setuprow{Appendix E}{least squares}\setuprow{Lesson II.2}{the LQR as a minimisation; completing the square}\setuprow{Lesson II.12}{minimum snap: a quadratic cost with linear constraints}\setuprow{Lessons II.13--II.16}{MPC: a quadratic program at every step; sampling-based optimisation}\setuprow{Lessons II.17--II.20}{the safety filter's QP; fitting a residual model; training a policy}\setuprow{Part IV}{optimal control and trajectory optimisation (IV.1--IV.6)}}%
+The lessons of Part~II replace formulas by questions: \emph{which} input is best, \emph{which} path is smoothest, \emph{which} command is closest to the pilot's and still safe. Each question is a minimisation, and the answer is only as good as the method that finds it. This appendix covers what Part~II needs: the conditions that characterise a minimum, why convex problems are the ones a controller can rely on, the Lagrange and Karush--Kuhn--Tucker conditions for constraints, the quadratic program and the method the simulator uses to solve it, and gradient methods with their speed.}
+
+\section{Minima without constraints}
+
+Let $f(\vx)$ be a smooth function of $n$ variables. Its \term{gradient} $\nabla f$ is the column of its first partial derivatives and its \term{Hessian} $\nabla^2f$ the symmetric matrix of the second ones. Near a point $\vx^*$,
+\begin{equation}\label{eq:J-taylor}
+  f(\vx^* + \vec\delta) = f(\vx^*) + \nabla f(\vx^*)^\T\vec\delta + \tfrac12\vec\delta^\T\nabla^2f(\vx^*)\,\vec\delta + o(\|\vec\delta\|^2) .
+\end{equation}
+
+\begin{theorem}[Conditions for a minimum]
+\label{thm:J-cond}
+If $\vx^*$ is a local minimum of $f$, then $\nabla f(\vx^*) = 0$ and $\nabla^2f(\vx^*) \succeq 0$. Conversely, if $\nabla f(\vx^*) = 0$ and $\nabla^2f(\vx^*) \succ 0$, then $\vx^*$ is a strict local minimum.
+\end{theorem}
+\begin{proof}
+If $\nabla f(\vx^*) \ne 0$, the step $\vec\delta = -\epsilon\nabla f$ lowers $f$ for small $\epsilon$, by \cref{eq:J-taylor}. With the gradient zero, the quadratic term decides: if it is negative in some direction, $f$ decreases along it; if it is positive in every direction, it dominates the remainder near $\vx^*$ (by \cref{eq:G-rayleigh}, it is at least $\tfrac12\lambda_{min}\|\vec\delta\|^2$).
+\end{proof}
+
+For a quadratic function $f = \tfrac12\vx^\T H\vx + \vec g^\T\vx$ with $H \succ 0$, the condition $\nabla f = H\vx + \vec g = 0$ is a linear system: the unique minimum is $\vx^* = -H^{-1}\vec g$. Least squares (\cref{thm:E-ls}) is this case with $H = 2X^\T X$; the unconstrained MPC of \cref{thm:mpc-linear} is it again, and so is the minimum-energy input of \cref{thm:I-mineng}.
+
+\section{Convexity}
+
+A local minimum need not be the best one. For a controller that must find \emph{the} answer, at every step, without supervision, the decisive property is convexity.
+
+\begin{definition}{Convex set and convex function}
+A set $\mathcal C$ is \term{convex} if it contains the segment between any two of its points. A function $f$ on a convex set is \term{convex} if $f(\theta\vx + (1 - \theta)\vec y) \le \theta f(\vx) + (1 - \theta)f(\vec y)$ for all $\theta \in [0, 1]$ — the chord lies above the graph. A smooth $f$ is convex exactly when $\nabla^2f \succeq 0$ everywhere.
+\end{definition}
+
+\begin{theorem}[Local is global]
+\label{thm:J-convex}
+For a convex function on a convex set, every local minimum is a global minimum, and the set of minimisers is convex. If $f$ is strictly convex, the minimiser is unique. For a smooth convex $f$ without constraints, $\nabla f(\vx^*) = 0$ is sufficient for a global minimum. (Boyd and Vandenberghe, 2004, ch.~4.)
+\end{theorem}
+\begin{proof}
+If $\vx$ were a local minimum and $f(\vec y) < f(\vx)$ for some $\vec y$, the points $\theta\vx + (1 - \theta)\vec y$ arbitrarily close to $\vx$ would have $f \le \theta f(\vx) + (1 - \theta)f(\vec y) < f(\vx)$, a contradiction. For the last claim, convexity gives $f(\vec y) \ge f(\vx) + \nabla f(\vx)^\T(\vec y - \vx)$ for all $\vec y$.
+\end{proof}
+
+Which problems of the lessons are convex? A quadratic cost with $H \succeq 0$ is convex; linear constraints define convex sets (polyhedra); a ball $\|\vx\| \le c$ is convex. So the MPC of Lesson~II.13 — quadratic cost, linear dynamics, bounds on thrust and altitude — is convex, and so is the safety filter of Lesson~II.17. Two things break convexity: a nonlinear model inside the constraints, and constraints that cut a hole, such as \enquote{stay outside this pillar} or \enquote{thrust at least $T_{min}$}. For those, a solver may return a local answer, or none.\tip{Before writing a controller as an optimisation, check that the problem is convex. If it is not, decide what the controller does when the solver returns a poor local answer — because one day it will.}
+
+\section{Constraints: Lagrange and Karush--Kuhn--Tucker}
+
+\begin{theorem}[Lagrange multipliers]
+\label{thm:J-lagrange}
+Let $\vx^*$ minimise $f(\vx)$ subject to $\vec h(\vx) = 0$, with the gradients of the constraints linearly independent at $\vx^*$. Then there is a vector $\vec\lambda$ with
+\begin{equation}\label{eq:J-lagrange}
+  \nabla f(\vx^*) + \sum_i\lambda_i\nabla h_i(\vx^*) = 0 .
+\end{equation}
+\end{theorem}
+
+The geometry is the whole proof: at a constrained minimum, $f$ cannot decrease along any direction that keeps $\vec h = 0$, so $\nabla f$ has no component along the constraint surface — it is a combination of the constraints' normals. The multiplier $\lambda_i$ is the price of the constraint: if it is relaxed from $h_i = 0$ to $h_i = -\epsilon$, the optimal cost falls by about $\lambda_i\epsilon$.
+
+Inequalities add a sign and a switch.
+
+\begin{theorem}[Karush--Kuhn--Tucker conditions]
+\label{thm:J-kkt}
+Let $\vx^*$ minimise $f(\vx)$ subject to $g_j(\vx) \le 0$ and $h_i(\vx) = 0$, with the gradients of the active constraints linearly independent at $\vx^*$. Then there are multipliers $\vec\mu$ and $\vec\lambda$ such that
+\begin{equation}\label{eq:J-kkt}
+  \nabla f + \sum_j\mu_j\nabla g_j + \sum_i\lambda_i\nabla h_i = 0, \qquad \mu_j \ge 0, \qquad \mu_jg_j(\vx^*) = 0 .
+\end{equation}
+For a convex problem ($f$ and $g_j$ convex, $h_i$ affine) these conditions are also sufficient. (Nocedal and Wright, 2006, ch.~12.)
+\end{theorem}
+
+The last condition, \term{complementary slackness}, is the switch: a constraint that is not active ($g_j < 0$) has $\mu_j = 0$ and does not matter; one that is active may push, but only outwards ($\mu_j \ge 0$). Solving a constrained problem is, in the end, finding out which constraints are active.\didyouknow{William Karush stated these conditions in his master's thesis in Chicago in 1939; Kuhn and Tucker published them independently in 1951. For decades they were known only by the later names.}
+
+\begin{example}[The safety filter, by hand]
+\label{ex:J-filter}
+A controller asks for the horizontal acceleration $\vec u_{ref} = (3, 1)\,\si{m/s^2}$. A safety condition requires $\vec a^\T\vec u \le b$ with $\vec a = (1, 0.5)$ and $b = 1$. Find the safe command closest to the request: minimise $\tfrac12\|\vec u - \vec u_{ref}\|^2$ subject to $\vec a^\T\vec u \le b$.
+
+\textbf{Step 1 — is the request safe?} $\vec a^\T\vec u_{ref} = 3.5 > 1$: no. The constraint must be active.
+
+\textbf{Step 2 — KKT.} $\vec u - \vec u_{ref} + \mu\vec a = 0$ gives $\vec u = \vec u_{ref} - \mu\vec a$. Activity: $\vec a^\T\vec u_{ref} - \mu\|\vec a\|^2 = b$, so $\mu = (3.5 - 1)/1.25 = 2 \ge 0$.
+
+\textbf{Step 3 — the answer.} $\vec u = (3, 1) - 2\,(1, 0.5) = (1, 0)$. Check: $\vec a^\T\vec u = 1$. The request is moved along $\vec a$, the normal of the constraint, just far enough — the shortest correction.
+
+\textbf{Step 4 — the general formula.} $\vec u = \vec u_{ref} - \max\big(0,\ (\vec a^\T\vec u_{ref} - b)/\|\vec a\|^2\big)\,\vec a$: do nothing when the request is safe, project it onto the boundary when it is not. With one constraint, the QP of a safety filter has this closed form; Lesson~II.17 derives $\vec a$ and $b$ from a barrier function.
+\end{example}
+
+\section{Quadratic programs}
+
+\begin{definition}{Quadratic program}
+A \term{quadratic program} (QP) is
+\begin{equation}\label{eq:J-qp}
+  \min_{\vx}\ \tfrac12\vx^\T P\vx + \vec q^\T\vx \quad\text{subject to}\quad \vec l \le A\vx \le \vec u ,
+\end{equation}
+with $P \succeq 0$. It is convex; with $P \succ 0$ its solution is unique whenever the constraints can be met.
+\end{definition}
+
+Equalities are rows with $l_i = u_i$, bounds on single variables are rows of the identity. The MPC of Lesson~II.13 is \cref{eq:J-qp} with $\vx$ the input sequence, $P$ built from the prediction matrices and the weights, and $A$ stacking the identity (thrust bounds) on the prediction matrix (altitude bounds).
+
+Two families of methods solve QPs. \emph{Active-set} methods guess which constraints are active, solve the resulting linear system, and correct the guess; they are exact and fast for small problems that change little from step to step. \emph{Splitting} methods, such as ADMM, separate the quadratic part from the constraints and alternate between them; each iteration is cheap, and a rough answer comes early.
+
+\begin{result}[ADMM for a QP]
+With a step parameter $\rho > 0$, start from any $\vec z$, $\vec y$ and repeat:
+\begin{align}
+  \vx &\leftarrow (P + \rho A^\T A)^{-1}\big(A^\T(\rho\vec z - \vec y) - \vec q\big), \label{eq:J-admm-x}\\
+  \vec z &\leftarrow \Pi_{[\vec l, \vec u]}\big(A\vx + \vec y/\rho\big), \label{eq:J-admm-z}\\
+  \vec y &\leftarrow \vec y + \rho\,(A\vx - \vec z) . \label{eq:J-admm-y}
+\end{align}
+$\Pi$ clips each component to its bounds. The matrix $P + \rho A^\T A$ does not change and is factorised once. $\vec y$ converges to the multipliers of the constraints. This is the core of OSQP (Stellato et al., 2020), and of \texttt{QpSolver} in \src{src/math/qp.ts}, which adds a small regularisation and a relaxation step.
+\end{result}
+
+\begin{example}[ADMM on the smallest QP]
+\label{ex:J-admm}
+Minimise $\tfrac12(x - 3)^2$ subject to $0 \le x \le 2$, with $\rho = 1$, starting from $z = y = 0$.
+
+\textbf{Step 1 — the answer, by KKT.} The unconstrained minimum 3 violates $x \le 2$; with that constraint active, $x - 3 + \mu = 0$ at $x = 2$ gives $\mu = 1$.
+
+\textbf{Step 2 — the iteration.} Here $P = 1$, $q = -3$, $A = 1$: $x \leftarrow (z - y + 3)/2$, $z \leftarrow \operatorname{clip}(x + y, 0, 2)$, $y \leftarrow y + x - z$.
+
+\textbf{Step 3 — the numbers.} $(x, z, y)$: $(1.5, 1.5, 0)$, $(2.25, 2, 0.25)$, $(2.375, 2, 0.625)$, $(2.19, 2, 0.81)$, $(2.09, 2, 0.91)$, $(2.05, 2, 0.95)$, \dots\ From the third iteration on, the error of $x$ and of $y$ halves at every step: $x \to 2$ and $y \to 1 = \mu$.
+
+\textbf{Step 4 — read it.} $z$ is feasible from the second iteration; $x$ approaches it from outside. A capped number of iterations therefore leaves a small violation, of the size of the last step — which is why the simulator's MPC keeps a margin of \SI{3}{cm} from the ceiling, and why its plan is clipped to the bounds before use.
+\end{example}
+\tip[-20pt]{Warm-starting ADMM from the previous step's solution is what makes it fast in MPC: the plan changes little in \SI{20}{ms}, and a handful of iterations suffice.}
+
+\section{Gradient methods}
+
+When the problem is too large to factorise, or not quadratic at all, the minimiser is approached by steps downhill: $\vx_{k+1} = \vx_k - \alpha\nabla f(\vx_k)$. How fast depends on the shape of $f$.
+
+\begin{theorem}[Gradient descent on a strongly convex function]
+\label{thm:J-gd}
+Let $\mu\Id \preceq \nabla^2f \preceq L\Id$ everywhere, with $0 < \mu \le L$. With the step $\alpha = 2/(L + \mu)$,
+\begin{equation}\label{eq:J-gd}
+  \|\vx_k - \vx^*\| \le \Big(\frac{\kappa - 1}{\kappa + 1}\Big)^k\|\vx_0 - \vx^*\|, \qquad \kappa = L/\mu .
+\end{equation}
+(Nocedal and Wright, 2006, ch.~3.)
+\end{theorem}
+\begin{proof}[Proof for a quadratic]
+For $f = \tfrac12\vx^\T H\vx + \vec g^\T\vx$, the error obeys $\vx_{k+1} - \vx^* = (\Id - \alpha H)(\vx_k - \vx^*)$. The eigenvalues of $\Id - \alpha H$ lie between $1 - \alpha L$ and $1 - \alpha\mu$, which for $\alpha = 2/(L + \mu)$ are $\mp(\kappa - 1)/(\kappa + 1)$.
+\end{proof}
+
+The condition number $\kappa$ of the Hessian — a ratio of eigenvalues, as in Appendix~I — sets the pace. For $\kappa = 100$ the factor is $99/101 = 0.98$: 115 steps to reduce the error tenfold. Newton's method, $\vx_{k+1} = \vx_k - (\nabla^2f)^{-1}\nabla f$, rescales the problem so that $\kappa = 1$ and solves a quadratic in one step, at the price of a linear system per step. Scaling the variables well before optimising — metres and newtons of similar importance, as in Example~\ref{ex:I-mixer} — is often the cheapest improvement of all.\pitfall{A gradient method that converges slowly is usually badly scaled, not badly coded. Look at the condition number of the Hessian before tuning the step.}
+
+Two variants appear in the lessons. Training a policy (Lesson~II.20) uses \emph{stochastic} gradients, estimated from a few samples at a time: noisier steps, many more of them. MPPI (Lesson~II.16) needs no gradient: it samples many input sequences, weights each by $e^{-J/\lambda}$, and averages — a soft minimum that tolerates costs with holes and jumps, at the price of many evaluations.
+
+\section{Beyond quadratic programs}
+
+Some constraints are convex without being linear. A bound on the length of a vector, $\|\vec T\| \le T_{max}$ — a thrust that may point anywhere within a cone of limited size — is a \term{second-order cone} constraint; problems with a linear or quadratic cost and such constraints are second-order cone programs (SOCPs), solved as reliably as QPs. Constraints that a matrix be positive semidefinite, $M(\vx) \succeq 0$ with $M$ affine in $\vx$, give \term{semidefinite programs}; with the Schur complement of \cref{thm:I-schur} many Lyapunov and Riccati inequalities take this form, which is how robust control is computed in Part~III.
+
+A lower bound on the length, $\|\vec T\| \ge T_{min}$, is not convex: it cuts a hole around zero. For rocket landing, Açıkmeşe and Ploen (2007) replaced it by a slack variable $\Gamma$ with $\|\vec T\| \le \Gamma$ and $T_{min} \le \Gamma \le T_{max}$, which is convex, and proved that the optimum of the relaxed problem satisfies $\|\vec T\| = \Gamma$ — the relaxation loses nothing. Finding such reformulations is much of the art of optimisation-based control.\didyouknow{\enquote{Lossless convexification} was flight-tested on the Masten Xombie rocket in 2012--2013, in a collaboration with NASA's Jet Propulsion Laboratory.}
+
+\begin{result}[Appendix J at a glance]
+\begin{center}\small
+\renewcommand{\arraystretch}{1.4}
+\begin{tabularx}{\linewidth}{@{}l>{\raggedright\arraybackslash}X@{}}
+unconstrained & $\nabla f = 0$, $\nabla^2f \succeq 0$; quadratic: $\vx^* = -H^{-1}\vec g$\\
+convex & chord above the graph; local $=$ global; KKT sufficient\\
+equality & $\nabla f + \sum\lambda_i\nabla h_i = 0$; $\lambda_i$ is the price of constraint $i$\\
+KKT & stationarity, $\mu_j \ge 0$, $\mu_jg_j = 0$: inactive constraints have zero multipliers\\
+one half-plane & $\vec u = \vec u_{ref} - \max(0, (\vec a^\T\vec u_{ref} - b)/\|\vec a\|^2)\,\vec a$\\
+QP & $\min\tfrac12\vx^\T P\vx + \vec q^\T\vx$, $\vec l \le A\vx \le \vec u$; ADMM: solve, clip, update multipliers\\
+gradient descent & error factor $(\kappa - 1)/(\kappa + 1)$ per step; Newton: $\kappa = 1$\\
+cones & $\|\vec T\| \le T_{max}$ convex (SOCP); $\|\vec T\| \ge T_{min}$ not — relax with a slack\\
+\end{tabularx}
+\end{center}
+\end{result}

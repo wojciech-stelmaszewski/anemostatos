@@ -19,17 +19,19 @@ E & \hyperref[app:prob]{Probability and random signals}: variance and covariance
 F & \hyperref[app:num]{Numerical methods}: roots, integrals, the integration of differential equations & \lessonref{les:meet}\\
 G & \hyperref[app:stab]{Stability of nonlinear systems}: linearisation, Lyapunov functions, the invariance principle, time scales & \lessonref{les:spring}\\
 H & \hyperref[app:quat]{Rotations and quaternions}: rotation matrices, axis and angle, quaternion kinematics, the attitude error & \lessonref{les:tilt}\\
+I & \hyperref[app:linalg]{Linear algebra beyond eigenvalues}: positive definite matrices, singular values, Gramians, the Riccati equations & \lessonref{les:lqr}\\
+J & \hyperref[app:optim]{Optimisation}: convexity, the KKT conditions, quadratic programs and ADMM, gradient methods & \lessonref{les:mpc}\\
 \bottomrule
 \end{tabularx}
 \end{center}
 
-Two more appendices belong to Part~II and are printed with it: \textsf{\textbf{I}}, linear algebra beyond eigenvalues (singular values, positive definite matrices, the Riccati equation), and \textsf{\textbf{J}}, optimisation (convexity, the Karush–Kuhn–Tucker conditions, quadratic and cone programs). The later volumes add \textsf{\textbf{K}}, norms of signals and systems, and \textsf{\textbf{L}}, the calculus of variations and dynamic programming. The letters stay the same throughout the course.
+Appendices I and J were written with Part~II, whose controllers are built from matrix equations and optimisation. The later volumes add \textsf{\textbf{K}}, norms of signals and systems, and \textsf{\textbf{L}}, the calculus of variations and dynamic programming. The letters stay the same throughout the course.
 
 \section*{How to use it}
 
 \begin{itemize}
   \item \textbf{As a reference.} Each appendix opens with a margin card, \emph{Where it is used}, that names the lessons relying on it, and the lessons point back here. Equations and theorems are numbered with the letter of the appendix: \enquote{Theorem~A.2}, \enquote{Equation~(C.7)}.
-  \item \textbf{As a refresher.} The appendices can be read in order. A and C together are the classical \enquote{signals and systems} course in forty pages; B and G are its stability theory; D, E and F are what a digital, noisy, computed loop adds; H is the geometry of a body that turns.
+  \item \textbf{As a refresher.} The appendices can be read in order. A and C together are the classical \enquote{signals and systems} course in forty pages; B and G are its stability theory; D, E and F are what a digital, noisy, computed loop adds; H is the geometry of a body that turns; I and J are the algebra and the optimisation behind Part~II's controllers.
   \item \textbf{With a pencil.} The worked examples use the drone of the lessons — $m = \SI{1}{kg}$, $K_p = 10$, $K_d = 7$, $K_i = 0.8$, a motor lag of \SI{30}{ms}, a controller at \SI{250}{Hz} — so that every number can be checked against a chapter or against the simulator.
 \end{itemize}
 
@@ -43,3 +45,5 @@ The statements follow the conventions of the \hyperref[sec:notation]{Prelude}: a
 \input{back/toolbox/F-numerics}
 \input{back/toolbox/G-stability}
 \input{back/toolbox/H-rotations}
+\input{back/toolbox/I-matrices}
+\input{back/toolbox/J-optimisation}

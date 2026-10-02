@@ -1,0 +1,248 @@
+\toolchapter{I}{Linear algebra beyond eigenvalues}{Eigenvalues say whether a system is stable. Symmetric matrices, singular values and two matrix equations say what it costs and which controller is best.}
+\label{app:linalg}
+
+\lead{\usedcard{\setuprow{Appendix G}{positive definite matrices, the Lyapunov equation}\setuprow{Lesson II.2}{the LQR and its Riccati equation}\setuprow{Lessons II.3, II.4}{augmented LQR; the Kalman filter, its Riccati equation and gain}\setuprow{Lesson II.13}{MPC: the QP's Hessian, the limit $N \to \infty$}\setuprow{Part III}{observability (III.9), singular values and robust control (III.11--III.14)}}%
+A first course in linear algebra ends with eigenvalues, and so does Appendix~A: the poles of $\dot{\vx} = A\vx$ are the eigenvalues of $A$. Part~II needs more. The LQR's cost is a quadratic form, and the best controller is found by solving a quadratic matrix equation; the Kalman filter's covariance is a positive definite matrix updated by the same equation; how hard a system is to steer is measured by the singular values of a matrix. This appendix collects these tools, with the drone's numbers: symmetric and positive definite matrices, the singular value decomposition, the Lyapunov equation and the Gramians, the matrix inversion lemma, and the Riccati equations.}
+
+\section{Symmetric matrices}
+
+Covariances, costs and Hessians are symmetric: $S = S^\T$. Symmetric matrices are the best-behaved of all.\tip{A covariance or a cost matrix computed in floating point drifts slightly away from symmetry. Code keeps it symmetric by replacing $P$ with $\tfrac12(P + P^\T)$ after each update.}
+
+\begin{theorem}[The spectral theorem]
+\label{thm:I-spectral}
+A real symmetric $n \times n$ matrix $S$ has $n$ real eigenvalues and $n$ eigenvectors that are perpendicular to each other. With the unit eigenvectors as the columns of $V$,
+\begin{equation}\label{eq:I-spectral}
+  S = V\Lambda V^\T, \qquad V^\T V = \Id, \qquad \Lambda = \diag(\lambda_1, \dots, \lambda_n) .
+\end{equation}
+(Horn and Johnson, 2013, ch.~4.)
+\end{theorem}
+
+In the coordinates of its eigenvectors, a symmetric matrix only stretches: $\vx^\T S\vx = \sum_i\lambda_i(\vec v_i^\T\vx)^2$. This is where the bounds $\lambda_{min}\|\vx\|^2 \le \vx^\T S\vx \le \lambda_{max}\|\vx\|^2$ of \cref{eq:G-rayleigh} come from, and why a positive definite matrix — all $\lambda_i > 0$ — defines ellipsoids $\vx^\T S\vx = c$ with their axes along the eigenvectors.
+
+\subsection{Three tests for positive definiteness}
+Appendix~G gave the definition: $P \succ 0$ if $\vx^\T P\vx > 0$ for all $\vx \ne 0$. Three tests are in use, and each has its place:
+\begin{itemize}
+  \item \emph{eigenvalues} all positive — the definition in the eigenvector coordinates; costly for large matrices;
+  \item \emph{leading principal minors} all positive (Sylvester's criterion) — convenient by hand for $2 \times 2$ and $3 \times 3$;
+  \item a \emph{Cholesky factor} exists — the fastest numerically, and the test that solvers use.
+\end{itemize}
+
+\begin{theorem}[Cholesky factorisation]
+\label{thm:I-chol}
+A symmetric matrix $P$ is positive definite if and only if $P = LL^\T$ with $L$ lower triangular and positive on its diagonal. The factor is unique and is computed column by column:
+\begin{equation}\label{eq:I-chol}
+  \ell_{jj} = \Big(p_{jj} - \sum_{k<j}\ell_{jk}^2\Big)^{1/2}, \qquad \ell_{ij} = \frac{1}{\ell_{jj}}\Big(p_{ij} - \sum_{k<j}\ell_{ik}\ell_{jk}\Big) \quad (i > j) .
+\end{equation}
+The matrix is not positive definite exactly when a square root of a non-positive number is required.
+\end{theorem}
+\begin{proof}
+If $P = LL^\T$ with $L$ invertible, $\vx^\T P\vx = \|L^\T\vx\|^2 > 0$ for $\vx \ne 0$. Conversely, write $P = \begin{psmallmatrix}p_{11} & \vec p^\T\\ \vec p & P_2\end{psmallmatrix}$; $p_{11} = \vec e_1^\T P\vec e_1 > 0$, and $P = \begin{psmallmatrix}\ell & 0\\ \vec p/\ell & \Id\end{psmallmatrix}\begin{psmallmatrix}1 & 0\\ 0 & P_2 - \vec p\vec p^\T/p_{11}\end{psmallmatrix}\begin{psmallmatrix}\ell & \vec p^\T/\ell\\ 0 & \Id\end{psmallmatrix}$ with $\ell = \sqrt{p_{11}}$. The middle block $P_2 - \vec p\vec p^\T/p_{11}$ is again positive definite (it is the restriction of the form to vectors with a suitable first component), and induction on $n$ finishes the proof.
+\end{proof}
+
+The block in the middle of that proof has a name of its own.
+
+\begin{theorem}[Schur complement]
+\label{thm:I-schur}
+For a symmetric block matrix $M = \begin{psmallmatrix}A & B\\ B^\T & C\end{psmallmatrix}$ with $A \succ 0$: $M \succ 0$ if and only if $C - B^\T A^{-1}B \succ 0$.
+\end{theorem}
+\begin{proof}
+$M = \begin{psmallmatrix}\Id & 0\\ B^\T A^{-1} & \Id\end{psmallmatrix}\begin{psmallmatrix}A & 0\\ 0 & C - B^\T A^{-1}B\end{psmallmatrix}\begin{psmallmatrix}\Id & A^{-1}B\\ 0 & \Id\end{psmallmatrix}$, and the outer factors are invertible, so $M$ and the block-diagonal matrix are positive definite together.
+\end{proof}
+
+The Schur complement turns a condition that is nonlinear in the unknowns into one that is linear — the trick behind the linear matrix inequalities of robust control (Lessons~III.11--III.14). It also appears, unnamed, in every Kalman update: the posterior covariance is the Schur complement of the joint covariance of state and measurement.\didyouknow{André-Louis Cholesky, a French artillery officer, devised his factorisation around 1910 to adjust geodetic surveys. He died in the First World War; the method was published by a colleague in 1924.}
+
+\begin{example}[The LQR's $P$, three ways]
+\label{ex:I-P}
+Lesson~II.2 found, for $m = \SI{1}{kg}$, $q_e = 100$, $q_v = 10$, $r = 1$, the Riccati solution $P = \begin{psmallmatrix}54.77 & 10\\ 10 & 5.477\end{psmallmatrix}$. Confirm that it is positive definite.
+
+\textbf{Step 1 — minors.} $54.77 > 0$ and $54.77 \cdot 5.477 - 100 = 200 > 0$.
+
+\textbf{Step 2 — Cholesky.} $\ell_{11} = \sqrt{54.77} = 7.401$, $\ell_{21} = 10/7.401 = 1.351$, $\ell_{22} = \sqrt{5.477 - 1.351^2} = 1.911$. Every square root was of a positive number.
+
+\textbf{Step 3 — Schur complement.} $5.477 - 10^2/54.77 = 3.651 > 0$: the same number as $\ell_{22}^2$, as the proof of \cref{thm:I-chol} says it must be.
+
+\textbf{Step 4 — eigenvalues.} $3.53$ and $56.7$. The cost $\vx^\T P\vx$ of starting \SI{1}{m} low at rest is $p_{11} = 54.8$; starting at rest in place but moving at \SI{1}{m/s} costs $p_{22} = 5.5$. The ratio of the eigenvalues, 16, says that some initial states are sixteen times as expensive per unit length as others.
+\end{example}
+
+\section{Singular values}
+
+Eigenvalues describe a square matrix applied to itself, again and again — the dynamics. A matrix that maps one kind of quantity to another — motor thrusts to forces and torques, inputs to outputs — is described by its singular values.
+
+\begin{theorem}[The singular value decomposition]
+\label{thm:I-svd}
+Every real $m \times n$ matrix $M$ can be written
+\begin{equation}\label{eq:I-svd}
+  M = U\Sigma V^\T ,
+\end{equation}
+with $U$ ($m \times m$) and $V$ ($n \times n$) orthogonal and $\Sigma$ ($m \times n$) zero except for the diagonal entries $\sigma_1 \ge \sigma_2 \ge \dots \ge 0$, the \term{singular values}. They are the square roots of the eigenvalues of $M^\T M$. The largest is the gain of the matrix,
+\begin{equation}\label{eq:I-norm}
+  \|M\|_2 = \max_{\vx \ne 0}\frac{\|M\vx\|}{\|\vx\|} = \sigma_1 ,
+\end{equation}
+and for a square invertible $M$ the smallest gain is $\sigma_n$ and $\|M^{-1}\|_2 = 1/\sigma_n$. (Golub and Van Loan, 2013, ch.~2.)
+\end{theorem}
+\begin{proof}
+$M^\T M$ is symmetric and positive semidefinite; by \cref{thm:I-spectral}, $M^\T M = V\diag(\sigma_i^2)V^\T$. For $\sigma_i > 0$ set $\vec u_i = M\vec v_i/\sigma_i$; these are orthonormal, since $\vec u_i^\T\vec u_j = \vec v_i^\T M^\T M\vec v_j/(\sigma_i\sigma_j) = \delta_{ij}$. Complete them to an orthonormal basis $U$; then $MV = U\Sigma$. For the norm, $\|M\vx\|^2 = \vx^\T M^\T M\vx \le \sigma_1^2\|\vx\|^2$, with equality at $\vx = \vec v_1$.
+\end{proof}
+
+The decomposition reads as a sentence: rotate the input into the directions $\vec v_i$, stretch each by $\sigma_i$, rotate into the output directions $\vec u_i$. The \term{condition number} $\kappa = \sigma_1/\sigma_n$ is the ratio between the strongest and the weakest direction. A large $\kappa$ means that the matrix is nearly singular: some outputs need very large inputs, and errors in the data are amplified by up to $\kappa$ in the solution.
+
+\keeptogether{10\baselineskip}
+\begin{example}[The authority of the mixer]
+\label{ex:I-mixer}
+The four motor thrusts of the X-quadrotor produce the collective thrust and three torques (\lessonref{les:cascade}):
+\begin{equation*}
+  \begin{pmatrix}T\\ \tau_x\\ \tau_y\\ \tau_z\end{pmatrix} =
+  \begin{pmatrix}1 & 1 & 1 & 1\\ d & -d & -d & d\\ c & -c & c & -c\\ d & d & -d & -d\end{pmatrix}
+  \begin{pmatrix}f_1\\ f_2\\ f_3\\ f_4\end{pmatrix},
+\end{equation*}
+with the arm $d = 0.17/\sqrt2 = \SI{0.120}{m}$ and the drag-torque coefficient $c = \SI{0.016}{m}$. Find the singular values.
+
+\textbf{Step 1 — orthogonal rows.} The four rows are perpendicular to each other: the patterns $(1, 1, 1, 1)$, $(1, -1, -1, 1)$, $(1, -1, 1, -1)$ and $(1, 1, -1, -1)$ are the four sign patterns of a Hadamard matrix. So $MM^\T$ is diagonal and the singular values are the lengths of the rows.
+
+\textbf{Step 2 — the values.} $\sigma = 2$ (thrust), $2d = 0.240$ (roll and pitch, twice), $2c = 0.032$ (yaw).
+
+\textbf{Step 3 — read it.} A thrust pattern of unit length (in newtons) buys at most \SI{2}{N} of collective thrust, \SI{0.24}{N.m} of roll torque, but only \SI{0.032}{N.m} of yaw torque. Yaw is the weak direction, by a factor of $7.5$ against roll and pitch. This is why the mixer gives up yaw first when the motors saturate (\lessonref{les:cascade}), and why the tilt-prioritised law of \lessonref{les:geometric} sends the thrust direction home before the heading.
+
+\textbf{Step 4 — a caution about units.} The first row is in newtons and the others in newton-metres, so the condition number $2/0.032 = 62$ depends on the units chosen. Singular values compare directions fairly only after every quantity is scaled by what is important for it — here, for instance, by the largest torque each axis needs. Scaling is the first step of every analysis of a system with several inputs and outputs.
+\end{example}
+\pitfall{A singular value computed from a matrix with mixed units is a number without meaning. Before comparing directions, divide every input and output by a value that is important for it.}
+
+\section{The Lyapunov equation and the Gramians}
+
+Appendix~G introduced the Lyapunov equation $A^\T P + PA = -Q$ as a way to find a Lyapunov function. Its solution also has a closed form, which turns it into a tool for measuring.
+
+\begin{theorem}[The solution of the Lyapunov equation]
+\label{thm:I-lyapint}
+If all eigenvalues of $A$ have negative real parts, the unique solution of $A^\T P + PA + Q = 0$ is
+\begin{equation}\label{eq:I-lyapint}
+  P = \int_0^\infty e^{A^\T t}\,Q\,e^{At}\,\dd t ,
+\end{equation}
+and $\vx_0^\T P\vx_0 = \int_0^\infty \vx(t)^\T Q\vx(t)\,\dd t$ along $\dot{\vx} = A\vx$, $\vx(0) = \vx_0$.
+\end{theorem}
+\begin{proof}
+The integral converges because $e^{At}$ decays exponentially. Then $A^\T P + PA = \int_0^\infty \frac{\dd}{\dd t}\big(e^{A^\T t}Qe^{At}\big)\,\dd t = \big[e^{A^\T t}Qe^{At}\big]_0^\infty = -Q$. The second statement is \cref{eq:I-lyapint} with $\vx(t) = e^{At}\vx_0$. Uniqueness: the equation is linear in the $n(n+1)/2$ unknowns of $P$, and its homogeneous version has only $P = 0$, by the same calculation.
+\end{proof}
+
+The integral form says what the solution \emph{is}: the accumulated cost of the free motion. Lesson~II.2 used it to price a PD controller (Example~\ref{ex:G-P} computed the same matrix for the default loop). By hand one solves the linear equations entry by entry; numerically, solvers transform $A$ to triangular form first (the Bartels–Stewart method).
+
+\begin{definition}{Controllability Gramian}
+For $\dot{\vx} = A\vx + B\symbf u$ and a time $T > 0$, the \term{controllability Gramian} is
+\begin{equation}\label{eq:I-gram}
+  W_c(T) = \int_0^T e^{At}BB^\T e^{A^\T t}\,\dd t .
+\end{equation}
+For a stable $A$ and $T \to \infty$ it solves $AW_c + W_cA^\T + BB^\T = 0$.
+\end{definition}
+
+\begin{theorem}[The cheapest way there]
+\label{thm:I-mineng}
+The system can be steered from $\vx(0) = 0$ to any $\vx_f$ in the time $T$ if and only if $W_c(T)$ is invertible — which holds exactly when $(A, B)$ is controllable. The input of least energy $\int_0^T\|\symbf u\|^2\,\dd t$ is then
+\begin{equation}\label{eq:I-minu}
+  \symbf u^*(t) = B^\T e^{A^\T(T - t)}\,W_c(T)^{-1}\vx_f, \qquad \int_0^T\|\symbf u^*\|^2\,\dd t = \vx_f^\T W_c(T)^{-1}\vx_f .
+\end{equation}
+(Kailath, 1980, ch.~2.)
+\end{theorem}
+\begin{proof}
+The input $\symbf u^*$ reaches $\vx(T) = \int_0^T e^{A(T-s)}B\symbf u^*(s)\,\dd s = W_c(T)W_c(T)^{-1}\vx_f$, using the substitution $t = T - s$ in \cref{eq:I-gram}. Any other input $\symbf u^* + \symbf w$ that reaches $\vx_f$ has $\int_0^T e^{A(T-s)}B\symbf w\,\dd s = 0$, so $\int\symbf u^{*\T}\symbf w\,\dd s = \vx_f^\T W_c^{-1}\int e^{A(T-s)}B\symbf w\,\dd s = 0$ and $\int\|\symbf u^* + \symbf w\|^2 = \int\|\symbf u^*\|^2 + \int\|\symbf w\|^2$. The energy follows by inserting $\symbf u^*$.
+\end{proof}
+
+\begin{example}[Moving the drone one metre in one second]
+\label{ex:I-gram}
+The L1 drone ($A = \begin{psmallmatrix}0 & 1\\ 0 & 0\end{psmallmatrix}$, $B = (0, 1)^\T$ for $m = \SI{1}{kg}$) is to be moved \SI{1}{m} up, from rest to rest, in $T = \SI{1}{s}$. What is the cheapest extra thrust?
+
+\textbf{Step 1 — the Gramian.} $e^{At}B = (t, 1)^\T$, so $W_c(T) = \int_0^T\begin{psmallmatrix}t^2 & t\\ t & 1\end{psmallmatrix}\dd t = \begin{psmallmatrix}T^3/3 & T^2/2\\ T^2/2 & T\end{psmallmatrix}$; for $T = 1$, $\begin{psmallmatrix}1/3 & 1/2\\ 1/2 & 1\end{psmallmatrix}$.
+
+\textbf{Step 2 — invert.} $\det W_c = 1/12$, $W_c^{-1} = \begin{psmallmatrix}12 & -6\\ -6 & 4\end{psmallmatrix}$, and $W_c^{-1}\vx_f = (12, -6)^\T$ for $\vx_f = (1, 0)^\T$.
+
+\textbf{Step 3 — the input.} $B^\T e^{A^\T(T-t)} = (T - t,\ 1)$, so $u^*(t) = 12(1 - t) - 6 = 6 - 12t$: \SI{6}{N} of extra thrust at the start, falling linearly to \SI{-6}{N} at the end. The energy is $\vx_f^\T W_c^{-1}\vx_f = \SI{12}{N^2.s}$.
+
+\textbf{Step 4 — read it.} The cheapest move pushes, then brakes, symmetrically: the minimum-energy path is the cubic $x = 3t^2 - 2t^3$. Halving the time multiplies the energy by $2^3 = 8$ — the $T^3$ in $W_c$ — which is why fast manoeuvres are expensive. A Gramian with a small eigenvalue marks a direction that is controllable in principle and costly in practice; the rank test of \cref{thm:A-rank} cannot see the difference.
+\end{example}
+
+The \term{observability Gramian} $W_o(T) = \int_0^Te^{A^\T t}C^\T Ce^{At}\,\dd t$ is the mirror image: $\vx_0^\T W_o\vx_0$ is the energy of the output produced by the initial state $\vx_0$, so states with small $\vx_0^\T W_o\vx_0$ are hard to see in noisy measurements. Observability returns in Lesson~III.9; balancing the two Gramians, to find which states of a model matter, belongs to the later volumes.
+
+\section{The matrix inversion lemma}
+
+\begin{theorem}[Woodbury identity]
+\label{thm:I-woodbury}
+If $A$, $C$ and $A + UCV$ are invertible,
+\begin{equation}\label{eq:I-woodbury}
+  (A + UCV)^{-1} = A^{-1} - A^{-1}U\big(C^{-1} + VA^{-1}U\big)^{-1}VA^{-1} .
+\end{equation}
+\end{theorem}
+\begin{proof}
+Multiply the right-hand side by $A + UCV$ and collect terms: the result is $\Id$.
+\end{proof}
+
+The lemma exchanges the inverse of a large matrix for the inverse of a small one. In the Kalman filter it connects the two forms of the update: the information form $P^{-1}_+ = P^{-1}_- + H^\T R^{-1}H$, which adds what a measurement contributes, and the gain form $P_+ = P_- - P_-H^\T(HP_-H^\T + R)^{-1}HP_-$, which inverts only a matrix of the size of the measurement. For one altimeter reading, that inverse is a single division.\innumbers{A navigation filter with 15 states and a 3-axis satellite fix: the gain form inverts a $3 \times 3$ matrix, the information form a $15 \times 15$.}
+
+\section{The Riccati equations}
+
+\begin{definition}{Algebraic Riccati equations}
+The \term{continuous algebraic Riccati equation} (CARE) and the \term{discrete} one (DARE) are
+\begin{align}
+  A^\T P + PA - PBR^{-1}B^\T P + Q &= 0 , \label{eq:I-care}\\
+  P = Q + A^\T PA - A^\T PB\,(R + B^\T PB)^{-1}B^\T PA , \label{eq:I-dare}
+\end{align}
+with $Q \succeq 0$, $R \succ 0$. A solution $P$ is \term{stabilising} if the closed loop $A - BK$, with $K = R^{-1}B^\T P$ (respectively $K = (R + B^\T PB)^{-1}B^\T PA$), has all its eigenvalues in the left half-plane (inside the unit circle).
+\end{definition}
+
+A quadratic equation has two roots, and a matrix quadratic equation has many solutions.\recall{The scalar Riccati equation $2ap - b^2p^2/r + q = 0$ has two roots, one positive and one negative. Only the positive one gives a stable closed loop, $a - b^2p/r < 0$.} The LQR needs exactly one of them, the stabilising one, and a construction finds it.
+
+\begin{theorem}[The Hamiltonian matrix]
+\label{thm:I-hamilton}
+Let $(A, B)$ be stabilisable and $(A, Q^{1/2})$ detectable. The $2n \times 2n$ matrix
+\begin{equation}\label{eq:I-ham}
+  \mathcal H = \begin{pmatrix}A & -BR^{-1}B^\T\\ -Q & -A^\T\end{pmatrix}
+\end{equation}
+has no eigenvalues on the imaginary axis, and its eigenvalues come in pairs $\pm\lambda$. Let the columns of $\begin{psmallmatrix}X_1\\ X_2\end{psmallmatrix}$ span the eigenvectors (more generally, the invariant subspace) of its $n$ eigenvalues with negative real parts. Then $X_1$ is invertible, and
+\begin{equation}\label{eq:I-PX}
+  P = X_2X_1^{-1}
+\end{equation}
+is the unique stabilising solution of the CARE; it is symmetric and positive semidefinite, and the eigenvalues of $A - BK$ are the stable eigenvalues of $\mathcal H$. (Anderson and Moore, 1990, ch.~3; Laub, 1979, for the numerical method.)
+\end{theorem}
+\begin{proof}[Proof of the main step]
+Suppose $P$ solves the CARE and set $X_1 = \Id$, $X_2 = P$. Then
+$\mathcal H\begin{psmallmatrix}\Id\\ P\end{psmallmatrix} = \begin{psmallmatrix}A - BR^{-1}B^\T P\\ -Q - A^\T P\end{psmallmatrix} = \begin{psmallmatrix}\Id\\ P\end{psmallmatrix}(A - BK)$, where the second row uses the CARE: $-Q - A^\T P = PA - PBR^{-1}B^\T P = P(A - BK)$. So the columns of $\begin{psmallmatrix}\Id\\ P\end{psmallmatrix}$ span an invariant subspace of $\mathcal H$ on which it acts as $A - BK$. A stabilising $P$ corresponds to the stable invariant subspace, which is unique; conversely, from any basis $\begin{psmallmatrix}X_1\\ X_2\end{psmallmatrix}$ of that subspace, $\begin{psmallmatrix}\Id\\ X_2X_1^{-1}\end{psmallmatrix}$ is another one. That $X_1$ is invertible, and the symmetry of $P$, use the hypotheses and are in the references.
+\end{proof}
+
+\begin{example}[The LQR of Lesson II.2, through its Hamiltonian]
+\label{ex:I-ham}
+For $A = \begin{psmallmatrix}0 & 1\\ 0 & 0\end{psmallmatrix}$, $B = (0, 1)^\T$, $Q = \diag(100, 10)$, $R = 1$, find the closed-loop poles without solving the Riccati equation.
+
+\textbf{Step 1 — the matrix.} $\mathcal H = \begin{psmallmatrix}0 & 1 & 0 & 0\\ 0 & 0 & 0 & -1\\ -100 & 0 & 0 & 0\\ 0 & -10 & -1 & 0\end{psmallmatrix}$.
+
+\textbf{Step 2 — its characteristic polynomial.} Expanding, $\det(s\Id - \mathcal H) = s^4 - 10s^2 + 100$. In $s^2$: $s^2 = 5 \pm j\sqrt{75}$, so $s = \pm(2.739 \pm 1.581\,j)$ — four eigenvalues in $\pm$ pairs, none on the imaginary axis.
+
+\textbf{Step 3 — the closed loop.} The stable pair $-2.739 \pm 1.581\,j$ are the LQR's poles: the polynomial $s^2 + 5.477s + 10$, i.e.\ $k_1 = 10$, $k_2 = 5.477$ — the gains of Lesson~II.2 for $r = 1$.
+
+\textbf{Step 4 — and $P$.} The stable eigenvectors, stacked as $X_1$, $X_2$, give $X_2X_1^{-1} = \begin{psmallmatrix}54.77 & 10\\ 10 & 5.477\end{psmallmatrix}$, the matrix of Example~\ref{ex:I-P}. For a single input the polynomial of Step~2 is in general $a(s)a(-s) + \tfrac1r\,b(-s)^\T Q\,b(s)$ — the \emph{symmetric root locus}: the LQR's poles are the stable roots of a polynomial built from the plant and the weights.
+\end{example}
+
+The discrete equation has a symplectic matrix in place of $\mathcal H$, with eigenvalues in pairs $\lambda$, $1/\lambda$, and the same construction. The Kalman filter's Riccati equation is the DARE of the \emph{dual} system, with $A \to F^\T$, $B \to H^\T$, $Q \to$ the process noise, $R \to$ the measurement noise: estimation and control share one equation (\lessonref{les:kalman}).
+
+\begin{example}[The smallest Kalman filter]
+\label{ex:I-kalman}
+A constant drifts as a random walk, $x_{k+1} = x_k + w_k$ with $\operatorname{var} w = q = 0.01$, and is measured as $y_k = x_k + v_k$ with $\operatorname{var} v = r = 1$. Find the steady Kalman gain.
+
+\textbf{Step 1 — the scalar DARE.} For the prior variance $p$: $p = (p - p^2/(p + r)) + q$, i.e.\ $p^2 - qp - qr = 0$.
+
+\textbf{Step 2 — the positive root.} $p = \big(q + \sqrt{q^2 + 4qr}\big)/2 = (0.01 + 0.2002)/2 = 0.105$.
+
+\textbf{Step 3 — the gain.} $K = p/(p + r) = 0.095$: each new measurement moves the estimate by about a tenth of the innovation. The filter averages over roughly the last ten readings, the number that balances the drift ($q$) against the noise ($r$): for $q \ll r$, $K \approx \sqrt{q/r} = 0.1$.
+\end{example}
+
+\begin{result}[Appendix I at a glance]
+\begin{center}\small
+\renewcommand{\arraystretch}{1.4}
+\begin{tabularx}{\linewidth}{@{}l>{\raggedright\arraybackslash}X@{}}
+symmetric & $S = V\Lambda V^\T$, real $\lambda_i$, orthogonal eigenvectors\\
+$P \succ 0$ & eigenvalues $> 0$ \;$\Leftrightarrow$\; leading minors $> 0$ \;$\Leftrightarrow$\; Cholesky $P = LL^\T$ exists\\
+Schur complement & $\begin{psmallmatrix}A & B\\ B^\T & C\end{psmallmatrix} \succ 0 \Leftrightarrow A \succ 0,\ C - B^\T A^{-1}B \succ 0$\\
+SVD & $M = U\Sigma V^\T$; $\|M\|_2 = \sigma_1$; condition number $\sigma_1/\sigma_n$ — scale the units first\\
+Lyapunov & $A^\T P + PA + Q = 0$ \;$\Leftrightarrow$\; $P = \int_0^\infty e^{A^\T t}Qe^{At}\dd t$, the cost of the free motion\\
+Gramian & $W_c(T) = \int_0^T e^{At}BB^\T e^{A^\T t}\dd t$; least energy to reach $\vx_f$: $\vx_f^\T W_c^{-1}\vx_f$\\
+inversion lemma & $(A + UCV)^{-1} = A^{-1} - A^{-1}U(C^{-1} + VA^{-1}U)^{-1}VA^{-1}$\\
+CARE & $A^\T P + PA - PBR^{-1}B^\T P + Q = 0$; stabilising $P = X_2X_1^{-1}$ from the stable subspace of $\mathcal H$\\
+\end{tabularx}
+\end{center}
+\end{result}

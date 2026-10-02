@@ -173,15 +173,27 @@ motor lag.
 
 **Part IV — Aerospace GNC** (being built)
 
-| #     | Lesson                         | Level  | What you learn                                                                                                     |
-| ----- | ------------------------------ | ------ | ------------------------------------------------------------------------------------------------------------------ |
-| IV.1  | Where LQR comes from           | L1     | the maximum principle: the costate λ = Px, u = −R⁻¹Bᵀλ at every sample, predicted at a step                        |
-| IV.2  | Full throttle, then full brake | L1     | bang-bang: one switch on the braking curve, the minimum time t*, and a lead for the motors                         |
-| IV.3  | The map of all futures         | L1     | dynamic programming: the value function as a map; exactly xᵀPx until the motors saturate                           |
-| IV.4  | Land on the last drop          | rocket | fall, then full thrust: the suicide burn, its ignition altitude, and propellant that burns away                    |
-| IV.24 | Aim where it will be           | L3     | pure pursuit tail-chases; proportional navigation keeps the line of sight still and hits a weaving target          |
-| IV.26 | Drift                          | L3     | an unaided inertial navigator: a gyro bias of 0.05 °/s is 38 m after 30 s, as g·b·t³/6 predicts                    |
-| IV.27 | When the tangent lies          | L3     | one range beacon: the EKF is confidently wrong, the UKF honestly unsure; a good NIS does not prove a good estimate |
+| #     | Lesson                         | Level     | What you learn                                                                                                     |
+| ----- | ------------------------------ | --------- | ------------------------------------------------------------------------------------------------------------------ |
+| IV.1  | Where LQR comes from           | L1        | the maximum principle: the costate λ = Px, u = −R⁻¹Bᵀλ at every sample, predicted at a step                        |
+| IV.2  | Full throttle, then full brake | L1        | bang-bang: one switch on the braking curve, the minimum time t*, and a lead for the motors                         |
+| IV.3  | The map of all futures         | L1        | dynamic programming: the value function as a map; exactly xᵀPx until the motors saturate                           |
+| IV.4  | Land on the last drop          | rocket    | fall, then full thrust: the suicide burn, its ignition altitude, and propellant that burns away                    |
+| IV.7  | Balancing on a flame           | rocket    | thrust-vector control of an unstable airframe: a lower and an upper gain margin on the Nyquist chart               |
+| IV.8  | The rocket is a noodle         | rocket    | the gyro sees the bending mode and the loop sings; a notch, and where the gyro sits                                |
+| IV.9  | Fuel that moves                | rocket    | slosh near crossover eats the margin; baffles give it back                                                         |
+| IV.10 | First the wrong way            | rocket    | a right-half-plane zero: the sidestep starts the wrong way and caps the bandwidth                                  |
+| IV.11 | Two ways to wobble             | aircraft  | the short period and the phugoid, as pole pairs and in flight; Lanchester's estimate                               |
+| IV.12 | Level 1                        | aircraft  | a pitch damper moves the short period into the level-1 handling-qualities region                                   |
+| IV.13 | One gain does not fit all      | aircraft  | a fixed gain buzzes when fast; a schedule on dynamic pressure keeps the margin                                     |
+| IV.17 | Throttle is energy             | aircraft  | total-energy control holds the speed in a climb where separate loops cannot                                        |
+| IV.18 | Point the telescope            | satellite | quaternion feedback, the shortest rotation, and a Lyapunov function that only falls                                |
+| IV.19 | Spin to turn                   | satellite | a disturbance fills the wheels; dump momentum with thrusters without losing the target                             |
+| IV.20 | On or off                      | satellite | the dead-band limit cycle of on–off thrusters and its fuel rate                                                    |
+| IV.22 | Stars and gyros                | satellite | the MEKF fuses a slow star tracker with a drifting gyro; the bias must be a state                                  |
+| IV.24 | Aim where it will be           | L3        | pure pursuit tail-chases; proportional navigation keeps the line of sight still and hits a weaving target          |
+| IV.26 | Drift                          | L3        | an unaided inertial navigator: a gyro bias of 0.05 °/s is 38 m after 30 s, as g·b·t³/6 predicts                    |
+| IV.27 | When the tangent lies          | L3        | one range beacon: the EKF is confidently wrong, the UKF honestly unsure; a good NIS does not prove a good estimate |
 
 ## Run it
 

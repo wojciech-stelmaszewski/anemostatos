@@ -1,7 +1,8 @@
 # Parts IV and V — Aerospace GNC and Engineering Practice
 
-> **Status (2026-10-02):** M19 (the vehicle abstraction) and M20 (IV.1–IV.4)
-> are built, and three lessons of M25 (IV.24, IV.26, IV.27); §5 lists what was
+> **Status (2026-10-02):** M19 (the vehicle abstraction), M20 (IV.1–IV.4)
+> and M22 (IV.7–IV.10) are built; M23 has IV.11–IV.13 and IV.17, M24 has
+> IV.18–IV.20 and IV.22, and M25 has IV.24, IV.26 and IV.27. §5 lists what was
 > built and where it differs from this plan. The rest is planned. Milestones
 > M19–M26 in [roadmap.md](roadmap.md) point here. Part IV depends on Part III
 > ([analysis.md](analysis.md)): its lessons use the Bode, Nyquist, pole,
@@ -455,6 +456,82 @@ meet at work.
   NIS does not prove a good estimate, and that the UKF is honest, not more
   accurate. Two beacons were dropped: both filters lock onto the mirror
   solution.
+
+### Built (2026-10-02, second round: chapters L, M and N)
+
+**M22 — Chapter L (IV.7–IV.10).** `sim/vehicles/tvc.ts` (`sim.vehicle =
+'tvc'`): a rigid pitch-plane rocket with μα > 0, a gimbal with travel, rate
+limit and lag, the first bending mode (gyro station a parameter) and a slosh
+mass, frozen at one flight condition: only the motion across the flight path
+is simulated, not the burn. `control/tvc.ts` is one discrete controller used
+by both the simulator and `analysis/tvc.ts`, which breaks the loop at the
+gimbal and gives both gain margins from closed-loop eigenvalues; a Nyquist
+chart (`tvc`) shows them.
+
+- IV.7: the student predicts the least pitch gain μα/μc = 0.48 (true 0.46;
+  the drift coupling makes it depend a little on kd, which the lesson says).
+  Goal ≥ 6 dB both ways; kp 1.5, kd 0.8 gives −9.7/+17.1 dB, PM 49°.
+- IV.8: "10 dB of attenuation" became |L| ≤ −10 dB at the mode with PM ≥ 30°
+  (a 40 dB notch: −14 dB, 39°; 30 dB is not enough). Gyros at 0.4 and 0.6 see
+  the same +18 dB with opposite slopes: one sings, one is stable (in Try).
+- IV.9: the goal is a number: the least baffle damping (about ζ 0.027) that
+  keeps the curve 0.5 from −1.
+- IV.10 flies a hovering test vehicle (T = mg), not a rocket in ascent; the
+  student predicts z = √(T·l/I) = 2.02 rad/s. The pitch loop also limits the
+  speed: instability comes at an outer ωn of about 0.75 rad/s, not cleanly at
+  z/2, and a faster pitch loop makes it worse.
+
+**M23 — Chapter M (IV.11–IV.13, IV.17).** `sim/vehicles/aircraft.ts`: a 5 t
+light jet in the pitch plane at 110 m/s and 4000 m (ISA), elevator servo,
+engine spool-up and 40 ms of delay; trim by Newton, the linear model by the
+generic `linearize`. A light aircraft's short period is already well damped,
+so the jet gives the damper something to fix. `control/autopilot.ts`
+(attitude hold, damper, schedule, auto-throttle, TECS), `analysis/aircraft.ts`.
+
+- IV.11: short period 1.94 s, ζ 0.24; phugoid 49.3 s, ζ 0.05 (flown within
+  1–3 %). The student predicts the phugoid (Lanchester: 49.8 s).
+- IV.12: the bare airframe is level 3; the least damper gain for level 1 is
+  0.083 s (the short-period approximation says 0.070; most of the gap is the
+  approximation, not the servo). Goal: level 1 within 1.1× that gain.
+- IV.13: a gain tuned at 80 m/s has 55° there and 30° at 160 m/s, where the
+  nose buzzes at 2 Hz; scheduled on q̄ it keeps 55–78°. The goal adds a
+  crossover of at least 4 rad/s, because lowering a fixed gain alone would
+  meet the margin; without the delay the fixed gain never drops below 68°.
+- IV.17: "separate loops fight" does not hold as such (a noise-free
+  auto-throttle at gain 0.4 holds 1 m/s). Goal: 0.3 m/s in a 300 m climb with
+  the separate loops' throttle gain capped at 0.2: they reach 0.48 m/s, TECS
+  0.15 m/s. The engine lag is what makes the difference real.
+- Not built: IV.14, IV.15, IV.16; no wind on the aircraft.
+
+**M24 — Chapter N (IV.18–IV.20, IV.22).** `sim/vehicles/satellite.ts`:
+quaternion attitude, J = diag(4, 5, 3) kg·m², three wheels (0.2 N·m,
+0.6 N·m·s), on–off thruster pairs, a constant disturbance.
+`control/satellite.ts` (quaternion feedback, momentum dumping with optional
+feedforward, the dead-band law and its limit-cycle formulas),
+`estimation/startracker.ts` (the MEKF of III.23 on a biased gyro and a
+two-star tracker).
+
+- IV.18: the plan had no prediction; the command is 240° about the
+  diagonal and the student predicts the angle actually turned (120°: q and −q
+  are one attitude). 15.3 s the short way against about 23 s the long way.
+  V falls monotonically until the gains hit the wheel torque limit, then rises
+  by about a millionth; the lesson says the guarantee is lost there.
+- IV.19: the z wheel fills at h_max/τ_d = 30 s (the prediction); dumping
+  alone jumps 0.80°, with feedforward 0.29° (the PD offset τ_d/(kp/2)).
+- IV.20: the simple ω²/db fuel formula is off 2.4×; the prediction counts the
+  pulse time, and the drift rate is floored at half a minimum pulse. Goal:
+  within 0.5° on at most 1.3× the least fuel.
+- IV.22: the gyro alone drifts |b|·30 s = 212″ (prediction); with the bias
+  estimated it stays under 8″ through a 10 s tracker outage. Without the
+  bias state it is about 50″ off while its 2σ says 6″, the point of IV.27
+  again.
+- Not built: IV.21 (panel), IV.23 (CMG).
+
+`Simulation.loops()` now gives the loops of whatever flies, so the charts and
+the live formula follow the rocket, the TVC loop and the autopilot. Still
+open: with a Part IV vehicle selected the side panel also shows the drone's
+controller, setpoint and PID groups, and a crash shows the drone's "hit the
+ground" message.
 
 **Build order.** M19 first: nothing else in Part IV can start without the
 vehicle abstraction. Then the **must** lessons across M20–M25, then Part V,

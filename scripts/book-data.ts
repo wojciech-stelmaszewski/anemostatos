@@ -818,7 +818,7 @@ for (const kind of ['pid', 'mpc'] as const)
     },
     events: (s) => at(s, 8, 'setpoint.y', 3.95),
   });
-for (const h of [0.1, 0.3, 0.5, 1, 2])
+for (const h of [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.8, 1, 1.5, 2])
   add({
     name: `horizon-${h}`,
     seconds: 20,

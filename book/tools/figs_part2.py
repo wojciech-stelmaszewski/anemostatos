@@ -651,3 +651,71 @@ def mpc_ceiling():
     b.set_ylabel("N")
     b.set_xlabel("time after the jump [s]", loc="right")
     save(f, "mpc_ceiling")
+
+
+def _mpc_lin_gains(H, qp=50, qv=5, r=0.05, dt=0.02, b=1.0):
+    """First-move gains (kp, kd) of the unconstrained condensed altitude MPC: u0 = -kp·e - kd·v."""
+    n = max(2, round(H / dt))
+    k = np.arange(n)[:, None]
+    j = np.arange(n)[None, :]
+    gp = np.where(j <= k, b * dt * dt * (k - j + 0.5), 0.0)
+    gv = np.where(j <= k, b * dt, 0.0)
+    hm = 2 * (r * np.eye(n) + qp * gp.T @ gp + qv * gv.T @ gv)
+    kk = (np.arange(n) + 1) * dt
+    de = 2 * qp * gp.T @ np.ones(n)
+    dv = 2 * (qp * gp.T @ kk + qv * gv.T @ np.ones(n))
+    return np.linalg.solve(hm, de)[0], np.linalg.solve(hm, dv)[0]
+
+
+def _mpc_lin_reach(H, y0=2.0, r=3.95, umin=-9.81, umax=24.4 - 9.81):
+    kp, kd = _mpc_lin_gains(H)
+    y, v, t = y0, 0.0, 0.0
+    while t < 10:
+        u = np.clip(-kp * (y - r) - kd * v, umin, umax)
+        for _ in range(20):
+            v += u * 0.001
+            y += v * 0.001
+            t += 0.001
+        if abs(y - r) < 0.05:
+            return t
+    return np.nan
+
+
+@fig
+def mpc_horizon():
+    f, (a, b) = plt.subplots(1, 2, figsize=(TEXT_W, 62 * MM), gridspec_kw=dict(wspace=0.3))
+    hs = [0.1, 0.2, 0.3, 0.5, 1]
+    cols = ramp(len(hs), "blue")
+    for h, col in zip(hs, cols):
+        d = win(load(f"horizon-{h}"), 7.5, 16)
+        a.plot(d.t - 8, d["pos.y"], color=col, lw=0.9, label=f"{h} s")
+    a.axhline(4, color=C["err"], lw=0.7)
+    a.set_xlim(-0.5, 8)
+    a.set_ylim(1.9, 4.1)
+    a.set_title("Altitude, by horizon")
+    a.set_ylabel("m")
+    a.set_xlabel("time after the jump [s]", loc="right")
+    a.legend(loc="lower right", fontsize=6.0, title="horizon", title_fontsize=6.0)
+    hh = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.8, 1, 1.5, 2]
+    meas = []
+    for h in hh:
+        d = win(load(f"horizon-{h}"), 8, 20)
+        k = np.argmax(np.abs(d["pos.y"].values - 3.95) < 0.05)
+        meas.append(d.t.values[k] - 8)
+    hm = np.geomspace(0.08, 2.2, 60)
+    b.loglog(hm, [_mpc_lin_reach(h) for h in hm], color=C["meas"], lw=0.8, ls=(0, (3, 2)), label="linear MPC law, saturated")
+    b.loglog(hh, meas, "o", color=C["meas"], ms=3, label="flight")
+    b.axhline(1.6, color=C["I"], lw=0.7, ls=(0, (4, 2.5)))
+    b.axvline(0.6, color=C["I"], lw=0.7, ls=(0, (4, 2.5)))
+    b.text(0.62, 4.5, "goal: horizon ≤ 0.6 s,\nreached in < 1.6 s", fontsize=6.0, color=C["I"])
+    b.set_xticks([0.1, 0.2, 0.5, 1, 2])
+    b.set_xticklabels(["0.1", "0.2", "0.5", "1", "2"])
+    b.set_yticks([1, 2, 5])
+    b.set_yticklabels(["1", "2", "5"])
+    b.minorticks_off()
+    b.set_title("Time to reach the set-point")
+    b.set_ylabel("s")
+    b.set_xlabel("horizon [s]", loc="right")
+    b.legend(loc="lower left", fontsize=6.0)
+    b.grid(True, which="major", axis="both")
+    save(f, "mpc_horizon")

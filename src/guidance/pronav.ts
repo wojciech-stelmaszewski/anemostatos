@@ -21,15 +21,11 @@ export function targetState(g: GuidanceParams, t: number): { pos: Vec3; vel: Vec
   const side = v3(-Math.sin(head), 0, Math.cos(head));
   const w = (2 * Math.PI) / Math.max(g.weavePeriod, 0.1);
   const a = g.weaveAcc;
-  // Sideways: acceleration a·sin(ωt) from rest, so velocity (a/ω)(1 − cos ωt), position
-  // (a/ω)(t − sin(ωt)/ω): the target drifts to one side while it weaves.
-  const lat = a > 0 ? (a / w) * (t - Math.sin(w * t) / w) : 0;
-  const latV = a > 0 ? (a / w) * (1 - Math.cos(w * t)) : 0;
-  const pos = add(
-    add(v3(g.targetX, 0, g.targetZ), scale(along, g.targetSpeed * t)),
-    scale(side, lat - (a > 0 ? (a / w) * t : 0)),
-  );
-  const vel = add(scale(along, g.targetSpeed), scale(side, latV - (a > 0 ? a / w : 0)));
+  // Sideways acceleration a·sin(ωt), centred: position −(a/ω²)·sin(ωt), velocity −(a/ω)·cos(ωt).
+  const lat = -(a / (w * w)) * Math.sin(w * t);
+  const latV = -(a / w) * Math.cos(w * t);
+  const pos = add(add(v3(g.targetX, 0, g.targetZ), scale(along, g.targetSpeed * t)), scale(side, lat));
+  const vel = add(scale(along, g.targetSpeed), scale(side, latV));
   return { pos, vel };
 }
 

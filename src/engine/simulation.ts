@@ -22,6 +22,7 @@ import { profileOffset, zeroReference, type Reference } from './reference';
 import { FaultMonitor } from '@/estimation/fdi';
 import { RocketLander } from '@/control/rocket';
 import { initialRocket, stepRocket, type RocketState } from '@/sim/vehicles/rocket';
+import { Engagement, targetState } from '@/guidance/pronav';
 import { Tap } from './tap';
 import { Telemetry } from './telemetry';
 
@@ -73,6 +74,9 @@ export class Simulation {
   telemetry = new Telemetry(HISTORY_SECONDS * TELEMETRY_HZ);
   /** The last eight seconds of the gyro and one motor command at the physics rate, for spectra. */
   tap = new Tap();
+  /** The interception of lesson IV.24, while `guidance.enabled`. */
+  engagement = new Engagement();
+  private guidanceHold: Vec3 | null = null;
   /** The fault monitor of the flight computer (L3, lesson III.28). */
   fdi = new FaultMonitor();
   /** The rocket and its landing law, while `params.sim.vehicle` is 'rocket' (Part IV). */
@@ -190,6 +194,8 @@ export class Simulation {
     this.armed = true;
     this.measurement = null;
     this.tap.reset();
+    this.engagement.reset();
+    this.guidanceHold = null;
     this.fdi.reset();
     this.lander.reset();
     this.rocket = p.sim.vehicle === 'rocket' ? initialRocket(p.rocket) : null;
@@ -351,9 +357,28 @@ export class Simulation {
         p.probe.point === 'ref.y' && probeIn !== 0
           ? v3(this.setpoint.x, this.setpoint.y + probeIn, this.setpoint.z)
           : this.setpoint;
-      const sp: Setpoint = exact
+      let sp: Setpoint = exact
         ? { pos, yaw: this.yaw, vel: r.vel, acc: r.acc, jerk: r.jerk, snap: r.snap }
         : { pos, yaw: this.yaw };
+      const g = p.guidance;
+      if (g.enabled && this.level === 3 && this.t >= g.start && !this.takingOff) {
+        // The guidance law commands an acceleration; the reference sits on the drone so that the
+        // geometric controller flies exactly that acceleration (its feedforward), at the altitude.
+        const s = this.state;
+        const a = this.engagement.update(g, this.t, s.pos, s.vel);
+        if (a) {
+          this.guidanceHold = v3(s.pos.x, this.setpoint.y, s.pos.z);
+          sp = {
+            pos: v3(s.pos.x, this.setpoint.y, s.pos.z),
+            yaw: this.yaw,
+            vel: v3(s.vel.x, 0, s.vel.z),
+            acc: v3(a.x, 0, a.z),
+          };
+        } else if (this.guidanceHold) {
+          // The engagement is over: hover where it ended.
+          sp = { pos: this.guidanceHold, yaw: this.yaw };
+        }
+      }
       const t0 = performance.now();
       this.actuation = this.controller.tick({
         params: p,
@@ -521,6 +546,17 @@ export class Simulation {
       tl.set('fdi.altAlarm', f.altAlarm ? 1 : 0);
       tl.set('fdi.cusum', Math.max(...f.cusum));
       tl.set('fdi.motor', f.motor + 1);
+    }
+    if (this.level === 3 && this.params.guidance.enabled && this.engagement.started) {
+      const g = this.params.guidance;
+      const tg = targetState(g, this.t - g.start);
+      const e = this.engagement;
+      tl.set('tgt.x', tg.pos.x);
+      tl.set('tgt.z', tg.pos.z);
+      tl.set('eng.range', e.last.range);
+      tl.set('eng.minRange', e.minRange);
+      tl.set('eng.losRate', (e.last.losRate * 180) / Math.PI);
+      tl.set('eng.closing', e.last.closing);
     }
     if (this.level === 3 && this.params.sensors.attitude === 'mekf') {
       const k = this.sensors.mekf;

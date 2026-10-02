@@ -119,6 +119,17 @@ export interface SensorParams {
   baroNoise: number;
   /** A glitch: every fix is off by this much along x while it is not 0, m. */
   gpsGlitch: number;
+  /**
+   * An inertial navigator runs alongside from `insStart` (s): it integrates the gyro and the
+   * accelerometer with no position fix (lesson IV.26). The controller does not fly on it.
+   */
+  ins: boolean;
+  insStart: number;
+  /** Range-only beacons: a filter estimates the horizontal position from them (lesson IV.27). */
+  beacons: boolean;
+  /** Range noise σ, m, and readings per second. */
+  beaconNoise: number;
+  beaconRateHz: number;
 }
 
 /** Flight after the loss of a rotor (src/control/fault.ts, lesson III.27). */
@@ -237,6 +248,37 @@ export interface UncertaintyParams {
   delayMs: number;
 }
 
+/** The filter on range-only beacons (src/estimation/ukf.ts, lesson IV.27). */
+export interface BeaconFilterParams {
+  kind: 'ekf' | 'ukf';
+  /** Where the filter starts, relative to the truth, m, and how unsure it says it is, m. */
+  guessX: number;
+  guessZ: number;
+  sigma0: number;
+  /** When it starts, s. */
+  start: number;
+}
+
+/** An interception (src/guidance/pronav.ts, lesson IV.24); the drone flies the geometric outer. */
+export interface GuidanceParams {
+  enabled: boolean;
+  law: 'pursuit' | 'pn';
+  /** Navigation constant of proportional navigation. */
+  N: number;
+  /** The pursuer's speed, m/s, held along the line of sight, and the gain that holds it, 1/s. */
+  speed: number;
+  pursuitGain: number;
+  /** When the chase starts, s. */
+  start: number;
+  /** The target: start (x, z), heading, speed, and a sideways weave (m/s², s). */
+  targetX: number;
+  targetZ: number;
+  targetHeadingDeg: number;
+  targetSpeed: number;
+  weaveAcc: number;
+  weavePeriod: number;
+}
+
 /** Identification from a chirp (src/estimation/sysid.ts, lesson III.26). */
 export interface SysIdParams {
   /**
@@ -272,6 +314,7 @@ export interface ControlParams {
   ahrs: AhrsParams;
   mekf: MekfParams;
   navEkf: NavEkfParams;
+  beaconFilter: BeaconFilterParams;
   fault: FaultParams;
   fdi: FdiParams;
   /** The landing law of the rocket (src/control/rocket.ts). */
@@ -502,6 +545,7 @@ export interface Params {
   probe: ProbeParams;
   uncertainty: UncertaintyParams;
   sysid: SysIdParams;
+  guidance: GuidanceParams;
 }
 
 export const defaultParams = (): Params => ({
@@ -585,6 +629,11 @@ export const defaultParams = (): Params => ({
     gpsNoise: 0.3,
     baroNoise: 0.1,
     gpsGlitch: 0,
+    ins: false,
+    insStart: 5,
+    beacons: false,
+    beaconNoise: 0.02,
+    beaconRateHz: 10,
   },
   vibration: { gyroDeg: 0, acc: 0, hoverHz: 110 },
   control: {
@@ -595,6 +644,7 @@ export const defaultParams = (): Params => ({
     ahrs: { tau: 1, kp: 1, ki: 0.3, gate: 0.05 },
     mekf: { gyroDeg: 0.5, biasWalkDeg: 0.02, accDeg: 3, magDeg: 2, gate: 0 },
     navEkf: { accSigma: 0.5, biasWalk: 0.01, gate: 0 },
+    beaconFilter: { kind: 'ekf', guessX: 0, guessZ: 0, sigma0: 3, start: 5 },
     fault: {
       enabled: false,
       posKp: 2,
@@ -681,6 +731,20 @@ export const defaultParams = (): Params => ({
   },
   uncertainty: { massPct: 30, tauFactor: 2, delayMs: 20 },
   sysid: { estimator: 'direct', minCoherence: 0, amp: 0.4, seconds: 60 },
+  guidance: {
+    enabled: false,
+    law: 'pursuit',
+    N: 4,
+    speed: 4,
+    pursuitGain: 1.5,
+    start: 5,
+    targetX: 20,
+    targetZ: -10,
+    targetHeadingDeg: 90,
+    targetSpeed: 2,
+    weaveAcc: 0,
+    weavePeriod: 4,
+  },
   probe: { point: 'none', signal: 'sine', amp: 0.3, freqHz: 1, f0Hz: 0.1, f1Hz: 20, durationS: 60 },
 });
 

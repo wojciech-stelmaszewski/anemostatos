@@ -50,6 +50,7 @@ for i, pg in enumerate(d):
             if rr[2]-rr[0] > 500 and rr[3]-rr[1] > 700: continue
             if inter(n, rr): print(f"p{i+1} ({lab}) NOTE/DRAWING {n[4]} note y {n[1]:.0f}-{n[3]:.0f} drawing {tuple(round(v) for v in rr)}"); break
         for im in pg.get_image_info():
+            if im["bbox"][0] < 0: continue  # a clipped crop: its reported box is not what is seen
             if inter(n, im["bbox"]): print(f"p{i+1} ({lab}) NOTE/IMAGE {n[4]}")
     # any two margin lines from different notes / captions overlapping
     for j, a in enumerate(L):
@@ -57,4 +58,22 @@ for i, pg in enumerate(d):
             ov = min(a[3], b[3]) - max(a[1], b[1]); oh = min(a[2], b[2]) - max(a[0], b[0])
             if ov > 0.55 * min(a[3]-a[1], b[3]-b[1]) and oh > 2 and abs(a[1]-b[1]) > 3.5:
                 print(f"p{i+1} ({lab}) TEXT '{a[4][:30]}' / '{b[4][:30]}'")
+    # anything in the page body that runs below the foot of the text block: a drawing, an image
+    # or a line of text that did not fit (a TikZ figure or a box placed with [h] near the foot)
+    if any(dr["rect"].width > 500 and dr["rect"].height > 700 for dr in pg.get_drawings()):
+        continue  # a full-page design: the cover, a part page
+    low = []
+    for b in pg.get_text("dict")["blocks"]:
+        for l in b.get("lines", []):
+            t = "".join(s["text"] for s in l["spans"]).strip()
+            if l["bbox"][3] > YB + 9 and t and not t.isdigit() and not t.lower().strip("ivxlc") == "":
+                low.append(f"text '{t[:30]}'")
+    for dr in pg.get_drawings():
+        r = dr["rect"]
+        if r.y1 > YB + 8 and r.y0 > 100 and r.width > 1: low.append(f"drawing {tuple(round(v) for v in r)}")
+    for im in pg.get_image_info():
+        # a clipped crop (\marginscreen) reports the whole uncropped image, which starts off the page
+        if im["bbox"][3] > YB + 4 and im["bbox"][0] >= 0: low.append("image")
+    for what in dict.fromkeys(low):
+        print(f"p{i+1} ({lab}) BELOW FOOT {what}")
 print("notes:", tot)

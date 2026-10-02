@@ -10,7 +10,7 @@ Anemostatos begins with the simplest vehicle it can offer: a quadrotor that can 
 
 \subsection{The forces}
 Three kinds of force act on the drone along the vertical axis (\cref{fig:meet-fbd}):
-\marginnote{\resizebox{\marginparwidth}{!}{\input{tikz/freebody}}\par\vspace{3pt}\captionsetup{type=figure}\caption{The forces on the L1 drone. We count forces and positions as positive upwards.}\label{fig:meet-fbd}}
+\marginnote{\resizebox{\marginparwidth}{!}{\input{tikz/freebody}}\par\vspace{3pt}\captionsetup{type=figure}\caption{The forces on the L1 drone. We count forces and positions as positive upwards.}\label{fig:meet-fbd}}[-88pt]
 \begin{itemize}
   \item the \textbf{thrust} $T$ of the four propellers, upwards, which we choose;
   \item the \textbf{weight} $mg$, downwards, with $m$ the mass and $g = \SI{9.81}{m/s^2}$;
@@ -200,8 +200,6 @@ Look at the gust at $t \approx \SI{16}{s}$ in detail, because it contains the wh
   \item Once the gust is over, both terms return to zero, and the thrust returns to the feedforward value $\hat m g = \SI{9.81}{N}$.
 \end{enumerate}
 
-\screen[0 0 495 0]{meet}{The Anemostatos screen during Lesson I.1. Top: the 3D scene with the drone, the translucent setpoint sphere and the coloured arrows of the P, I, D and FF contributions. Bottom left: the \emph{live formula} with the numbers being added at this instant. Bottom: the charts, in the same colours as this book.}{fig:meet-screen}
-
 \begin{inapp}[Where this lesson lives]
 Start it from the lesson panel: \ui{Part I · PID\then 1. Meet the loop\then Start}. Everything on the screen is a view of the loop in \cref{fig:meet-loop}:
 \begin{itemize}[leftmargin=1.2em]
@@ -212,6 +210,8 @@ Start it from the lesson panel: \ui{Part I · PID\then 1. Meet the loop\then Sta
 \end{itemize}
 Keys: \key{↑}\,\key{↓} move the setpoint, \key{G} fires a gust, \key{M} switches the controller off, \key{R} resets, \key{Space} pauses.
 \end{inapp}
+
+\screen[0 0 495 0]{meet}{The Anemostatos screen during Lesson I.1. Top: the 3D scene with the drone, the translucent setpoint sphere and the coloured arrows of the P, I, D and FF contributions. Bottom left: the \emph{live formula} with the numbers being added at this instant. Bottom: the charts, in the same colours as this book.}{fig:meet-screen}
 
 \begin{trythis}
 \begin{enumerate}

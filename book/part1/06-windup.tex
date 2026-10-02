@@ -71,7 +71,7 @@ A rough check: if the error fell linearly from 4 to 0, the area would be $\tfrac
 
 \textbf{Step 5 — check} (\cref{fig:windup-predict}). The simulator: integral \SI{17.2}{N} at the crossing, peak \SI{7.39}{m}. The model has no motor lag, and is off by two centimetres.
 
-\textbf{Step 6 — the scaling.} The integral at arrival is $K_i$ times an area that the gains do not influence — it is fixed by the motors and the air. So the windup is proportional to $K_i$:\tip{Ask what a result scales with. The windup is proportional to $K_i$ and to the area of the error while saturated — and to nothing else.} the same model gives a peak of \SI{6.51}{m} for $K_i = 1$ and \SI{8.41}{m} for $K_i = 6$.
+\textbf{Step 6 — the scaling.} The integral at arrival is $K_i$ times an area that the gains do not influence — it is fixed by the motors and the air. So the windup is proportional to $K_i$:\tip[-120pt]{Ask what a result scales with. The windup is proportional to $K_i$ and to the area of the error while saturated — and to nothing else.} the same model gives a peak of \SI{6.51}{m} for $K_i = 1$ and \SI{8.41}{m} for $K_i = 6$.
 \end{example}
 
 \simfig{windup_predict}{Prediction next to measurement for the run without anti-windup. Left: the altitude; dotted is the full-thrust climb \eqref{eq:windup-climb}, dashed the model of Example~\ref{ex:windup-size} (saturated climb, then the PID loop). Right: the integral; the dot marks the predicted value when the drone reaches the setpoint.}{fig:windup-predict}

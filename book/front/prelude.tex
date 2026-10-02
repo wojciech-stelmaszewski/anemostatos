@@ -69,7 +69,7 @@ with $d = L/\sqrt2$, $L = \SI{0.17}{m}$ and $c_\tau = \SI{0.016}{m}$. The body r
   \dot q = \tfrac12\,q\otimes(0, \vec\omega).
 \end{equation}
 The inertia matrix is diagonal, $J = \diag(0.0082,\ 0.0149,\ 0.0082)\,\si{kg.m^2}$, the middle entry being the yaw axis. Quaternions — four numbers that describe a rotation without the singularities of angles — are explained in \lessonref{les:geometric} and the \hyperref[app:quat]{appendix}.
-\marginnote{\resizebox{\marginparwidth}{!}{\input{tikz/motors}}\par\vspace{2pt}\captionsetup{type=figure}\caption{The motor layout seen from above.}\label{fig:prelude-motors}}
+\marginnote{\resizebox{\marginparwidth}{!}{\input{tikz/motors}}\par\vspace{2pt}\captionsetup{type=figure}\caption{The motor layout seen from above.}\label{fig:prelude-motors}}[-134pt]
 
 \subsection*{Ground}
 The floor is solid. Touching it slowly means landing; touching it faster than \SI{3}{m/s}, or with a tilt of more than $80^\circ$, is a crash that stops the run. A run starts on the ground; the setpoint rises at \SI{1}{m/s} during take-off, and the integrators of the controllers are held at zero until the take-off is over.

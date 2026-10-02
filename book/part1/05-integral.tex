@@ -12,7 +12,7 @@ The controller believes $\hat m = \SI{1}{kg}$; the drone weighs $m = \SI{1.4}{kg
 \label{ex:integral-offset}
 Where does the \SI{1.4}{kg} drone hover when asked for \SI{2}{m}, with $K_p = 10$ and the integral off?
 
-\textbf{Step 1 — what the feedforward misses.} It supplies $\hat m g = \SI{9.81}{N}$. The weight is $mg = 1.4 \cdot 9.81 = \SI{13.73}{N}$. The difference is the load that feedback must carry:\innumbers{\SI{3.92}{N} is the weight of four chocolate bars. The motors can give \SI{24.4}{N} in total, so the load is a sixth of everything they have.}
+\textbf{Step 1 — what the feedforward misses.} It supplies $\hat m g = \SI{9.81}{N}$. The weight is $mg = 1.4 \cdot 9.81 = \SI{13.73}{N}$. The difference is the load that feedback must carry:\innumbers[-62pt]{\SI{3.92}{N} is the weight of four chocolate bars. The motors can give \SI{24.4}{N} in total, so the load is a sixth of everything they have.}
 \begin{equation*}
   \Delta F = (m - \hat m)\,g = 0.4 \cdot 9.81 = \SI{3.92}{N}.
 \end{equation*}
@@ -131,7 +131,7 @@ with the solution $c_1 = -0.523$, $c_2 = 2.095$, $c_3 = -0.571$.
 
 \textbf{Step 5 — the overshoot.} The fast terms die first and leave $e \approx -0.571\,e^{-0.412t}$: negative, and returning to zero slowly. The error crosses zero at $t = \SI{1.30}{s}$ and is most negative at $t = \SI{2.54}{s}$, where $e = \SI{-0.142}{m}$.
 
-\textbf{Step 6 — check.} The simulator: zero crossing at \SI{1.35}{s}, largest overshoot \SI{14.2}{cm} at \SI{2.63}{s}. And the area: $\int_0^\infty e\,\dd t = -c_1/s_1 - c_2/s_2 - c_3/s_3 = -0.101 + 1.489 - 1.388 = 0$, as it must be.\tip[-52pt]{For a stable pole $\int_0^\infty e^{st}\,\dd t = -1/s$. The area under a sum of exponentials is a one-line calculation.}
+\textbf{Step 6 — check.} The simulator: zero crossing at \SI{1.35}{s}, largest overshoot \SI{14.2}{cm} at \SI{2.63}{s}. And the area: $\int_0^\infty e\,\dd t = -c_1/s_1 - c_2/s_2 - c_3/s_3 = -0.101 + 1.489 - 1.388 = 0$, as it must be.\tip[-84pt]{For a stable pole $\int_0^\infty e^{st}\,\dd t = -1/s$. The area under a sum of exponentials is a one-line calculation.}
 \end{example}
 
 With the default $K_i = 0.8$ the same calculation gives \SI{4.7}{cm} of overshoot (the simulator: \SI{4.9}{cm}), spread over a long tail, because the slow pole is at $-0.085$.

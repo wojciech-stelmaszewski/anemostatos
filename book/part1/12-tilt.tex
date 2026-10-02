@@ -56,11 +56,11 @@ What must the L3 quadrotor do to stand still in a steady \SI{4}{m/s} wind along 
   \tan\theta = \frac{F_{drag}}{mg} = \frac{1.92}{9.81} = 0.196, \qquad \theta = 11.1^\circ .
 \end{equation}
 
-\textbf{Step 3 — the size.} $T = \sqrt{1.92^2 + 9.81^2} = \SI{10.0}{N}$, i.e.\ $mg/\cos\theta$: a tilted drone must push harder to keep its altitude, because only the vertical part of its thrust carries the weight.\innumbers{The price of leaning is $1/\cos\theta$. At $11^\circ$: 2\,\% more thrust. At $35^\circ$: 22\,\%. At $60^\circ$: twice the weight.}
+\textbf{Step 3 — the size.} $T = \sqrt{1.92^2 + 9.81^2} = \SI{10.0}{N}$, i.e.\ $mg/\cos\theta$: a tilted drone must push harder to keep its altitude, because only the vertical part of its thrust carries the weight.\innumbers[-120pt]{The price of leaning is $1/\cos\theta$. At $11^\circ$: 2\,\% more thrust. At $35^\circ$: 22\,\%. At $60^\circ$: twice the weight.}
 
 \textbf{Step 4 — with the recorded wind.} The drag of the actual run averages \SI{1.63}{N}, which gives $9.4^\circ$ and \SI{9.93}{N}.
 
-\textbf{Step 5 — check} (\cref{fig:tilt-predict}, right). The L3 drone's pitch averages $9.3^\circ$ and its thrust \SI{9.95}{N}. Moment by moment the pitch follows $\arctan(F_{drag}/F_{up})$ computed from the wind, with a short delay and some overshoot: the dynamics of the next two lessons.\didyouknow[-26pt]{Turn the argument round and the drone is a wind gauge: its tilt in a hover gives the wind. Weather researchers fly quadrotors for exactly this.}
+\textbf{Step 5 — check} (\cref{fig:tilt-predict}, right). The L3 drone's pitch averages $9.3^\circ$ and its thrust \SI{9.95}{N}. Moment by moment the pitch follows $\arctan(F_{drag}/F_{up})$ computed from the wind, with a short delay and some overshoot: the dynamics of the next two lessons.\didyouknow[-118pt]{Turn the argument round and the drone is a wind gauge: its tilt in a hover gives the wind. Weather researchers fly quadrotors for exactly this.}
 \end{example}
 
 \simfig{tilt_predict}{Prediction next to measurement. Left, L2: the force that the $x$ loop applies (orange), against the drag computed from the recorded wind with the sign reversed (dashed); the integral (green) supplies the slow part. Right, L3: the quadrotor's pitch angle (blue) against the angle that would balance the instantaneous wind force, \cref{eq:tilt-angle} (dashed).}{fig:tilt-predict}
@@ -135,7 +135,7 @@ A light aircraft flies at $V = \SI{60}{m/s}$ and must fly a circle of radius $R 
 
 \textbf{Step 3 — the bank.} The aircraft rolls by the angle $\varphi$ so that the lift has a horizontal part: $\tan\varphi = (V^2/R)/g = 3.6/9.81$, $\varphi = 20.2^\circ$. It is \cref{eq:tilt-angle} with the centripetal force in place of the drag.
 
-\textbf{Step 4 — the price.} To keep its altitude the lift must grow to $mg/\cos\varphi = 1.065\,mg$: the pilot pulls back on the stick in a turn, and everyone on board feels 6.5\,\% heavier.\didyouknow[-24pt]{At $60^\circ$ of bank everyone weighs double: $1/\cos 60^\circ = 2$. Student pilots learn that number early.}
+\textbf{Step 4 — the price.} To keep its altitude the lift must grow to $mg/\cos\varphi = 1.065\,mg$: the pilot pulls back on the stick in a turn, and everyone on board feels 6.5\,\% heavier.\didyouknow[-38pt]{At $60^\circ$ of bank everyone weighs double: $1/\cos 60^\circ = 2$. Student pilots learn that number early.}
 
 \textbf{Step 5 — the same structure.} To change where it goes, the aircraft first changes its attitude. Its autopilot is therefore a cascade too: a heading loop commands a bank angle, a bank loop commands a roll rate, a roll-rate loop moves the ailerons (Lessons~IV.11–IV.13).
 \end{example}

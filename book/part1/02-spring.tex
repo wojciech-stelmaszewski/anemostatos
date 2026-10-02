@@ -247,7 +247,7 @@ Model the motors as a first-order lag with $\tau = \SI{30}{ms}$ and find the pol
 \begin{equation*}
   s_1 = -33.63, \qquad s_{2,3} = +0.147 \pm 3.145\,j .
 \end{equation*}
-(Check: the roots of a cubic sum to minus the ratio of its first two coefficients, $-1/\tau = -33.33$, and $-33.63 + 2\cdot0.147 = -33.33$.)\tip{Vieta's rules check roots for free. For $a_3s^3 + a_2s^2 + a_1s + a_0$ the roots add up to $-a_2/a_3$ and multiply to $-a_0/a_3$.}
+(Check: the roots of a cubic sum to minus the ratio of its first two coefficients, $-1/\tau = -33.33$, and $-33.63 + 2\cdot0.147 = -33.33$.)\tip[-64pt]{Vieta's rules check roots for free. For $a_3s^3 + a_2s^2 + a_1s + a_0$ the roots add up to $-a_2/a_3$ and multiply to $-a_0/a_3$.}
 
 \textbf{Step 6 — read them.} The real pole is the motor itself, a little faster than $-1/\tau$. The complex pair is the spring, at almost the old frequency (\SI{3.145}{rad/s} instead of 3.162), but with a \emph{positive} real part: the oscillation grows like $e^{0.147t}$ and doubles every $\ln 2/0.147 = \SI{4.7}{s}$. The first-order estimate of \cref{eq:spring-lag} gives $K_p\tau/(2m) = 0.15$, which is the same number.
 \end{example}

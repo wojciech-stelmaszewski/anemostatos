@@ -89,7 +89,7 @@ In 1927 the telephone engineer Harold Black faced a problem: the vacuum-tube amp
 
 \textbf{Step 1 — the open-loop amplifier.} Suppose an amplifier has a gain $A = 1000$, but, because of its tubes, the gain may vary by $\pm20\,\%$: anywhere between 800 and 1200. The output is $v_{out} = A\,v_{in}$, so the output varies by $\pm 20\,\%$ as well.
 
-\textbf{Step 2 — close the loop.} Feed a fraction $\beta$ of the output back and subtract it from the input, using a precise resistor divider with $\beta = 0.1$.\didyouknow{Black had the idea on the ferry to work on 2~August 1927 and sketched it on his copy of \emph{The New York Times}. The patent took nine years to be granted: throwing gain away to gain precision sounded absurd.} The amplifier now amplifies the difference:
+\textbf{Step 2 — close the loop.} Feed a fraction $\beta$ of the output back and subtract it from the input, using a precise resistor divider with $\beta = 0.1$.\didyouknow[-112pt]{Black had the idea on the ferry to work on 2~August 1927 and sketched it on his copy of \emph{The New York Times}. The patent took nine years to be granted: throwing gain away to gain precision sounded absurd.} The amplifier now amplifies the difference:
 \begin{equation*}
   v_{out} = A\,(v_{in} - \beta\,v_{out}).
 \end{equation*}
@@ -219,7 +219,7 @@ Here is a first taste of why a drone needs feedback, with numbers you will meet 
 
 \textbf{Step 4 — integrate twice.} Starting at rest, $\dot y(t) = -0.192\,t$ and $y(t) = y_0 - \tfrac12\,0.192\,t^2$.
 
-\textbf{Step 5 — evaluate.} After \SI{1}{s} the drone has sunk \SI{9.6}{cm}; after \SI{5}{s}, \SI{2.4}{m} — it has hit the floor from a hover at two metres. A two-percent error in one number has become a crash in five seconds.\pitfall{Open-loop errors do not stay small. A constant error in force becomes an error in position that grows as $t^2$.} No model is ever that good, and the wind has not even started blowing. Feedback is not optional.
+\textbf{Step 5 — evaluate.} After \SI{1}{s} the drone has sunk \SI{9.6}{cm}; after \SI{5}{s}, \SI{2.4}{m} — it has hit the floor from a hover at two metres. A two-percent error in one number has become a crash in five seconds.\pitfall[-14pt]{Open-loop errors do not stay small. A constant error in force becomes an error in position that grows as $t^2$.} No model is ever that good, and the wind has not even started blowing. Feedback is not optional.
 \end{example}
 
 \subsection{What you will be able to do}

@@ -1,1 +1,47 @@
-% TODO
+\bookchapter{}{Answers}{The short answer to every exercise: the number to check, the sign to get right, the reason in a sentence.}
+\label{app:answers}
+
+\lead{These are answers, not solutions. Each gives the result an exercise asks for and, where it helps, the one step that leads there or the number the simulator measured. Look an answer up after you have one of your own: an agreement confirms it, and a disagreement says where to look again.}
+
+% The answers are written to \jobname.ans by \answer (see the style file) as the lessons are
+% typeset, and the file is closed by \closeanswers before the appendices, so it is complete when it
+% is read back here in the same run. The commands it contains:
+%   \answerpart{numeral}{title}     a part of the book: a heading across the full width
+%   \answerlesson{label}{title}     a lesson: a heading in the column
+%   \answeritem{number}{text}       one answer
+\makeatletter
+\newif\ifanem@anscols
+\newlength{\anem@anslabel}
+\newcommand{\anem@anscolsend}{\end{multicols}\global\anem@anscolsfalse}
+\renewcommand{\answerpart}[2]{%
+  \ifanem@anscols\anem@anscolsend\fi
+  \par\addvspace{14pt}\needspace{30mm}%
+  \noindent{\color{accent}\sanscaps\scriptsize PART\hspace{0.6em}#1}\hspace{1.1em}%
+    {\sffamily\fontsize{15}{19}\selectfont\color{ink}#2}\par\nobreak
+  \vspace{3pt}\nobreak{\color{hair}\rule{\linewidth}{0.5pt}}\par\nobreak\vspace{6pt}%
+  \begin{multicols}{2}\global\anem@anscolstrue}
+\renewcommand{\answerlesson}[2]{%
+  \par\addvspace{9pt}% (no \needspace: in multicols it measures the page, not the column)
+  \noindent\hangindent=\anem@anslabel\hangafter=1
+    \makebox[\anem@anslabel][l]{\color{accent}\sanslight\normalsize #1}%
+    {\sffamily\normalsize\color{ink}\raggedright #2\par}\nobreak\vspace{3pt}\nobreak}
+\renewcommand{\answeritem}[2]{%
+  \par\noindent\hangindent=\anem@anslabel\hangafter=1
+  \makebox[\anem@anslabel][l]{\sffamily\footnotesize\color{accent}#1}#2\par\vspace{2.5pt}}
+
+\begin{fullwidth}
+\small
+\setlength{\parindent}{0pt}
+\setlength{\columnsep}{7mm}
+\setlength{\multicolsep}{0pt}
+\setlength{\anem@anslabel}{4.1em}
+% ragged right with hyphenation: a narrow column of formulas cannot be justified evenly
+\rightskip=0pt plus 2.5em \parfillskip=0pt plus 1fil \spaceskip=\fontdimen2\font \xspaceskip=0pt
+\hyphenpenalty=200 \tolerance=2000
+\thickmuskip=5mu plus 1mu \medmuskip=4mu plus 1mu minus 2mu % formulas do not stretch to fill a ragged line
+\IfFileExists{\jobname.ans}
+  {\input{\jobname.ans}}
+  {\noindent\textit{The answers are collected while the lessons are typeset; run \LaTeX\ again to print them here.}}
+\ifanem@anscols\anem@anscolsend\fi
+\end{fullwidth}
+\makeatother

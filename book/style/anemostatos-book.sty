@@ -103,6 +103,7 @@
 \RequirePackage{emptypage}
 \RequirePackage{afterpage}
 \RequirePackage{needspace}
+\RequirePackage{multicol}
 \RequirePackage[export]{adjustbox}
 \RequirePackage{wrapfig}
 \RequirePackage{placeins}
@@ -304,6 +305,7 @@
   \thispagestyle{empty}%
   \renewcommand{\lessontitle}{}\renewcommand{\lessonpart}{}%
   \addcontentsline{toc}{part}{\protect\numberline{#1}#2}%
+  \immediate\write\answersfile{\string\answerpart{#1}{\unexpanded{#2}}}%
   \begin{tikzpicture}[remember picture, overlay, shift={(current page.north west)}]
     \nightgrid{\paperheight}{0.52}
     \shade[inner color=accent!60!night, outer color=night, opacity=0.35]
@@ -636,11 +638,23 @@
 % The set-up of a lesson, in the margin beside its lead: \setupcard{\setuprow{Level}{…}…}
 \newcommand{\setupcard}[1]{\marginpar{\marginfont{\sanscaps\scriptsize\color{accent}THE SET-UP}\par\vspace{4pt}#1}}
 \newcommand{\setuprow}[2]{{\color{ink}#1}\\#2\par\vspace{3.5pt}}
-% answers collected for the appendix
+% Answers collected for the appendix (back/answers.tex reads them back after \closeanswers).
+% The file \jobname.ans gets \answerpart{numeral}{title} from \bookpart, \answerlesson{label}{title}
+% before the first answer of each lesson, and \answeritem{exercise number}{text} for each answer.
+% The three commands are defined in back/answers.tex; until then they do nothing.
 \newwrite\answersfile
 \immediate\openout\answersfile=\jobname.ans
-\newcommand{\answer}[1]{\immediate\write\answersfile{\string\answeritem{\theexercise}{\unexpanded{#1}}}}
-\newcommand{\answeritem}[2]{\par\noindent\hangindent=3.2em\makebox[3.2em][l]{\sffamily\small\color{accent}#1}#2\par\smallskip}
+\newcommand{\anem@anslesson}{}
+\newcommand{\answer}[1]{%
+  \edef\anem@tmp{\lessonlabel}%
+  \ifx\anem@tmp\anem@anslesson\else
+    \global\let\anem@anslesson\anem@tmp
+    \immediate\write\answersfile{\string\answerlesson{\lessonlabel}{\unexpanded\expandafter{\lessontitle}}}%
+  \fi
+  \immediate\write\answersfile{\string\answeritem{\theexercise}{\unexpanded{#1}}}}
+\newcommand{\answerpart}[2]{}
+\newcommand{\answerlesson}[2]{}
+\newcommand{\answeritem}[2]{}
 \newcommand{\closeanswers}{\immediate\closeout\answersfile}
 
 % ---------------------------------------------------------------- diagrams --

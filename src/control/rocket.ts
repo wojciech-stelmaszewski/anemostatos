@@ -27,10 +27,11 @@ export class RocketLander {
       cmd = s.v < target ? r.thrustMax : s.mass * GRAVITY + s.mass * c.speedGain * (target - s.v);
     }
     const thrust = engineThrust(cmd, s, r);
+    // Reported as the altitude loop, so the charts show the descent to the pad.
     this.last = {
-      setpoint: this.lit ? -c.touchdownSpeed : 0,
-      measurement: s.v,
-      error: (this.lit ? -c.touchdownSpeed : 0) - s.v,
+      setpoint: 0,
+      measurement: s.h,
+      error: -s.h,
       parts: [{ key: 'p', label: 'thrust', value: thrust, like: 'p' }],
       unsaturated: cmd,
       output: thrust,

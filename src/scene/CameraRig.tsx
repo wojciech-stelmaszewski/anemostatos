@@ -15,6 +15,7 @@ const PRESETS = {
 export function CameraRig() {
   const mode = useUi((s) => s.camera);
   const level = useParams((s) => s.params.sim.level);
+  const vehicle = useParams((s) => s.params.sim.vehicle ?? 'quadrotor');
   const controls = useRef<OrbitControlsImpl>(null);
   const { camera } = useThree();
   const drone = useRef(new THREE.Vector3());
@@ -25,12 +26,17 @@ export function CameraRig() {
     const c = controls.current;
     if (!c) return;
     const t = new THREE.Vector3(0, 1.85, 0);
+    // The rocket stands 2 m tall: frame it from further away.
     const offset =
-      level === 1 ? new THREE.Vector3(0.95, 0.45, 1.45) : new THREE.Vector3(1.6, 0.9, 2.5);
+      vehicle === 'rocket'
+        ? new THREE.Vector3(5, 1.5, 8)
+        : level === 1
+          ? new THREE.Vector3(0.95, 0.45, 1.45)
+          : new THREE.Vector3(1.6, 0.9, 2.5);
     c.target.copy(t);
     camera.position.copy(t).add(offset);
     c.update();
-  }, [level, camera]);
+  }, [level, vehicle, camera]);
 
   useEffect(() => {
     const c = controls.current;

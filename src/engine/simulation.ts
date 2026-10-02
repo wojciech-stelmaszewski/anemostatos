@@ -193,7 +193,10 @@ export class Simulation {
     this.fdi.reset();
     this.lander.reset();
     this.rocket = p.sim.vehicle === 'rocket' ? initialRocket(p.rocket) : null;
-    if (this.rocket) this.mirrorRocket();
+    if (this.rocket) {
+      this.mirrorRocket();
+      this.takingOff = false;
+    }
     this.script?.(this);
     for (const fn of this.resetListeners) fn();
   }

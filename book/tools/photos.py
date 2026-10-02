@@ -68,6 +68,8 @@ PHOTOS = {
     "deepblue": "File:IBM Deep Blue at Computer History Museum (9361685537).jpg",
     "refinery": "File:Control room at an early ACS petroleum refinery installation.jpg",
     "fermiac": "File:STAN ULAM HOLDING THE FERMIAC.jpg",
+    "acat": "File:The F-16D Automatic Collision Avoidance Technology aircraft tests of the Automatic Ground Collision Avoidance System, or Auto-GCAS, included flights in areas of potentially hazardous terrain, including canyons and mount (ED09-0290-32).jpg",
+    "jenkin": "File:Henry Charles Fleeming Jenkin. Etching by W. Holl, 1884. Wellcome V0003068.jpg",
 }
 
 # Fractions to trim (left, top, right, bottom): scan borders and printed captions.
@@ -75,6 +77,7 @@ CROPS = {
     "f8": (0, 0, 0, 0.10),
     "turbinehall": (0.035, 0.04, 0.05, 0.04),
     "windtunnel": (0.03, 0.03, 0.03, 0.03),
+    "acat": (0, 0.14, 0, 0.16),
 }
 
 

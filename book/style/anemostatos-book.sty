@@ -213,15 +213,19 @@
 \newcommand{\chapterquote}[4]{\csdef{anem@quote@#1}{\anem@printquote{#2}{#3}{#4}}}
 \newcommand{\anem@quote}[1]{\ifcsdef{anem@quote@#1}{\csuse{anem@quote@#1}}{}}
 \newcommand{\anem@printquote}[3]{%
-  \par\vspace*{-1mm}%
-  \noindent\hfill\begin{minipage}{104mm}\raggedleft
-    {\displayserif\itshape\fontsize{10.6}{14.2}\selectfont\color{ink}#1\par}%
-    \vspace{2.2mm}%
-    {\sanscaps\scriptsize\color{accent}#2\par}%
-    \vspace{0.6mm}%
-    {\sffamily\scriptsize\color{muted}#3\par}%
-  \end{minipage}\par
-  \vspace{7mm}}
+  \par\vspace*{-2mm}%
+  \begin{tcolorbox}[enhanced, breakable=false, width=112mm,
+      enlarge left by=\dimexpr\linewidth-112mm\relax,
+      colback=paper, colframe=sepia!30, boxrule=0.4pt, arc=0pt, outer arc=0pt,
+      borderline west={1.6pt}{0pt}{accent},
+      left=13mm, right=7mm, top=5mm, bottom=4.5mm, before skip=0pt, after skip=8mm,
+      overlay={\node[anchor=north west, inner sep=0pt, text=accent!75]
+        at ($(frame.north west)+(3.4mm,-1.4mm)$) {\displayserif\fontsize{42}{42}\selectfont “};}]
+    {\displayserif\itshape\fontsize{10.6}{14.4}\selectfont\color{ink}\raggedright #1\par}%
+    \vspace{2.6mm}%
+    {\raggedleft{\sanscaps\scriptsize\color{accent}#2}\par\vspace{0.5mm}%
+     {\sffamily\scriptsize\color{muted}#3}\par}%
+  \end{tcolorbox}}
 
 % ---------------------------------------------------------------- lesson opener
 % \lesson{label}{title}{subtitle}{level}{app id}{part tag}

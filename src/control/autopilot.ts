@@ -63,6 +63,55 @@ export interface AutopilotParams {
   kTI: number;
   kEP: number;
   kEI: number;
+  /**
+   * The pitch law (lesson IV.15): `classic` is the damper and attitude hold above; `ndi` inverts
+   * the aircraft's pitching-moment model to get the pitch acceleration q̇_d = k_q·(k_a·(θ_ref − θ) − q).
+   */
+  law: 'classic' | 'ndi';
+  /** NDI: bandwidth of the pitch-rate loop k_q, and the attitude gain k_a, 1/s. */
+  ndiBandwidth: number;
+  ndiAttitude: number;
+  /**
+   * A pilot in the loop (lesson IV.16) flies the attitude in place of the autopilot's attitude
+   * loop: elevator −pilotGain·(θ_ref − θ), seen `pilotDelayMs` late (perception and the arm).
+   */
+  pilot: boolean;
+  /** The pilot's gain, ° of elevator per ° of attitude error, and the pilot's delay, ms. */
+  pilotGain: number;
+  pilotDelayMs: number;
+  /** NDI: the model's pitching moment is (1 + modelError) times the true one (−0.3: 30 % low). */
+  modelError: number;
+}
+
+/** The pitch-rate, attitude and inversion parts of the NDI command, rad, and their sum. */
+export interface NdiCommand {
+  de: number;
+  att: number;
+  rate: number;
+  inv: number;
+}
+
+/**
+ * Nonlinear dynamic inversion of the pitch axis [Enns 1994]. The model says
+ *   q̇ = (q̄·S·c/I)·(C_m0 + C_mα·α + C_mq·q·c/(2V) + C_mδe·δe),
+ * so the elevator that gives the wanted q̇_d is
+ *   δe = (I·q̇_d/(q̄·S·c) − C_m0 − C_mα·α − C_mq·q̂) / C_mδe.
+ * With the model's moment (1 + e) times the truth, the aircraft gets q̇_d/(1 + e): an error in
+ * the model is an error in the loop gain.
+ */
+export function ndiElevator(
+  s: Pick<AircraftState, 'V' | 'alpha' | 'q' | 'theta' | 'h'>,
+  thetaRef: number,
+  a: AircraftParams,
+  ap: AutopilotParams,
+): NdiCommand {
+  const qbar = dynamicPressure(atmosphere(s.h).density, s.V);
+  const scale = a.inertia / (qbar * a.wingArea * a.chord * (1 + ap.modelError) * a.cmDe);
+  const att = scale * ap.ndiBandwidth * ap.ndiAttitude * (thetaRef - s.theta);
+  const rate = -scale * ap.ndiBandwidth * s.q;
+  const qhat = (s.q * a.chord) / (2 * s.V);
+  const inv = -(a.cm0 + a.cmAlpha * s.alpha + a.cmQ * qhat) / a.cmDe;
+  return { de: att + rate + inv, att, rate, inv };
 }
 
 const RAD = Math.PI / 180;
@@ -84,6 +133,9 @@ export class Autopilot {
   /** The pitch attitude and rate the law sees, delayed by `delayMs` (a ring of 1 ms samples). */
   private ring: { theta: number; q: number }[] = [];
   private head = 0;
+  /** The pitch attitude the pilot sees, delayed by `pilotDelayMs`. */
+  private pilotRing: number[] = [];
+  private pilotHead = 0;
   /** The outer loops: the rate-limited flight-path command, rad, the last speed, integrators. */
   gammaRef = 0;
   private vPrev = NaN;
@@ -98,6 +150,8 @@ export class Autopilot {
     this.last = emptyTerms();
     this.ring = [];
     this.head = 0;
+    this.pilotRing = [];
+    this.pilotHead = 0;
     this.gammaRef = 0;
     this.vPrev = NaN;
     this.iV = 0;
@@ -116,6 +170,20 @@ export class Autopilot {
     const out = this.ring[this.head]!;
     this.ring[this.head] = { theta: s.theta, q: s.q };
     this.head = (this.head + 1) % n;
+    return out;
+  }
+
+  /** The attitude `pilotDelayMs` ago. */
+  private pilotSees(theta: number, ap: AutopilotParams, dt: number): number {
+    const n = Math.max(0, Math.round(ap.pilotDelayMs / 1000 / dt));
+    if (n === 0) return theta;
+    if (this.pilotRing.length !== n) {
+      this.pilotRing = Array.from({ length: n }, () => theta);
+      this.pilotHead = 0;
+    }
+    const out = this.pilotRing[this.pilotHead]!;
+    this.pilotRing[this.pilotHead] = theta;
+    this.pilotHead = (this.pilotHead + 1) % n;
     return out;
   }
 
@@ -151,9 +219,12 @@ export class Autopilot {
     }
     const m = this.delayed(s, ap, dt);
     const e = thetaRef - m.theta;
-    const attitude = -g * ap.kTheta * e;
-    const damper = g * m.q;
-    const ff = trim.input.de + ap.elevatorOffset * RAD;
+    const ndi =
+      ap.law === 'ndi' ? ndiElevator({ ...s, theta: m.theta, q: m.q }, thetaRef, a, ap) : null;
+    const pilotE = ap.pilot ? thetaRef - this.pilotSees(s.theta, ap, dt) : 0;
+    const attitude = ndi ? ndi.att : ap.pilot ? -ap.pilotGain * pilotE : -g * ap.kTheta * e;
+    const damper = ndi ? ndi.rate : g * m.q;
+    const ff = (ndi ? ndi.inv : trim.input.de) + ap.elevatorOffset * RAD;
     const cmd = ff + attitude + damper;
     const lim = a.elevatorMax * RAD;
     const out = Math.min(Math.max(cmd, -lim), lim);
@@ -162,9 +233,9 @@ export class Autopilot {
       measurement: m.theta * DEG,
       error: e * DEG,
       parts: [
-        { key: 'att', label: 'attitude', value: attitude * DEG, like: 'p' },
-        { key: 'damp', label: 'damper', value: damper * DEG, like: 'd' },
-        { key: 'ff', label: 'trim', value: ff * DEG, ff: true },
+        { key: 'att', label: ap.pilot ? 'pilot' : 'attitude', value: attitude * DEG, like: 'p' },
+        { key: 'damp', label: ndi ? 'rate' : 'damper', value: damper * DEG, like: 'd' },
+        { key: 'ff', label: ndi ? 'inversion' : 'trim', value: ff * DEG, ff: true },
       ],
       unsaturated: cmd * DEG,
       output: out * DEG,

@@ -5,6 +5,8 @@ import {
   meetsPitchSpec,
   PITCH_SPEC,
 } from '@/analysis/aircraft';
+import { unshapedResidual } from '@/analysis/panel';
+import { pioFreeRate } from '@/analysis/pio';
 import { analyseTvc, minPitchGain, wrongWayZero, type TvcAnalysis } from '@/analysis/tvc';
 import { bangBangLimits, minimumTime } from '@/control/bangbang';
 import { designLqr } from '@/control/lqr';
@@ -13,6 +15,7 @@ import { insGyroError } from '@/estimation/ins';
 import type { Simulation } from '@/engine/simulation';
 import { GRAVITY, type Params } from '@/sim/params';
 import { ignitionAltitude } from '@/sim/vehicles/rocket';
+import { panelFreeHz } from '@/sim/vehicles/satellite';
 import { Notice, Try } from './Bits';
 import { M as Tex } from './Math';
 import { setAt } from './script';
@@ -227,6 +230,73 @@ const unaidedDrift = (p: Params): number => {
 const worstKnowledge = (sim: Simulation): number => {
   const w = sim.telemetry.window(['st.err'], IV22.from);
   return Math.max(0, ...w.series[0]!.filter((v) => Number.isFinite(v)));
+};
+
+/** Lesson IV.15: the model error the inversion must survive, either way. */
+const IV15 = { error: 0.3 };
+/** Whether the pitch requirement holds with the model `e` off, for both signs; cached per design. */
+let ndiCache: { key: string; r: { e: number; ok: boolean; pm: number; wc: number }[] } | null =
+  null;
+const ndiRobust = (p: Params) => {
+  const key = JSON.stringify([p.aircraft, p.autopilot.ndiBandwidth, p.autopilot.ndiAttitude]);
+  if (ndiCache?.key !== key) {
+    const r = [-IV15.error, IV15.error].map((e) => {
+      const m = meetsPitchSpec({ ...p, autopilot: { ...p.autopilot, law: 'ndi', modelError: e } });
+      return { e, ok: m.ok, pm: m.worstPm, wc: m.slowestWc };
+    });
+    ndiCache = { key, r };
+  }
+  return ndiCache.r;
+};
+
+/** Lesson IV.16: a startled pilot's two-cycle burst of elevator at the loop's own frequency. */
+const IV16 = {
+  at: 5,
+  burst: 8,
+  w: 3.8,
+  early: [10, 15] as const,
+  late: [25, 35] as const,
+  slack: 1.25,
+};
+const startle = (sim: Simulation) => {
+  const T = (4 * Math.PI) / IV16.w;
+  for (let t = 0; t <= T; t += 0.02)
+    setAt(sim, IV16.at + t, 'autopilot.elevatorOffset', IV16.burst * Math.sin(IV16.w * t));
+  setAt(sim, IV16.at + T + 0.02, 'autopilot.elevatorOffset', 0);
+};
+/** Half the peak-to-peak of the elevator command between two times, °. */
+const elevatorSwing = (sim: Simulation, from: number, to: number): number => {
+  const w = sim.telemetry.window(['air.decmd'], from);
+  const v = w.series[0]!.filter((x, i) => Number.isFinite(x) && w.t[i]! <= to);
+  return v.length ? (Math.max(...v) - Math.min(...v)) / 2 : 0;
+};
+/** The slowest elevator rate with no PIO within the travel, cached (a bisection over describing functions). */
+let pioCache: { key: string; r: number } | null = null;
+const pioFree = (p: Params): number => {
+  const ap = p.autopilot;
+  const key = JSON.stringify([
+    { ...p.aircraft, servoRate: 0 },
+    ap.gain,
+    ap.delayMs,
+    ap.pilotGain,
+    ap.pilotDelayMs,
+  ]);
+  if (pioCache?.key !== key) pioCache = { key, r: pioFreeRate(p) };
+  return pioCache.r;
+};
+
+/** Lesson IV.21: the slew, and the window after it in which the panel must be still. */
+const IV21 = { deg: 30, from: 15, until: 30, ratio: 0.05 };
+/** The panel's largest angle from `IV21.from` on in this flight, °. */
+const panelSwing = (sim: Simulation): number => {
+  const w = sim.telemetry.window(['sat.eta'], IV21.from);
+  return w.series[0]!.reduce((m, v) => (Number.isFinite(v) ? Math.max(m, Math.abs(v)) : m), 0);
+};
+let panelCache: { key: string; r: number } | null = null;
+const unshaped = (p: Params): number => {
+  const key = JSON.stringify({ ...p.satellite, shaper: 'none', shaperHz: 0 });
+  if (panelCache?.key !== key) panelCache = { key, r: unshapedResidual(p, IV21.from, IV21.until) };
+  return panelCache.r;
 };
 
 /** Lessons of Part IV, in plan order (by `n`). */
@@ -1113,6 +1183,219 @@ export const PART_FOUR: Lesson[] = [
     ),
   },
   {
+    id: 'ndi',
+    n: 15,
+    part: 4,
+    chapter: M,
+    title: 'Invert the aeroplane',
+    level: 1,
+    loop: 'pitch',
+    chart: 'envelope',
+    setup: (p) => {
+      flyAircraft(p);
+      p.aircraft.speed = 80;
+      p.autopilot = {
+        ...p.autopilot,
+        gain: 0.5,
+        kTheta: 2,
+        schedule: 'qbar',
+        designSpeed: 80,
+        autothrottle: true,
+        speedTarget: 160,
+        speedRate: 2,
+        law: 'ndi',
+        ndiBandwidth: 8,
+        ndiAttitude: 2,
+        modelError: -IV15.error,
+      };
+    },
+    events: (sim) => {
+      for (const t of [6, 46]) {
+        setAt(sim, t, 'autopilot.thetaOffset', 2);
+        setAt(sim, t + 6, 'autopilot.thetaOffset', 0);
+      }
+    },
+    predict: {
+      label: 'Pitch-rate bandwidth the aircraft gets',
+      unit: '1/s',
+      truth: (p) => p.autopilot.ndiBandwidth / (1 + p.autopilot.modelError),
+      tolerance: 0.05,
+    },
+    goal: {
+      text: `Predict the bandwidth the aircraft really gets from the inversion. Then choose k_q and k_a so that the pitch loop meets the requirement of lesson IV.13 (phase margin ≥ ${PITCH_SPEC.pmDeg}°, crossover ≥ ${PITCH_SPEC.wc} rad/s, 80 to 160 m/s) with the model ${IV15.error * 100} % too weak and ${IV15.error * 100} % too strong.`,
+      check: ({ sim, prediction }) => {
+        const p = sim.params;
+        if (p.sim.vehicle !== 'aircraft' || p.autopilot.law !== 'ndi')
+          return 'this lesson flies the aircraft on dynamic inversion';
+        if (prediction == null) return 'first the prediction: what does the model error do to k_q?';
+        const truth = p.autopilot.ndiBandwidth / (1 + p.autopilot.modelError);
+        if (Math.abs(prediction - truth) > 0.05 * truth)
+          return 'not within 5 %: the aircraft gets the acceleration the model asks for, divided by 1 + e';
+        const r = ndiRobust(p);
+        const bad = r.find((x) => !x.ok);
+        return (
+          !bad ||
+          `with the model ${bad.e > 0 ? 'too strong' : 'too weak'} by ${Math.abs(bad.e) * 100} %: worst phase margin ${bad.pm.toFixed(0)}°, slowest crossover ${bad.wc.toFixed(2)} rad/s`
+        );
+      },
+    },
+    solution: (p) => {
+      p.autopilot.ndiBandwidth = 6;
+      p.autopilot.ndiAttitude = 1;
+    },
+    body: (
+      <>
+        <p>
+          The schedule of lesson IV.13 is a model in disguise: it assumes the elevator's moment
+          grows with <Tex>{'\\bar q'}</Tex> and nothing else. <b>Nonlinear dynamic inversion</b>{' '}
+          [Enns 1994] writes the model down whole. The pitching moment is
+        </p>
+        <Tex display>
+          {
+            '\\dot q = \\frac{\\bar q S c}{I}\\left(C_{m_0} + C_{m_\\alpha}\\alpha + C_{m_q}\\hat q + C_{m_{\\delta_e}}\\delta_e\\right)'
+          }
+        </Tex>
+        <p>
+          so the elevator that gives any wanted pitch acceleration <Tex>{'\\dot q_d'}</Tex> can be
+          solved for, at every speed and angle of attack, with no table:
+        </p>
+        <Tex display>
+          {
+            '\\delta_e = \\frac{I\\,\\dot q_d/(\\bar q S c) - C_{m_0} - C_{m_\\alpha}\\alpha - C_{m_q}\\hat q}{C_{m_{\\delta_e}}}, \\qquad \\dot q_d = k_q\\left(k_a(\\theta_{ref} - \\theta) - q\\right)'
+          }
+        </Tex>
+        <p>
+          If the model were perfect, the aircraft would become <Tex>{'\\dot q = \\dot q_d'}</Tex> at
+          every flight condition: a pitch-rate loop of bandwidth <Tex>{'k_q'}</Tex> everywhere. The
+          model is not perfect. Here it believes the pitching moment is{' '}
+          <b>{IV15.error * 100} % weaker</b> than it is (<b>Model error</b> −0.3), so it moves the
+          elevator further than needed.
+        </p>
+        <Try>
+          Work out the pitch-rate bandwidth the aircraft really gets with <Tex>{'k_q'}</Tex> = 8 and
+          a model whose moment is <Tex>{'(1+e)'}</Tex> times the truth, and enter it. Then look at
+          the margins chart: the solid line is the inversion, the dashed the q̄ schedule of the last
+          lesson with the same error in the elevator's strength. Set <b>Model error</b> to +0.3 and
+          back. Find <Tex>{'k_q'}</Tex> and <Tex>{'k_a'}</Tex> that pass both ways.
+        </Try>
+        <Notice>
+          The model's error is the loop's gain error: the inversion asks for{' '}
+          <Tex>{'\\dot q_d'}</Tex> and gets <Tex>{'\\dot q_d/(1+e)'}</Tex>. With <Tex>{'k_q'}</Tex>{' '}
+          = 8 and e = −0.3 that is a bandwidth of 11.4; the measured crossover is 10.4 rad/s, a
+          little lower because of the attitude loop around it. The phase margin then falls to 33°,
+          and with e = +0.3 the loop is slow but safe. <Tex>{'k_q'}</Tex> = 6, <Tex>{'k_a'}</Tex> =
+          1 holds 50° and at least 5 rad/s across the whole envelope, both ways. The flat lines are
+          the point: one design for every speed, and a margin you can trust as far as you trust the
+          model. The schedule tuned for its nominal elevator loses its crossover at 80 m/s when the
+          elevator is 30 % weaker (3.8 rad/s). It could be retuned too; the difference is that the
+          inversion's error is the same number everywhere, measured once.
+        </Notice>
+      </>
+    ),
+  },
+  {
+    id: 'pio',
+    n: 16,
+    part: 4,
+    chapter: M,
+    title: 'The pilot in the loop',
+    level: 1,
+    loop: 'pitch',
+    chart: 'pio',
+    setup: (p) => {
+      flyAircraft(p);
+      p.aircraft.servoRate = 20;
+      p.autopilot = {
+        ...p.autopilot,
+        gain: 0.1,
+        kTheta: 0,
+        pilot: true,
+        pilotGain: 1,
+        pilotDelayMs: 150,
+      };
+    },
+    events: startle,
+    predict: {
+      label: 'Slowest elevator rate with no PIO',
+      unit: '°/s',
+      truth: pioFree,
+      tolerance: 0.1,
+    },
+    goal: {
+      text: `Predict the slowest elevator rate at which no PIO is possible within the elevator's travel. Then choose the elevator rate so that the startle at ${IV16.at} s dies out (the swing from ${IV16.late[0]} to ${IV16.late[1]} s at most half that from ${IV16.early[0]} to ${IV16.early[1]} s), with no more than ${(IV16.slack - 1) * 100} % margin on that rate.`,
+      check: ({ sim, prediction }) => {
+        const p = sim.params;
+        if (p.sim.vehicle !== 'aircraft' || !p.autopilot.pilot)
+          return 'this lesson flies the aircraft with the pilot in the loop';
+        if (prediction == null)
+          return 'first the prediction: how does the onset amplitude scale with the rate?';
+        const truth = pioFree(p);
+        if (Math.abs(prediction - truth) > 0.1 * truth)
+          return 'not within 10 %: read the onset off the chart, then scale it to the travel';
+        if (p.aircraft.servoRate > IV16.slack * truth)
+          return `${p.aircraft.servoRate} °/s is more actuator than needed: the least is about ${truth.toFixed(0)} °/s`;
+        if (sim.t < IV16.late[1])
+          return `watching the startle: ${sim.t.toFixed(0)} of ${IV16.late[1]} s`;
+        const early = elevatorSwing(sim, IV16.early[0]!, IV16.early[1]!);
+        const late = elevatorSwing(sim, IV16.late[0]!, IV16.late[1]!);
+        return (
+          late <= early / 2 ||
+          `still swinging ±${late.toFixed(1)}° of elevator (±${early.toFixed(1)}° earlier): the PIO holds`
+        );
+      },
+    },
+    solution: (p) => {
+      p.aircraft.servoRate = Math.ceil(pioFree(p) * 1.05);
+    },
+    body: (
+      <>
+        <p>
+          A pilot flying attitude is a controller too: a gain (degrees of stick per degree of error)
+          and a delay of perception and muscle, here 150 ms. A tense pilot uses a high gain. With
+          this aircraft's pitch damper the small-signal loop is stable, with a thin gain margin of
+          1.26.
+        </p>
+        <p>
+          The elevator's actuator here is slow: 20°/s, as after a hydraulic failure. While the
+          command moves slower than that, the actuator follows. A command{' '}
+          <Tex>{'A\\sin\\omega t'}</Tex> asks for a rate of <Tex>{'A\\omega'}</Tex>; above the limit{' '}
+          <Tex>{'R'}</Tex> the elevator becomes a triangle that lags the command. That lag is what
+          the describing function of lesson III.8 measures. For a pure rate limiter it depends on{' '}
+          <Tex>{'A\\omega/R'}</Tex> alone:
+        </p>
+        <Tex display>
+          {
+            'N \\approx \\frac{4R}{\\pi\\omega A}\\,e^{-j\\arccos\\left(\\frac{\\pi R}{2\\omega A}\\right)} \\quad \\text{for}\\ A\\omega > \\tfrac{\\pi}{2}R'
+          }
+        </Tex>
+        <p>
+          The chart computes it for the simulator's own actuator and multiplies it by the airframe
+          and the pilot. At each amplitude it finds where the loop's phase is −180° and plots the
+          gain there. Below 1 an oscillation of that size dies out; above 1 it grows. That is a{' '}
+          <b>pilot-induced oscillation</b> [Klyde 1997]: nothing is broken, and the harder the pilot
+          tries, the worse it gets.
+        </p>
+        <Try>
+          Watch the startle at 5 s: two cycles of elevator from a surprised pilot, and the loop
+          locks into a swing of ±14° that does not stop. Read the onset off the chart. Because N
+          depends on <Tex>{'A\\omega/R'}</Tex> only, doubling the rate doubles the onset amplitude.
+          Work out the rate at which the onset moves out to the elevator's travel of 20°, and enter
+          it. Then set <b>Elevator rate limit</b> just above it, press <b>R</b>, and watch the
+          startle die out.
+        </Try>
+        <Notice>
+          The elevator starts to rate-limit at <Tex>{'R/\\omega'}</Tex> = 4.4° of command (grey
+          line). The loop runs away only at 7.7°, once the lag has grown enough. In flight a burst
+          that leaves less than about 6° of command dies out and one that leaves more than about 8°
+          locks in. Scaling the onset to the travel gives 20 × 20/7.7 = 52°/s; the exact search
+          gives 52.4°/s. The real cure is not always a faster actuator: pilots are told to let go,
+          which sets their gain to zero, and modern flight controls filter the command so it never
+          asks for more rate than the actuator has.
+        </Notice>
+      </>
+    ),
+  },
+  {
     id: 'energy',
     n: 17,
     part: 4,
@@ -1445,6 +1728,100 @@ export const PART_FOUR: Lesson[] = [
           fuel in proportion; a slower drift saves it twice over. The narrow band and fast drift the
           satellite starts with burn about sixteen times the least. The pointing pays for it: a
           telescope that needs 0.01° cannot live on thrusters, and that is why the wheels exist.
+        </Notice>
+      </>
+    ),
+  },
+  {
+    id: 'panel',
+    n: 21,
+    part: 4,
+    chapter: N,
+    title: 'Panels that wave',
+    level: 1,
+    loop: 'point.z',
+    chart: 'panel',
+    setup: (p) => {
+      p.sim.vehicle = 'satellite';
+      p.satellite = {
+        ...p.satellite,
+        slewAxis: 'z',
+        slewDeg: IV21.deg,
+        kp: 4,
+        kd: 4,
+        profileTorque: 0.15,
+        panel: { inertia: 0.3, hz: 0.5, zeta: 0.005, sensor: 'hub' },
+        shaper: 'none',
+        shaperHz: 0.5,
+      };
+    },
+    predict: {
+      label: "The panel's frequency in flight",
+      unit: 'Hz',
+      truth: (p) => panelFreeHz(p.satellite),
+      tolerance: 0.03,
+    },
+    goal: {
+      text: `Predict the frequency at which the panel swings on the free satellite. Then shape the slew so that from ${IV21.from} s on the panel swings less than ${IV21.ratio * 100} % as much as after the unshaped slew, with the sensor on the hub.`,
+      check: ({ sim, prediction }) => {
+        const p = sim.params;
+        if (p.sim.vehicle !== 'satellite' || !(p.satellite.panel.inertia > 0))
+          return 'this lesson flies the satellite with its panel';
+        if (prediction == null) return 'first the prediction: does the hub stay still?';
+        const truth = panelFreeHz(p.satellite);
+        if (Math.abs(prediction - truth) > 0.03 * truth)
+          return 'not within 3 %: the hub is not clamped; it swings against the panel';
+        if (p.satellite.panel.sensor !== 'hub') return 'put the sensor back on the hub';
+        if (sim.t < IV21.until) return `watching the panel: ${sim.t.toFixed(0)} of ${IV21.until} s`;
+        const now = panelSwing(sim);
+        const ref = unshaped(p);
+        return (
+          now <= IV21.ratio * ref ||
+          `the panel still swings ${now.toFixed(3)}°, ${((now / ref) * 100).toFixed(0)} % of the unshaped ${ref.toFixed(3)}°`
+        );
+      },
+    },
+    solution: (p) => {
+      p.satellite.shaper = 'zv';
+      p.satellite.shaperHz = panelFreeHz(p.satellite);
+    },
+    body: (
+      <>
+        <p>
+          Solar panels are large, light and flexible. Here one panel sits on a hinge about the z
+          axis with a spring and almost no damping (ζ 0.005): held on a clamped hub it would swing
+          at 0.5 Hz. The satellite slews {IV21.deg}° about z in the classic way: full torque one
+          way, then the other, at 0.15 N·m, with that torque fed forward and the quaternion feedback
+          of lesson IV.18 tracking the profile. The panel feels each switch of the torque as a kick
+          and is left ringing when the slew is over.
+        </p>
+        <p>
+          The fix is <b>input shaping</b> [Singer 1990]. Split the command into two halves, the
+          second half a period of the mode later. The swing the first half starts, the second half
+          cancels. The ZV shaper does exactly that; the ZVD shaper uses three steps over a whole
+          period and tolerates a wrong frequency far better. Both need the frequency the panel
+          really has in flight.
+        </p>
+        <Tex display>
+          {
+            'J_z\\ddot\\theta = \\tau + k\\eta + c\\dot\\eta, \\qquad J_p(\\ddot\\theta + \\ddot\\eta) = -k\\eta - c\\dot\\eta'
+          }
+        </Tex>
+        <Try>
+          The hub has <Tex>{'J_z'}</Tex> = 3 kg·m² and the panel <Tex>{'J_p'}</Tex> = 0.3 kg·m².
+          Work out the panel's frequency when the hub is free to swing against it, and enter it.
+          Then choose <b>Input shaper</b> and its frequency. Try 0.5 Hz, the clamped frequency, as
+          well. Last, set <b>Attitude sensor</b> to <b>on the panel tip</b> and press <b>R</b>.
+        </Try>
+        <Notice>
+          On a free hub the mode is stiffer by <Tex>{'\\sqrt{(J_z + J_p)/J_z}'}</Tex>: 0.524 Hz. A
+          ZV shaper there leaves 4 % of the unshaped swing; tuned to 0.5 Hz it leaves 8 %, and the
+          ZVD shaper, about ten times less sensitive, leaves 1 % even there. The tip sensor is the
+          other half of the lesson. On the hub, the sensor sees what the wheels push on
+          (collocated): any positive gains take energy out of the panel, and it cannot go unstable.
+          On the tip it sees the panel's bending as well, with the opposite phase above the mode,
+          and the same feedback pumps energy in: at every gain tried, from 0.2 to 50, the swing
+          grows, until the wheels saturate with the panel near ±20°.
         </Notice>
       </>
     ),

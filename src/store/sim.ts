@@ -38,6 +38,8 @@ export type ExtraChart =
   | 'hq'
   | 'envelope'
   | 'energy'
+  | 'pio'
+  | 'panel'
   | 'lyapunovV'
   | 'wheels'
   | 'startracker';

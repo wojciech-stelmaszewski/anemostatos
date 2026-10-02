@@ -2,7 +2,7 @@ import { useMemo, useRef } from 'react';
 import { controllerKey } from '@/control/registry';
 import { useParams } from '@/store/params';
 import { sim, useUi, type AnalysisChart, type ExtraChart } from '@/store/sim';
-import { AircraftPoles, EnvelopeChart, HqChart } from '@/ui/analysis/AircraftCharts';
+import { AircraftPoles, EnvelopeChart, HqChart, PioChart } from '@/ui/analysis/AircraftCharts';
 import { BodeChart } from '@/ui/analysis/BodeChart';
 import { DescribingChart } from '@/ui/analysis/DescribingChart';
 import { DispersionChart } from '@/ui/analysis/DispersionChart';
@@ -45,6 +45,8 @@ const EXTRA: { value: ExtraChart; label: string }[] = [
   { value: 'hq', label: 'aircraft: handling qualities' },
   { value: 'envelope', label: 'aircraft: margins across speed' },
   { value: 'energy', label: 'aircraft: speed and altitude' },
+  { value: 'pio', label: 'aircraft: pilot-induced oscillation' },
+  { value: 'panel', label: 'satellite: panel vibration' },
   { value: 'lyapunovV', label: 'satellite: Lyapunov function' },
   { value: 'wheels', label: 'satellite: wheel momentum' },
   { value: 'startracker', label: 'satellite: attitude knowledge' },
@@ -109,6 +111,15 @@ const BEACON_ERR: SeriesSpec[] = [
 const AIRSPEED: SeriesSpec[] = [
   { key: 'air.vref', label: 'reference', color: SIGNAL.setpoint, dash: [4, 3], width: 1.5 },
   { key: 'air.V', label: 'airspeed', color: SIGNAL.measurement, width: 2 },
+];
+/** Lesson IV.16: what the elevator is asked for, and what it does. */
+const ELEVATOR: SeriesSpec[] = [
+  { key: 'air.decmd', label: 'command', color: SIGNAL.setpoint, width: 1.5 },
+  { key: 'air.de', label: 'elevator', color: SIGNAL.measurement, width: 2 },
+];
+/** Lesson IV.21: the solar panel's angle relative to the hub. */
+const PANEL: SeriesSpec[] = [
+  { key: 'sat.eta', label: 'panel bending', color: SIGNAL.measurement, width: 2 },
 ];
 const ALTITUDE: SeriesSpec[] = [
   { key: 'air.href', label: 'reference', color: SIGNAL.setpoint, dash: [4, 3], width: 1.5 },
@@ -227,7 +238,8 @@ export function ChartsPanel() {
     extra === 'airmodes' ||
     extra === 'hq' ||
     extra === 'envelope' ||
-    extra === 'energy';
+    extra === 'energy' ||
+    extra === 'pio';
   const ctrlKey = useParams((s) => controllerKey(s.params));
   const loopOptions = useMemo(
     () => loopsFor(useParams.getState().params).map((l) => ({ value: l.id, label: l.name })),
@@ -377,6 +389,15 @@ export function ChartsPanel() {
                   <TimeChart title="Altitude" unit="m" series={ALTITUDE} />
                 </div>
               </div>
+            ) : extra === 'pio' ? (
+              <div className="flex h-full min-h-0 flex-col gap-1.5">
+                <div className="min-h-0 flex-1">
+                  <TimeChart title="Elevator" unit="°" series={ELEVATOR} />
+                </div>
+                <div className="min-h-0 flex-[1.4]">
+                  <PioChart />
+                </div>
+              </div>
             ) : extra === 'hq' ? (
               <HqChart />
             ) : extra === 'envelope' ? (
@@ -491,6 +512,8 @@ export function ChartsPanel() {
             shadeKey="st.blind"
             logY
           />
+        ) : extra === 'panel' ? (
+          <TimeChart title="Solar panel bending" unit="°" series={PANEL} includeZero />
         ) : extra === 'wheels' ? (
           <TimeChart
             title="Wheel momentum"

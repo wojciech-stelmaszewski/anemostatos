@@ -46,6 +46,20 @@ export interface SatelliteParams {
   /** Thruster control: dead band on each axis' angle, and the drift rate it fires to, °/s. */
   deadbandDeg: number;
   driftRateDeg: number;
+  /**
+   * A solar panel on a hinge about the body z axis (lesson IV.21): its inertia about that axis,
+   * kg·m² (0: no panel, a rigid satellite), the frequency of the panel on a clamped hub, Hz, its
+   * damping ratio, and which angle the attitude sensor measures (the hub's, or the panel tip's).
+   */
+  panel: { inertia: number; hz: number; zeta: number; sensor: 'hub' | 'tip' };
+  /**
+   * Fly the slew as a rest-to-rest profile at ± this torque, N·m, with that torque fed forward
+   * and the feedback tracking the profile (0: the slew is a step of the target).
+   */
+  profileTorque: number;
+  /** Shape the slew command into two (ZV) or three (ZVD) steps timed for a mode at `shaperHz`. */
+  shaper: 'none' | 'zv' | 'zvd';
+  shaperHz: number;
   /** Run the attitude estimator of lesson IV.22 (src/estimation/startracker.ts). */
   navigation: boolean;
   /** The gyro's true bias, °/h (1 °/h is 1 arc-second per second), and its noise, °/√h. */
@@ -72,6 +86,9 @@ export interface SatelliteState {
   thrustTorque: Vec3;
   /** Propellant used so far, g, and the thrusters' total firing time, s. */
   fuel: number;
+  /** The panel's angle relative to the hub, rad, and its rate (zero without a panel). */
+  eta: number;
+  etaDot: number;
 }
 
 export interface SatelliteInput {
@@ -93,6 +110,25 @@ export function wheelTorque(cmd: number, h: number, sp: SatelliteParams): number
   return t;
 }
 
+/**
+ * The torque the panel's hinge puts on the hub about z, N·m: k·η + c·η̇ with k = J_p·ω_p² and
+ * c = 2ζ·ω_p·J_p, where ω_p is the panel's frequency on a clamped hub. The hub of inertia J_z and
+ * the panel J_p then obey J_z·θ̈ = τ + k·η + c·η̇ and J_p·(θ̈ + η̈) = −k·η − c·η̇.
+ */
+export function panelHinge(s: SatelliteState, sp: SatelliteParams): number {
+  const jp = sp.panel.inertia;
+  if (!(jp > 0)) return 0;
+  const wn = 2 * Math.PI * sp.panel.hz;
+  return jp * wn * wn * s.eta + 2 * sp.panel.zeta * wn * jp * s.etaDot;
+}
+
+/**
+ * The panel's frequency on a free hub, Hz: the hub swings against the panel, so the mode is
+ * stiffer than on a clamped hub by √((J_z + J_p)/J_z).
+ */
+export const panelFreeHz = (sp: SatelliteParams): number =>
+  sp.panel.hz * Math.sqrt((sp.inertia.z + sp.panel.inertia) / sp.inertia.z);
+
 /** One step, semi-implicit Euler: rates first, then the attitude with the new rates. */
 export function stepSatellite(
   s: SatelliteState,
@@ -113,11 +149,19 @@ export function stepSatellite(
   const H = v3(J.x * s.w.x + s.h.x, J.y * s.w.y + s.h.y, J.z * s.w.z + s.h.z);
   const gyro = cross(s.w, H);
   const tau = add(add(tw, tt), sp.disturbance);
+  // The panel pulls on the hub through its hinge: a spring and a damper on its relative angle.
+  const hinge = panelHinge(s, sp);
+  const wzDot = (tau.z - gyro.z + hinge) / J.z;
   s.w = v3(
     s.w.x + ((tau.x - gyro.x) / J.x) * dt,
     s.w.y + ((tau.y - gyro.y) / J.y) * dt,
-    s.w.z + ((tau.z - gyro.z) / J.z) * dt,
+    s.w.z + wzDot * dt,
   );
+  if (sp.panel.inertia > 0) {
+    // J_p·(θ̈ + η̈) = −hinge torque: the panel's absolute angle θ + η.
+    s.etaDot += (-wzDot - hinge / sp.panel.inertia) * dt;
+    s.eta += s.etaDot * dt;
+  }
   s.q = qIntegrate(s.q, s.w, dt);
   s.h = v3(s.h.x - tw.x * dt, s.h.y - tw.y * dt, s.h.z - tw.z * dt);
   s.wheelTorque = tw;
@@ -133,6 +177,8 @@ export function initialSatellite(): SatelliteState {
     wheelTorque: v3(),
     thrustTorque: v3(),
     fuel: 0,
+    eta: 0,
+    etaDot: 0,
   };
 }
 

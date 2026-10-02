@@ -1,7 +1,8 @@
-import { qIdentity, type Quat } from '@/math/quat';
+import { qFromAxisAngle, qIdentity, type Quat } from '@/math/quat';
 import { v3, type Vec3 } from '@/math/vec3';
 import {
   attitudeError,
+  slewAxis,
   targetAttitude,
   type SatelliteInput,
   type SatelliteParams,
@@ -40,6 +41,74 @@ export const limitCycleFuelRate = (sp: SatelliteParams, axis: 'x' | 'y' | 'z' = 
   (2 * pulseTime(sp, axis) * sp.thrusterFlow) / limitCyclePeriod(sp, axis);
 
 /**
+ * An input shaper for a mode of frequency `hz` (the damped frequency) and damping `zeta`: the
+ * steps of the command, as times, s, and fractions that add up to 1 [Singer 1990]. ZV: two
+ * steps half a period apart; ZVD: three, a whole period in all, and far less sensitive to an
+ * error in the frequency.
+ */
+export function shaperSteps(
+  kind: 'none' | 'zv' | 'zvd',
+  hz: number,
+  zeta = 0,
+): { t: number; a: number }[] {
+  if (kind === 'none' || !(hz > 0)) return [{ t: 0, a: 1 }];
+  const k = Math.exp((-zeta * Math.PI) / Math.sqrt(1 - zeta * zeta));
+  const half = 1 / (2 * hz);
+  if (kind === 'zv')
+    return [
+      { t: 0, a: 1 / (1 + k) },
+      { t: half, a: k / (1 + k) },
+    ];
+  const d = (1 + k) * (1 + k);
+  return [
+    { t: 0, a: 1 / d },
+    { t: half, a: (2 * k) / d },
+    { t: 2 * half, a: (k * k) / d },
+  ];
+}
+
+/** Inertia about the slew axis, the panel's included (it turns with the hub in a slow slew), kg·m². */
+export function slewInertia(sp: SatelliteParams): number {
+  const a = slewAxis(sp);
+  const J = sp.inertia;
+  return J.x * a.x * a.x + J.y * a.y * a.y + (J.z + sp.panel.inertia) * a.z * a.z;
+}
+
+/** Length of the profiled slew: rest to rest at ±profileTorque, 2·√(Θ·J/τ), s (0: a step). */
+export function profileTime(sp: SatelliteParams): number {
+  if (!(sp.profileTorque > 0)) return 0;
+  const angle = Math.abs((sp.slewDeg * Math.PI) / 180);
+  return 2 * Math.sqrt((angle * slewInertia(sp)) / sp.profileTorque);
+}
+
+/** The slew angle, rate and acceleration at time `t`, before shaping: a step, or bang-bang. */
+function slewProfile(sp: SatelliteParams, t: number): [number, number, number] {
+  const angle = (sp.slewDeg * Math.PI) / 180;
+  if (t < 0) return [0, 0, 0];
+  const total = profileTime(sp);
+  if (total === 0 || t >= total) return [angle, 0, 0];
+  const acc = (Math.sign(angle) * sp.profileTorque) / slewInertia(sp);
+  const half = total / 2;
+  if (t < half) return [0.5 * acc * t * t, acc * t, acc];
+  const r = total - t;
+  return [angle - 0.5 * acc * r * r, acc * r, -acc];
+}
+
+/**
+ * The commanded slew at time `t` from the start, through the shaper if any: the angle about the
+ * slew axis, rad, its rate, rad/s, and acceleration, rad/s². The shaper sums delayed, scaled
+ * copies of the profile, so a profile that ends at rest still ends at rest.
+ */
+export function shapedSlew(sp: SatelliteParams, t: number): [number, number, number] {
+  const out: [number, number, number] = [0, 0, 0];
+  for (const st of shaperSteps(sp.shaper, sp.shaperHz)) {
+    const p = slewProfile(sp, t - st.t);
+    for (let i = 0; i < 3; i++) out[i] = out[i]! + st.a * p[i]!;
+  }
+  return out;
+}
+
+/**
  * Attitude control of the satellite (lessons IV.18–IV.20).
  *
  * Wheels: quaternion feedback τ = −kp·q_e − kd·ω, globally stabilising for a rigid body [Wie
@@ -61,8 +130,11 @@ export class SatelliteController {
   private fired = { x: 0, y: 0, z: 0 };
   /** The torque the controller asked for, N·m (before the wheels limit it). */
   command: Vec3 = v3();
+  /** Time since the start, s (the shaper's clock). */
+  private time = 0;
 
   reset(): void {
+    this.time = 0;
     this.error = qIdentity();
     this.dumping = { x: false, y: false, z: false };
     this.fire = { x: 0, y: 0, z: 0 };
@@ -72,8 +144,25 @@ export class SatelliteController {
 
   tick(s: SatelliteState, sp: SatelliteParams, dt: number): SatelliteInput {
     const shortest = sp.actuator === 'thrusters' || sp.shortest;
-    const e = attitudeError(s.q, targetAttitude(sp), shortest);
+    const plain = sp.shaper === 'none' && !(sp.profileTorque > 0);
+    const [phi, phiDot, phiDdot] = plain ? [0, 0, 0] : shapedSlew(sp, this.time);
+    const axis = slewAxis(sp);
+    const target = plain ? targetAttitude(sp) : qFromAxisAngle(axis, phi);
+    const e = attitudeError(s.q, target, shortest);
+    this.time += dt;
+    // The profile's rate and the torque it takes (zero for a step).
+    const wRef = { x: axis.x * phiDot, y: axis.y * phiDot, z: axis.z * phiDot };
+    const J = sp.inertia;
+    const ff = {
+      x: J.x * axis.x * phiDdot,
+      y: J.y * axis.y * phiDdot,
+      z: (J.z + sp.panel.inertia) * axis.z * phiDdot,
+    };
     this.error = e;
+    // A sensor on the panel's tip sees the hub's angle plus the panel's own (lesson IV.21).
+    const tip = sp.panel.inertia > 0 && sp.panel.sensor === 'tip';
+    const meas = tip ? { ...e, z: e.z + s.eta / 2 } : e;
+    const rate = tip ? { ...s.w, z: s.w.z + s.etaDot } : s.w;
     const wheel = v3();
     const thrusters = v3();
     if (sp.actuator === 'thrusters') {
@@ -101,7 +190,7 @@ export class SatelliteController {
       return { wheel, thrusters };
     }
     for (const c of comps) {
-      wheel[c] = -sp.kp * e[c] - sp.kd * s.w[c];
+      wheel[c] = ff[c] - sp.kp * meas[c] - sp.kd * (rate[c] - wRef[c]);
       if (sp.dump) {
         const h = s.h[c];
         if (Math.abs(h) > sp.dumpStart) this.dumping[c] = true;

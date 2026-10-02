@@ -8,6 +8,7 @@ import {
   PITCH_SPEC,
   type HqPoint,
 } from '@/analysis/aircraft';
+import { pioOnset } from '@/analysis/pio';
 import type { Complex } from '@/math/complex';
 import type { Params } from '@/sim/params';
 import { useParams } from '@/store/params';
@@ -257,17 +258,34 @@ export function EnvelopeChart() {
   const key = useParams((s) => airKey(s.params));
   const data = useMemo(() => {
     const p = current();
+    const ndi = p.autopilot.law === 'ndi';
+    // Against NDI: the q̄ schedule, with the same error in the elevator's strength (a gain error).
     const other = {
       ...p,
-      autopilot: {
-        ...p.autopilot,
-        schedule: p.autopilot.schedule === 'qbar' ? ('none' as const) : ('qbar' as const),
-      },
+      autopilot: ndi
+        ? {
+            ...p.autopilot,
+            law: 'classic' as const,
+            schedule: 'qbar' as const,
+            gain: p.autopilot.gain / (1 + p.autopilot.modelError),
+          }
+        : {
+            ...p.autopilot,
+            schedule: p.autopilot.schedule === 'qbar' ? ('none' as const) : ('qbar' as const),
+          },
     };
+    const label = (q: Params) =>
+      q.autopilot.law === 'ndi'
+        ? 'dynamic inversion'
+        : q.autopilot.schedule === 'qbar'
+          ? ndi
+            ? 'scheduled on q̄ (same error)'
+            : 'scheduled on q̄'
+          : 'fixed gain';
     return {
       now: envelopeMargins(p, 17),
       other: envelopeMargins(other, 17),
-      sched: p.autopilot.schedule,
+      labels: [label(p), label(other)] as const,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- the key stands for the parameters
   }, [key]);
@@ -357,12 +375,12 @@ export function EnvelopeChart() {
       readout={readout}
       legend={[
         {
-          label: data.sched === 'qbar' ? 'scheduled on q̄' : 'fixed gain',
+          label: data.labels[0],
           color: ENV_COLOR.now,
           mark: 'line',
         },
         {
-          label: data.sched === 'qbar' ? 'fixed gain' : 'scheduled on q̄',
+          label: data.labels[1],
           color: ENV_COLOR.other,
           mark: 'line',
         },
@@ -371,6 +389,97 @@ export function EnvelopeChart() {
         <span>
           worst PM {worst.toFixed(0)}° · slowest crossover {slowest.toFixed(2)} rad/s (dashed: the
           requirement)
+        </span>
+      }
+    >
+      <canvas ref={canvas} className="min-h-0 w-full flex-1" />
+    </ChartCard>
+  );
+}
+
+/**
+ * Lesson IV.16: harmonic balance of the pilot–aircraft loop through the rate-limited elevator. For
+ * each amplitude of the elevator command, the loop gain where its phase is −180°: below 1 an
+ * oscillation of that size dies out, above 1 it grows. The first crossing is the onset of the PIO.
+ */
+export function PioChart() {
+  const key = useParams((s) => airKey(s.params));
+  const data = useMemo(
+    () => pioOnset(current()),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the key stands for the parameters
+    [key],
+  );
+  const travel = current().aircraft.elevatorMax;
+  const { canvas, readout } = useChartCanvas(
+    (f) => {
+      const { ctx, w, h, hover } = f;
+      const X0 = 38;
+      const X1 = w - 10;
+      const Y0 = 8;
+      const Y1 = h - 18;
+      const hi = Math.max(1.5, ...data.curve.map((c) => c.gain)) * 1.1;
+      const X = (a: number) => X0 + (a / travel) * (X1 - X0);
+      const Y = (g: number) => Y1 - (Math.min(g, hi) / hi) * (Y1 - Y0);
+      grid(
+        f,
+        { x0: X0, x1: X1, y0: Y0, y1: Y1 },
+        niceTicks(0, travel, 5).map((v) => ({ v, X: X(v), label: `${v}°` })),
+        niceTicks(0, hi, 4).map((v) => ({ v, Y: Y(v), label: v.toFixed(1) })),
+      );
+      // Gain 1: the boundary between dying out and growing.
+      ctx.strokeStyle = INK.text;
+      ctx.setLineDash([5, 4]);
+      ctx.beginPath();
+      ctx.moveTo(X0, Y(1));
+      ctx.lineTo(X1, Y(1));
+      ctx.stroke();
+      // Where the elevator starts to rate-limit at the loop's own frequency.
+      ctx.strokeStyle = INK.muted;
+      ctx.beginPath();
+      ctx.moveTo(X(data.rateLimitDeg), Y0);
+      ctx.lineTo(X(data.rateLimitDeg), Y1);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.strokeStyle = SIGNAL.measurement;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      data.curve.forEach((c, i) => {
+        if (i) ctx.lineTo(X(c.ampDeg), Y(c.gain));
+        else ctx.moveTo(X(c.ampDeg), Y(c.gain));
+      });
+      ctx.stroke();
+      if (Number.isFinite(data.onsetDeg)) dot(ctx, X(data.onsetDeg), Y(1), SIGNAL.error, 4);
+      ctx.fillStyle = INK.muted;
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'bottom';
+      ctx.fillText('elevator command amplitude', X1, Y1 - 2);
+      if (!hover || hover.x < X0 || hover.x > X1) return;
+      const a = ((hover.x - X0) / (X1 - X0)) * travel;
+      const c = data.curve.reduce((p, q) =>
+        Math.abs(q.ampDeg - a) < Math.abs(p.ampDeg - a) ? q : p,
+      );
+      return `${c.ampDeg.toFixed(1)}°   loop gain ${c.gain.toFixed(2)} at ${c.w.toFixed(2)} rad/s`;
+    },
+    [data],
+  );
+  return (
+    <ChartCard
+      title="Pilot and elevator: loop gain at −180° against amplitude"
+      readout={readout}
+      legend={[
+        {
+          label: 'describing function × airframe × pilot',
+          color: SIGNAL.measurement,
+          mark: 'line',
+        },
+      ]}
+      summary={
+        <span>
+          {Number.isFinite(data.onsetDeg)
+            ? `PIO above ${data.onsetDeg.toFixed(1)}° of command, at ${data.onsetW.toFixed(2)} rad/s`
+            : 'no PIO within the elevator’s travel'}{' '}
+          · rate-limits above {data.rateLimitDeg.toFixed(1)}° (grey) · small-signal gain margin{' '}
+          {(1 / data.linearGain).toFixed(2)}
         </span>
       }
     >

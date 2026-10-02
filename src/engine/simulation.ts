@@ -852,6 +852,7 @@ export class Simulation {
       tl.set('air.h', a.h);
       tl.set('air.href', this.params.aircraft.altitude + this.params.autopilot.altitudeOffset);
       tl.set('air.de', a.de * deg);
+      tl.set('air.decmd', this.autopilot.last.unsaturated);
       tl.set('air.thrust', a.thrust);
       tl.set('air.qbar', dynamicPressure(atmosphere(a.h).density, a.V));
     }
@@ -876,6 +877,7 @@ export class Simulation {
       tl.set(`sat.thr.${c}`, Math.sign(s.thrustTorque[c]));
     }
     tl.set('sat.fuel', s.fuel);
+    if (sp.panel.inertia > 0) tl.set('sat.eta', s.eta * RAD_DEG);
     if (sp.navigation) {
       tl.set('st.err', this.starNav.error(s));
       tl.set('st.sigma2', this.starNav.sigma2());

@@ -1,7 +1,7 @@
 // Linear analysis of the aircraft of Chapter M (docs/aerospace-gnc.md §4): its modes, the
 // handling-qualities point of its short period, and the margins of the pitch autopilot, all from
 // the generic linearisation of the simulator's own step around a level-flight trim.
-import { scheduledGain, type AutopilotParams } from '@/control/autopilot';
+import { ndiElevator, scheduledGain, type AutopilotParams } from '@/control/autopilot';
 import { cabs, cdiv, csub, cx, type Complex } from '@/math/complex';
 import { eigenvalues, type Mat } from '@/math/mat';
 import { logspace, margins, type Margins } from '@/math/margins';
@@ -47,6 +47,26 @@ export function autopilotRow(ap: AutopilotParams, a: AircraftParams, qbar: numbe
   const k = KEEP.map(() => 0);
   k[I_THETA] = g * ap.kTheta;
   k[I_Q] = g;
+  return k;
+}
+
+/**
+ * The feedback row of whichever pitch law is set, at speed `V`: the classic law's gains, or the
+ * NDI law differentiated numerically around the level-flight trim (θ_ref held at the trim).
+ */
+export function lawRow(p: Params, V: number, qbar: number): number[] {
+  if (p.autopilot.law !== 'ndi') return autopilotRow(p.autopilot, p.aircraft, qbar);
+  const t = trimAircraft(p.aircraft, V, p.aircraft.altitude).state;
+  const de = (d: Partial<typeof t>) =>
+    ndiElevator({ ...t, ...d }, t.theta, p.aircraft, p.autopilot).de;
+  const base = de({});
+  const h = 1e-6;
+  const k = KEEP.map(() => 0);
+  k[0] = (de({ V: t.V + h }) - base) / h;
+  k[1] = (de({ alpha: t.alpha + h }) - base) / h;
+  k[I_Q] = (de({ q: t.q + h }) - base) / h;
+  k[I_THETA] = (de({ theta: t.theta + h }) - base) / h;
+  k[4] = (de({ h: t.h + 1e-3 }) - base) / 1e-3;
   return k;
 }
 
@@ -100,7 +120,7 @@ export function modesOf(a: Mat): Modes {
 /** Modes of the aircraft at its start speed, with the autopilot (`withAutopilot`) or bare. */
 export function aircraftModes(p: Params, withAutopilot = true, V = p.aircraft.speed): Modes {
   const m = aircraftLinear(p.aircraft, V);
-  const k = withAutopilot ? autopilotRow(p.autopilot, p.aircraft, m.qbar) : KEEP.map(() => 0);
+  const k = withAutopilot ? lawRow(p, V, m.qbar) : KEEP.map(() => 0);
   return modesOf(closed(m, k, p.autopilot.delayMs / 1000));
 }
 
@@ -134,7 +154,7 @@ export function hqLevel(zeta: number, cap: number): 1 | 2 | 3 {
 
 export function hqPoint(p: Params, withAutopilot = true): HqPoint | null {
   const m = aircraftLinear(p.aircraft, p.aircraft.speed);
-  const k = withAutopilot ? autopilotRow(p.autopilot, p.aircraft, m.qbar) : KEEP.map(() => 0);
+  const k = withAutopilot ? lawRow(p, p.aircraft.speed, m.qbar) : KEEP.map(() => 0);
   const sp = modesOf(closed(m, k, p.autopilot.delayMs / 1000)).shortPeriod;
   if (!sp) return null;
   const cap = (sp.wn * sp.wn) / m.nAlpha;
@@ -165,9 +185,9 @@ export function pitchLoopMargins(
   p: Params,
   V: number,
   w = logspace(0.5, 200, 400),
-): Margins & { qbar: number } {
+): Margins & { qbar: number; stable: boolean; pitch: { pmDeg: number; wc: number } } {
   const m = aircraftLinear(p.aircraft, V);
-  const k = autopilotRow(p.autopilot, p.aircraft, m.qbar);
+  const k = lawRow(p, V, m.qbar);
   const n = m.a.length;
   const tau = p.autopilot.delayMs / 1000;
   const l = w.map((om) => {
@@ -213,7 +233,16 @@ export function pitchLoopMargins(
     const ph = -om * tau;
     return { re: re * Math.cos(ph) - im * Math.sin(ph), im: re * Math.sin(ph) + im * Math.cos(ph) };
   });
-  return { ...margins(w, l), qbar: m.qbar };
+  const mg = margins(w, l);
+  // The pitch loop's own crossover is the highest one; slower ones belong to the flight path, which
+  // an attitude hold leaves to itself (with NDI the loop crosses 1 again near the phugoid).
+  const top = mg.gainCrossovers[mg.gainCrossovers.length - 1];
+  const wrap = (d: number) => d - 360 * Math.round(d / 360);
+  const stable = eigenvalues(closed(m, k, tau)).every((z) => z.re < 0);
+  const pitch = top
+    ? { pmDeg: stable ? wrap(top.pmDeg) : -Math.abs(wrap(top.pmDeg)), wc: top.w }
+    : { pmDeg: Infinity, wc: NaN };
+  return { ...mg, qbar: m.qbar, stable, pitch };
 }
 
 /** The envelope of lesson IV.13: speeds at the start altitude. */
@@ -225,7 +254,7 @@ export function envelopeMargins(p: Params, count = 9) {
   for (let i = 0; i < count; i++) {
     const V = ENVELOPE.vMin + ((ENVELOPE.vMax - ENVELOPE.vMin) * i) / (count - 1);
     const m = pitchLoopMargins(p, V);
-    out.push({ V, pmDeg: m.pmDeg, wc: m.wc, qbar: m.qbar });
+    out.push({ V, pmDeg: m.pitch.pmDeg, wc: m.pitch.wc, qbar: m.qbar });
   }
   return out;
 }

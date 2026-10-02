@@ -10,6 +10,7 @@ import {
 import { add, clone, cross, dot, length, normalize, scale, sub, v3, type Vec3 } from '@/math/vec3';
 import { FOOT_HEIGHT, MOTOR_POSITIONS } from '../drone';
 import { GRAVITY, type DroneParams, type Level, type Params } from '../params';
+import type { Vehicle } from './types';
 
 export interface DroneState {
   pos: Vec3;
@@ -194,18 +195,18 @@ export const rotorDragForce = (s: DroneState, wind: Vec3, thrust: number, k: num
  * (position, velocity, the rotor thrusts as the motors' lag state), and at level 1 it is the
  * vertical (y, v, Σ rotor thrust) of the altitude loop, which `l1Plant` models by hand.
  */
-export const quadrotor = {
-  id: 'quadrotor' as const,
+export const quadrotor: Vehicle<DroneState, Actuation> = {
+  id: 'quadrotor',
   initial: (): DroneState => initialState(),
-  step(s: DroneState, u: Actuation, env: { wind: Vec3; external: Vec3 }, dt: number, p: Params) {
+  step(s, u, env, dt, p) {
     stepDynamics(p.sim.level, s, u, env.wind, env.external, p.drone, dt);
   },
-  stateNames: ['y', 'v', 'T'] as const,
-  inputNames: ['thrust'] as const,
-  toVector(s: DroneState): number[] {
+  stateNames: ['y', 'v', 'T'],
+  inputNames: ['thrust'],
+  toVector(s) {
     return [s.pos.y, s.vel.y, s.rotors[0] + s.rotors[1] + s.rotors[2] + s.rotors[3]];
   },
-  fromVector(x: readonly number[], ref: DroneState): DroneState {
+  fromVector(x, ref) {
     const s: DroneState = {
       ...ref,
       pos: v3(ref.pos.x, x[0]!, ref.pos.z),
@@ -221,15 +222,13 @@ export const quadrotor = {
     };
     return s;
   },
-  inputToVector: (u: Actuation): number[] => [
-    u.motorCmd[0] + u.motorCmd[1] + u.motorCmd[2] + u.motorCmd[3],
-  ],
-  inputFromVector: (v: readonly number[]): Actuation => ({
+  inputToVector: (u) => [u.motorCmd[0] + u.motorCmd[1] + u.motorCmd[2] + u.motorCmd[3]],
+  inputFromVector: (v) => ({
     motorCmd: [v[0]! / 4, v[0]! / 4, v[0]! / 4, v[0]! / 4],
     forceCmd: v3(),
   }),
   /** Hover at 2 m in calm air: the thrust that holds the weight (with healthy motors). */
-  trim(p: Params): { state: DroneState; input: Actuation } {
+  trim(p: Params) {
     const eta = p.drone.motorEfficiency.reduce((a, b) => a + b, 0) / 4;
     const w = (p.drone.mass * GRAVITY) / eta;
     const s = initialState();

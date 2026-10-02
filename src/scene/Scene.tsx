@@ -6,6 +6,8 @@ import { sim } from '@/store/sim';
 import { SCENE } from '@/ui/colors';
 import { CameraRig } from './CameraRig';
 import { DroneRig } from './DroneRig';
+import { LandingPad, RocketRig } from './Rocket';
+import { useParams } from '@/store/params';
 import { Grid } from './Grid';
 import { ForceArrows, TermArrows } from './overlays/ForceArrows';
 import { HeightAids } from './overlays/HeightAids';
@@ -80,6 +82,19 @@ function KeyLight() {
   );
 }
 
+/** The vehicle being simulated: the drone, or the rocket of Part IV on its pad. */
+function VehicleRig() {
+  const vehicle = useParams((s) => s.params.sim.vehicle ?? 'quadrotor');
+  return vehicle === 'rocket' ? (
+    <>
+      <LandingPad />
+      <RocketRig />
+    </>
+  ) : (
+    <DroneRig />
+  );
+}
+
 export function Scene() {
   return (
     <Canvas
@@ -130,7 +145,7 @@ export function Scene() {
         <shadowMaterial opacity={0.45} />
       </mesh>
 
-      <DroneRig />
+      <VehicleRig />
       <HeightAids />
       <SetpointGhost />
       <ReferencePath />

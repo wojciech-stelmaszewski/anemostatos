@@ -16,8 +16,8 @@ export function linearize<S, U>(
   p: Params,
   at: { state: S; input: U },
   dt = PHYS_DT,
-  hx = 1e-6,
-  hu = 1e-6,
+  hx = 1e-5,
+  hu = 1e-3,
 ): Linearization {
   const ref = at.state;
   const u0 = vehicle.inputToVector(at.input);

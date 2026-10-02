@@ -24,10 +24,7 @@ export class RocketLander {
     let cmd = 0;
     if (this.lit && !s.landed) {
       const target = -c.touchdownSpeed;
-      cmd =
-        s.v < target
-          ? r.thrustMax
-          : s.mass * GRAVITY + s.mass * c.speedGain * (target - s.v);
+      cmd = s.v < target ? r.thrustMax : s.mass * GRAVITY + s.mass * c.speedGain * (target - s.v);
     }
     const thrust = engineThrust(cmd, s, r);
     this.last = {

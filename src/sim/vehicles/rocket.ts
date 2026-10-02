@@ -52,7 +52,13 @@ export function engineThrust(cmd: number, s: RocketState, r: RocketParams): numb
 }
 
 /** One step, semi-implicit Euler like the quadrotor. */
-export function stepRocket(s: RocketState, u: RocketInput, ext: Vec3, dt: number, r: RocketParams): void {
+export function stepRocket(
+  s: RocketState,
+  u: RocketInput,
+  ext: Vec3,
+  dt: number,
+  r: RocketParams,
+): void {
   if (s.landed || s.crashed) {
     s.thrust = 0;
     return;
@@ -96,7 +102,14 @@ export const rocket: Vehicle<RocketState, RocketInput> = {
   stateNames: ['h', 'v', 'm'],
   inputNames: ['thrust'],
   toVector: (s) => [s.h, s.v, s.mass],
-  fromVector: (x, ref) => ({ ...ref, h: x[0]!, v: x[1]!, mass: x[2]!, landed: false, crashed: false }),
+  fromVector: (x, ref) => ({
+    ...ref,
+    h: x[0]!,
+    v: x[1]!,
+    mass: x[2]!,
+    landed: false,
+    crashed: false,
+  }),
   inputToVector: (u) => [u.thrust],
   inputFromVector: (v) => ({ thrust: v[0]! }),
   /** Hovering at the start altitude with the engine holding the weight. */

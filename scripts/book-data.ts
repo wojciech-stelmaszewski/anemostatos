@@ -636,6 +636,17 @@ for (const [tag, inner, comp] of [
     },
     events: brokenProp,
   });
+for (const k of [0.5, 2, 3, 4, 6, 8, 12])
+  add({
+    name: `indi-prop-inertia${k}`,
+    seconds: 25,
+    setup: (p) => {
+      damaged(p);
+      p.control.l3.inner = 'indi';
+      p.control.model.inertiaScale = k;
+    },
+    events: brokenProp,
+  });
 for (const [tag, inner, comp] of [
   ['pid', 'pid', 'none'],
   ['acc', 'pid', 'indi'],

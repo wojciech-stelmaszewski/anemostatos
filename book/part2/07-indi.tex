@@ -1,0 +1,226 @@
+\lesson{II.7}{Don't model it, measure it}{A model of everything that acts on the drone is impossible. A measurement of what all of it does together is a gyroscope away.}{3}{indi}{Part II · Beyond PID}
+\label{les:indi}
+
+\lead{\setupcard{\setuprow{Level}{L3}\setuprow{Controller}{the cascade; the rate loop is the PID of Lesson~13}\setuprow{Ghost}{the same flight with the PID rate loop}\setuprow{Event}{at $t = \SI{12}{s}$ the propeller of motor 2 chips: it keeps its speed and gives 60\,\% of its thrust}\setuprow{Goal}{after the fault, a position error below \SI{30}{cm}}}%
+A propeller chips in flight. Its motor keeps spinning at the commanded speed, but it pushes 40\,\% less. Nothing in the controller knows.\innumbers{A chipped or bent propeller is the most common in-flight damage of a small drone. Losing 40\,\% of one rotor's thrust is survivable — if the controller reacts within tens of milliseconds.} The PID rate loop sees the drone start to roll and pitch, lets its integral grow, and while it grows the drone leans by ten degrees and slides three quarters of a metre. Incremental nonlinear dynamic inversion does not wait. It asks what angular acceleration the drone has \emph{right now}, compares it with the one it wants, and changes the torque of the motors by exactly the difference. The fault is inside the measurement, so the cure is too.}
+
+\section{What the fault does}
+
+The drone hovers at \SI{2}{m}, \SI{2}{m} away from where it took off, each motor giving $mg/4 = \SI{2.45}{N}$. At $t = \SI{12}{s}$ motor~2 drops to 60\,\% efficiency.
+
+\begin{example}[The fault in numbers]
+\label{ex:indi-fault}
+Find the thrust and the torques lost at the moment of the fault, and the angular accelerations they cause.
+
+\textbf{Step 1 — the thrust.} Motor~2 loses $0.4 \cdot 2.45 = \SI{0.98}{N}$.
+
+\textbf{Step 2 — the torques.} By the mixer of \cref{eq:cascade-mixer}, motor~2 sits at the lever arm $d = \SI{0.12}{m}$ from both the roll and the pitch axis: losing its thrust produces a roll torque and a pitch torque of $d \cdot 0.98 = \SI{0.118}{N.m}$ each, and a yaw torque of $c_\tau \cdot 0.98 = \SI{0.016}{N.m}$.
+
+\textbf{Step 3 — the accelerations.} With $J = \SI{0.0082}{kg.m^2}$ about roll and pitch: $0.118/0.0082 = \SI{14.3}{rad/s^2}$, or \SI{820}{\degree/s^2}. Left alone for a tenth of a second, the drone would roll by $\tfrac12 \cdot 14.3 \cdot 0.1^2 = \SI{0.07}{rad}$, four degrees, and be turning at \SI{82}{\degree/s}.
+
+\textbf{Step 4 — and in the end.} To hold the drone level, motor~2 must be commanded harder (it delivers only 60\,\% of what it is asked), and all four must give a little more to replace the lost lift. In the steady state the rate loop has to command about \SI{1430}{\degree/s^2} of extra roll and pitch acceleration, as if from healthy motors — \SI{0.2}{N.m} each.
+\end{example}
+
+\section{The PID's answer: wait for an error}
+
+The rate loop of \lessonref{les:cascade} computes a desired angular acceleration from the rate error, $\alpha = \mathrm{PID}(\omega_{sp} - \omega)$, and converts it to a torque with the model inertia. Against a constant disturbing torque the P term alone would need a constant rate error; the integral removes that error, but slowly.
+
+\begin{example}[How far the PID drone leans]
+\label{ex:indi-pid}
+Estimate the attitude error that the PID cascade needs to carry the fault before its rate integral has taken over.
+
+\textbf{Step 1 — the rate error.} To command \SI{1430}{\degree/s^2} with $K_p = 18$, the rate error must be $1430/18 = \SI{79}{\degree/s}$.
+
+\textbf{Step 2 — the attitude error.} That rate error is the attitude loop's command, $K_{att}\,\theta_e$ with $K_{att} = 8$: $\theta_e = 79/8 = 9.9^\circ$.
+
+\textbf{Step 3 — the integral.} It grows at $K_i = 6$ times the rate error, $\SI{474}{\degree/s^2}$ per second at first, and slower as the error shrinks: it needs several seconds to reach 1430. In the simulator the integral term reads \SI{-215}{\degree/s^2} \SI{0.5}{s} after the fault, \SI{-680}{} after two seconds and \SI{-1279}{} after eight.
+
+\textbf{Step 4 — check} (\cref{fig:indi-prop}). The simulator's attitude error peaks at $10.9^\circ$ half a second after the fault. Tilted by about ten degrees for most of a second, the drone accelerates sideways at $g\tan 10^\circ = \SI{1.7}{m/s^2}$; it drifts \SI{54}{cm} in $x$ and \SI{52}{cm} in $z$ before the outer loops bring it back. The largest position error is \SI{77}{cm}, \SI{1.65}{s} after the fault.
+\end{example}
+
+\simfig{indi_prop}{The prop breaks at $t = 0$. Top: the position error with the PID rate loop (grey) and with rate INDI (blue). Middle: the roll angle. Bottom: the INDI command split into its parts: the torque the motors produce now, $\tau_0/\hat J$, jumps to carry the fault within a tenth of a second, while the desired and the measured accelerations, which differ only briefly, return to zero.}{fig:indi-prop}
+
+\section{Incremental dynamic inversion}
+
+\subsection{Inversion, and why it is hard}
+\emph{Dynamic inversion} computes the torque that produces a desired angular acceleration from a model of everything that acts on the body:
+\begin{equation}\label{eq:indi-ndi}
+  \vec\tau = J\,\vec\alpha_{des} + \vec\omega \times J\vec\omega - \vec\tau_{aero} - \vec\tau_{other} .
+\end{equation}
+Every term one forgets — a rotor's drag, a shifted battery, a broken prop — becomes an error that the loop must then fight as a disturbance. A complete model of an aircraft takes years of wind-tunnel work, and it is still wrong after the first repair.\didyouknow{Dynamic inversion has flown since the 1990s: the X-38 crew-return demonstrator and the F-35 use model-based inversion laws, each backed by a large aerodynamic database.}
+
+\subsection{The incremental idea}
+Write Euler's equation \eqref{eq:H-euler-eq} at the present instant, with whatever unknown torques there are, and at an instant a few milliseconds later, after the motors' torque has changed from $\vec\tau_0$ to $\vec\tau$:
+\begin{equation*}
+  J\dot{\vec\omega}_0 = \vec\tau_0 + \vec\tau_{rest}, \qquad J\dot{\vec\omega} = \vec\tau + \vec\tau_{rest}' .
+\end{equation*}
+Over a few milliseconds the body's rate and attitude barely change, so the unknown rest barely changes either: $\vec\tau_{rest}' \approx \vec\tau_{rest}$. Subtract:
+\begin{equation}\label{eq:indi-increment}
+  J\,(\dot{\vec\omega} - \dot{\vec\omega}_0) \approx \vec\tau - \vec\tau_0 .
+\end{equation}
+The unknown has cancelled. To reach a desired acceleration $\vec\alpha_{des}$, set $\dot{\vec\omega} = \vec\alpha_{des}$ and solve:
+
+\begin{result}[Incremental nonlinear dynamic inversion]
+\begin{equation}\label{eq:indi-law}
+  \vec\tau = \vec\tau_0 + \hat J\,\big(\vec\alpha_{des} - \dot{\vec\omega}_0\big), \qquad \vec\alpha_{des} = K\,(\vec\omega_{sp} - \vec\omega) .
+\end{equation}
+$\vec\tau_0$ is the torque the motors produce now; $\dot{\vec\omega}_0$ the angular acceleration the drone has now, from the gyroscope; $\hat J$ the only model left. The rate loop has a single gain, $K = \SI{20}{s^{-1}}$.
+\end{result}
+
+Everything that acts on the drone — the gyroscopic term, the aerodynamics, the broken prop — is inside the measured $\dot{\vec\omega}_0$ and needs no model. The law keeps what the motors already do and changes it by exactly the missing part.\tip{Read INDI as a sentence: \enquote{keep doing what you are doing, and add what is missing}. The model only says how much torque buys how much acceleration.}\recall{Euler's equation (Appendix~H): $J\dot{\vec\omega} = \vec\tau - \vec\omega \times J\vec\omega$. INDI never evaluates the cross product; the gyroscope measures its effect.}
+
+\paragraph{Where $\vec\tau_0$ comes from.} From the motors' speeds, which modern drones report back to the flight controller, converted to the thrust a \emph{healthy} propeller would make at that speed — or, without such telemetry, from a model of the motors driven by the commands. It must be the actuator's \emph{state}, not the thrust it truly delivers. The chipped prop spins at the commanded speed and pushes less; that deficit must appear in $\dot{\vec\omega}_0$, where the increment can see and close it, and not be hidden in $\vec\tau_0$.
+
+\paragraph{Where $\dot{\vec\omega}_0$ comes from.} From differentiating the gyroscope. A derivative is noisy (\lessonref{les:noise}), so it is filtered — here by a second-order filter at \SI{20}{Hz}. And because $\vec\tau_0$ must describe the \emph{same} moment as $\dot{\vec\omega}_0$, it passes through the same filter. Why that matters is the subject of Lesson~II.9.
+
+\begin{example}[How fast INDI catches the fault]
+\label{ex:indi-catch}
+Estimate the rate error and the attitude error that the fault causes under rate INDI.
+
+\textbf{Step 1 — the blind interval.} The fault's angular acceleration reaches the law only through the filter (a delay of about $\sqrt2/(2\pi \cdot 20) = \SI{11}{ms}$ for a second-order Butterworth filter) and acts through the motors' lag (\SI{30}{ms}). For roughly \SI{40}{ms} the drone accelerates at the fault's \SI{14.3}{rad/s^2} almost unopposed.
+
+\textbf{Step 2 — the rate error.} $14.3 \cdot 0.04 = \SI{0.57}{rad/s} = \SI{33}{\degree/s}$. The simulator's largest rate error: \SI{34}{\degree/s}.
+
+\textbf{Step 3 — the angle.} During the blind interval $\tfrac12 \cdot 14.3 \cdot 0.04^2 = \SI{0.011}{rad}$. Afterwards the rate error decays with the time constant $1/K = \SI{0.05}{s}$, adding about $0.57 \cdot 0.05 = \SI{0.029}{rad}$. In total $0.04$ radians, $2.3^\circ$. The simulator: $2.26^\circ$.
+
+\textbf{Step 4 — the torque.} In \cref{fig:indi-prop} (bottom) the part $\tau_0/\hat J$ — what the motors produce — jumps from 0 to \SI{1556}{\degree/s^2} within a tenth of a second and settles at 1430. There is no integral to wind up: the increment starts every sample from what the actuators actually do.
+
+\textbf{Step 5 — the position.} The largest error is \SI{21}{cm}, and it is almost all \emph{vertical}: the drone sinks while the altitude loop replaces the lost lift. The tilt never exceeds $2.4^\circ$, and the horizontal drift stays below \SI{2}{cm}. Goal met. (The lost lift is a force, not a torque; the next lesson catches it too.)
+\end{example}
+
+\section{The model that remains}
+
+INDI still needs $\hat J$, the \emph{control effectiveness}: how much angular acceleration a newton-metre buys. How wrong may it be?
+
+\begin{example}[The tolerance to a wrong inertia]
+\label{ex:indi-effect}
+Let the controller believe $\hat J = kJ$. Find the range of $k$ for which the increment loop is stable.
+
+\textbf{Step 1 — the loop of the increment.} Write $G(s) = 1/(\tau_ms + 1)$ for the motors and $F(s)$ for the filter. The command is $\tau = F G\,\tau + kJ\big(\alpha_{des} - FG\tau/J\big) + \dots$ — the filtered torque of the motors, plus $k$ times the filtered acceleration they produce, with the opposite sign. Collecting the terms in $\tau$: $\tau\,\big(1 + (k - 1)\,FG\big) = \dots$
+
+\textbf{Step 2 — the edge.} The loop is unstable when $1 + (k - 1)FG(j\omega) = 0$ at some frequency: when $FG$ reaches $-180^\circ$ with the magnitude $1/(k - 1)$. With the \SI{20}{Hz} filter and the \SI{30}{ms} lag, $FG$ passes $-180^\circ$ at \SI{147}{rad/s} with the magnitude 0.13; with the millisecond of sampling delay of the \SI{1}{kHz} loop, at \SI{135}{rad/s} with 0.15. So the edge is at $k = 1 + 1/0.15 \approx 7.4$.
+
+\textbf{Step 3 — under-estimates.} For $k < 1$ the factor $k - 1$ is negative: the loop is a positive feedback with a gain below one, and stable. The response is merely slower.
+
+\textbf{Step 4 — check} (\cref{fig:indi-effect}). Flown with the broken prop: $k = 0.5$ lets the drone roll to $4.6^\circ$; $k = 2$, 3, 4 and 6 fly well, with the tilt even smaller than at $k = 1$; at $k = 8$ the motors start to chatter before the fault, and at $k = 12$ the drone flips.
+
+\textbf{Step 5 — read it.} INDI is robust to everything it does \emph{not} model, and remarkably tolerant of an error in the one thing it does — here by a factor of more than six. What it cannot survive is a wildly wrong idea of its own actuators: the effectiveness enters every increment.\pitfall{The tolerance runs one way. Over-estimating the inertia makes the increments too large; at about seven times the truth they overshoot each other. Under-estimates only slow the loop.}
+\end{example}
+
+\simfig{indi_effect}{The tolerance to a wrong inertia. Left: the thrust of motor~1 around the fault for four believed inertias: half and twice the truth fly cleanly, six times is still stable, eight times chatters. Right: the edge from Example~\ref{ex:indi-effect}, $1 + 1/|FG|$ along the frequency axis, read where $FG$ passes $-180^\circ$; the dots and crosses are the flights.}{fig:indi-effect}
+
+\begin{keyidea}[Measure what you cannot model]
+A controller can avoid a model of a quantity if it can measure that quantity's effect. INDI replaces the model of all moments acting on the drone by one sensor reading, the angular acceleration, and keeps only a model of its own actuators. The idea pays twice: unmodelled effects are rejected at the speed of the sensor and the filter, not at the speed of an integrator; and the controller works the same on a damaged vehicle as on a healthy one.
+\end{keyidea}
+
+\screen[0 0 495 998]{indi}{Lesson II.7 in the app after the fault, with rate INDI. The contributions chart shows the three parts of the INDI command for the roll rate: the held torque of the motors takes over the fault, the desired and measured accelerations are back to zero.}{fig:indi-screen}
+
+\begin{inapp}
+\begin{itemize}[leftmargin=1.2em]
+  \item The switch is \ui{Controller\then Inner stage\then attitude P + rate INDI} (\param{control.l3.inner = 'indi'}); the gains are \param{control.indi.rateKpRP} and \param{rateKpYaw}, the filter \param{control.indi.filterHz}, and the believed inertia \param{control.model.inertiaScale}.
+  \item The law is the class \texttt{RateIndi} in \src{src/control/stages.ts}. The motors' state comes from \texttt{MotorEstimate}: telemetry of the rotor speeds if \param{sensors.motorFeedback} is on, otherwise a first-order model driven by the commands.
+  \item The fault is the scripted event \param{drone.motorEfficiency.1 = 0.6} at $t = \SI{12}{s}$ (motors are numbered from zero in the code). The motor telemetry reports the rotor's speed, so the damage is visible only in the motion.
+  \item The chart's three parts are labelled $\tau_0/\hat J$ (the motors now), $\alpha_{des}$ and $-\dot\omega$, all in \si{\degree/s^2}.
+\end{itemize}
+\end{inapp}
+
+\begin{trythis}
+\begin{enumerate}
+  \item Watch the fault with the PID rate loop (the ghost), then switch the inner stage to rate INDI and press \key{R}.
+  \item Set \ui{Assumed inertia} to $\times0.5$, $\times2$, $\times6$, then $\times8$.
+  \item Switch motor telemetry off (\param{sensors.motorFeedback}) so that $\tau_0$ comes from a model of the motors. Does it still work?
+\end{enumerate}
+\predict{with rate INDI, the largest position error after the fault is \SI{21}{cm} and almost all of it vertical. Which part of the controller is responsible for that error, and what would remove it?}
+\end{trythis}
+
+\section{The engineer's view: sensor-based control}
+
+\subsection{An integrator that starts in the right place}
+In the steady state of \cref{eq:indi-law} the drone does not accelerate, $\dot{\vec\omega}_0 = 0$, and the rate error is zero, so $\vec\tau = \vec\tau_0$: the command equals what the motors already produce, whatever that is. INDI therefore removes constant torque disturbances exactly, as an integrator would. But the \enquote{integral} is held in the physical state of the motors, not in a variable of the controller: it cannot wind up, it starts every sample from what the actuators actually do, and it responds as fast as the filter allows.
+
+\subsection{What INDI needs}
+\begin{itemize}
+  \item a measurement of the controlled quantity's \emph{derivative} — the angular acceleration — or a clean enough sensor to differentiate;
+  \item a measurement or model of the actuator's state, synchronised with that measurement;
+  \item the control effectiveness, roughly;
+  \item actuators fast compared with the loop: if the motors lag, the increment arrives late, and the blind interval of Example~\ref{ex:indi-catch} grows.
+\end{itemize}
+It does not need a model of the vehicle's aerodynamics, mass distribution or damage. That is why it has become the standard inner loop of research on agile and damaged multicopters, and has flown on airliners.\innumbers{The angular acceleration of a quadrotor is a large, clean signal: hundreds of degrees per second squared. On an airliner it is a few degrees per second squared, and far harder to measure well.}
+
+\begin{example}[An aircraft that lost part of a wing's lift]
+\label{ex:indi-aircraft}
+A light aircraft rolls with its ailerons: $\dot p = L_\delta\,\delta + L_{rest}$, with the roll effectiveness $L_\delta = \SI{10}{s^{-2}}$ per radian of aileron. Ice on one wing produces an unknown rolling acceleration of \SI{0.5}{rad/s^2}. With INDI on the roll rate, what aileron does the law command?
+
+\textbf{Step 1 — before the ice.} Level flight, $\dot p_0 = 0$, aileron $\delta_0 = 0$.
+
+\textbf{Step 2 — the ice.} The aircraft starts to roll: the gyroscope's derivative shows $\dot p_0 = \SI{0.5}{rad/s^2}$ while the ailerons are still at $\delta_0 = 0$.
+
+\textbf{Step 3 — the increment.} With $\alpha_{des} = 0$: $\delta = \delta_0 + (0 - 0.5)/L_\delta = \SI{-0.05}{rad} = -2.9^\circ$.
+
+\textbf{Step 4 — the next sample.} The aileron now cancels the ice; $\dot p_0 = 0$ and $\delta_0 = -2.9^\circ$, so the law commands $\delta = \delta_0$: it holds the correction, without ever having known that there was ice. Neither the size of the ice's effect nor its cause entered the design.
+\end{example}
+
+\subsection{In formal terms}
+
+\begin{theorem}[The increment loop]
+\label{thm:indi-loop}
+Let the actuator respond to its command through $G(s)$ with $G(0) = 1$, let $\vec\tau_0$ and $\dot{\vec\omega}$ be measured through the same filter $F(s)$ with $F(0) = 1$, and let $\hat J = kJ$ with $k > 0$ (one axis, the cross-coupling neglected over the increment). Then the commanded torque obeys
+\begin{equation*}
+  \big(1 + (k - 1)\,F(s)G(s)\big)\,\tau = kJ\,\alpha_{des} - k\,F(s)\,\tau_d ,
+\end{equation*}
+where $\tau_d$ is the external disturbing torque. The increment loop is stable if $1 + (k - 1)FG$ has no zeros in the right half-plane; for $0 < k \le 1$ this holds whenever $|FG| \le 1$, and for $k > 1$ it holds while $k < 1 + 1/|FG(j\omega_{180})|$, where $FG$ reaches $-180^\circ$ at $\omega_{180}$. In the steady state, $\tau = J\alpha_{des} - \tau_d$: the disturbance is cancelled exactly, for every $k$ in the stable range.
+\end{theorem}
+\begin{proof}
+Insert $\tau_0 = G\tau$ (filtered: $FG\tau$) and $J\dot\omega = G\tau + \tau_d$ (filtered: $F(G\tau + \tau_d)$) into \cref{eq:indi-law} and collect the terms in $\tau$. The stability statements are the Nyquist criterion (Appendix~C) applied to the loop $(k - 1)FG$. At $s = 0$, $F = G = 1$: $k\tau = kJ\alpha_{des} - k\tau_d$.
+\end{proof}
+
+The theorem's neglected terms are the rate feedback through $\alpha_{des}$ and the coupling between the axes. Both are slow compared with the increment loop, which is why the simple edge of Example~\ref{ex:indi-effect} predicts the flights. A full analysis treats INDI as a nonlinear controller with a time-scale separation (Smeur, Chu and de Croon, 2016; \cref{thm:cascade-tikhonov}).
+
+\begin{lookahead}
+\begin{itemize}[leftmargin=1.2em]
+  \item The same increment one level up, on forces and accelerations, catches the lost lift and the wind: Lesson~II.8.
+  \item The filters on the two signals must agree, or the increment compares two different moments: Lesson~II.9.
+  \item With INDI below, an optimiser on top no longer needs an accurate model (Lesson~II.15); the arena of Lesson~II.21 measures how much that matters.
+  \item Losing a motor entirely is beyond any increment: Lesson~III.27 flies on three rotors, and III.28 detects the fault first. For aircraft, INDI returns in Part~IV with the pilot in the loop (IV.15).
+\end{itemize}
+\end{lookahead}
+
+\begin{remember}
+\begin{itemize}
+  \item Over a short increment the unknown torques do not change: $J(\dot\omega - \dot\omega_0) \approx \tau - \tau_0$.
+  \item INDI: $\tau = \tau_0 + \hat J(\alpha_{des} - \dot\omega_0)$. Everything unmodelled is inside the measured $\dot\omega_0$.
+  \item $\tau_0$ is the actuators' state (motor speeds), not their delivered torque; $\tau_0$ and $\dot\omega_0$ pass the same filter.
+  \item The broken prop: PID \SI{77}{cm} and $11^\circ$ of tilt; rate INDI \SI{21}{cm} (vertical) and $2.3^\circ$.
+  \item The only model is the control effectiveness; here it may be wrong by a factor of six or more.
+\end{itemize}
+\end{remember}
+
+\begin{curiosity}{A passenger jet that measures instead of modelling}
+\photo{phlab}{The Cessna Citation II \enquote{PH-LAB}, the laboratory aircraft of TU Delft and the Netherlands Aerospace Centre.}
+Fly-by-wire airliners keep their handling the same over a huge range of speeds, altitudes and weights by inverting a model of the aircraft: given the pilot's demanded pitch rate, compute the elevator that produces it. The models behind such laws fill thick reports, are built from wind-tunnel and flight tests, and must be revised whenever the aircraft changes.
+
+In 2018 researchers at Delft University of Technology flew a different kind of law on their laboratory jet, a Cessna Citation registered PH-LAB. It was incremental: it measured the angular accelerations the aircraft had, compared them with the ones the pilot wanted, and changed the control surfaces by the difference, with only a rough model of how strongly each surface acts. Test pilots flew it through manoeuvres and with deliberately disturbed controls, and found the handling indistinguishable from a model-based design that had taken far more work.
+
+The same group had developed INDI for small drones, where models are poor and damage is common. On a jet with passengers' seats it showed that measuring can replace modelling at full scale — provided the sensors are good and the actuators fast. Those two provisos are this chapter's next two lessons.
+\end{curiosity}
+
+\begin{exercises}
+\exercise[1] A prop of a hovering drone drops to 80\,\% efficiency. Find the roll angular acceleration at the first instant ($d = \SI{0.12}{m}$, $J = \SI{0.0082}{kg.m^2}$, \SI{2.45}{N} per motor).
+\answer{$0.2 \cdot 2.45 = \SI{0.49}{N}$; $0.12 \cdot 0.49/0.0082 = \SI{7.2}{rad/s^2}$.}
+\exercise[1] With the PID rate loop ($K_p = 18$) and the attitude loop ($K_{att} = 8$), what attitude error carries a steady demand of \SI{700}{\degree/s^2} before the integral has acted?
+\answer{$700/18 = \SI{39}{\degree/s}$, then $39/8 = 4.9^\circ$.}
+\exercise[1] In Example~\ref{ex:indi-catch}, how does the blind interval change if the motors lag by \SI{15}{ms} instead of 30? Estimate the new attitude error.
+\answer{About \SI{26}{ms}: rate error $14.3 \cdot 0.026 = \SI{0.37}{rad/s}$, angle $\approx 0.005 + 0.37 \cdot 0.05 = \SI{0.024}{rad} = 1.4^\circ$.}
+\exercise[2]\exkind{derive} Derive \cref{eq:indi-increment} for an axis with a rotor drag torque $-c\omega$, and state the condition on the sample time under which neglecting the change of $-c\omega$ is justified.
+\answer{$J\dot\omega = \tau - c\omega + \tau_r$; between two instants $J(\dot\omega - \dot\omega_0) = \tau - \tau_0 - c(\omega - \omega_0)$. The last term is $c\,\dot\omega\,\Delta t$ over a step $\Delta t$: negligible when $c\,\Delta t \ll J$, i.e. when the increment is short compared with the drag's time constant $J/c$.}
+\exercise[2]\exkind{derive} Compute $|FG|$ and $\angle FG$ at \SI{147}{rad/s} for the \SI{20}{Hz} second-order Butterworth filter and the \SI{30}{ms} motor lag, and confirm the edge $k \approx 8.7$ without the sampling delay.
+\answer{$\omega/\omega_f = 147/125.7 = 1.17$: $|F| = 1/\sqrt{1 + 1.17^4} = 0.59$, $\angle F = -\arctan\big(\sqrt2 \cdot 1.17/(1 - 1.37)\big) = -102^\circ$; $|G| = 1/\sqrt{1 + 4.41^2} = 0.22$, $\angle G = -77^\circ$. Together $0.13$ and $-179^\circ$: $k = 1 + 1/0.13 = 8.7$.}
+\exercise[2]\exkind{derive} In Example~\ref{ex:indi-aircraft} the believed effectiveness is $\hat L_\delta = 5$ instead of 10. What does the first increment command, and how does the aileron reach its final value?
+\answer{The first increment commands $-0.5/5 = -0.1$~rad, twice what is needed; the aircraft rolls the other way at \SI{0.5}{rad/s^2}, and the next increment takes $0.1$~rad back. Without any lag this would swing for ever ($k - 1 = 1$); with the filter and the actuator it is $k = 2$ in \cref{thm:indi-loop}, well inside the stable range, and the aileron settles at $-0.05$~rad.}
+\exercise[2]\exkind{fly} In Lesson~II.7 switch the motor telemetry off, so that $\tau_0$ comes from the model of the motors. Does rate INDI still catch the fault? Explain with the paragraph \enquote{Where $\vec\tau_0$ comes from}.
+\answer{Yes: the model, driven by the commands, also does not know the damage, so — like the telemetry — it reports a healthy motor's thrust, and the deficit shows up in $\dot\omega_0$. It works as long as the model's lag matches the real motors.}
+\exercise[2]\exkind{code} In \src{src/control/stages.ts}, \texttt{RateIndi.torque} computes $\dot\omega$ as the difference of two \emph{filtered} rates divided by $\Delta t$. Why is the filter applied before differencing rather than after, and does it matter for a linear filter?
+\answer{For a linear time-invariant filter, filtering and differencing commute: the result is the same. Filtering first keeps a single filter state per axis (the rate, not its noisy derivative) and makes the order obvious for the pair $\tau_0$, $\dot\omega$ that must share the filter.}
+\exercise[3]\exkind{derive} INDI as a disturbance observer. Show that $\hat\tau_d = J\dot\omega_{0,f} - \tau_{0,f}$ is an estimate of the external torque filtered by $F$, and rewrite \cref{eq:indi-law} with $k = 1$ as $\tau = J\alpha_{des} - \hat\tau_d$. Compare with the ADRC law of Lesson~II.5.
+\answer{$J\dot\omega = G\tau + \tau_d$, so $J\dot\omega_f - \tau_{0,f} = F(G\tau + \tau_d) - FG\tau = F\tau_d$. Then $\tau = \tau_{0,f} + J(\alpha_{des} - \dot\omega_f) = J\alpha_{des} - F\tau_d$. It is ADRC's \enquote{cancel the estimated disturbance}, with the observer replaced by a sensor and a filter: the estimate arrives after the filter's delay instead of after $5/\omega_o$.}
+\end{exercises}

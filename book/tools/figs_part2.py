@@ -389,3 +389,63 @@ def adrcbw_score():
     b.set_xlabel("$\\omega_o$  [rad/s]", loc="right")
     b.grid(True, which="major", axis="both")
     save(f, "adrcbw_score")
+
+
+# ─── Lesson II.7 ───────────────────────────────────────────────────────────
+def _poserr(d):
+    return np.sqrt((d["sp.x"] - d["pos.x"]) ** 2 + (d["sp.y"] - d["pos.y"]) ** 2 + (d["sp.z"] - d["pos.z"]) ** 2)
+
+
+@fig
+def indi_prop():
+    f, ax = plt.subplots(3, 1, figsize=(TEXT_W, 100 * MM), sharex=True, gridspec_kw=dict(hspace=0.35, height_ratios=[1.1, 1, 1.1]))
+    for tag, col, lab in (("pid", C["ghost"], "PID rate loop"), ("rate", C["meas"], "rate INDI")):
+        d = win(load(f"indi-prop-{tag}"), 11, 20)
+        ax[0].plot(d.t - 12, 100 * _poserr(d), color=col, lw=1.3 if tag == "pid" else 1.1, label=lab)
+        ax[1].plot(d.t - 12, d["roll"], color=col, lw=1.3 if tag == "pid" else 1.1)
+    ax[0].legend(loc="upper right")
+    ax[0].set_title("Position error after the prop of motor 2 loses 40 % of its thrust")
+    ax[0].set_ylabel("cm")
+    ax[1].set_title("Roll angle")
+    ax[1].set_ylabel("degrees")
+    d = win(load("indi-prop-rate"), 11, 20)
+    for key, col, lab in (("held", C["I"], "$\\tau_0/\\hat J$: the motors now"), ("want", C["P"], "$\\alpha_{des}$"),
+                          ("have", C["D"], "$-\\dot\\omega$: measured")):
+        ax[2].plot(d.t - 12, d[f"rate.roll.part.{key}"], color=col, lw=1.0, label=lab)
+    ax[2].legend(loc="lower right", ncol=3, fontsize=6.2)
+    ax[2].set_title("The three parts of the INDI command, roll axis")
+    ax[2].set_ylabel("deg/s²")
+    ax[2].set_xlim(-0.5, 4)
+    xlab_time(ax[2], "time after the fault  [s]")
+    save(f, "indi_prop")
+
+
+@fig
+def indi_effect():
+    f, (a, b) = plt.subplots(1, 2, figsize=(TEXT_W, 58 * MM), gridspec_kw=dict(wspace=0.3, width_ratios=[1.3, 1]))
+    for k, col in (("8", C["err"]), ("0.5", C["FF"]), ("2", C["meas"]), ("6", C["I"])):
+        d = win(load(f"indi-prop-inertia{k}"), 11.5, 14)
+        a.plot(d.t - 12, d["motor.1"], color=col, lw=0.4 if k == "8" else 1.0, alpha=0.45 if k == "8" else 1.0,
+               label=f"$\\hat J = {k}\\,J$", zorder=1 if k == "8" else 3)
+    a.legend(loc="upper left", ncol=2, fontsize=6.2)
+    a.set_title("Thrust of motor 1 around the fault")
+    a.set_ylabel("N")
+    a.set_xlim(-0.5, 2)
+    xlab_time(a, "time after the fault  [s]")
+    wf, tau = 2 * np.pi * 20, 0.03
+    w = np.geomspace(10, 1000, 400)
+    FG = (wf**2 / ((1j * w) ** 2 + np.sqrt(2) * wf * 1j * w + wf**2)) / (tau * 1j * w + 1) * np.exp(-1j * w * 0.001)
+    ph = np.degrees(np.unwrap(np.angle(FG)))
+    b.semilogx(w, 1 / abs(FG) + 1, color=C["ink"], lw=1.0)
+    k180 = np.interp(-180, ph[::-1], (1 / abs(FG) + 1)[::-1])
+    b.axhline(k180, color=C["err"], lw=0.7, ls=(0, (4, 2.5)))
+    b.text(12, k180 * 1.12, f"edge: $\\hat J/J \\approx {k180:.1f}$", fontsize=6.4, color=C["err"])
+    for k, ok in ((0.5, True), (2, True), (3, True), (4, True), (6, True), (8, False), (12, False)):
+        b.plot(600, k, "o" if ok else "x", color=C["I"] if ok else C["err"], ms=3.5, mew=1.2)
+    b.text(250, 14, "flown", fontsize=6.2, color=C["muted"])
+    b.set_yscale("log")
+    b.set_ylim(0.4, 30)
+    b.set_title("$1 + 1/|F G|$")
+    b.set_xlabel("$\\omega$  [rad/s]", loc="right")
+    b.grid(True, which="major", axis="both")
+    save(f, "indi_effect")

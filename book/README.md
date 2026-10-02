@@ -15,9 +15,9 @@ make book           # LuaLaTeX, two passes → book/anemostatos.pdf
 ```
 
 It needs a TeX distribution with LuaLaTeX and the Libertinus and Fira
-fonts (TeX Live has both). The build takes about ten seconds per pass. The
-figures, screenshots and photographs are committed, so nothing else has to
-run first.
+fonts (TeX Live has both). The build takes about forty-five seconds per
+pass. The figures, screenshots and photographs are committed, so nothing
+else has to run first.
 
 ## Regenerate the material
 

@@ -1,8 +1,10 @@
 # The Curriculum
 
-> **Status (2026-09-30):** Parts I and II are implemented in the app. Part I
-> is written in the book. Parts III–V are planned. This document is the
-> map of the whole programme; the part plans hold the detail.
+> **Status (2026-10-02):** Parts I–III are implemented in the app and Part IV
+> is under way (19 of 29 lessons). Parts I and II, volume 1 of the book, are
+> written; its back matter is being finished (§5.3). Part V is planned.
+> This document is the map of the whole programme; the part plans hold the
+> detail.
 
 Anemostatos is one course in two forms: the simulator, and the book
 _Anemostatos_. This page says what the course is meant to teach, what it covers
@@ -32,13 +34,13 @@ Three principles hold throughout:
 
 ## 2. The five parts
 
-| Part                         | Lessons      | Vehicles                               | App                           | Book              | Plan                                 |
-| ---------------------------- | ------------ | -------------------------------------- | ----------------------------- | ----------------- | ------------------------------------ |
-| I. The PID controller        | I.1–I.14     | Quadrotor, levels L1–L3                | done (M0–M6)                  | written; see §5   | [roadmap.md](roadmap.md)             |
-| II. Beyond PID               | II.1–II.21   | Quadrotor                              | done (M7–M12)                 | II.1–II.5 written | [beyond-pid.md](beyond-pid.md)       |
-| III. Why it works            | III.1–III.30 | Quadrotor                              | done (M13–M18)                | not written       | [analysis.md](analysis.md)           |
-| IV. Aerospace GNC            | IV.1–IV.29   | Quadrotor, rocket, aircraft, satellite | 19 of 29 (M19, M20, M22 done) | not written       | [aerospace-gnc.md](aerospace-gnc.md) |
-| V. From whiteboard to flight | V.1–V.6      | All                                    | planned (M26)                 | not written       | [aerospace-gnc.md](aerospace-gnc.md) |
+| Part                         | Lessons      | Vehicles                               | App                           | Book            | Plan                                 |
+| ---------------------------- | ------------ | -------------------------------------- | ----------------------------- | --------------- | ------------------------------------ |
+| I. The PID controller        | I.1–I.14     | Quadrotor, levels L1–L3                | done (M0–M6)                  | written; see §5 | [roadmap.md](roadmap.md)             |
+| II. Beyond PID               | II.1–II.21   | Quadrotor                              | done (M7–M12)                 | written; see §5 | [beyond-pid.md](beyond-pid.md)       |
+| III. Why it works            | III.1–III.30 | Quadrotor                              | done (M13–M18)                | not written     | [analysis.md](analysis.md)           |
+| IV. Aerospace GNC            | IV.1–IV.29   | Quadrotor, rocket, aircraft, satellite | 19 of 29 (M19, M20, M22 done) | not written     | [aerospace-gnc.md](aerospace-gnc.md) |
+| V. From whiteboard to flight | V.1–V.6      | All                                    | planned (M26)                 | not written     | [aerospace-gnc.md](aerospace-gnc.md) |
 
 One hundred lessons. Eighty-four exist in the app today: Parts I–III complete, Part IV begun.
 
@@ -59,36 +61,36 @@ teaches each item. "App" says whether the lessons exist in the simulator.
 
 | Area                          | Topics                                                                                           | Lessons                           | App     |
 | ----------------------------- | ------------------------------------------------------------------------------------------------ | --------------------------------- | ------- |
-| Feedback fundamentals         | Open and closed loop, error, disturbance rejection, sensitivity to model error                   | 1–5                               | done    |
-| PID in practice               | Windup, derivative kick, noise and filtering, sampling, delay, actuator lag, tuning              | 6–11                              | done    |
-| Cascaded loops                | Time-scale separation, inner and outer loops, mixing                                             | 12–14                             | done    |
-| Classical analysis            | Transfer functions, Bode, Nyquist, root locus, Routh–Hurwitz, margins, system type               | III.1–III.4                       | planned |
-| Fundamental limits            | Bode integral, delay, right-half-plane zeros and poles                                           | III.4, III.5, IV.7, IV.10         | planned |
-| Loop shaping                  | Lead, lag, notch, target loop shapes                                                             | III.6                             | planned |
+| Feedback fundamentals         | Open and closed loop, error, disturbance rejection, sensitivity to model error                   | I.1–I.5                           | done    |
+| PID in practice               | Windup, derivative kick, noise and filtering, sampling, delay, actuator lag, tuning              | I.6–I.11                          | done    |
+| Cascaded loops                | Time-scale separation, inner and outer loops, mixing                                             | I.12–I.14                         | done    |
+| Classical analysis            | Transfer functions, Bode, Nyquist, root locus, Routh–Hurwitz, margins, system type               | III.1–III.4                       | done    |
+| Fundamental limits            | Bode integral, delay, right-half-plane zeros and poles                                           | III.4, III.5, IV.7, IV.10         | done    |
+| Loop shaping                  | Lead, lag, notch, target loop shapes                                                             | III.6                             | done    |
 | State space                   | State feedback, integral action, pole placement                                                  | II.1–II.3                         | done    |
-| Optimal control, linear       | LQR, LQI, LQG, loop-transfer recovery                                                            | II.2, II.3, III.10                | partly  |
-| Optimal control, theory       | Calculus of variations, Pontryagin, bang-bang, dynamic programming, HJB                          | IV.1–IV.4                         | planned |
+| Optimal control, linear       | LQR, LQI, LQG, loop-transfer recovery                                                            | II.2, II.3, III.10                | done    |
+| Optimal control, theory       | Calculus of variations, Pontryagin, bang-bang, dynamic programming, HJB                          | IV.1–IV.4                         | done    |
 | Trajectory optimisation       | Minimum snap, direct collocation, convex powered-descent guidance                                | II.12, IV.5, IV.6                 | partly  |
 | Predictive control            | QP, linear MPC, sampling-based MPC, constraints                                                  | II.13–II.16                       | done    |
 | Safety filters                | Control barrier functions, envelope protection                                                   | II.17, V.5                        | partly  |
-| Estimation, linear            | Kalman filter, observability, detectability, separation                                          | II.4, III.9                       | partly  |
+| Estimation, linear            | Kalman filter, observability, detectability, separation                                          | II.4, III.9                       | done    |
 | Estimation, nonlinear         | Complementary and Mahony filters, EKF, multiplicative EKF, UKF, particle filter, smoothing       | III.22–III.24, IV.22, IV.27–IV.29 | partly  |
 | Disturbance observers         | ADRC, extended state observer, incremental control (INDI)                                        | II.5–II.9                         | done    |
-| Nonlinear stability           | Lyapunov, LaSalle, region of attraction, describing functions, circle criterion                  | III.7, III.8                      | planned |
+| Nonlinear stability           | Lyapunov, LaSalle, region of attraction, describing functions, circle criterion                  | III.7, III.8                      | done    |
 | Nonlinear design              | Dynamic inversion, geometric control on SO(3), differential flatness, sliding mode, backstepping | II.7–II.12, III.15, III.16, IV.15 | partly  |
-| Robust control                | Uncertainty models, small gain, singular values, disk margins, H∞ loop shaping, μ analysis       | III.11–III.14                     | partly  |
-| Adaptive control              | MRAC, robust modifications, L1 adaptive control                                                  | II.18, III.17                     | partly  |
+| Robust control                | Uncertainty models, small gain, singular values, disk margins, H∞ loop shaping, μ analysis       | III.11–III.14                     | done    |
+| Adaptive control              | MRAC, robust modifications, L1 adaptive control                                                  | II.18, III.17                     | done    |
 | Learning-based control        | Learned residual models, neural-network policies, reinforcement learning                         | II.19–II.21                       | done    |
-| Digital implementation        | Sampling, z-plane, aliasing, quantisation, rate limits, jitter, fixed-point code                 | 9, III.18–III.20, V.3             | partly  |
-| Filtering of real sensors     | Vibration, notch and RPM-tracking filters, anti-alias filters                                    | 8, III.20, III.21                 | partly  |
-| System identification         | Least squares, relay tuning, frequency-domain identification with coherence                      | III.25, III.26                    | planned |
+| Digital implementation        | Sampling, z-plane, aliasing, quantisation, rate limits, jitter, fixed-point code                 | I.9, III.18–III.20, V.3           | partly  |
+| Filtering of real sensors     | Vibration, notch and RPM-tracking filters, anti-alias filters                                    | I.8, III.20, III.21               | done    |
+| System identification         | Least squares, relay tuning, frequency-domain identification with coherence                      | III.25, III.26                    | done    |
 | Fault detection and tolerance | Residual tests, redundancy and voting, control after actuator loss                               | II.7, III.27, III.28, V.4         | partly  |
 | Verification                  | Monte Carlo campaigns, pass rates with confidence, worst cases, requirements and budgets         | III.29, III.30, V.1, V.2, V.6     | partly  |
-| Flight dynamics               | Trim, linearisation, longitudinal modes, stability augmentation, handling qualities              | IV.11, IV.12                      | planned |
-| Gain scheduling               | Point designs, interpolation, hidden coupling                                                    | IV.13, IV.14                      | planned |
-| Launch vehicles               | Thrust-vector control, conditional stability, bending, slosh                                     | IV.7–IV.10                        | planned |
-| Spacecraft attitude           | Quaternion feedback, reaction wheels, momentum management, thrusters, flexible appendages        | IV.18–IV.23                       | planned |
-| Guidance and navigation       | Proportional navigation, relative orbital motion, inertial navigation                            | IV.24–IV.26                       | planned |
+| Flight dynamics               | Trim, linearisation, longitudinal modes, stability augmentation, handling qualities              | IV.11, IV.12                      | done    |
+| Gain scheduling               | Point designs, interpolation, hidden coupling                                                    | IV.13, IV.14                      | partly  |
+| Launch vehicles               | Thrust-vector control, conditional stability, bending, slosh                                     | IV.7–IV.10                        | done    |
+| Spacecraft attitude           | Quaternion feedback, reaction wheels, momentum management, thrusters, flexible appendages        | IV.18–IV.23                       | partly  |
+| Guidance and navigation       | Proportional navigation, relative orbital motion, inertial navigation                            | IV.24–IV.26                       | partly  |
 | Engineering practice          | Mode logic, bumpless transfer, standards, the design review                                      | V.5, V.6                          | planned |
 
 Left out on purpose, with the reason in the part plans: multi-agent and
@@ -148,8 +150,8 @@ chapter that needs a new symbol adds it to that table.
 
 | Volume | Parts | Title                                                    | State                                   |
 | ------ | ----- | -------------------------------------------------------- | --------------------------------------- |
-| 1      | I–II  | _Anemostatos_ — from PID to learning                     | Part I written, Part II not yet         |
-| 2      | III   | analysis, robustness and the real loop                   | after the app's Part III                |
+| 1      | I–II  | _Anemostatos_ — from PID to learning                     | written; back matter being finished     |
+| 2      | III   | analysis, robustness and the real loop                   | not begun; the app's Part III is done   |
 | 3      | IV–V  | aerospace guidance, navigation and control, and practice | after the app's Parts IV–V              |
 | —      | all   | solutions to the exercises                               | collected by `\answer` during the build |
 
@@ -181,56 +183,83 @@ and completes the subject, and otherwise with the volume that needs it.
 | F        | Numerical methods                                                                   | lesson I.1   | 1      | collocation (IV.6), fixed point (V.3)     |
 | G        | Stability of nonlinear systems: Lyapunov, invariance, time scales                   | lesson I.2   | 1      | describing function (III.8)               |
 | H        | Rotations and quaternions                                                           | lesson I.12  | 1      | the error state of the MEKF (III.23)      |
-| I        | Linear algebra: singular values, positive definiteness, the Riccati equation        | II.2         | 1      | — (written with Part II)                  |
-| J        | Optimisation: convexity, KKT conditions, quadratic and cone programs                | II.13        | 1      | — (written with Part II)                  |
+| I        | Linear algebra: singular values, positive definiteness, the Riccati equation        | II.2         | 1      | —                                         |
+| J        | Optimisation: convexity, KKT conditions, quadratic and cone programs                | II.13        | 1      | —                                         |
 | K        | Norms of signals and systems                                                        | III.11       | 2      | —                                         |
 | L        | Calculus of variations and dynamic programming                                      | IV.1         | 3      | —                                         |
 
-### 5.3 State of volume 1, verified 2026-09-30
+### 5.3 State of volume 1, verified 2026-10-02
 
-First checked on the build of commit `8e1df9c` (127 pages): the sources,
-the build log and the rendered pages. Lessons I.1–I.4 were then rebuilt to the
-full standard of §4, and lessons I.5–I.14 after them; Part I is complete and
-the book now has 288 pages with the toolbox.
+Checked on the build of commit `84078df`: the sources, the build log, the
+rendered pages and `book/tools/check_margins.py`. The book has 535 pages
+(i–xi, then 1–524): Chapter 0 and the Prelude, Part I on pages 19–201,
+Part II on pages 202–415, the toolbox on pages 416–511, then the
+references, photo credits and colophon. The first check, on commit
+`8e1df9c`, found 127 pages and Part I below the standard.
 
-**What is good.** The design system is consistent and carries the app's
-colours. Chapter 0 and the Prelude are complete. Lessons I.1–I.4 meet the
-whole standard of §4 and are the model for the rest: five or six worked
-examples and eleven to thirteen exercises each (labelled `derive`, `fly`,
-`code`), a figure that draws each prediction over the simulator's flight,
-an engineer's-view section with twelve theorems between them, stated with
-hypotheses and proofs or sources, and a where-this-leads box. Every number they
-quote from the simulator comes from an experiment in
-`scripts/book-data.ts`. The book builds from a clean checkout in
-eleven seconds.
+**What is good.** All thirty-five lessons are written: I.1–I.14, and
+II.1–II.21 in the five chapters A–E of Part II. Every lesson meets the list
+of §4: at least three worked examples (164 in all), at least eight
+exercises (335, every one with an `\answer`), each lesson with at least one
+`derive`, one `fly` and one `code` exercise, an _In Anemostatos_ box, a
+_Try this_ experiment, an _Out in the World_ page, an engineer's view
+ending in _In formal terms_ (76 theorems across the two parts), a
+where-this-leads box and a figure from the simulator's flights. Every
+number quoted from the simulator comes from an experiment in
+`scripts/book-data.ts`. The toolbox has all ten appendices of volume 1,
+A–J, and the PDF has no "??" left and no undefined reference. Every
+chapter from Chapter 0 to II.21, and the toolbox's opener and appendices
+A–H, open with a quotation kept in `book/front/quotes.tex`, each checked
+against its source. The front matter is new since the first check: a
+black cover with an emblem of a feedback loop standing in the wind, a page
+that explains the name, a technical preface on how the book is built and
+how it goes with the simulator, and a Chapter 0 that opens with the story
+of Ingenuity on Mars. `check_margins.py` reports, besides colliding margin
+notes, any text, drawing or image below the foot of the text block; on
+this build it reports nothing (299 notes). The build takes about ninety
+seconds for its two passes.
 
 **What is missing or wrong.**
 
-| #   | Finding                                                                                                                                                                                                                                     | State                                                   |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| 1   | Lessons I.5–I.14 had no worked example and three to five exercises each, over five to seven pages. They did not meet §4.                                                                                                                    | fixed (rewritten to the level of 1–4)                   |
-| 2   | Part II is a title page followed by nothing; its five chapter files are stubs. The cover promises thirty-five lessons.                                                                                                                      | open: 21 chapters to write                              |
-| 3   | The mathematical toolbox and the app map were stubs. Appendices A–H are written (about 80 pages, `book/back/toolbox/`); I and J follow with Part II, and the app map is still a stub. The remaining "??" are references to Part II lessons. | open: appendices I, J and the app map                   |
-| 4   | The check marks of the _What to remember_ boxes were missing: the math font has no such glyph.                                                                                                                                              | fixed (drawn with TikZ)                                 |
-| 5   | `main.tex` and `scripts/book-data.ts` referred to `make book`, `make book-data` and `book/README.md`, none of which existed.                                                                                                                | fixed (three make targets, the README)                  |
-| 6   | The imprint named a script `book/tools/figures` that does not exist.                                                                                                                                                                        | fixed                                                   |
-| 7   | No author, editor or credit anywhere in the book.                                                                                                                                                                                           | fixed (title page, imprint, colophon)                   |
-| 8   | The field map of Chapter 0 listed Bode, Nyquist, root locus, Lyapunov, Pontryagin, dynamic programming and H∞ against Parts I–II, which do not teach them.                                                                                  | fixed (the map names the part that does)                |
-| 9   | Chapter 0 and the preface described a two-part course.                                                                                                                                                                                      | fixed (they describe the five parts)                    |
-| 10  | Four lines were too wide by 3–11 pt (lessons I.2 and I.4, the motor figure).                                                                                                                                                                | fixed in lessons I.1–I.4; three lines under 3 pt remain |
+| #   | Finding                                                                                                                                                                                                                                        | State                                      |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| 1   | Lessons I.5–I.14 had no worked example and three to five exercises each, over five to seven pages. They did not meet §4.                                                                                                                       | fixed (rewritten to the level of I.1–I.4)  |
+| 2   | Part II was a title page followed by nothing; its five chapter files were stubs, while the title page promises thirty-five lessons.                                                                                                            | fixed (II.1–II.21, chapters A–E)           |
+| 3   | The mathematical toolbox and the app map were stubs.                                                                                                                                                                                           | toolbox fixed (A–J, 96 pages); app map: 15 |
+| 4   | The check marks of the _What to remember_ boxes were missing: the math font has no such glyph.                                                                                                                                                 | fixed (drawn with TikZ)                    |
+| 5   | `main.tex` and `scripts/book-data.ts` referred to `make book`, `make book-data` and `book/README.md`, none of which existed.                                                                                                                   | fixed (three make targets, the README)     |
+| 6   | The imprint named a script `book/tools/figures` that does not exist.                                                                                                                                                                           | fixed                                      |
+| 7   | No author, editor or credit anywhere in the book.                                                                                                                                                                                              | fixed (title page, imprint, colophon)      |
+| 8   | The field map of Chapter 0 listed Bode, Nyquist, root locus, Lyapunov, Pontryagin, dynamic programming and H∞ against Parts I–II, which do not teach them.                                                                                     | fixed (the map names the part that does)   |
+| 9   | Chapter 0 and the preface described a two-part course.                                                                                                                                                                                         | fixed (they describe the five parts)       |
+| 10  | Lines too wide. Now four: lesson I.11 by 9.7 pt (a paragraph), I.12 by 4.8 pt (the chain equation), II.2 by 3.7 pt (a list item), the contents by 1.3 pt.                                                                                      | open                                       |
+| 11  | Chapters opened without a quotation.                                                                                                                                                                                                           | fixed, except appendices I and J           |
+| 12  | Margin notes, margin figures and boxes ran below the foot of the page after the quotations and the new Chapter 0 moved them; nothing checked for it.                                                                                           | fixed (`check_margins.py` checks the foot) |
+| 13  | MPPI shifted its warm start one step per re-plan, 2.5 times faster than time. Fixed in `src/control/mppi.ts`; the MPPI flights of II.16 and II.21 re-flown, their figures and numbers updated. The ranking and the conclusions did not change. | fixed                                      |
+| 14  | The answers to the 335 exercises are collected into `build/main.ans` and printed nowhere; `book/back/answers.tex` is a stub. When they are printed, §4 and §5.1, which send the solutions to a companion volume, change with them.             | open: answers appendix, in progress        |
+| 15  | The app map (`book/back/appmap.tex`) is a stub and prints nothing.                                                                                                                                                                             | open: in progress                          |
+| 16  | No index.                                                                                                                                                                                                                                      | open: in progress                          |
+| 17  | No back cover.                                                                                                                                                                                                                                 | open: in progress                          |
+| 18  | Underfull pages in lessons II.15–II.20.                                                                                                                                                                                                        | open: in progress                          |
+| 19  | Lesson II.21 has no screenshot of the app; the screenshot of II.16 dates from before the MPPI fix (finding 13).                                                                                                                                | open: in progress                          |
+| 20  | Lessons I.5 and I.11 show no screenshot, although `book/screens/integral.jpg` and `challenge.jpg` are committed.                                                                                                                               | open                                       |
+| 21  | After the two passes of `make book` the log still asks for a rerun ("Label(s) may have changed"), and the count it prints of "lines that mention undefined references" counts font-shape warnings: there is no undefined reference.            | open                                       |
 
-Findings 1–3 are writing work and belong to the book's own schedule.
+Findings 14–19 are being done now and are marked fixed as they are merged.
 
 ## 6. Order of work
 
 1. **M13 and the must lessons of Part III** in the app
    ([analysis.md](analysis.md) §5). Everything later uses its charts and
-   its Monte Carlo runner.
+   its Monte Carlo runner. Done.
 2. **Volume 1 of the book to the standard of §4**: lessons I.5–I.14, Part II,
-   appendices A–J (A–H first, I and J with Part II).
-3. **The rest of Part III**, then volume 2.
+   appendices A–J (A–H first, I and J with Part II). Written; the back
+   matter is being finished (§5.3).
+3. **The rest of Part III**, then volume 2. The app's part is done; volume
+   2 is not begun.
 4. **M19, the vehicle abstraction**, then the must lessons of Part IV,
-   then Part V ([aerospace-gnc.md](aerospace-gnc.md) §5).
+   then Part V ([aerospace-gnc.md](aerospace-gnc.md) §5). Under way: M19,
+   M20 and M22 are done, M23–M25 begun.
 5. **The rest of Part IV**, then volume 3.
 
 Steps 1 and 2 are independent and can run side by side.

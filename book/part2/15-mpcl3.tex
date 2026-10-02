@@ -102,8 +102,6 @@ Explain why, between \SI{14}{s} and \SI{19}{s}, the drones with INDI leave the p
 
 The planner of this lesson cannot see the problem coming. Its constraints are fixed numbers: \SI{6.87}{m/s^2} sideways whatever the wind. In the gust the real budget shrinks, because part of the thrust is spent against the disturbance, and the planner keeps planning with the old one. A planner that knew the disturbance, the one INDI measures, could subtract it from its limits and plan a path that is still feasible. That is the step from this linear point-mass MPC to the nonlinear MPC of the racing literature.
 
-\screen[0 0 495 998]{mpcl3}{Lesson II.15 in the app at $t = \SI{20}{s}$, MPC alone. The error chart (bottom left) still shows the excursion left by the gusts around \SI{16}{s}; the wind chart (bottom right) shows them. The information card lists what the planned figure-8 needs: \SI{2.96}{m/s}, \SI{4.66}{m/s^2}, a tilt of \SI{25}{\degree} against the \SI{35}{\degree} limit.}{fig:mpcl3-screen}
-
 \begin{inapp}
 \begin{itemize}[leftmargin=1.2em]
   \item The outer stage is \ui{Controller\then Outer stage\then MPC} (\param{control.l3.outer = 'mpc'}); INDI is \param{control.l3.inner = 'indi'} and \param{control.l3.compensation = 'indi'}. The MPC's weights and horizon are \param{control.mpc.*}, the limits \param{control.l3.maxTiltDeg}, \param{vMaxH} and \param{vMaxV}.
@@ -111,6 +109,8 @@ The planner of this lesson cannot see the problem coming. Its constraints are fi
   \item The four flights are the experiments \texttt{mpcl3-*} in \src{scripts/book-data.ts}.
 \end{itemize}
 \end{inapp}
+
+\screen[0 0 495 998]{mpcl3}{Lesson II.15 in the app at $t = \SI{20}{s}$, MPC alone. The error chart (bottom left) still shows the excursion left by the gusts around \SI{16}{s}; the wind chart (bottom right) shows them. The information card lists what the planned figure-8 needs: \SI{2.96}{m/s}, \SI{4.66}{m/s^2}, a tilt of \SI{25}{\degree} against the \SI{35}{\degree} limit.}{fig:mpcl3-screen}
 
 \begin{trythis}
 \begin{enumerate}
@@ -124,7 +124,7 @@ The planner of this lesson cannot see the problem coming. Its constraints are fi
 \section{The engineer's view: hierarchies}
 
 \subsection{Layers that run at different speeds}
-Every serious control system is a stack. In a refinery, an economic optimiser sets the plant's targets, an MPC moves the set-points of the regulatory loops, and those PID loops move the valves, each layer acting less often and looking further ahead than the one below it (Qin and Badgwell, 2003). In an airliner, the flight management system plans the route, the autopilot holds the path, and the fly-by-wire laws turn the pilot's or autopilot's demand into surface deflections. Each layer works on a simplified model of everything below it and trusts the layer below to make that model true. The design question is always the same: is the inner layer fast and faithful enough for the outer one's model to hold?\didyouknow{Lesson~I.13 met the rule of thumb for cascades: each loop several times faster than the one around it. A hierarchy of optimisers obeys the same rule.}
+Every serious control system is a stack. In a refinery, an economic optimiser sets the plant's targets, an MPC moves the set-points of the regulatory loops, and those PID loops move the valves, each layer acting less often and looking further ahead than the one below (Qin and Badgwell, 2003). In an airliner, the flight management system plans the route, the autopilot holds the path, and the fly-by-wire laws turn the pilot's or autopilot's demand into surface deflections. Each layer works on a simplified model of everything below it and trusts the layer below to make it true. The design question never changes: is the inner layer fast and faithful enough for the outer one's model to hold?\didyouknow{Lesson~I.13 met the rule of thumb for cascades: each loop several times faster than the one around it. A hierarchy of optimisers obeys the same rule.}
 
 \begin{example}[An aircraft's turn budget]
 \label{ex:mpcl3-aircraft}

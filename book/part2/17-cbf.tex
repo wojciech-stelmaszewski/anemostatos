@@ -118,8 +118,6 @@ Compare the lesson's flight for $\gamma = 1$, $2.5$ and \SI{4}{1/s} (\cref{fig:c
 
 \simfig{cbf_barrier}{Left: the barrier $h$ after the filter wakes, pillar on the line of flight. Dashed: the critically damped solution of \cref{eq:cbf-cond} with equality, from the state at waking. The flight runs slightly ahead while the drone tilts back to brake. Right: distance to the pillar's surface during one swing of the lesson. Without the filter (grey) the drone passes through twice, \SI{45}{cm} deep. With the filter it never goes below zero; with $\gamma = 2.5$ and $4$ it dips a few centimetres into the margin (shaded).}{fig:cbf-barrier}
 
-\screen[0 0 495 998]{cbf}{Lesson II.17 in the app with the filter on, at $t = \SI{13.2}{s}$, while the drone slides round the pillar. The red arrow at the drone is the filter's correction. The position-$x$ chart shows the measured $x$ falling behind the set-point near the pillar. The selector \ui{Safety filter} is at the bottom of the controller panel.}{fig:cbf-screen}
-
 \begin{inapp}
 \begin{itemize}[leftmargin=1.2em]
   \item The switch is \ui{Controller\then Safety filter\then control barrier function} (\param{control.l3.safety = 'cbf'}). The rate and the margin are \param{control.cbf.gamma} and \param{control.cbf.margin}. The pillar is \param{world.pillar}, \param{pillarX}, \param{pillarZ}, \param{pillarR}, and a ceiling (\param{world.ceiling}) adds a second constraint.
@@ -127,6 +125,8 @@ Compare the lesson's flight for $\gamma = 1$, $2.5$ and \SI{4}{1/s} (\cref{fig:c
   \item In \src{src/control/cascade.ts} the filter sits after the outer stage (geometric, MPC or MPPI) and before the disturbance compensation and the tilt limit. The correction is logged as \param{cbf.dx}, \param{cbf.dz}, and \param{cbf.active} counts the active rows.
 \end{itemize}
 \end{inapp}
+
+\screen[0 0 495 998]{cbf}{Lesson II.17 in the app with the filter on, at $t = \SI{13.2}{s}$, while the drone slides round the pillar. The red arrow at the drone is the filter's correction. The position-$x$ chart shows the measured $x$ falling behind the set-point near the pillar. The selector \ui{Safety filter} is at the bottom of the controller panel.}{fig:cbf-screen}
 
 \begin{trythis}
 \begin{enumerate}

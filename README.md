@@ -171,6 +171,18 @@ motor lag.
 | III.29 | One flight proves nothing     | L3    | Monte Carlo: 300 dispersed flights, the failing corner, a pass rate with confidence                     |
 | III.30 | The robustness report card    | L1–L3 | margins, Monte Carlo and RMS for every controller: fast is not robust                                   |
 
+**Part IV — Aerospace GNC** (being built)
+
+| #     | Lesson                         | Level  | What you learn                                                                                                     |
+| ----- | ------------------------------ | ------ | ------------------------------------------------------------------------------------------------------------------ |
+| IV.1  | Where LQR comes from           | L1     | the maximum principle: the costate λ = Px, u = −R⁻¹Bᵀλ at every sample, predicted at a step                        |
+| IV.2  | Full throttle, then full brake | L1     | bang-bang: one switch on the braking curve, the minimum time t*, and a lead for the motors                         |
+| IV.3  | The map of all futures         | L1     | dynamic programming: the value function as a map; exactly xᵀPx until the motors saturate                           |
+| IV.4  | Land on the last drop          | rocket | fall, then full thrust: the suicide burn, its ignition altitude, and propellant that burns away                    |
+| IV.24 | Aim where it will be           | L3     | pure pursuit tail-chases; proportional navigation keeps the line of sight still and hits a weaving target          |
+| IV.26 | Drift                          | L3     | an unaided inertial navigator: a gyro bias of 0.05 °/s is 38 m after 30 s, as g·b·t³/6 predicts                    |
+| IV.27 | When the tangent lies          | L3     | one range beacon: the EKF is confidently wrong, the UKF honestly unsure; a good NIS does not prove a good estimate |
+
 ## Run it
 
 The simulator runs locally in the browser. It needs Node.js ≥ 20 and a

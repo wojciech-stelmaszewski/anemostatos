@@ -1,7 +1,9 @@
 # Parts IV and V — Aerospace GNC and Engineering Practice
 
-> **Status (2026-09-30):** planned, nothing implemented. Milestones M19–M26
-> in [roadmap.md](roadmap.md) point here. Part IV depends on Part III
+> **Status (2026-10-02):** M19 (the vehicle abstraction) and M20 (IV.1–IV.4)
+> are built, and three lessons of M25 (IV.24, IV.26, IV.27); §5 lists what was
+> built and where it differs from this plan. The rest is planned. Milestones
+> M19–M26 in [roadmap.md](roadmap.md) point here. Part IV depends on Part III
 > ([analysis.md](analysis.md)): its lessons use the Bode, Nyquist, pole,
 > dispersion and covariance views built there.
 
@@ -380,6 +382,79 @@ meet at work.
 | M24       | Chapter N: satellite, wheels, thrusters, flexible panel, star-tracker filter — IV.18–IV.23                |
 | M25       | Chapter O: guidance laws, relative motion, INS, UKF, particle filter, smoother — IV.24–IV.29              |
 | M26       | Part V: requirement tables, campaign reports, fixed-point controller, voter, mode logic — V.1–V.6         |
+
+### Built (2026-10-02, by three parallel agents)
+
+**M19 — the vehicle abstraction.**
+
+- `sim/vehicles/types.ts`: `Vehicle<S, U>` with `initial`, `step`, state and
+  input names, vector conversion and `trim`. `linearize` is not a method: it
+  is generic (`analysis/linearize.ts`, central differences of the vehicle's
+  own step around its trim), and sensors stay in `sim/sensors.ts`, so the
+  interface has no `measure`.
+- `sim/dynamics.ts` moved unchanged to `sim/vehicles/quadrotor.ts` (the old
+  file re-exports it). The simulator still calls the quadrotor's step
+  directly, which keeps `tests/fixtures/baseline.json` bit for bit
+  identical (same checksum before and after). Its trim and linearisation
+  cover the L1 vertical state (y, v, T) and match the analytic plant of
+  Part III to 1e-8; L3 trim is not built.
+- `sim/atmosphere.ts`: ISA to 20 km (ρ₀ 1.225 kg/m³, a₀ 340.29 m/s,
+  ρ(11 km) 0.3639 kg/m³); not used yet.
+- `sim/vehicles/rocket.ts`: the 1D rocket (variable mass, thrust off or in
+  [Tmin, Tmax], ṁ = −T/(Isp·g₀), touchdown against 1 m/s), selected by
+  `sim.vehicle`; the simulator integrates it and mirrors its state into the
+  drone's, so the scene, camera and charts follow. This suits 1D and planar
+  vehicles; a full 3D aircraft or satellite will want its own scene pose.
+  A procedural lander and landing pad in the scene.
+
+**M20 — Chapter K (IV.1–IV.4).**
+
+- IV.1: the LQR design returns P; the costate λ = P·x is recorded. In
+  discrete time the law uses the next sample's costate, so −R⁻¹Bᵀλ of the
+  current sample and the command differ by up to 3.5 %, which the lesson
+  says; the costate equation holds within 12 % along the flight (the
+  two-state model leaves out the motor lag; 3 % with fast motors). The
+  student predicts λ_v at the step from P_ev = m·√(q·r) (5.657, flown
+  5.645).
+- IV.2 (`control/bangbang.ts`): the plan's "beat the PID by 30 %" does not
+  hold: a high-gain PID (Kp 60, Kd 10) also rides the thrust limits and
+  settles a 1.5 m descent in 0.67 s against the minimum t* = 0.715 s. The
+  lesson's goal is to predict t* and settle within 10 % of it; bang-bang
+  gives the floor and the shape, not a better controller. The motor lag
+  needs a 40 ms lead on the switching curve.
+- IV.3 (`math/grid.ts`, `control/dp.ts`): value iteration on (e, v) with the
+  real thrust limits (zero thrust among the levels). "Where LQR stops being
+  optimal" became "where it stops being exact": V equals xᵀPx up to the
+  saturation threshold m·g/k₁ (0.99 m) and rises beyond it (+16 % for a 4 m
+  descent, +7 % for a climb), while the saturated LQR stays within 1 % of
+  the grid's optimum. The student predicts the threshold.
+- IV.4 (`control/rocket.ts`): ignition at 44.65 m (exact, by bisection on
+  the simulator's step); the constant-mass estimate h₀·m·g/T gives 45.13 m
+  (1.1 % high), which is the prediction. The law is "full thrust, then hold
+  0.5 m/s", not a pure bang-bang cut at v = 0, so a small fuel margin gives
+  a real window: lit 0.5 m too low it hits at 5.2 m/s, lit 10 m too high it
+  runs dry. No aerodynamics yet.
+
+**M25, first lessons (IV.24, IV.26, IV.27).**
+
+- IV.24 (`guidance/pronav.ts`): pure pursuit and proportional navigation
+  command the geometric controller's acceleration against a centred
+  weaving target (2 m/s; the drone 4 m/s). Pursuit misses by 0.52 m at a
+  1.5 m/s² weave and 0.88 m at 3 m/s²; PN hits (0.05 m) every time, on a
+  path a third shorter. The target is drawn in a top-view engagement chart,
+  not in the 3D scene; no prediction.
+- IV.26 (`estimation/ins.ts`): an unaided strapdown navigator runs beside the
+  flight from 5 s (the controller does not fly on it). With 0.05 °/s of roll
+  bias the error is 38.5 m after 30 s against g·b·t³/6 = 38.52 m, the
+  student's prediction. Aiding and the Schuler period are in the text only.
+- IV.27 (`estimation/ukf.ts`): one range beacon. The plan's goal ("consistent
+  NIS") does not work: both filters' NIS look healthy (the EKF's about 1),
+  while the EKF ends 0.6–23 m off with a 2σ of 0.6 m (26–108 σ) and the UKF
+  10 m off with a 2σ of 37 m (within 1 σ). The goal is consistency against
+  the truth (error ≤ 2σ from 15 to 35 s); the lesson's point is that a good
+  NIS does not prove a good estimate, and that the UKF is honest, not more
+  accurate. Two beacons were dropped: both filters lock onto the mirror
+  solution.
 
 **Build order.** M19 first: nothing else in Part IV can start without the
 vehicle abstraction. Then the **must** lessons across M20–M25, then Part V,

@@ -49,7 +49,7 @@ const reachesGoal = (lesson: Lesson, withSolution: boolean, seconds = 45): boole
 
 describe('Part II and III lesson goals', () => {
   // III.29's goal needs a 300-flight campaign; tests/dispersion.test.ts checks it.
-  const heavy = ['montecarlo'];
+  const heavy = ['montecarlo', 'freqid'];
   for (const lesson of LESSONS.filter(
     (l) => (l.part === 2 || l.part === 3) && l.goal && !heavy.includes(l.id),
   )) {

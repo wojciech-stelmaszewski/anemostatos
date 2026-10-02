@@ -22,6 +22,8 @@ import { Notice, Try } from './Bits';
 import { M } from './Math';
 import { setAt } from './script';
 import { ReportPanel } from '@/ui/arena/ReportPanel';
+import { ChirpFitPanel, SweepFitPanel } from '@/ui/analysis/SysIdPanel';
+import { finishedChirp, fitChirp } from '@/estimation/sysid';
 import type { Lesson } from './types';
 
 /**
@@ -127,6 +129,21 @@ const truthHoverRms = (p: Params): number => {
   for (let k = 0; k < 20000; k++) sim.step();
   truthCache = { key, rms: hoverRms(sim, 4, 20) };
   return truthCache.rms;
+};
+
+/** Mean distance below (negative) or above the setpoint over the last seconds, m. */
+const hoverOffset = (sim: Simulation, seconds: number): number => {
+  const { series } = sim.telemetry.window(['pos.y', 'sp.y'], sim.t - seconds);
+  let sum = 0;
+  let n = 0;
+  series[0]!.forEach((y, i) => {
+    const e = y - series[1]![i]!;
+    if (Number.isFinite(e)) {
+      sum += e;
+      n++;
+    }
+  });
+  return n ? sum / n : NaN;
 };
 
 /** When lesson III.27 takes the propeller off motor 2, s. */
@@ -1673,6 +1690,160 @@ export const PART_THREE: Lesson[] = [
           fault becomes a flight-control incident. The gate costs one in a thousand honest fixes,
           and the filter barely notices. Every flight navigation system tests its measurements this
           way; the hard part is the gate's size, the trade between missed outliers and lost data.
+        </Notice>
+      </>
+    ),
+  },
+  {
+    id: 'sysid',
+    n: 25,
+    part: 3,
+    chapter: I,
+    title: 'Identify, then design',
+    level: 1,
+    chart: 'bode',
+    setup: (p) => {
+      calm(p);
+      p.control.l1.kind = 'lqr';
+      p.control.lqr = { ...p.control.lqr, lagState: true, integral: false };
+      p.sensors.motorFeedback = false;
+      p.sensors.delayMs = 20;
+      p.control.model.mass = 0.7;
+      p.control.model.motorTau = 0.06;
+    },
+    goal: {
+      text: 'Identify the drone and give the LQR the right model: mass within 5 % and motor lag within 15 % of the truth, and the drone hovering within 2 cm of its setpoint.',
+      check: ({ sim }) => {
+        const p = sim.params;
+        if (p.control.l1.kind !== 'lqr')
+          return 'keep the LQR: the point is to design it on a better model';
+        const m = p.control.model.mass / p.drone.mass - 1;
+        const t = p.control.model.motorTau / p.drone.motorTau - 1;
+        if (Math.abs(m) > 0.05 || Math.abs(t) > 0.15)
+          return `the model believes ${p.control.model.mass.toFixed(2)} kg and ${(p.control.model.motorTau * 1000).toFixed(0)} ms: press Sweep and fit`;
+        if (sim.t < 12) return 'flying…';
+        const offset = hoverOffset(sim, 3);
+        return (
+          Math.abs(offset) < 0.02 || `hovering ${(offset * 100).toFixed(1)} cm off the setpoint`
+        );
+      },
+    },
+    solution: (p) => {
+      p.control.model.mass = 1.0;
+      p.control.model.motorTau = 0.03;
+    },
+    body: (
+      <>
+        <p>
+          Every model-based design of the course trusted <b>Controller → model</b>: the mass, the
+          motor lag. Here the model is wrong, as models are before anyone has measured the vehicle:
+          it believes 0.7 kg and 60 ms. The LQR designed on it holds the drone about 40 cm below its
+          setpoint, because its feedforward was computed for a lighter drone and it has no integral
+          to fix that.
+        </p>
+        <p>
+          <b>System identification</b> measures the model instead of guessing it. A sweep with the
+          probe on the thrust (lesson III.1) gives the plant <M>{'P(j\\omega)'}</M> from the thrust
+          the motors received to the altitude the controller read. For{' '}
+          <M>{'P(s) = e^{-sd}/(m s^2(\\tau s + 1))'}</M> two straight lines fit it:
+        </p>
+        <M display>
+          {
+            '\\frac{1}{|P|^2\\omega^4} = m^2 + m^2\\tau^2\\,\\omega^2, \\qquad \\angle P + \\pi + \\arctan(\\omega\\tau) = -\\omega d'
+          }
+        </M>
+        <p>
+          The first gives <M>{'m'}</M> and <M>{'\\tau'}</M> by least squares, the second the delay.
+        </p>
+        <SweepFitPanel />
+        <Try>
+          Press <b>Sweep and fit</b>, compare the fit with the truth, and press{' '}
+          <b>Use the fitted model</b>: the LQR is redesigned on it at once. Then try the{' '}
+          <b>Relay test</b>: a relay switches the thrust between hover ± 0.5 N on the sign of the
+          vertical velocity, the loop settles into a limit cycle, and its amplitude and period give
+          the ultimate gain and period that Ziegler and Nichols tuned with. Set{' '}
+          <b>Sensors → Delay</b> to 0 and run it again.
+        </Try>
+        <Notice>
+          The fit recovers mass and lag within a fraction of a per cent, and the delay as the
+          sensor's 20 ms plus a millisecond of sampling. The relay finds the velocity loop's −180°
+          point: with 20 ms of delay at about 0.18 s, the period within 3 % and the gain within 10 %
+          of what the model predicts; with no delay it moves to 0.04 s, set by the motor lag alone
+          (so fast a cycle spans a few samples, and its gain is then off by half: the relay's
+          sine-wave approximation needs a slower cycle). A loop without lag or delay has no −180°
+          point at all, which is why Ziegler–Nichols had no answer for the double integrator of Part
+          I. The model's motor lag barely changes this hover; the mass decides it. Identification
+          shows which parameters matter.
+        </Notice>
+      </>
+    ),
+  },
+  {
+    id: 'freqid',
+    n: 26,
+    part: 3,
+    chapter: I,
+    title: 'Trust the coherence',
+    level: 1,
+    chart: 'bode',
+    setup: (p) => {
+      p.wind.gustsOn = false;
+      p.wind.turbSigma = 0.8;
+      p.sensors.delayMs = 20;
+      p.sysid = { estimator: 'direct', minCoherence: 0, amp: 0.4, seconds: 60 };
+    },
+    goal: {
+      text: 'Identify the drone in turbulence from a chirp: mass and motor lag within 10 %, delay within 3 ms of the truth.',
+      check: ({ sim }) => {
+        const p = sim.params;
+        const id = finishedChirp(p);
+        if (!id) return 'press Fly the chirp (again after changing its amplitude or duration)';
+        const f = fitChirp(id, p.sysid.minCoherence, p.sysid.estimator);
+        if (!Number.isFinite(f.mass)) return 'too few frequencies pass the coherence threshold';
+        const m = f.mass / p.drone.mass - 1;
+        const t = f.tau / p.drone.motorTau - 1;
+        const d = f.delay * 1000 - p.sensors.delayMs;
+        return (
+          (Math.abs(m) <= 0.1 && Math.abs(t) <= 0.1 && Math.abs(d) <= 3) ||
+          `fit: ${f.mass.toFixed(2)} kg, ${(f.tau * 1000).toFixed(1)} ms, ${(f.delay * 1000).toFixed(1)} ms of delay`
+        );
+      },
+    },
+    solution: (p) => {
+      p.sysid = { estimator: 'viaProbe', minCoherence: 0.75, amp: 1.2, seconds: 90 };
+    },
+    body: (
+      <>
+        <p>
+          A sweep flies one frequency at a time. A <b>chirp</b> sweeps them all in one run, and the
+          spectra of the recorded signals give the response at every frequency at once: the plant
+          from the thrust <M>{'u'}</M> to the altitude <M>{'y'}</M> is{' '}
+          <M>{'\\hat P = \\Phi_{uy}/\\Phi_{uu}'}</M>. Next to it comes the <b>coherence</b>,
+        </p>
+        <M display>
+          {'\\gamma^2(\\omega) = \\frac{|\\Phi_{uy}|^2}{\\Phi_{uu}\\,\\Phi_{yy}} \\in [0, 1],'}
+        </M>
+        <p>
+          the fraction of the output that the input explains linearly at that frequency. Where the
+          wind moves the drone more than the chirp does, it falls.
+        </p>
+        <ChirpFitPanel />
+        <Try>
+          Press <b>Fly the chirp</b> and look at the fit. Raise{' '}
+          <b>Identification → Fit where coherence ≥</b>: the coherence is high almost everywhere,
+          and the fit is still wrong. Switch <b>Estimate the plant from</b> to{' '}
+          <b>the test signal</b> and look at the coherence again. Then give the chirp enough
+          amplitude and time, fly it again, and fit only where the coherence is honest.
+        </Try>
+        <Notice>
+          In a closed loop the thrust is partly the controller's answer to the wind, so it is
+          correlated with the wind's effect on the altitude. The estimate from the thrust is biased,
+          and its coherence is high because the bias is linear: in this turbulence it finds between
+          0.5 and 0.7 kg on every seed tried, with γ² above 0.8 over most of the band. Measuring
+          both signals against the injected test signal, which the wind does not know about, removes
+          the bias, and its coherence honestly drops where the wind dominates. Flight test engineers
+          identify aircraft this way [Tischler 2012]: excite on purpose, measure against the
+          excitation, and believe only the frequencies with high coherence.
         </Notice>
       </>
     ),

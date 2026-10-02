@@ -95,3 +95,65 @@ export function correlate(x: ArrayLike<number>, freqHz: number, dt: number): Com
   }
   return { re: (2 * re) / x.length, im: (2 * im) / x.length };
 }
+
+export interface CrossSpectrum {
+  /** Frequencies, Hz. */
+  f: number[];
+  /** Frequency response estimate H = Pxy/Pxx, from x to y. */
+  h: Complex[];
+  /** Magnitude-squared coherence |Pxy|²/(Pxx·Pyy), 0…1. */
+  coherence: number[];
+}
+
+/**
+ * Frequency response from x to y and its coherence by Welch's method (Hann segments, 50 %
+ * overlap, mean removed): H₁ = Pxy/Pxx. The coherence says how much of y, at each frequency, is
+ * explained linearly by x; noise that x did not cause pulls it below one.
+ */
+export function crossSpectrum(
+  x: ArrayLike<number>,
+  y: ArrayLike<number>,
+  fs: number,
+  segment = 4096,
+): CrossSpectrum {
+  let n = segment;
+  while (n > x.length) n >>= 1;
+  if (n < 8) throw new Error('crossSpectrum: signal too short');
+  const win = Array.from({ length: n }, (_, i) => 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / n));
+  const half = n / 2;
+  const sxx = new Array<number>(half + 1).fill(0);
+  const syy = new Array<number>(half + 1).fill(0);
+  const sre = new Array<number>(half + 1).fill(0);
+  const sim = new Array<number>(half + 1).fill(0);
+  const seg = (v: ArrayLike<number>, start: number) => {
+    let mean = 0;
+    for (let i = 0; i < n; i++) mean += v[start + i]!;
+    mean /= n;
+    const re = new Float64Array(n);
+    const im = new Float64Array(n);
+    for (let i = 0; i < n; i++) re[i] = (v[start + i]! - mean) * win[i]!;
+    fft(re, im);
+    return { re, im };
+  };
+  for (let start = 0; start + n <= x.length; start += half) {
+    const a = seg(x, start);
+    const b = seg(y, start);
+    for (let k = 0; k <= half; k++) {
+      sxx[k] = sxx[k]! + a.re[k]! ** 2 + a.im[k]! ** 2;
+      syy[k] = syy[k]! + b.re[k]! ** 2 + b.im[k]! ** 2;
+      // conj(X)·Y
+      sre[k] = sre[k]! + a.re[k]! * b.re[k]! + a.im[k]! * b.im[k]!;
+      sim[k] = sim[k]! + a.re[k]! * b.im[k]! - a.im[k]! * b.re[k]!;
+    }
+  }
+  const f: number[] = [];
+  const h: Complex[] = [];
+  const coherence: number[] = [];
+  for (let k = 1; k <= half; k++) {
+    f.push((k * fs) / n);
+    const pxx = Math.max(sxx[k]!, 1e-300);
+    h.push({ re: sre[k]! / pxx, im: sim[k]! / pxx });
+    coherence.push((sre[k]! ** 2 + sim[k]! ** 2) / (pxx * Math.max(syy[k]!, 1e-300)));
+  }
+  return { f, h, coherence };
+}

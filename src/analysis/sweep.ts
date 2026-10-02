@@ -15,6 +15,11 @@ export interface SweepPoint {
   /** Closed loop from the reference to the altitude, Y/R (reference probe only). */
   yr?: Complex;
   /**
+   * The plant as the controller sees it (thrust probe only): from the thrust that reaches the
+   * motors to the altitude the controller reads, sensor delay and sampling included.
+   */
+  pm?: Complex;
+  /**
    * Torque probes: one column of the 2 × 2 sensitivity and complementary sensitivity at the
    * plant input, as [roll, pitch] responses to the probe on this point's axis.
    */
@@ -71,8 +76,11 @@ export class Sweep {
   private left: number;
   private total = 0;
   private fHz = 0;
-  /** Running correlation sums, real and imaginary parts, of: in, u, uc, y, τx, τz, τc,x, τc,z. */
-  private acc = new Float64Array(16);
+  /**
+   * Running correlation sums, real and imaginary parts, of: in, u, uc, y, τx, τz, τc,x, τc,z, and
+   * the altitude the controller last read.
+   */
+  private acc = new Float64Array(18);
   private k = 0;
 
   constructor(
@@ -141,6 +149,7 @@ export class Sweep {
         l: cneg(cdiv(uc, u)),
         s: cdiv(u, d),
         t: cneg(cdiv(uc, d)),
+        pm: cdiv(c(8), u),
       });
     else
       this.points.push({
@@ -182,6 +191,9 @@ export class Sweep {
             a[8 + 2 * j] = a[8 + 2 * j]! + more[j]! * cs;
             a[9 + 2 * j] = a[9 + 2 * j]! - more[j]! * sn;
           }
+          const ym = sim.measurement ? sim.measurement.pos.y : v3;
+          a[16] = a[16]! + ym * cs;
+          a[17] = a[17]! - ym * sn;
           this.k++;
         }
         budget -= n;

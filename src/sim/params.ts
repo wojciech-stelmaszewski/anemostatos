@@ -224,6 +224,20 @@ export interface UncertaintyParams {
   delayMs: number;
 }
 
+/** Identification from a chirp (src/estimation/sysid.ts, lesson III.26). */
+export interface SysIdParams {
+  /**
+   * `direct`: the plant from the thrust to the altitude, P_uy/P_uu. `viaProbe`: both against the
+   * injected test signal, P_dy/P_du, which the loop's reaction to the wind does not bias.
+   */
+  estimator: 'direct' | 'viaProbe';
+  /** Fit only the frequencies whose coherence is at least this (0…1). */
+  minCoherence: number;
+  /** Chirp amplitude on the thrust, N, and its duration, s (0.2 → 8 Hz). */
+  amp: number;
+  seconds: number;
+}
+
 /** What the controller believes about the vehicle. The truth lives in `DroneParams`. */
 export interface ModelParams {
   /** Assumed mass m̂, kg. */
@@ -438,6 +452,7 @@ export interface Params {
   control: ControlParams;
   probe: ProbeParams;
   uncertainty: UncertaintyParams;
+  sysid: SysIdParams;
 }
 
 export const defaultParams = (): Params => ({
@@ -600,6 +615,7 @@ export const defaultParams = (): Params => ({
     },
   },
   uncertainty: { massPct: 30, tauFactor: 2, delayMs: 20 },
+  sysid: { estimator: 'direct', minCoherence: 0, amp: 0.4, seconds: 60 },
   probe: { point: 'none', signal: 'sine', amp: 0.3, freqHz: 1, f0Hz: 0.1, f1Hz: 20, durationS: 60 },
 });
 

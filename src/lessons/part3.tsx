@@ -1096,8 +1096,8 @@ export const PART_THREE: Lesson[] = [
         <p>
           In lesson III.11 you tuned a PID by hand until the whole family of drones passed the
           small-gain test, and the loop slowed down to about 2.8 Hz. Among more than a hundred PID
-          tunes, none passes it faster. <b>H∞ loop shaping</b> [Glover 1989] designs the other way
-          round, in two steps.
+          tunes, none passes it faster; the loop you shaped by hand in III.6 passes at 2.1 Hz.{' '}
+          <b>H∞ loop shaping</b> [Glover 1989] designs the other way round, in two steps.
         </p>
         <p>
           <b>Shape.</b> Choose a weight <M>{'W(s)'}</M> so that the shaped plant{' '}

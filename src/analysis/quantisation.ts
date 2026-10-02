@@ -1,6 +1,7 @@
 // The real computer (docs/analysis.md §4, Chapter I, lessons III.18 and III.19): what the loop
 // rate costs the quadrotor's rate loop, and the limit cycle a coarse altimeter leaves in the
 // altitude loop, predicted by a describing function.
+import { dfRelay } from './describing';
 import { PHYS_DT } from '@/engine/simulation';
 import { logspace, margins } from '@/math/margins';
 import type { Params } from '@/sim/params';
@@ -38,7 +39,7 @@ export function lowestRate(p: Params, pmDeg: number): number {
  * Describing function of a quantiser of step q held at a boundary between two levels: for a small
  * sine of amplitude A it switches like a relay of ±q/2, N(A) = 4·(q/2)/(π·A) = 2q/(π·A).
  */
-export const quantiserDf = (q: number, a: number): number => (2 * q) / (Math.PI * a);
+export const quantiserDf = (q: number, a: number): number => dfRelay(a, q / 2);
 
 export interface QuantisationPrediction {
   /** Step of the altimeter, m. */
@@ -61,5 +62,10 @@ export function quantisationCycle(p: Params): QuantisationPrediction | null {
     w.map((x) => loopGain(m, x)),
   );
   const q = posQuantStep(bits);
-  return { q, gm: r.gm, f180Hz: r.w180 / (2 * Math.PI), amplitude: (2 * q) / (Math.PI * r.gm) };
+  return {
+    q,
+    gm: r.gm,
+    f180Hz: r.w180 / (2 * Math.PI), // N(A)·|L| = 1 at the −180° frequency, with |L| = 1/GM: the relay's amplitude 4·(q/2)/(π·N).
+    amplitude: (4 * (q / 2)) / (Math.PI * r.gm),
+  };
 }

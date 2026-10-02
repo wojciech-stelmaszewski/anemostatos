@@ -600,8 +600,27 @@ tests prove unmet at the start and reachable by its documented solution.
 - The PID model drops the states of terms that are switched off, so the
   pole map shows no poles that the loop cannot move.
 
-**Still to build:** III.6 (loop shaping, with `shaping.ts`), the spectrum
-chart and the `multisine` probe signal.
+**Built (2026-10-02, by a parallel agent): III.6.**
+
+- `analysis/shaping.ts`: lead, lag and notch stages after the L1 PID
+  (`control.shaping`, off by default); they fly in `control/altitude.ts`
+  and are part of the PID's linear model, which matches a flown sweep
+  within 1 %. A lead of α = 9 peaks at 52–53° against 53.1° in theory.
+- The lesson starts from P alone (Kp 20, no D, no I), which is unstable,
+  and the student bends the loop with a lead (phase at crossover) and a lag
+  (gain at low frequency), without D or I.
+- Goal: crossover 1.8–2.2 Hz, PM ≥ 45° (the plan said 50°: on a grid of
+  294 designs only 3 reached it, too tight for sliders; the reference
+  solution has 50.3°) and |L(0.1 Hz)| ≥ 40 dB. The solution (Kp 22, lead
+  0.25 → 16 Hz, lag 0.15 → 0.03 Hz) crosses at 2.08 Hz and also passes
+  the family test of III.11 (|W·T| 0.75); without the lag PM is 3° higher
+  but the low-frequency gain falls under 40 dB.
+- The target shape is drawn as zones on the Bode chart (a floor at low
+  frequency, a crossover window, the allowed phase there), not as a curve.
+  The notch is available but the lesson does not use it.
+
+**Still to build:** the spectrum chart of the L1 loop and the `multisine`
+probe signal.
 
 Root-locus trail, delay margin, the `predict` field (first used by III.4),
 $S$/$T$ measurement, `shaping.ts` (lead/lag, notch on L1), spectrum chart.
@@ -652,7 +671,25 @@ $S$/$T$ measurement, `shaping.ts` (lead/lag, notch on L1), spectrum chart.
   from 0.3 to 10 N. The goal (PM ≥ 45°, GM ≥ 10 dB, jitter < 0.15 N) leaves
   a window of kfQ ≈ 3–5 N.
 
-**Still to build:** III.8 (describing functions).
+**Built (2026-10-02, by a parallel agent): III.8.**
+
+- The limit cycle of lesson I.2 (P only) is held by the quadratic air
+  drag, not by the motors' saturation: at Kp 10 the thrust swings about
+  4.6 N against limits of +14.6 / −9.8 N, and saturation alone could not
+  stop an instability whose growth rate Kp·τ/(2m) is positive at any
+  gain. The lesson uses the describing function of quadratic drag,
+  N(A) = 8cA/(3π), on the loop the drag sees (force to vertical velocity,
+  exact and discrete, with the controller in it).
+- `analysis/describing.ts`: describing functions of saturation, relay,
+  dead zone and quadratic drag, and the crossing of G(jω) with −1/N(A).
+  −1/N(A) is drawn on a new chart of G(jω) (`describing`), not on the
+  Nyquist chart of the thrust loop, because the drag sits elsewhere in the
+  loop. The quantiser of III.19 uses its relay.
+- Predicted at Kp 10: 0.460 m at 0.501 Hz; flown: 0.4601 m at 0.5010 Hz.
+  Kp 5, c = 0.5 and τ = 50 ms agree within 2 %. Where it fails: at Kp 40
+  saturation joins in (over 5 % of samples) and the flight gives 0.67 m
+  against 0.91 m predicted. The circle criterion is mentioned, not built.
+- The student predicts the amplitude before flying.
 
 Lyapunov overlay and region-of-attraction grid; `describing.ts` and the
 $-1/N(A)$ overlay; altimeter-bias state and altimeter-dropout event for
@@ -702,9 +739,9 @@ the Kalman filter; covariance chart; LQG margin measurement.
   the central controller at γ = 1.05·γ_min, discretised (Tustin) at the
   controller rate. W is a PI times an optional lead; the PI integrator is
   run explicitly so that it can be held on the ground. L1 kind `hinf`.
-- The plan compared H∞ with lesson III.6, which does not exist yet; the
-  lesson compares it with the PID of III.11 instead. On a 108-tune grid
-  the fastest PID that passes the family test crosses at 2.84 Hz.
+- The plan compared H∞ with lesson III.6; the lesson compares it with
+  the PID of III.11 (the fastest of 108 tunes that passes the family test
+  crosses at 2.84 Hz) and with III.6 (built later, it passes at 2.1 Hz).
 - A PI weight alone gives ε_max ≈ 0.31 and fails the family test from
   about 2 Hz: a −40 dB/decade shape is the wrong one. With a lead in the
   weight (5 → 50 rad/s) ε_max is 0.41 and the loop passes at 3.5 Hz. The
@@ -802,7 +839,59 @@ portrait.
   under 2× of the truth, which the goal computes by flying the same
   setting on the true position.
 
-**Still to build:** III.18, III.19, III.25, III.26.
+**Built (2026-10-02, by parallel agents): III.18, III.19, III.25 and III.26.**
+M17 is complete.
+
+- III.18 flies a racing tune (rate Kp 100, Kd 1.5, attitude Kp 20;
+  crossover 9–11 Hz). The default cascade crosses at 2.5 Hz with only
+  44.9° even at 1 kHz, so the plan's goal (the lowest rate with
+  PM ≥ 45°) could not be met, and halving its rate to 50 Hz costs only 8°.
+  PM at 1000 / 500 / 250 / 125 / 62.5 / 50 Hz: 55 / 52 / 47 / 36 / 13 /
+  2°; the lowest rate with PM ≥ 45° is 250 Hz (200 Hz gives 44.6°). The
+  rate-loop model matches a sweep flown at 125 Hz within 5 %.
+- No z-plane pole map in III.18: the rate-loop model is a frequency
+  response only; the lesson uses the two-channel chart and its margin
+  bars. No prediction either: ωc·T/2 ignores the cost of the discrete D
+  term and estimates 173 Hz against 250 Hz; it stays in the text as an
+  estimate.
+- Jitter (`sensors.jitterMs`, a random delay of 0…J) and a motor rate
+  limit (`drone.motorSlew`, N/s per motor) are in III.18, not III.19: the
+  L1 altitude loop never asks for fast thrust changes, and 2 ms of jitter
+  at its 1 Hz crossover costs a fraction of a degree. At 62.5 Hz, 4 ms of
+  jitter is safe and 8 ms shakes the drone (a fixed delay: 2 ms safe, 4 ms
+  shakes). With 30 N/s of rate limit a 0.5 m step is unchanged and a 3 m
+  step overshoots by more than a metre.
+- III.19 quantises the position sensor only (`sensors.posQuantBits` over
+  10 m); motor-command quantisation is not built. There is no slow hunt:
+  the integrator settles the drone on the boundary between the two levels
+  nearest the setpoint (up to q/2 away) and the loop dithers there with
+  amplitude 2q/(π·GM), the quantiser seen as a relay of ±q/2. At GM 15.6:
+  6.4 / 1.6 / 0.4 mm at 6 / 8 / 10 bits predicted, 6.6 / 1.8 / 0.5 mm
+  flown. Goal: predict the amplitude at 8 bits (±20 %), then hold the
+  height within 1 cm with at most 10 bits.
+- III.25 and III.26 run on L1, not on the L3 rate loop: L1 has the loop
+  models, probe sweeps and the LQR. `estimation/sysid.ts` fits
+  P(s) = e^{−sd}/(m s²(τs + 1)) from a sweep in two linear steps
+  (m = 1.0000, τ = 30.03 ms, d = 20.93 ms against 1.0, 30, 20 + about
+  1 ms of sampling).
+- "LQR on the fitted model beats the wrong one" is shown on the hover
+  offset of an LQR without integral (−41 cm on the wrong model, 0 on the
+  fitted one; the mass decides it, a wrong τ alone does little).
+- The relay acts on the vertical-velocity loop (the altitude loop, a
+  double integrator, has no −180° crossing at a finite frequency) and
+  switches around the measured hover thrust, not m̂·g. With 20 ms of delay
+  it finds Ku 46.7 and Tu 184 ms against 51.3 and 178 ms from the model;
+  without delay Tu agrees (45 against 43 ms) but Ku is off by 2×, which
+  the lesson says.
+- III.26 is about identification in closed loop: in continuous
+  turbulence (σ 0.8, gusts off) the estimate from the thrust (P_uy/P_uu)
+  is biased even where the coherence is high (m 0.52–0.69 on every seed),
+  while the estimate against the excitation (P_dy/P_du) with γ² ≥ 0.75,
+  1.2 N for 90 s fits m and τ within 10 % and d within 3 ms on 8 of 8
+  seeds. Its goal reads the stored chirp result (as III.29), so it is
+  tested in `tests/sysid.test.ts`. The coherence chart is part of the
+  lesson panel, not a chart kind.
+- `math/fft.ts` gained `crossSpectrum` (Welch H₁ and coherence).
 
 First pass: vibration model, IMU sample rate and anti-alias pole, notch
 and RPM notch bank, `attitude.ts`, gyro bias, magnetometer. Second pass:

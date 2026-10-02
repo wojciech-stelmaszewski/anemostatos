@@ -138,28 +138,34 @@ motor lag.
 
 **Part III — Why it works** (the third semester, being built; plan in [docs/analysis.md](docs/analysis.md)):
 
-| #      | Lesson                        | Level | What you learn                                                                         |
-| ------ | ----------------------------- | ----- | -------------------------------------------------------------------------------------- |
-| III.1  | The drone as a filter         | L1    | frequency response and the Bode plot; bandwidth, measured by flying sines              |
-| III.2  | Poles tell the story          | L1    | the pole map of the whole loop; damping ratio; a root locus drawn by hand              |
-| III.3  | How far from the edge?        | L1    | gain and phase margins on the Bode and Nyquist plots                                   |
-| III.4  | Delay is a phase thief        | L1    | delay costs phase: predict the delay that destabilises the loop, then check it         |
-| III.5  | The waterbed                  | L1    | sensitivity and Bode's integral: what is rejected here is amplified there              |
-| III.7  | Energy that only goes down    | L1    | a Lyapunov function, what it proves, and the far larger region that really works       |
-| III.9  | What the filter can't see     | L1    | observability: a state no data can reveal, and a filter honest about it                |
-| III.10 | Optimal plus optimal ≠ robust | L1    | LQG: a Kalman filter takes the LQR's margins; loop transfer recovery buys them back    |
-| III.11 | How wrong can I be?           | L1    | a family of plants, the small-gain test, and sixty drones flown to check it            |
-| III.12 | One loop at a time lies       | L3    | roll and pitch as one loop: singular values, eigen-loops and the disk margin           |
-| III.13 | Design for the worst          | L1    | H∞ loop shaping: choose the shape, two Riccati equations give the margin ε_max         |
-| III.20 | Ghost frequencies             | L3    | aliasing: rotor vibration sampled too slowly becomes a wobble no filter removes        |
-| III.21 | Notch the noise               | L3    | low-pass, notch and RPM-tracking notch: what each costs in phase margin                |
-| III.22 | Where is up?                  | L3    | attitude from gyro and accelerometer: complementary and Mahony filters in a turn       |
-| III.23 | Four numbers, three unknowns  | L3    | the multiplicative EKF: a χ² gate shuts out a disturbed magnetometer                   |
-| III.24 | Fly on beliefs                | L3    | a navigation EKF on GPS, baro and IMU; gating the outlier that would fly the drone off |
-| III.27 | Three rotors left             | L3    | losing a rotor: rank 4 → 3, give up yaw, spin, and lead the lag                        |
-| III.28 | Notice that it broke          | L3    | fault detection: a two-sided χ² test, a CUSUM that names the motor, in time            |
-| III.29 | One flight proves nothing     | L3    | Monte Carlo: 300 dispersed flights, the failing corner, a pass rate with confidence    |
-| III.30 | The robustness report card    | L1–L3 | margins, Monte Carlo and RMS for every controller: fast is not robust                  |
+| #      | Lesson                        | Level | What you learn                                                                                          |
+| ------ | ----------------------------- | ----- | ------------------------------------------------------------------------------------------------------- |
+| III.1  | The drone as a filter         | L1    | frequency response and the Bode plot; bandwidth, measured by flying sines                               |
+| III.2  | Poles tell the story          | L1    | the pole map of the whole loop; damping ratio; a root locus drawn by hand                               |
+| III.3  | How far from the edge?        | L1    | gain and phase margins on the Bode and Nyquist plots                                                    |
+| III.4  | Delay is a phase thief        | L1    | delay costs phase: predict the delay that destabilises the loop, then check it                          |
+| III.5  | The waterbed                  | L1    | sensitivity and Bode's integral: what is rejected here is amplified there                               |
+| III.6  | Shape the loop                | L1    | lead, lag and notch: bend the Bode plot into a target shape instead of turning gains                    |
+| III.7  | Energy that only goes down    | L1    | a Lyapunov function, what it proves, and the far larger region that really works                        |
+| III.8  | The bounce, predicted         | L1    | the describing function of air drag predicts the bounce of lesson I.2 to the millimetre                 |
+| III.9  | What the filter can't see     | L1    | observability: a state no data can reveal, and a filter honest about it                                 |
+| III.10 | Optimal plus optimal ≠ robust | L1    | LQG: a Kalman filter takes the LQR's margins; loop transfer recovery buys them back                     |
+| III.11 | How wrong can I be?           | L1    | a family of plants, the small-gain test, and sixty drones flown to check it                             |
+| III.12 | One loop at a time lies       | L3    | roll and pitch as one loop: singular values, eigen-loops and the disk margin                            |
+| III.13 | Design for the worst          | L1    | H∞ loop shaping: choose the shape, two Riccati equations give the margin ε_max                          |
+| III.18 | How slow can you go?          | L3    | loop rate and phase: each halving costs more; jitter as half a delay; a motor rate limit                |
+| III.19 | The computer cannot count     | L1    | a quantised altimeter: the drone rests between two steps and dithers, as a describing function predicts |
+| III.20 | Ghost frequencies             | L3    | aliasing: rotor vibration sampled too slowly becomes a wobble no filter removes                         |
+| III.21 | Notch the noise               | L3    | low-pass, notch and RPM-tracking notch: what each costs in phase margin                                 |
+| III.22 | Where is up?                  | L3    | attitude from gyro and accelerometer: complementary and Mahony filters in a turn                        |
+| III.23 | Four numbers, three unknowns  | L3    | the multiplicative EKF: a χ² gate shuts out a disturbed magnetometer                                    |
+| III.24 | Fly on beliefs                | L3    | a navigation EKF on GPS, baro and IMU; gating the outlier that would fly the drone off                  |
+| III.25 | Identify, then design         | L1    | fit m, τ and the delay from a sweep, redesign the LQR on them; the relay finds Ku, Tu                   |
+| III.26 | Trust the coherence           | L1    | identification in a closed loop: why the thrust lies, measuring against the excitation                  |
+| III.27 | Three rotors left             | L3    | losing a rotor: rank 4 → 3, give up yaw, spin, and lead the lag                                         |
+| III.28 | Notice that it broke          | L3    | fault detection: a two-sided χ² test, a CUSUM that names the motor, in time                             |
+| III.29 | One flight proves nothing     | L3    | Monte Carlo: 300 dispersed flights, the failing corner, a pass rate with confidence                     |
+| III.30 | The robustness report card    | L1–L3 | margins, Monte Carlo and RMS for every controller: fast is not robust                                   |
 
 ## Run it
 

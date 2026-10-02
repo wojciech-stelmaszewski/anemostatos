@@ -5,6 +5,8 @@ import { AttitudeFilter, type AttitudeGains } from '@/estimation/attitude';
 import { LowPass2 } from '@/estimation/filters';
 import { Mekf } from '@/estimation/mekf';
 import { NavEkf } from '@/estimation/navekf';
+import { Ins } from '@/estimation/ins';
+import { RangeFilter, type Beacon } from '@/estimation/ukf';
 import type { DroneState } from './dynamics';
 import {
   GRAVITY,
@@ -12,6 +14,7 @@ import {
   type DroneParams,
   type MekfParams,
   type NavEkfParams,
+  type BeaconFilterParams,
   type SensorParams,
   type VibrationParams,
 } from './params';
@@ -62,8 +65,13 @@ export interface ImuContext {
   ahrs: AhrsParams;
   mekf: MekfParams;
   navEkf: NavEkfParams;
+  /** The range-only filter of lesson IV.27; absent: no beacons. */
+  beaconFilter?: BeaconFilterParams;
   dt: number;
 }
+
+/** The beacon of lesson IV.27, in the horizontal plane, m. */
+export const BEACONS: Beacon[] = [{ x: 10, z: 0 }];
 
 const DEG = Math.PI / 180;
 /** Inclination of the earth's field: it points 65° below the horizon (central Europe). */
@@ -110,6 +118,10 @@ export class Sensors {
   private ahrsOn = false;
   readonly mekf = new Mekf();
   readonly nav = new NavEkf();
+  /** The inertial navigator of lesson IV.27 and the range-only filter of lesson IV.27. */
+  readonly ins = new Ins();
+  rangeFilter = new RangeFilter('ekf');
+  private nextBeacon = 0;
   private navOn = false;
   private steps = 0;
   private nextGps = 0;
@@ -149,7 +161,19 @@ export class Sensors {
     if (!estimating) this.ahrsOn = false;
     if (!navigating) this.navOn = false;
     this.steps++;
-    if (!shaking && !biased && !estimating && !navigating && imuRateHz <= 0 && aaFilterHz <= 0)
+    const inertial = c.sensors.ins;
+    const beacons = c.sensors.beacons && !!c.beaconFilter;
+    if (!inertial) this.ins.reset();
+    if (
+      !shaking &&
+      !biased &&
+      !estimating &&
+      !navigating &&
+      !inertial &&
+      !beacons &&
+      imuRateHz <= 0 &&
+      aaFilterHz <= 0
+    )
       return;
     let omega = m.omega;
     let acc = m.acc;
@@ -272,6 +296,30 @@ export class Sensors {
       m.pos = this.nav.pos;
       m.vel = this.nav.vel;
     }
+    const t = this.steps * c.dt;
+    if (inertial && t >= c.sensors.insStart) {
+      // Alongside, never flown on: the navigator integrates the same IMU samples.
+      if (!this.ins.started) this.ins.start(s.q, s.pos, s.vel);
+      else this.ins.step(omega, acc, GRAVITY, c.dt);
+    }
+    if (beacons) {
+      const bf = c.beaconFilter!;
+      if (t < bf.start) {
+        this.nextBeacon = bf.start;
+        if (this.rangeFilter.kind !== bf.kind) this.rangeFilter = new RangeFilter(bf.kind);
+        this.rangeFilter.reset([s.pos.x + bf.guessX, s.pos.z + bf.guessZ, 0, 0], bf.sigma0, 0.5);
+      } else if (t >= this.nextBeacon) {
+        const dt = 1 / Math.max(c.sensors.beaconRateHz, 0.1);
+        this.nextBeacon += dt;
+        const f = this.rangeFilter;
+        f.predict(dt, 0.3);
+        const n = c.sensors.beaconNoise;
+        const z = BEACONS.map(
+          (b) => Math.hypot(s.pos.x - b.x, s.pos.z - b.z) + n * this.rng.normal(),
+        );
+        f.update(z, BEACONS, Math.max(n, 1e-3));
+      }
+    }
   }
 
   /** The magnetometer: the field, turned by the local disturbance, seen from the body, unit. */
@@ -359,6 +407,8 @@ export class Sensors {
     this.mekf.reset();
     this.nav.reset();
     this.navOn = false;
+    this.ins.reset();
+    this.nextBeacon = 0;
     this.steps = 0;
     this.nextGps = 0;
     Object.assign(this.est, { magNis: 0, magUsed: true, gpsNis: 0, gpsUsed: true });

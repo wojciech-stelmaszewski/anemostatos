@@ -23,6 +23,7 @@ import { FaultMonitor } from '@/estimation/fdi';
 import { RocketLander } from '@/control/rocket';
 import { initialRocket, stepRocket, type RocketState } from '@/sim/vehicles/rocket';
 import { Engagement, targetState } from '@/guidance/pronav';
+import { insGyroError } from '@/estimation/ins';
 import { Tap } from './tap';
 import { Telemetry } from './telemetry';
 
@@ -342,6 +343,7 @@ export class Simulation {
       ahrs: p.control.ahrs,
       mekf: p.control.mekf,
       navEkf: p.control.navEkf,
+      beaconFilter: p.control.beaconFilter,
       dt,
     });
 
@@ -546,6 +548,24 @@ export class Simulation {
       tl.set('fdi.altAlarm', f.altAlarm ? 1 : 0);
       tl.set('fdi.cusum', Math.max(...f.cusum));
       tl.set('fdi.motor', f.motor + 1);
+    }
+    if (this.level === 3 && this.params.sensors.ins && this.sensors.ins.started) {
+      const n = this.sensors.ins;
+      tl.set('ins.err', Math.hypot(n.pos.x - s.pos.x, n.pos.z - s.pos.z));
+      const b = this.params.sensors.gyroBias;
+      const bias = (Math.hypot(b.x, b.z) * Math.PI) / 180;
+      tl.set('ins.pred', insGyroError(bias, GRAVITY, n.t));
+    }
+    if (
+      this.level === 3 &&
+      this.params.sensors.beacons &&
+      this.t >= this.params.control.beaconFilter.start
+    ) {
+      const f = this.sensors.rangeFilter;
+      const err = Math.hypot(f.x[0]! - s.pos.x, f.x[1]! - s.pos.z);
+      tl.set('rng.err', err);
+      tl.set('rng.sigma2', 2 * f.sigmaPos);
+      tl.set('rng.nis', f.lastNis);
     }
     if (this.level === 3 && this.params.guidance.enabled && this.engagement.started) {
       const g = this.params.guidance;

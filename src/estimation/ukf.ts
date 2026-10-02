@@ -102,7 +102,10 @@ export class RangeFilter {
         pts.push(this.x.map((v, i) => v - col[i]!));
       }
       const wm = [lam / (n + lam), ...new Array<number>(2 * n).fill(1 / (2 * (n + lam)))];
-      const wc = [lam / (n + lam) + (1 - 1 + 2), ...new Array<number>(2 * n).fill(1 / (2 * (n + lam)))];
+      const wc = [
+        lam / (n + lam) + (1 - 1 + 2),
+        ...new Array<number>(2 * n).fill(1 / (2 * (n + lam))),
+      ];
       const zs = pts.map((x) => beacons.map((b) => range(x, b)));
       zHat = beacons.map((_, i) => zs.reduce((acc, zz, k) => acc + wm[k]! * zz[i]!, 0));
       s = r.map((row) => [...row]);
@@ -110,12 +113,17 @@ export class RangeFilter {
       pts.forEach((x, k) => {
         const dz = zs[k]!.map((v, i) => v - zHat[i]!);
         const dx = x.map((v, i) => v - this.x[i]!);
-        for (let i = 0; i < m; i++) for (let j = 0; j < m; j++) s[i]![j] = s[i]![j]! + wc[k]! * dz[i]! * dz[j]!;
-        for (let i = 0; i < n; i++) for (let j = 0; j < m; j++) pxz[i]![j] = pxz[i]![j]! + wc[k]! * dx[i]! * dz[j]!;
+        for (let i = 0; i < m; i++)
+          for (let j = 0; j < m; j++) s[i]![j] = s[i]![j]! + wc[k]! * dz[i]! * dz[j]!;
+        for (let i = 0; i < n; i++)
+          for (let j = 0; j < m; j++) pxz[i]![j] = pxz[i]![j]! + wc[k]! * dx[i]! * dz[j]!;
       });
     }
     const nu = z.map((v, i) => v - zHat[i]!);
-    const sInvNu = solve(s, nu.map((v) => [v]));
+    const sInvNu = solve(
+      s,
+      nu.map((v) => [v]),
+    );
     const nis = nu.reduce((acc, v, i) => acc + v * sInvNu[i]![0]!, 0);
     // K = Pxz·S⁻¹; P⁻ = P − K·S·Kᵀ.
     const k = transpose(solve(s, transpose(pxz)));

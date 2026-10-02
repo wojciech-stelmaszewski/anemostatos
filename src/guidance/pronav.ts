@@ -24,7 +24,10 @@ export function targetState(g: GuidanceParams, t: number): { pos: Vec3; vel: Vec
   // Sideways acceleration a·sin(ωt), centred: position −(a/ω²)·sin(ωt), velocity −(a/ω)·cos(ωt).
   const lat = -(a / (w * w)) * Math.sin(w * t);
   const latV = -(a / w) * Math.cos(w * t);
-  const pos = add(add(v3(g.targetX, 0, g.targetZ), scale(along, g.targetSpeed * t)), scale(side, lat));
+  const pos = add(
+    add(v3(g.targetX, 0, g.targetZ), scale(along, g.targetSpeed * t)),
+    scale(side, lat),
+  );
   const vel = add(scale(along, g.targetSpeed), scale(side, latV));
   return { pos, vel };
 }

@@ -1,5 +1,6 @@
 import { bangBangLimits, minimumTime } from '@/control/bangbang';
 import { designLqr } from '@/control/lqr';
+import { insGyroError } from '@/estimation/ins';
 import type { Simulation } from '@/engine/simulation';
 import { GRAVITY, type Params } from '@/sim/params';
 import { ignitionAltitude } from '@/sim/vehicles/rocket';
@@ -69,6 +70,26 @@ const exactIgnition = (p: Params): number => {
   const key = JSON.stringify(p.rocket);
   if (ignitionCache?.key !== key) ignitionCache = { key, h: ignitionAltitude(p.rocket) };
   return ignitionCache.h;
+};
+
+/** Lesson IV.26: the gyro bias on roll, °/s, and how long the navigator runs alone, s. */
+const DRIFT = { biasDeg: 0.05, seconds: 30 };
+/** The error lesson IV.26 asks the student to predict: g·b·t³/6 after DRIFT.seconds, m. */
+const driftAfter = (p: Params): number => {
+  const b = p.sensors.gyroBias;
+  return insGyroError((Math.hypot(b.x, b.z) * Math.PI) / 180, GRAVITY, DRIFT.seconds);
+};
+
+/** Lesson IV.27: the largest position error, in units of the filter's own σ, from `from` on. */
+const worstNees = (sim: Simulation, from: number): number => {
+  const w = sim.telemetry.window(['rng.err', 'rng.sigma2'], from);
+  let worst = 0;
+  for (let i = 0; i < w.t.length; i++) {
+    const e = w.series[0]![i]!;
+    const s = w.series[1]![i]! / 2;
+    if (Number.isFinite(e) && s > 0) worst = Math.max(worst, e / s);
+  }
+  return worst;
 };
 
 /** Lessons of Part IV, in plan order (by `n`). */
@@ -384,6 +405,204 @@ export const PART_FOUR: Lesson[] = [
           aim a little high and use the throttle to correct. A booster whose engine at its lowest
           setting still lifts more than its weight cannot even do that: it cannot hover, and must
           get the timing right.
+        </Notice>
+      </>
+    ),
+  },
+  {
+    id: 'pronav',
+    n: 24,
+    part: 4,
+    chapter: O,
+    title: 'Aim where it will be',
+    level: 3,
+    chart: 'engagement',
+    loop: 'pos.x',
+    setup: (p) => {
+      p.wind.enabled = false;
+      p.control.l3.outer = 'geometric';
+      p.guidance = { ...p.guidance, enabled: true, law: 'pursuit', weaveAcc: 3 };
+    },
+    goal: {
+      text: 'Catch the weaving target: a closest approach under 0.2 m.',
+      check: ({ sim }) => {
+        const p = sim.params;
+        if (!p.guidance.enabled) return 'switch the chase on';
+        if (p.control.l3.outer !== 'geometric')
+          return 'the guidance law commands an acceleration: fly it with the geometric outer stage';
+        const e = sim.engagement;
+        if (!e.over) return sim.t < p.guidance.start ? 'taking off…' : 'chasing…';
+        return (
+          e.minRange < 0.2 || `closest approach ${e.minRange.toFixed(2)} m: press R to chase again`
+        );
+      },
+    },
+    solution: (p) => {
+      p.guidance.law = 'pn';
+    },
+    body: (
+      <>
+        <p>
+          A target crosses the sky at the drone's height, 2 m/s, swerving from side to side. The
+          drone, twice as fast, must reach it. The obvious law is <b>pure pursuit</b>: always fly
+          towards where the target is now.
+        </p>
+        <p>
+          Watch the chart from above. The pursuer arrives where the target was and has to turn
+          again: it curls in behind and ends in a tail chase, a third longer than it needs, and
+          against a swerving target it cannot turn fast enough at the end.
+        </p>
+        <p>
+          <b>Proportional navigation</b> [Zarchan 2012] flies to where the target <i>will be</i>. If
+          the line of sight to the target does not rotate, the two are on a collision course
+          (sailors know it: a ship whose bearing stays constant will hit you). So turn against the
+          rotation:
+        </p>
+        <Tex display>{'a = N\\,V_c\\,\\dot\\lambda, \\qquad N \\approx 3\\text{–}5'}</Tex>
+        <p>
+          with <Tex>{'\\dot\\lambda'}</Tex> the rotation rate of the line of sight and{' '}
+          <Tex>{'V_c'}</Tex> the closing speed. It needs only what a seeker measures: an angle rate
+          and a closing speed, not where the target is going.
+        </p>
+        <Try>
+          Watch the pursuit, then set <b>Guidance → Guidance law</b> to proportional navigation and
+          press <b>R</b>. Then try <b>N</b> at 1, 3 and 6, and a bigger weave.
+        </Try>
+        <Notice>
+          Proportional navigation has guided missiles since the 1950s, and a version of it brings
+          spacecraft to a docking port. Its line of sight hardly turns until the very end, so the
+          pursuer flies an almost straight line: here 20 m instead of pursuit's 29, and a hit
+          instead of a 0.9 m miss.
+        </Notice>
+      </>
+    ),
+  },
+  {
+    id: 'ins',
+    n: 26,
+    part: 4,
+    chapter: O,
+    title: 'Drift',
+    level: 3,
+    chart: 'ins',
+    loop: 'pos.x',
+    setup: (p) => {
+      p.sensors.ins = true;
+      p.sensors.insStart = 5;
+      p.sensors.gyroBias = { x: DRIFT.biasDeg, y: 0, z: 0 };
+    },
+    predict: {
+      label: 'Navigator error after 30 s',
+      unit: 'm',
+      truth: driftAfter,
+      tolerance: 0.1,
+    },
+    goal: {
+      text: 'Before it happens, predict how far the inertial navigator will be from the truth after 30 seconds on its own, within 10 %.',
+      check: ({ sim, prediction }) => {
+        if (!sim.params.sensors.ins) return 'run the inertial navigator';
+        const truth = driftAfter(sim.params);
+        if (prediction == null)
+          return 'first the prediction: a tilt that grows like b·t, seen by gravity';
+        if (Math.abs(prediction - truth) / truth > 0.1)
+          return 'not within 10 %: integrate twice — g·b·t, then t², then t³';
+        const end = sim.params.sensors.insStart + DRIFT.seconds;
+        if (sim.t < end) return 'drifting…';
+        return true;
+      },
+    },
+    solution: () => {},
+    body: (
+      <>
+        <p>
+          An <b>inertial navigator</b> knows where it is without looking outside. It integrates the
+          gyro into an attitude, turns the accelerometer's reading into the world frame with that
+          attitude, adds gravity back, and integrates twice into velocity and position. Submarines,
+          airliners and rockets carry one; it cannot be jammed.
+        </p>
+        <p>
+          Here one runs alongside the drone from 5 s, started from the truth and never corrected.
+          Its gyro has a bias of 0.05 °/s on roll: a good MEMS gyro, a poor aircraft one. Without
+          the bias the navigator follows the drone exactly; the error is the bias alone.
+        </p>
+        <p>
+          A bias <Tex>{'b'}</Tex> tilts the navigator's "up" by <Tex>{'b\\,t'}</Tex>. Gravity, seen
+          through that tilt, looks like a horizontal acceleration of <Tex>{'g\\,b\\,t'}</Tex>, and
+          two integrations later:
+        </p>
+        <Tex display>{'e(t) \\approx \\tfrac{1}{6}\\,g\\,b\\,t^3'}</Tex>
+        <Try>
+          Compute the error after 30 s (the bias in rad/s!) and enter it. Then watch the error on a
+          logarithmic scale against the dashed prediction.
+        </Try>
+        <Notice>
+          The cube is merciless: a navigator that is 5 m off after 15 s is 38 m off after 30 s and
+          300 m after a minute. That is why every inertial system is aided — by GPS, a star tracker,
+          a terrain map — and why the aiding filter estimates the gyro bias, as the MEKF of III.23
+          did. Over hours the error would stop growing like t³ and swing with the Schuler period of
+          84 minutes: the earth's curvature turns a position error back into a tilt.
+        </Notice>
+      </>
+    ),
+  },
+  {
+    id: 'ukf',
+    n: 27,
+    part: 4,
+    chapter: O,
+    title: 'When the tangent lies',
+    level: 3,
+    chart: 'beacons',
+    loop: 'pos.x',
+    setup: (p) => {
+      p.sensors.beacons = true;
+      p.control.beaconFilter = { kind: 'ekf', guessX: 4, guessZ: 4, sigma0: 5, start: 5 };
+      p.setpoint.profile = 'circle';
+      p.setpoint.profileAmplitude = 1;
+      p.setpoint.profilePeriod = 20;
+    },
+    goal: {
+      text: 'Get an estimate you can trust: from 15 s to 35 s the position error never exceeds twice the filter’s own σ.',
+      check: ({ sim }) => {
+        if (!sim.params.sensors.beacons) return 'keep the beacon on';
+        if (sim.t < 35) return 'filtering…';
+        const w = worstNees(sim, 15);
+        return w <= 2 || `the error reached ${w.toFixed(1)} σ of what the filter claims`;
+      },
+    },
+    solution: (p) => {
+      p.control.beaconFilter.kind = 'ukf';
+    },
+    body: (
+      <>
+        <p>
+          A single beacon ten metres away tells the drone how far away it is, to 2 cm, ten times a
+          second. A filter starts 6 m from the truth, says so (σ = 5 m), and estimates the position
+          from the ranges alone. One range only says <i>on which circle</i> the drone is, not where
+          on it: the honest answer is "on that circle, somewhere".
+        </p>
+        <p>
+          The <b>EKF</b> replaces the circle by its tangent at the estimate. Each precise range then
+          shrinks its uncertainty across the tangent, and it ends up sure of a point that can be 5,
+          10, 20 metres off, with a σ of 30 cm. Its NIS looks healthy: the range it predicts matches
+          the range it measures, because a wrong point on the right circle fits.
+        </p>
+        <p>
+          The <b>unscented Kalman filter</b> [Julier 2004] does not linearise. It places 2n + 1
+          sigma points around the estimate, pushes each through the true distance function, and
+          reads the mean and the spread of the prediction from them. The curvature of the circle
+          shows up in that spread, and the filter does not believe what it cannot know.
+        </p>
+        <Try>
+          Watch the error against the dashed 2σ on the upper chart: the EKF's error runs far above
+          its own bound. Switch <b>Beacon filter</b> to the UKF and press <b>R</b>.
+        </Try>
+        <Notice>
+          The UKF is no better at finding the drone: it is still metres off, as one beacon must
+          leave it. It is honest about it, and an honest filter can be combined, gated and trusted;
+          a confident wrong one flies the vehicle into the ground. Note what the NIS could not tell:
+          a consistent innovation does not prove a consistent estimate, which only the truth (here,
+          the simulator) or a second, independent measurement can check.
         </Notice>
       </>
     ),

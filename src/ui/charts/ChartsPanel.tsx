@@ -5,6 +5,7 @@ import { sim, useUi, type AnalysisChart, type ExtraChart } from '@/store/sim';
 import { BodeChart } from '@/ui/analysis/BodeChart';
 import { DescribingChart } from '@/ui/analysis/DescribingChart';
 import { DispersionChart } from '@/ui/analysis/DispersionChart';
+import { EngagementChart } from '@/ui/analysis/EngagementChart';
 import { MimoChart } from '@/ui/analysis/MimoChart';
 import { MuChart } from '@/ui/analysis/MuChart';
 import { ValueMap } from '@/ui/analysis/ValueMap';
@@ -35,6 +36,9 @@ const EXTRA: { value: ExtraChart; label: string }[] = [
   { value: 'attitude', label: 'attitude estimate' },
   { value: 'dispersion', label: 'Monte Carlo campaign' },
   { value: 'fault', label: 'after a rotor loss' },
+  { value: 'engagement', label: 'the chase, from above' },
+  { value: 'ins', label: 'inertial drift' },
+  { value: 'beacons', label: 'range-only filter' },
   { value: 'fdi', label: 'fault detection' },
   { value: 'heading', label: 'heading estimate' },
   { value: 'nav', label: 'navigation filter' },
@@ -81,6 +85,19 @@ const NAV_NIS: SeriesSpec[] = [
 /** The two tests of the fault monitor (lesson III.28). */
 const NIS: SeriesSpec[] = [{ key: 'fdi.nis', label: 'NIS', color: SIGNAL.measurement, width: 2 }];
 const CUSUM: SeriesSpec[] = [{ key: 'fdi.cusum', label: 'CUSUM', color: SIGNAL.error, width: 2 }];
+/** Lesson IV.26: the inertial navigator's error against the prediction from the gyro bias. */
+const INS: SeriesSpec[] = [
+  { key: 'ins.err', label: 'navigator error', color: SIGNAL.error, width: 2 },
+  { key: 'ins.pred', label: 'g·b·t³/6', color: SIGNAL.measurement, dash: [4, 3], width: 1.5 },
+];
+/** Lesson IV.27: the range-only filter's error against its own 2σ. */
+const BEACON_ERR: SeriesSpec[] = [
+  { key: 'rng.err', label: 'position error', color: SIGNAL.error, width: 2 },
+  { key: 'rng.sigma2', label: 'filter 2σ', color: SIGNAL.measurement, dash: [4, 3], width: 1.5 },
+];
+const BEACON_NIS: SeriesSpec[] = [
+  { key: 'rng.nis', label: 'NIS of each range', color: SIGNAL.measurement, width: 1.5 },
+];
 /** After a rotor loss: how far the thrust axis is from where it should point. */
 const FAULT: SeriesSpec[] = [
   { key: 'fault.tiltErr', label: 'thrust-axis error', color: SIGNAL.error, width: 2 },
@@ -166,7 +183,9 @@ export function ChartsPanel() {
     extra === 'nav' ||
     extra === 'describing' ||
     extra === 'mu' ||
-    extra === 'value';
+    extra === 'value' ||
+    extra === 'engagement' ||
+    extra === 'beacons';
   const ctrlKey = useParams((s) => controllerKey(s.params));
   const loopOptions = useMemo(
     () => loopsFor(useParams.getState().params).map((l) => ({ value: l.id, label: l.name })),
@@ -296,6 +315,26 @@ export function ChartsPanel() {
           <div className="row-span-2 min-h-0">
             {extra === 'lyapunov' ? (
               <PhasePortrait meta={meta} lyapunov />
+            ) : extra === 'engagement' ? (
+              <EngagementChart />
+            ) : extra === 'beacons' ? (
+              <div className="flex h-full min-h-0 flex-col gap-1.5">
+                <div className="min-h-0 flex-1">
+                  <TimeChart
+                    title="Range-only filter: error against its own 2σ (log scale)"
+                    unit="m"
+                    series={BEACON_ERR}
+                    logY
+                  />
+                </div>
+                <div className="min-h-0 flex-1">
+                  <TimeChart
+                    title="NIS of the ranges (χ², 1 degree of freedom)"
+                    series={BEACON_NIS}
+                    logY
+                  />
+                </div>
+              </div>
             ) : extra === 'nav' ? (
               <div className="flex h-full min-h-0 flex-col gap-1.5">
                 <div className="min-h-0 flex-1">
@@ -378,6 +417,13 @@ export function ChartsPanel() {
           analysisChart(extra)
         ) : extra === 'phase' ? (
           <PhasePortrait meta={meta} />
+        ) : extra === 'ins' ? (
+          <TimeChart
+            title="Inertial navigator: position error (log scale)"
+            unit="m"
+            series={INS}
+            logY
+          />
         ) : extra === 'fault' ? (
           <TimeChart
             title="Thrust axis: error from its target"

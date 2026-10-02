@@ -1,0 +1,180 @@
+\lesson{II.8}{Feel the push}{A gust is a force. An accelerometer feels a force the instant it acts — long before it has moved the drone far enough to be an error.}{3}{indi-wind}{Part II · Beyond PID}
+\label{les:indiwind}
+
+\lead{\setupcard{\setuprow{Level}{L3}\setuprow{Wind}{the gusty wind of Lesson~I.11, in all three directions, seed 4242}\setuprow{Controller}{the cascade}\setuprow{Ghost}{the PID cascade on the same wind}\setuprow{Goal}{an RMS position error at least 40\,\% below the ghost's, between 8 and \SI{40}{s}}}%
+The previous lesson caught a torque the moment it acted, by measuring the angular acceleration. A gust is not a torque but a force, and the cascade of Part~I catches it slowly: the force must first change the velocity, then the velocity loop must notice, then its integral must build up. This lesson applies the incremental idea one level up. The accelerometer measures the force's effect at once; the acceleration loop keeps the thrust the motors produce now and changes it by exactly the missing acceleration. On the gust challenge's wind, the RMS position error falls from \SI{22}{cm} to six.}
+
+\section{Why the cascade is late}
+
+In the cascade of \lessonref{les:cascade} a horizontal gust acts on the drone through this chain: the force accelerates the drone; the velocity changes; the velocity loop sees a velocity error and asks for an acceleration against it; its P term reacts in proportion to the speed already gained, its I term only after the error has lasted. By the time the correction arrives, the gust has already moved the drone.
+
+The same happens vertically, with the altitude loop. The issue is not the gains — Part~I tuned them as high as noise and lag allowed — but the \emph{order} of the information: the controller learns of a force through its integrals, the velocity and the position, and integrals are slow.\didyouknow{Each integration costs $90^\circ$ of phase. A force reaches the position through two of them: by the time the position error peaks, a sinusoidal gust has already turned around.}
+
+\section{The incremental law on forces}
+
+Newton's law for the drone, now and an instant later, with all unknown forces collected in $\vec d$:
+\begin{equation*}
+  \hat m\,\vec a_0 = \vec F_0 + \hat m\vec g + \vec d, \qquad \hat m\,\vec a = \vec F + \hat m\vec g + \vec d' .
+\end{equation*}
+Over an increment the disturbance hardly changes, $\vec d' \approx \vec d$. Subtracting, and asking for the acceleration $\vec a_{sp}$ that the velocity loop wants:
+
+\begin{result}[Cascaded INDI on acceleration]
+\begin{equation}\label{eq:indiwind-law}
+  \vec F = \vec F_0 + \hat m\,\big(\vec a_{sp} - \vec a_0\big), \qquad \vec a_0 = R(q)\,\vec a_{meas} + \vec g .
+\end{equation}
+$\vec F_0$ is the thrust vector the motors produce now (their speeds, rotated with the attitude); $\vec a_0$ the acceleration the drone has now, from the accelerometer's specific force rotated into the world and with gravity added back (Prelude). Both pass through the same filter, here \SI{10}{Hz}.
+\end{result}
+
+The desired force then goes to the thrust-vector block of \lessonref{les:cascade}, which turns it into a tilt and a thrust, and the rate loop below flies the tilt. Nothing else changes in the cascade — except that the velocity loop's integral is now bypassed: the increment already integrates (as in Lesson~II.7, its steady state holds the force the motors produce), and a second integrator would only add overshoot.\recall{The accelerometer measures the specific force, acceleration minus gravity, in the body frame: hovering it reads $+g$ upwards (Prelude). Rotating it to the world and adding $\vec g$ gives the true acceleration.}
+
+\begin{example}[What INDI knows about the wind]
+\label{ex:indiwind-dist}
+Show that the law contains an estimate of the disturbance force, and compare it with the truth.
+
+\textbf{Step 1 — rearrange.} From the first line above, $\vec d = \hat m\vec a_0 - \vec F_0 - \hat m\vec g$. Every term is available to the controller: the filtered acceleration, the filtered thrust vector, the model mass.
+
+\textbf{Step 2 — the law in these terms.} Substituting $\vec F_0 = \hat m\vec a_0 - \hat m\vec g - \vec d$ into \cref{eq:indiwind-law}: $\vec F = \hat m(\vec a_{sp} - \vec g) - \hat{\vec d}$. The nominal force for the wanted acceleration, minus the estimated disturbance: ADRC's \enquote{cancel the estimate}, with the observer replaced by a sensor.\tip[-30pt]{When a disturbance-rejection scheme looks unfamiliar, rearrange it until it reads \enquote{nominal command minus estimated disturbance}. ADRC, INDI and the disturbance observers of industry all take that form.}
+
+\textbf{Step 3 — compare with the truth} (\cref{fig:indiwind-gust}, bottom). The simulator knows the true disturbance force. Over the 32 seconds of the challenge it has an RMS of \SI{0.51}{N} in $x$ and \SI{1.26}{N} in $y$; INDI's implied estimate differs from it by 0.07 and \SI{0.16}{N} RMS — and by only 0.03 and \SI{0.06}{N} once it is shifted by \SI{20}{ms}, the delay of the filter. INDI knows the wind almost exactly, about two hundredths of a second late, without ever having computed it.
+\end{example}
+
+\simfig{indi_gust}{The gust challenge's wind, in all three directions. Top: the position error of the PID cascade (grey) and with acceleration INDI (blue). Bottom: one gust enlarged — the true disturbance force and the estimate implied by the INDI law, which follows it \SI{20}{ms} late.}{fig:indiwind-gust}
+
+\section{How much the increment removes}
+
+Once the disturbance is cancelled, what remains of it is what passes during the time the correction takes to arrive. That time differs between the vertical and the horizontal direction, and so does the result.\innumbers{A gust of \SI{2}{rad/s} repeats every \SI{3}{s}. The vertical blind interval of \SI{52}{ms} is under 2\,\% of that, the horizontal \SI{0.2}{s} about 7\,\%.}
+
+\begin{example}[Vertical and horizontal, predicted]
+\label{ex:indiwind-residual}
+Estimate the fraction of a gust force that survives the INDI correction, at a gust frequency of \SI{2}{rad/s}, vertically and horizontally.
+
+\textbf{Step 1 — the residual.} If the correction arrives a time $T$ after the force, the residual force is $\vec d(t) - \vec d(t - T)$. For a sinusoidal force of frequency $\omega$ its size is $|1 - e^{-j\omega T}| \approx \omega T$ times the force.
+
+\textbf{Step 2 — vertically.} The thrust's size answers directly: the filter's delay, $\sqrt2/(2\pi \cdot 10) = \SI{22}{ms}$, plus the motors' \SI{30}{ms}. $T \approx \SI{52}{ms}$ and $\omega T = 0.10$: a tenth of the force survives.
+
+\textbf{Step 3 — horizontally.} A sideways force needs a tilt: the attitude loop's time constant $1/K_{att} = \SI{0.125}{s}$, the rate loop's lag and the filter add up to $T \approx \SI{0.2}{s}$. $\omega T = 0.4$: four tenths survive.
+
+\textbf{Step 4 — check.} The simulator, from the PID cascade to acceleration INDI: the vertical RMS error falls from 11.6 to \SI{1.6}{cm} (to 0.14), the horizontal from 19.0 to \SI{5.7}{cm} (to 0.30). The order and the rough size are those of the estimate; the PID cascade itself was not doing nothing, so the ratios are a little larger than the residuals.
+
+\textbf{Step 5 — the total.} \SI{22.2}{cm} RMS for the cascade, \SI{5.9}{cm} with acceleration INDI: 73\,\% less. Goal met by a wide margin. The largest single error falls from 78 to \SI{30}{cm}; the tilt still reaches $29^\circ$ in the strongest gusts — there is no way around tilting to hold against a sideways force (\cref{thm:tilt-hover}).
+\end{example}
+
+\begin{keyidea}[Each INDI loop rejects disturbances at its own level]
+Rate INDI cancels torques, acceleration INDI cancels forces. Neither helps with the other's disturbance: with only rate INDI the gust error is unchanged (\SI{22}{cm}), and with only acceleration INDI the broken prop of Lesson~II.7 drifts \SI{86}{cm}. Together they reduce both: \SI{3.8}{cm} after the broken prop, \SI{5.7}{cm} in the gusts. Research stacks put INDI under everything else for this reason.
+\end{keyidea}
+\pitfall{Switching on acceleration INDI without rate INDI is not a half-way house: it leaves every torque disturbance to the PID rate loop. Check which stage the disturbance enters before choosing the cure.}
+
+\begin{center}\small\sffamily
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lcccc}
+\toprule
+disturbance & PID & rate INDI & accel.\ INDI & both\\
+\midrule
+broken prop, max error & \SI{77}{cm} & \SI{21}{cm} & \SI{86}{cm} & \SI{3.8}{cm}\\
+gusty wind, RMS & \SI{22}{cm} & \SI{22}{cm} & \SI{5.9}{cm} & \SI{5.7}{cm}\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\screen[0 0 495 998]{indiwind}{Lesson II.8 in the app with acceleration INDI. The disturbance chart shows the true force of the wind and, dashed, the estimate implied by the INDI law; the chart selector offers the new loops \enquote{Accel x/y/z (INDI)}.}{fig:indiwind-screen}
+
+\begin{inapp}
+\begin{itemize}[leftmargin=1.2em]
+  \item The switch is \ui{Controller\then Disturbance compensation\then acceleration INDI} (\param{control.l3.compensation = 'indi'}); the filter is \param{control.indi.accFilterHz}, synchronised like the rate loop's.
+  \item The law is the class \texttt{AccelIndi} in \src{src/control/stages.ts}. It declares \texttt{replacesIntegral = true}, and the cascade then bypasses the velocity loop's I term.
+  \item Its \texttt{extras} publish the implied disturbance, $\hat m\vec a_f - \vec F_{0,f} - \hat m\vec g$, under \texttt{est.dist.*}, in the same definition as the simulator's true \texttt{dist.*}.
+  \item The goal compares with a reference flight of the PID cascade on the same seed, computed once when the lesson starts.
+\end{itemize}
+\end{inapp}
+
+\begin{trythis}
+\begin{enumerate}
+  \item First switch only the inner stage to rate INDI and reset. Is the gust error better?
+  \item Now set \ui{Disturbance compensation\then acceleration INDI}. Pick the loop \enquote{Accel X (INDI)} in the chart selector and look at its parts.
+  \item Lower the accelerometer filter to \SI{2}{Hz}. What happens to the vertical error, and why?
+\end{enumerate}
+\predict{with the accelerometer filter at \SI{2}{Hz}, how long is the vertical correction delayed, and what fraction of a \SI{2}{rad/s} gust survives?}
+\end{trythis}
+
+\section{The engineer's view: measure the effect, not the cause}
+
+\subsection{Sensors that see forces}
+A position sensor sees a force only after two integrations, a velocity sensor after one. An accelerometer sees it directly: the specific force \emph{is} the sum of all non-gravitational forces divided by the mass. That is why acceleration feedback is the classical cure for disturbances in mechanical systems — in active suspensions, in machine tools, in the vibration isolation of telescopes and wafer steppers — and why every flight controller carries an accelerometer even when it never uses it for navigation.\didyouknow{Wafer steppers position a silicon wafer to a nanometre while it accelerates at several $g$. Their stages measure their own acceleration and feed it back for the same reason as here: the forces arrive faster than any position sensor can report them.}
+
+The price is the sensor's own imperfections. Accelerometers are noisy and vibrate with the frame; their bias drifts; and the measured acceleration includes the motors' own vibration (Lesson~III.20). The filter of \SI{10}{Hz} is a compromise between these and the delay of Example~\ref{ex:indiwind-residual} — the trade of Lesson~II.6 once more.
+
+\subsection{Where it stops}
+The correction is only as good as the blind interval is short compared with the disturbance. A gust that rises in a tenth of a second is half over before a horizontal correction arrives. What remains is either accepted or attacked with \emph{preview}: measuring the disturbance before it arrives.
+
+\begin{example}[An airliner flying into a gust]
+\label{ex:indiwind-aircraft}
+An airliner at \SI{230}{m/s} meets the upward gust of \SI{10}{m/s} from Example~\ref{ex:challenge-aircraft}, which now rises over \SI{50}{m} of air. The load-alleviation system deflects spoilers in proportion to the measured vertical acceleration; from accelerometer to spoiler the blind interval is about \SI{0.15}{s}. How much of the extra load does it remove?
+
+\textbf{Step 1 — the gust's time.} \SI{50}{m} at \SI{230}{m/s}: the gust rises in \SI{0.22}{s}. Its dominant frequency is about $\pi/0.22 = \SI{14}{rad/s}$.
+
+\textbf{Step 2 — the residual.} $|1 - e^{-j\omega T}|$ with $\omega T = 14 \cdot 0.15 = 2.1$: $2\sin(1.05) = 1.7$. The correction arrives so late that it is out of phase: measured feedback alone would make the peak \emph{worse}.
+
+\textbf{Step 3 — the remedy.} Measure the gust \emph{before} the wing meets it: a sensor in the nose (an angle-of-attack vane or, in research aircraft, a laser that sees the air ahead) gives about \SI{0.1}{s} of preview, enough to move the spoilers as the gust arrives. This is feedforward, not feedback; it needs a model of how the gust will act, and it rejects what the feedback cannot.\tip[-40pt]{Feedback needs no model of the disturbance but always comes late; feedforward comes on time but needs a model. Good designs use feedforward for what can be seen coming and feedback for the rest.}
+
+\textbf{Step 4 — read it.} The increment is a powerful idea with a hard limit: the time between cause and correction. For the drone at \SI{2}{rad/s} that time is short enough; for an airliner's sharp gusts it is not, and the answer is to see further ahead.
+\end{example}
+
+\subsection{In formal terms}
+
+\begin{theorem}[What survives a delayed cancellation]
+\label{thm:indiwind-residual}
+Let a disturbance $d(t)$ be cancelled by an estimate that equals $d$ delayed by $T$ and filtered by $F(s)$ with $F(0) = 1$. Then the residual $d - \hat d$ has the transfer function $1 - F(s)e^{-sT}$ from $d$, and for frequencies with $\omega T \ll 1$ and $|F(j\omega) - 1| \ll 1$ its gain is approximately $\omega\,(T + T_F)$, where $T_F = -F'(0)$ is the filter's own delay. For a signal whose spectrum is concentrated below $\omega_d$, the residual RMS is at most about $\omega_d(T + T_F)$ times the disturbance's.
+\end{theorem}
+\begin{proof}
+Expand to first order in $s$: $F(s)e^{-sT} \approx (1 + F'(0)s)(1 - sT) \approx 1 - s(T + T_F)$, so $1 - Fe^{-sT} \approx s(T + T_F)$. The RMS bound follows by integrating the squared gain against the disturbance's spectrum (\cref{thm:E-psd}).
+\end{proof}
+
+For the second-order Butterworth filter at $f_c$, $T_F = \sqrt2/(2\pi f_c)$, which gave the \SI{22}{ms} of Example~\ref{ex:indiwind-residual}. The theorem is the frequency-domain form of \enquote{the faster the correction, the less gets through}, and it is the same law that limited the rate INDI of Lesson~II.7 and the observer of Lesson~II.5: every disturbance-cancelling scheme is judged by its total delay.\recall{The Butterworth filter's delay at low frequency is its group delay $\sqrt2/\omega_c$: Lesson~II.6, and the sampling of \cref{app:sampling} adds half a sample more.}
+
+\begin{lookahead}
+\begin{itemize}[leftmargin=1.2em]
+  \item The two filters of each INDI loop must be identical; what happens when they are not is the next lesson.
+  \item An optimiser on top of INDI — model predictive control planning the motion, INDI cancelling what the plan's model left out — is Lesson~II.15.
+  \item Learning the shape of the disturbance, so that it can be predicted rather than only measured, is Lesson~II.19. Gust preview and load alleviation return with the aircraft of Part~IV (IV.11, IV.17).
+  \item Accelerometer vibration and its filtering: Lessons~III.20 and III.21.
+\end{itemize}
+\end{lookahead}
+
+\begin{remember}
+\begin{itemize}
+  \item A gust is a force; an accelerometer measures its effect at once.
+  \item Acceleration INDI: $\vec F = \vec F_0 + \hat m(\vec a_{sp} - \vec a_0)$, with $\vec a_0$ from the accelerometer, $\vec F_0$ from the motors, both through the same filter. The velocity integral is bypassed.
+  \item It implies the estimate $\hat{\vec d} = \hat m\vec a_0 - \vec F_0 - \hat m\vec g$; here within a few per cent of the truth, \SI{20}{ms} late.
+  \item What survives is about $\omega T$ of the disturbance, $T$ the total delay: a tenth vertically, nearer half horizontally, where the drone must tilt.
+  \item Gusty wind: \SI{22}{cm} RMS with the PID cascade, \SI{5.9}{cm} with acceleration INDI; rate and acceleration INDI each reject their own kind of disturbance.
+\end{itemize}
+\end{remember}
+
+\begin{curiosity}{Wings that feel the gust}
+An airliner's wing is a long beam, and a gust is a sudden extra load at its tip. The structure must be strong enough for the worst gusts the certification rules prescribe, and strength is weight. Since the 1970s engineers have asked whether the controls could take part of that load instead: when a gust pushes the wing up, deflect the ailerons and spoilers so that the lift moves inboard, towards the root, where the wing is strong.
+
+The first load-alleviation systems used accelerometers in the wing and on the fuselage, exactly as in this lesson: they sensed the gust's effect and reacted. They worked for slow, long gusts and for the bending of the wing that follows a gust, but they were always a little late for the sharpest ones, as Example~\ref{ex:indiwind-aircraft} shows. Later systems added sensors that look ahead of the aircraft: vanes and pressure ports in the nose, and in research flights laser instruments that measure the air a hundred metres in front.
+
+The reward is in the structure. A wing that does not have to carry the full peak of every gust can be lighter or longer for the same weight, and a longer wing flies more efficiently. In the newest designs the control laws are part of the structural design from the first day — measured forces, cancelled before they become stresses.
+\end{curiosity}
+
+\begin{exercises}
+\exercise[1] The accelerometer of a hovering drone reads $(0.3,\ 9.81,\ 0)\,\si{m/s^2}$ in the body frame, which is level. What is the drone's acceleration, and what force does INDI attribute to a disturbance if the motors produce exactly \SI{9.81}{N} upwards ($\hat m = \SI{1}{kg}$)?
+\answer{$\vec a = (0.3, 0, 0)\,\si{m/s^2}$; $\hat d = \hat m\vec a - \vec F_0 - \hat m\vec g = (0.3, 0, 0)$\,N: a sideways push of \SI{0.3}{N}.}
+\exercise[1] What is the delay $\sqrt2/(2\pi f_c)$ of the second-order Butterworth filter at 5, 10 and \SI{20}{Hz}?
+\answer{45, 22 and \SI{11}{ms}.}
+\exercise[1] By Example~\ref{ex:indiwind-residual}, what fraction of a vertical \SI{2}{rad/s} gust survives if the accelerometer filter is at \SI{2}{Hz}?
+\answer{$T_F = \sqrt2/(2\pi \cdot 2) = \SI{0.11}{s}$, $T \approx 0.14$: $\omega T = 0.28$, about a quarter.}
+\exercise[2]\exkind{derive} Derive \cref{eq:indiwind-law} from Newton's law at two instants, and show that its steady state, with $\vec a_0 = \vec a_{sp} = 0$, is $\vec F = \vec F_0$, whatever the steady wind.
+\answer{Subtract $\hat m\vec a_0 = \vec F_0 + \hat m\vec g + \vec d$ from $\hat m\vec a = \vec F + \hat m\vec g + \vec d'$ with $\vec d' = \vec d$, and set $\vec a = \vec a_{sp}$. In steady state $\vec a_0 = 0$ and $\vec a_{sp} = 0$ (velocity at its setpoint), so $\vec F = \vec F_0$: the motors keep producing exactly what holds the drone against the wind.}
+\exercise[2]\exkind{derive} With $T = \SI{52}{ms}$, at which gust frequency does the vertical residual of \cref{thm:indiwind-residual} reach one half? What does that say about very short gusts?
+\answer{$\omega T = 0.5$ (first-order estimate): $\omega \approx \SI{10}{rad/s}$, a gust of about \SI{0.3}{s}. Shorter gusts are cancelled less and less; beyond $\omega T \approx 1$ the correction no longer helps.}
+\exercise[2]\exkind{derive} Example~\ref{ex:indiwind-dist}, Step~2. Show that with a wrong model mass, $\hat m \ne m$, the implied estimate is $\hat{\vec d} = \vec d + (\hat m - m)(\vec a_0 - \vec g)$, and explain why a wrong mass makes no difference to the cancellation in hover.
+\answer{With the true law $m\vec a_0 = \vec F_0 + m\vec g + \vec d$: $\hat m\vec a_0 - \vec F_0 - \hat m\vec g = \vec d + (\hat m - m)(\vec a_0 - \vec g)$. In hover the term $(\hat m - m)(-\vec g)$ is constant: it is part of what the increment cancels, like any constant force.}
+\exercise[2]\exkind{fly} In Lesson~II.8 switch acceleration INDI on, then set \param{control.model.mass} to 0.7 and to \SI{1.5}{kg}. Does the RMS error change much? Which way, and why? Use the previous exercise and the inertia experiment of Lesson~II.7.
+\answer{Not much: \SI{7.2}{cm} at \SI{0.7}{kg}, \SI{5.1}{cm} at \SI{1.5}{kg}, against \SI{5.9}{cm} with the true mass and \SI{22}{cm} for the PID cascade. The steady part of the error is cancelled as a constant force; $\hat m$ only scales each increment, like the inertia of Lesson~II.7 — too small and the correction takes several steps, somewhat too large and it acts like a higher gain, until far too large overshoots.}
+\exercise[2]\exkind{code} In \src{src/control/stages.ts}, \texttt{AccelIndi.sample} rotates the accelerometer reading with the \emph{measured} attitude $q$. What error does an attitude error of $1^\circ$ produce in $\vec a_0$ when hovering, and how does INDI respond to it?
+\answer{The specific force of $g$ is rotated by $1^\circ$ too far: a false horizontal acceleration of $g\sin1^\circ = \SI{0.17}{m/s^2}$, which INDI cancels by tilting slightly — a steady position error until the outer loops, which see the true position, push back.}
+\exercise[3]\exkind{derive} The residual of a filtered, delayed cancellation, exactly. For $F(s) = \omega_f^2/(s^2 + \sqrt2\omega_fs + \omega_f^2)$ and the motor lag $1/(\tau_ms + 1)$ in place of a pure delay, compute $|1 - F(j\omega)/(1 + j\omega\tau_m)|$ at \SI{2}{rad/s} for $f_c = \SI{10}{Hz}$ and $\tau_m = \SI{30}{ms}$, and compare with $\omega(T_F + \tau_m)$.
+\answer{$F(2j) \approx 1 - 0.0225 \cdot 2j - \dots$, $1/(1 + 0.06j) \approx 1 - 0.06j$: the product is about $1 - 0.105j$; the residual $\approx 0.105$, equal to $\omega(T_F + \tau_m) = 2 \cdot 0.0525$ to two digits.}
+\end{exercises}

@@ -649,7 +649,9 @@ for (const k of [0.5, 2, 3, 4, 6, 8, 12])
   });
 for (const [tag, inner, comp] of [
   ['pid', 'pid', 'none'],
+  ['rate', 'indi', 'none'],
   ['acc', 'pid', 'indi'],
+  ['both', 'indi', 'indi'],
 ] as const)
   add({
     name: `indi-gust-${tag}`,
@@ -659,6 +661,17 @@ for (const [tag, inner, comp] of [
       gusty(p);
       p.control.l3.inner = inner;
       p.control.l3.compensation = comp;
+    },
+  });
+for (const m of [0.7, 1.5])
+  add({
+    name: `indi-gust-mass${m}`,
+    seconds: 40,
+    setup: (p) => {
+      l3(p);
+      gusty(p);
+      p.control.l3.compensation = 'indi';
+      p.control.model.mass = m;
     },
   });
 for (const sync of [false, true])

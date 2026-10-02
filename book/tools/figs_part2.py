@@ -449,3 +449,26 @@ def indi_effect():
     b.set_xlabel("$\\omega$  [rad/s]", loc="right")
     b.grid(True, which="major", axis="both")
     save(f, "indi_effect")
+
+
+# ─── Lesson II.8 ───────────────────────────────────────────────────────────
+@fig
+def indi_gust():
+    f, (a, b) = plt.subplots(2, 1, figsize=(TEXT_W, 78 * MM), gridspec_kw=dict(hspace=0.42))
+    for tag, col, lab in (("pid", C["ghost"], "PID cascade: 22.2 cm RMS"), ("acc", C["meas"], "acceleration INDI: 5.9 cm RMS")):
+        d = win(load(f"indi-gust-{tag}"), 8, 40)
+        a.plot(d.t, 100 * _poserr(d), color=col, lw=1.2 if tag == "pid" else 0.9, label=lab)
+    a.legend(loc="upper right")
+    a.set_xlim(8, 40)
+    a.set_title("Position error on the gusty wind, same seed")
+    a.set_ylabel("cm")
+    xlab_time(a)
+    d = win(load("indi-gust-acc"), 13.5, 16.5)
+    b.plot(d.t, d["dist.x"], color=C["ink"], lw=1.0, label="true disturbance force, $x$")
+    b.plot(d.t, d["est.dist.x"], color=C["meas"], lw=1.0, ls=(0, (4, 2)), label="what INDI implies: $\\hat m a_f - F_{0,f} - \\hat m g$")
+    b.legend(loc="lower left", fontsize=6.2)
+    b.set_xlim(13.5, 16.5)
+    b.set_title("One gust, enlarged")
+    b.set_ylabel("N")
+    xlab_time(b)
+    save(f, "indi_gust")

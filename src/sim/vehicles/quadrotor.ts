@@ -9,7 +9,7 @@ import {
 } from '@/math/quat';
 import { add, clone, cross, dot, length, normalize, scale, sub, v3, type Vec3 } from '@/math/vec3';
 import { FOOT_HEIGHT, MOTOR_POSITIONS } from '../drone';
-import { GRAVITY, type DroneParams, type Level } from '../params';
+import { GRAVITY, type DroneParams, type Level, type Params } from '../params';
 
 export interface DroneState {
   pos: Vec3;
@@ -186,4 +186,60 @@ export const rotorDragForce = (s: DroneState, wind: Vec3, thrust: number, k: num
   const up = qRotate(s.q, upY);
   const inPlane = sub(r, scale(up, dot(r, up)));
   return scale(inPlane, -k * thrust);
+};
+
+/**
+ * The quadrotor as a `Vehicle` (docs/aerospace-gnc.md §3.1). The simulator still calls
+ * `stepDynamics` directly; this wrapper is what trim and linearize see. Its state vector is
+ * (position, velocity, the rotor thrusts as the motors' lag state), and at level 1 it is the
+ * vertical (y, v, Σ rotor thrust) of the altitude loop, which `l1Plant` models by hand.
+ */
+export const quadrotor = {
+  id: 'quadrotor' as const,
+  initial: (): DroneState => initialState(),
+  step(s: DroneState, u: Actuation, env: { wind: Vec3; external: Vec3 }, dt: number, p: Params) {
+    stepDynamics(p.sim.level, s, u, env.wind, env.external, p.drone, dt);
+  },
+  stateNames: ['y', 'v', 'T'] as const,
+  inputNames: ['thrust'] as const,
+  toVector(s: DroneState): number[] {
+    return [s.pos.y, s.vel.y, s.rotors[0] + s.rotors[1] + s.rotors[2] + s.rotors[3]];
+  },
+  fromVector(x: readonly number[], ref: DroneState): DroneState {
+    const s: DroneState = {
+      ...ref,
+      pos: v3(ref.pos.x, x[0]!, ref.pos.z),
+      vel: v3(0, x[1]!, 0),
+      q: { ...ref.q },
+      omega: v3(),
+      motors: [...ref.motors],
+      rotors: [x[2]! / 4, x[2]! / 4, x[2]! / 4, x[2]! / 4],
+      force: clone(ref.force),
+      accel: v3(),
+      landed: false,
+      crashed: false,
+    };
+    return s;
+  },
+  inputToVector: (u: Actuation): number[] => [
+    u.motorCmd[0] + u.motorCmd[1] + u.motorCmd[2] + u.motorCmd[3],
+  ],
+  inputFromVector: (v: readonly number[]): Actuation => ({
+    motorCmd: [v[0]! / 4, v[0]! / 4, v[0]! / 4, v[0]! / 4],
+    forceCmd: v3(),
+  }),
+  /** Hover at 2 m in calm air: the thrust that holds the weight (with healthy motors). */
+  trim(p: Params): { state: DroneState; input: Actuation } {
+    const eta = p.drone.motorEfficiency.reduce((a, b) => a + b, 0) / 4;
+    const w = (p.drone.mass * GRAVITY) / eta;
+    const s = initialState();
+    s.pos = v3(0, 2, 0);
+    s.landed = false;
+    s.rotors = [w / 4, w / 4, w / 4, w / 4];
+    s.motors = s.rotors.map((r, i) => r * p.drone.motorEfficiency[i]!) as DroneState['motors'];
+    return {
+      state: s,
+      input: { motorCmd: [w / 4, w / 4, w / 4, w / 4], forceCmd: v3() },
+    };
+  },
 };

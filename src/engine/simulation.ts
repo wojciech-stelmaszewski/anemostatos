@@ -20,6 +20,8 @@ import { Wind } from '@/sim/wind';
 import { probeSignal } from './probe';
 import { profileOffset, zeroReference, type Reference } from './reference';
 import { FaultMonitor } from '@/estimation/fdi';
+import { RocketLander } from '@/control/rocket';
+import { initialRocket, stepRocket, type RocketState } from '@/sim/vehicles/rocket';
 import { Tap } from './tap';
 import { Telemetry } from './telemetry';
 
@@ -73,6 +75,9 @@ export class Simulation {
   tap = new Tap();
   /** The fault monitor of the flight computer (L3, lesson III.28). */
   fdi = new FaultMonitor();
+  /** The rocket and its landing law, while `params.sim.vehicle` is 'rocket' (Part IV). */
+  rocket: RocketState | null = null;
+  lander = new RocketLander();
   /** A frozen earlier run, overlaid on the charts for comparison. */
   ghost: { telemetry: Telemetry; label: string } | null = null;
   /** A lesson's script: run after every reset to (re)schedule its events. */
@@ -186,6 +191,9 @@ export class Simulation {
     this.measurement = null;
     this.tap.reset();
     this.fdi.reset();
+    this.lander.reset();
+    this.rocket = p.sim.vehicle === 'rocket' ? initialRocket(p.rocket) : null;
+    if (this.rocket) this.mirrorRocket();
     this.script?.(this);
     for (const fn of this.resetListeners) fn();
   }
@@ -285,6 +293,10 @@ export class Simulation {
     const dt = PHYS_DT;
     this.prevPos = clone(this.state.pos);
     this.prevQ = { ...this.state.q };
+    if (this.rocket) {
+      this.stepRocket(dt);
+      return;
+    }
 
     // Scripted events and the automatic setpoint profile.
     while (this.scheduled.length && this.scheduled[0]!.t <= this.t)
@@ -394,6 +406,46 @@ export class Simulation {
     this.t += dt;
     this.stepIndex++;
     if (this.stepIndex % TELEMETRY_EVERY === 0) this.record();
+  }
+
+  /**
+   * The rocket of Part IV: its own state and law, mirrored into `state` so that the scene, the
+   * camera and the charts follow it like the drone.
+   */
+  private stepRocket(dt: number): void {
+    const r = this.rocket!;
+    const p = this.params;
+    while (this.scheduled.length && this.scheduled[0]!.t <= this.t)
+      this.scheduled.shift()!.fn(this);
+    const u = this.armed && !r.crashed ? this.lander.tick(r, p) : { thrust: 0 };
+    const ext = this.poke && this.t < this.poke.until ? this.poke.force : v3();
+    if (this.poke && this.t >= this.poke.until) this.poke = null;
+    stepRocket(r, u, ext, dt, p.rocket);
+    this.mirrorRocket();
+    this.t += dt;
+    this.stepIndex++;
+    if (this.stepIndex % TELEMETRY_EVERY === 0) this.record();
+  }
+
+  private mirrorRocket(): void {
+    const r = this.rocket!;
+    const s = this.state;
+    s.pos = v3(0, r.h, 0);
+    s.vel = v3(0, r.v, 0);
+    s.landed = r.landed;
+    s.crashed = r.crashed;
+    s.q = { w: 1, x: 0, y: 0, z: 0 };
+    const quarter = r.thrust / 4;
+    s.motors = [quarter, quarter, quarter, quarter];
+    s.rotors = [quarter, quarter, quarter, quarter];
+    if (r.crashed) this.armed = false;
+    this.forces = {
+      thrust: v3(0, r.thrust, 0),
+      gravity: v3(0, -r.mass * GRAVITY, 0),
+      drag: v3(),
+      external: v3(),
+      net: v3(0, r.thrust - r.mass * GRAVITY, 0),
+    };
   }
 
   /**
@@ -523,8 +575,14 @@ export class Simulation {
       tl.set('probe.u', this.probe.u);
       tl.set('probe.uc', this.probe.uc);
     }
-    const loops = this.controller.loops();
+    const loops = this.rocket ? { alt: this.lander.last } : this.controller.loops();
     for (const id in loops) recordLoop(tl, id, loops[id]!);
+    if (this.rocket) {
+      const r = this.rocket;
+      tl.set('rocket.mass', r.mass);
+      tl.set('rocket.fuel', r.fuel);
+      tl.set('rocket.thrust', r.thrust);
+    }
     const extras = this.controller.extras();
     for (const k in extras) tl.set(k, extras[k]!);
     tl.commit(this.t);

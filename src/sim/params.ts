@@ -1,3 +1,5 @@
+import type { RocketParams } from './vehicles/rocket';
+import type { VehicleId } from './vehicles/types';
 import { defaultGains, type PidGains } from '@/control/pid';
 
 export type Level = 1 | 2 | 3;
@@ -262,6 +264,8 @@ export interface ControlParams {
   navEkf: NavEkfParams;
   fault: FaultParams;
   fdi: FdiParams;
+  /** The landing law of the rocket (src/control/rocket.ts). */
+  lander: { ignitionAlt: number; touchdownSpeed: number; speedGain: number };
   l1: { kind: L1Kind; estimator: L1Estimator };
   /** L1 LQR / LQI (docs/beyond-pid.md §4). Cost weights of J = Σ (q·x² + r·u²)·dt. */
   lqr: {
@@ -452,7 +456,10 @@ export interface WorldParams {
 }
 
 export interface Params {
-  sim: { level: Level; seed: number };
+  /** `vehicle` selects what flies (Part IV); the quadrotor is the default and the only one before. */
+  sim: { level: Level; seed: number; vehicle?: VehicleId };
+  /** The 1D rocket of lesson IV.4 (src/sim/vehicles/rocket.ts). */
+  rocket: RocketParams;
   world: WorldParams;
   setpoint: {
     x: number;
@@ -477,7 +484,17 @@ export interface Params {
 }
 
 export const defaultParams = (): Params => ({
-  sim: { level: 1, seed: 1337 },
+  sim: { level: 1, seed: 1337, vehicle: 'quadrotor' },
+  rocket: {
+    dryMass: 20,
+    fuel: 10,
+    thrustMax: 600,
+    thrustMin: 150,
+    isp: 200,
+    startAlt: 120,
+    startVel: 0,
+    crashSpeed: 1,
+  },
   world: { ceiling: 0, pillar: false, pillarX: 3, pillarZ: 0, pillarR: 0.6 },
   setpoint: {
     x: 0,
@@ -568,6 +585,7 @@ export const defaultParams = (): Params => ({
       leadLag: false,
       source: 'oracle',
     },
+    lander: { ignitionAlt: 30, touchdownSpeed: 0.5, speedGain: 2 },
     fdi: { nisWindow: 10, nisThreshold: 45, nisLow: 0, cusumDrift: 0.02, cusumThreshold: 0.02 },
     l1: { kind: 'pid', estimator: 'none' },
     lqr: {

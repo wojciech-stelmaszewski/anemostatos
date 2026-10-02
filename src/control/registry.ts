@@ -26,6 +26,7 @@ export const controllerKey = (p: Params): string => {
     l3.compensation,
     l3.safety,
     p.control.fault.enabled,
+    p.sim.vehicle ?? 'quadrotor',
   ].join('|');
 };
 

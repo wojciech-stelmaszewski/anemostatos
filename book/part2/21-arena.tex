@@ -88,6 +88,8 @@ Read the Noisy sensors column together with the motor jitter.
 
 The third price is computing time. \texttt{make bench} measures it as wall-clock time per \SI{1}{ms} physics step, simulation included, so the numbers depend on the machine and on what else it is doing. On the machine that built this book (2~October~2026), every formula controller — PID, geometric, INDI, L1, learned residual, the neural policy — cost between 9.7 and \SI{10.5}{\micro s} per step, MPC 31 to \SI{33}{\micro s} and MPPI \SI{86}{\micro s}; the run recorded in \texttt{docs/arena.md} (28~September) gave 2.8 to 3.6, about 24 and \SI{74}{\micro s}. The formula controllers are indistinguishable behind the cost of the physics; the optimisers are three and eight times more expensive, and on a flight computer, where there is no physics to simulate, the ratio is larger.\innumbers{MPPI rolls out 256 sampled input sequences of 30 steps every \SI{20}{ms}: about \num{380000} model steps per second.}
 
+\simfig{screens/arena}{Lesson II.21 in the app after \ui{Run the arena}, run in a browser: the results table of the lesson panel. The table is wider than the panel; it is shown here at its two scroll positions, left and right of the line. Orange marks the best value of each column. The cells agree with \cref{fig:arena-grid} except MPPI's row, whose flights depend on its sampled rollouts and come out a few millimetres different from the recorded flights behind the book's numbers. The \ui{\textmu s} column is the wall-clock time per physics step in that browser: it depends on the machine and on its load.}{fig:arena-screen}
+
 \section{What each family is best for}
 
 \begin{result}[Part II in one table]

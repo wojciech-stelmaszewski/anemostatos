@@ -24,6 +24,9 @@ import { RocketLander } from '@/control/rocket';
 import { initialRocket, stepRocket, type RocketState } from '@/sim/vehicles/rocket';
 import { TvcController } from '@/control/tvc';
 import { initialTvc, modeSlope, stepTvc, type TvcState } from '@/sim/vehicles/tvc';
+import { Autopilot } from '@/control/autopilot';
+import { atmosphere, dynamicPressure } from '@/sim/atmosphere';
+import { initialAircraft, stepAircraft, type AircraftState } from '@/sim/vehicles/aircraft';
 import { Engagement, targetState } from '@/guidance/pronav';
 import { insGyroError } from '@/estimation/ins';
 import { Tap } from './tap';
@@ -90,6 +93,9 @@ export class Simulation {
   /** The planar rocket of Chapter L and its thrust-vector controller, while `sim.vehicle` is 'tvc'. */
   tvc: TvcState | null = null;
   tvcControl = new TvcController();
+  /** The aircraft and its pitch autopilot, while `params.sim.vehicle` is 'aircraft' (Chapter M). */
+  aircraft: AircraftState | null = null;
+  autopilot = new Autopilot();
   /** A frozen earlier run, overlaid on the charts for comparison. */
   ghost: { telemetry: Telemetry; label: string } | null = null;
   /** A lesson's script: run after every reset to (re)schedule its events. */
@@ -217,6 +223,12 @@ export class Simulation {
       this.mirrorTvc();
       this.takingOff = false;
     }
+    this.aircraft = p.sim.vehicle === 'aircraft' ? initialAircraft(p.aircraft) : null;
+    this.autopilot.reset(p);
+    if (this.aircraft) {
+      this.mirrorAircraft();
+      this.takingOff = false;
+    }
     this.script?.(this);
     for (const fn of this.resetListeners) fn();
   }
@@ -322,6 +334,10 @@ export class Simulation {
     }
     if (this.tvc) {
       this.stepTvcRocket(dt);
+      return;
+    }
+    if (this.aircraft) {
+      this.stepAircraft(dt);
       return;
     }
 
@@ -496,6 +512,37 @@ export class Simulation {
     if (this.stepIndex % TELEMETRY_EVERY === 0) this.record();
   }
 
+  /** The aircraft of Chapter M: like the rocket, its own state and law, mirrored into `state`. */
+  private stepAircraft(dt: number): void {
+    const a = this.aircraft!;
+    const p = this.params;
+    while (this.scheduled.length && this.scheduled[0]!.t <= this.t)
+      this.scheduled.shift()!.fn(this);
+    const u = this.autopilot.tick(a, p, dt);
+    const ext = this.poke && this.t < this.poke.until ? this.poke.force : v3();
+    if (this.poke && this.t >= this.poke.until) this.poke = null;
+    stepAircraft(a, u, ext, dt, p.aircraft);
+    this.mirrorAircraft();
+    this.t += dt;
+    this.stepIndex++;
+    if (this.stepIndex % TELEMETRY_EVERY === 0) this.record();
+  }
+
+  private mirrorAircraft(): void {
+    const a = this.aircraft!;
+    const s = this.state;
+    const gamma = a.theta - a.alpha;
+    s.pos = v3(a.x, a.h, 0);
+    s.vel = v3(a.V * Math.cos(gamma), a.V * Math.sin(gamma), 0);
+    s.q = qFromAxisAngle(v3(0, 0, 1), a.theta);
+    s.crashed = a.crashed;
+    s.landed = false;
+    const quarter = a.thrust / 4;
+    s.motors = [quarter, quarter, quarter, quarter];
+    s.rotors = [quarter, quarter, quarter, quarter];
+    if (a.crashed) this.armed = false;
+  }
+
   private mirrorTvc(): void {
     const r = this.tvc!;
     const s = this.state;
@@ -519,6 +566,7 @@ export class Simulation {
   loops(): Record<string, LoopTerms> {
     if (this.rocket) return { alt: this.lander.last };
     if (this.tvc) return { pitch: this.tvcControl.last, drift: this.tvcControl.drift };
+    if (this.aircraft) return { pitch: this.autopilot.last };
     return this.controller.loops();
   }
 
@@ -725,6 +773,21 @@ export class Simulation {
           ? (r.theta - (r.u - this.wind.velocity.x) / this.params.tvc.speed) * DEG
           : 0,
       );
+    }
+    if (this.aircraft) {
+      const a = this.aircraft;
+      const deg = 180 / Math.PI;
+      tl.set('air.V', a.V);
+      tl.set('air.vref', this.autopilot.vRef);
+      tl.set('air.alpha', a.alpha * deg);
+      tl.set('air.q', a.q * deg);
+      tl.set('air.theta', a.theta * deg);
+      tl.set('air.gamma', (a.theta - a.alpha) * deg);
+      tl.set('air.h', a.h);
+      tl.set('air.href', this.params.aircraft.altitude + this.params.autopilot.altitudeOffset);
+      tl.set('air.de', a.de * deg);
+      tl.set('air.thrust', a.thrust);
+      tl.set('air.qbar', dynamicPressure(atmosphere(a.h).density, a.V));
     }
     const extras = this.controller.extras();
     for (const k in extras) tl.set(k, extras[k]!);

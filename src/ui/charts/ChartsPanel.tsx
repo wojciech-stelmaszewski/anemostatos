@@ -2,6 +2,7 @@ import { useMemo, useRef } from 'react';
 import { controllerKey } from '@/control/registry';
 import { useParams } from '@/store/params';
 import { sim, useUi, type AnalysisChart, type ExtraChart } from '@/store/sim';
+import { AircraftPoles, EnvelopeChart, HqChart } from '@/ui/analysis/AircraftCharts';
 import { BodeChart } from '@/ui/analysis/BodeChart';
 import { DescribingChart } from '@/ui/analysis/DescribingChart';
 import { DispersionChart } from '@/ui/analysis/DispersionChart';
@@ -40,6 +41,10 @@ const EXTRA: { value: ExtraChart; label: string }[] = [
   { value: 'engagement', label: 'the chase, from above' },
   { value: 'ins', label: 'inertial drift' },
   { value: 'beacons', label: 'range-only filter' },
+  { value: 'airmodes', label: 'aircraft: speed and poles' },
+  { value: 'hq', label: 'aircraft: handling qualities' },
+  { value: 'envelope', label: 'aircraft: margins across speed' },
+  { value: 'energy', label: 'aircraft: speed and altitude' },
   { value: 'fdi', label: 'fault detection' },
   { value: 'heading', label: 'heading estimate' },
   { value: 'nav', label: 'navigation filter' },
@@ -96,6 +101,15 @@ const INS: SeriesSpec[] = [
 const BEACON_ERR: SeriesSpec[] = [
   { key: 'rng.err', label: 'position error', color: SIGNAL.error, width: 2 },
   { key: 'rng.sigma2', label: 'filter 2σ', color: SIGNAL.measurement, dash: [4, 3], width: 1.5 },
+];
+/** Chapter M: the aircraft's speed and the auto-throttle's reference. */
+const AIRSPEED: SeriesSpec[] = [
+  { key: 'air.vref', label: 'reference', color: SIGNAL.setpoint, dash: [4, 3], width: 1.5 },
+  { key: 'air.V', label: 'airspeed', color: SIGNAL.measurement, width: 2 },
+];
+const ALTITUDE: SeriesSpec[] = [
+  { key: 'air.href', label: 'reference', color: SIGNAL.setpoint, dash: [4, 3], width: 1.5 },
+  { key: 'air.h', label: 'altitude', color: SIGNAL.measurement, width: 2 },
 ];
 const BEACON_NIS: SeriesSpec[] = [
   { key: 'rng.nis', label: 'NIS of each range', color: SIGNAL.measurement, width: 1.5 },
@@ -190,7 +204,11 @@ export function ChartsPanel() {
     extra === 'value' ||
     extra === 'engagement' ||
     extra === 'beacons' ||
-    extra === 'tvc';
+    extra === 'tvc' ||
+    extra === 'airmodes' ||
+    extra === 'hq' ||
+    extra === 'envelope' ||
+    extra === 'energy';
   const ctrlKey = useParams((s) => controllerKey(s.params));
   const loopOptions = useMemo(
     () => loopsFor(useParams.getState().params).map((l) => ({ value: l.id, label: l.name })),
@@ -322,6 +340,28 @@ export function ChartsPanel() {
               <PhasePortrait meta={meta} lyapunov />
             ) : extra === 'engagement' ? (
               <EngagementChart />
+            ) : extra === 'airmodes' ? (
+              <div className="flex h-full min-h-0 flex-col gap-1.5">
+                <div className="min-h-0 flex-1">
+                  <TimeChart title="Airspeed" unit="m/s" series={AIRSPEED} />
+                </div>
+                <div className="min-h-0 flex-[1.4]">
+                  <AircraftPoles />
+                </div>
+              </div>
+            ) : extra === 'energy' ? (
+              <div className="flex h-full min-h-0 flex-col gap-1.5">
+                <div className="min-h-0 flex-1">
+                  <TimeChart title="Airspeed" unit="m/s" series={AIRSPEED} />
+                </div>
+                <div className="min-h-0 flex-1">
+                  <TimeChart title="Altitude" unit="m" series={ALTITUDE} />
+                </div>
+              </div>
+            ) : extra === 'hq' ? (
+              <HqChart />
+            ) : extra === 'envelope' ? (
+              <EnvelopeChart />
             ) : extra === 'beacons' ? (
               <div className="flex h-full min-h-0 flex-col gap-1.5">
                 <div className="min-h-0 flex-1">

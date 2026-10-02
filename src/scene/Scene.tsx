@@ -6,6 +6,7 @@ import { sim } from '@/store/sim';
 import { SCENE } from '@/ui/colors';
 import { CameraRig } from './CameraRig';
 import { DroneRig } from './DroneRig';
+import { AircraftRig } from './Aircraft';
 import { LandingPad, RocketRig, TvcRocketRig } from './Rocket';
 import { useParams } from '@/store/params';
 import { Grid } from './Grid';
@@ -86,6 +87,7 @@ function KeyLight() {
 function VehicleRig() {
   const vehicle = useParams((s) => s.params.sim.vehicle ?? 'quadrotor');
   if (vehicle === 'tvc') return <TvcRocketRig />;
+  if (vehicle === 'aircraft') return <AircraftRig />;
   return vehicle === 'rocket' ? (
     <>
       <LandingPad />

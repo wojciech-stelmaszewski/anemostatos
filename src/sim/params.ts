@@ -2,6 +2,8 @@ import type { TvcControlParams } from '@/control/tvc';
 import type { RocketParams } from './vehicles/rocket';
 import type { TvcParams } from './vehicles/tvc';
 import type { VehicleId } from './vehicles/types';
+import type { AircraftParams } from './vehicles/aircraft';
+import type { AutopilotParams } from '@/control/autopilot';
 import { defaultGains, type PidGains } from '@/control/pid';
 
 export type Level = 1 | 2 | 3;
@@ -552,6 +554,9 @@ export interface Params {
   uncertainty: UncertaintyParams;
   sysid: SysIdParams;
   guidance: GuidanceParams;
+  /** The aircraft of Chapter M (src/sim/vehicles/aircraft.ts) and its pitch autopilot. */
+  aircraft: AircraftParams;
+  autopilot: AutopilotParams;
 }
 
 export const defaultParams = (): Params => ({
@@ -787,6 +792,53 @@ export const defaultParams = (): Params => ({
     weavePeriod: 4,
   },
   probe: { point: 'none', signal: 'sine', amp: 0.3, freqHz: 1, f0Hz: 0.1, f1Hz: 20, durationS: 60 },
+  aircraft: {
+    mass: 5000,
+    wingArea: 25,
+    chord: 1.8,
+    inertia: 25000,
+    thrustMax: 24000,
+    engineTau: 1.5,
+    cl0: 0.2,
+    clAlpha: 5,
+    clQ: 4,
+    clDe: 0.35,
+    cd0: 0.022,
+    cdK: 0.045,
+    cm0: 0.03,
+    cmAlpha: -1.2,
+    cmQ: -6,
+    cmDe: -1.2,
+    servoTau: 0.05,
+    servoRate: 60,
+    elevatorMax: 20,
+    speed: 110,
+    altitude: 4000,
+  },
+  autopilot: {
+    gain: 0,
+    kTheta: 0,
+    schedule: 'none',
+    designSpeed: 110,
+    elevatorOffset: 0,
+    thetaOffset: 0,
+    autothrottle: false,
+    speedTarget: 110,
+    speedRate: 2,
+    speedGain: 0.05,
+    delayMs: 40,
+    outer: 'none',
+    altitudeOffset: 0,
+    climbGain: 0.1,
+    gammaMax: 5,
+    gammaRate: 1,
+    speedInt: 0.01,
+    speedLoop: 0.3,
+    kTP: 1,
+    kTI: 0.2,
+    kEP: 1,
+    kEI: 0.2,
+  },
 });
 
 export const GRAVITY = 9.81;

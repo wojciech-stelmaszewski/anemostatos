@@ -26,11 +26,17 @@ export function CameraRig() {
   useEffect(() => {
     const c = controls.current;
     if (!c) return;
-    const t = new THREE.Vector3(0, vehicle === 'tvc' ? TVC_HEIGHT : 1.85, 0);
-    // The rocket stands 2 m tall: frame it from further away; the pitch-plane one is 12 m.
+    const t =
+      vehicle === 'aircraft'
+        ? new THREE.Vector3(sim.state.pos.x, sim.state.pos.y, sim.state.pos.z)
+        : new THREE.Vector3(0, vehicle === 'tvc' ? TVC_HEIGHT : 1.85, 0);
+    // The rocket stands 2 m tall, the pitch-plane one 12 m and the aircraft is 13 m long:
+    // frame them from further away.
     const offset =
-      vehicle === 'tvc'
-        ? new THREE.Vector3(4, 1, 30)
+      vehicle === 'aircraft'
+        ? new THREE.Vector3(-14, 5, 26)
+        : vehicle === 'tvc'
+          ? new THREE.Vector3(4, 1, 30)
         : vehicle === 'rocket'
           ? new THREE.Vector3(5, 1.5, 8)
           : level === 1
@@ -57,7 +63,12 @@ export function CameraRig() {
     if (!c) return;
     const { pos } = sim.renderPose();
     drone.current.set(pos.x, pos.y, pos.z);
-    if (mode !== 'orbit') {
+    if (vehicle === 'aircraft') {
+      // At a hundred metres per second a smoothed follow falls behind: keep it locked on.
+      const delta = drone.current.clone().sub(c.target);
+      c.target.add(delta);
+      camera.position.add(delta);
+    } else if (mode !== 'orbit') {
       // Follow: move camera and target together with the drone (smoothed).
       const target = drone.current.clone();
       // Keep the default framing height while the drone is on the ground / taking off.

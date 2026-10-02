@@ -1,3 +1,10 @@
+import {
+  aircraftModes,
+  hqPoint,
+  leastDamperGain,
+  meetsPitchSpec,
+  PITCH_SPEC,
+} from '@/analysis/aircraft';
 import { analyseTvc, minPitchGain, wrongWayZero, type TvcAnalysis } from '@/analysis/tvc';
 import { bangBangLimits, minimumTime } from '@/control/bangbang';
 import { designLqr } from '@/control/lqr';
@@ -132,6 +139,40 @@ const driftSettle = (sim: Simulation, t0: number, target: number, tol: number): 
   return settle;
 };
 const dB = (v: number) => `${v.toFixed(1)} dB`;
+
+/** Chapter M: fly the aircraft, trimmed, with the bare airframe (no autopilot). */
+const flyAircraft = (p: Params) => {
+  p.sim.vehicle = 'aircraft';
+  p.wind.enabled = false;
+};
+/** An elevator pulse of `deg` (positive: nose down) from `t` for `width` seconds. */
+const elevatorPulse = (sim: Simulation, t: number, deg: number, width: number) => {
+  setAt(sim, t, 'autopilot.elevatorOffset', deg);
+  setAt(sim, t + width, 'autopilot.elevatorOffset', 0);
+};
+/** Lesson IV.11: the period of the bare airframe's phugoid, from its poles, s. */
+const phugoidPeriod = (p: Params): number => aircraftModes(p, false).phugoid!.period;
+
+/** Lesson IV.12: the least pure-damper gain for level 1, cached (a bisection over pole sets). */
+let damperCache: { key: string; g: number } | null = null;
+const leastGain = (p: Params): number => {
+  const key = JSON.stringify([p.aircraft, p.autopilot.delayMs]);
+  if (damperCache?.key !== key) damperCache = { key, g: leastDamperGain(p) };
+  return damperCache.g;
+};
+
+/** Lesson IV.17: climb this much at this time; hold the speed this well; the gentlest throttle. */
+const IV17 = { at: 5, climb: 300, tol: 0.3, maxGain: 0.2, until: 40 };
+/** The largest speed error since the climb began, m/s. */
+const speedSpread = (sim: Simulation): number => {
+  const w = sim.telemetry.window(['air.V', 'air.vref'], IV17.at);
+  let worst = 0;
+  for (let i = 0; i < w.t.length; i++) {
+    const e = Math.abs(w.series[0]![i]! - w.series[1]![i]!);
+    if (Number.isFinite(e)) worst = Math.max(worst, e);
+  }
+  return worst;
+};
 
 /** Lessons of Part IV, in plan order (by `n`). */
 export const PART_FOUR: Lesson[] = [
@@ -781,6 +822,324 @@ export const PART_FOUR: Lesson[] = [
           the pitch loop faster does not help here: above the zero the drift-rate feedback changes
           sign, and a faster pitch loop lets it through. Aircraft have the same zero, between the
           elevator and the altitude: pull up and the aeroplane first sinks.
+        </Notice>
+      </>
+    ),
+  },
+  {
+    id: 'modes',
+    n: 11,
+    part: 4,
+    chapter: M,
+    title: 'Two ways to wobble',
+    level: 1,
+    loop: 'pitch',
+    chart: 'airmodes',
+    setup: flyAircraft,
+    events: (sim) => elevatorPulse(sim, 5, -2, 1),
+    predict: {
+      label: 'Phugoid period',
+      unit: 's',
+      truth: phugoidPeriod,
+      tolerance: 0.1,
+    },
+    goal: {
+      text: 'Before the pulse at 5 s, predict the period of the slow oscillation (the phugoid) within 10 %. Then read both periods off the pole map.',
+      check: ({ sim, prediction }) => {
+        const p = sim.params;
+        if (p.sim.vehicle !== 'aircraft') return 'this lesson flies the aircraft';
+        if (prediction == null)
+          return 'first the prediction: a stone that trades height for speed and back';
+        const truth = phugoidPeriod(p);
+        if (Math.abs(prediction - truth) / truth > 0.1)
+          return 'not within 10 %: Lanchester needs only the speed';
+        return sim.t > 6 || 'wait for the pulse at 5 s';
+      },
+    },
+    solution: () => {},
+    body: (
+      <>
+        <p>
+          A small jet cruises at 110 m/s, 4000 m up, trimmed: the elevator holds the nose where the
+          lift equals the weight, and the throttle where the thrust equals the drag. Nobody touches
+          anything. At 5 s the elevator is pulled up 2° for one second and released.
+        </p>
+        <p>
+          Two motions follow, on very different time scales [Stevens 2016]. The nose bobs a few
+          times within seconds and is still: the <b>short period</b>, a rotation about the centre of
+          mass at almost constant speed, with the angle of attack as the spring and the tail as the
+          damper. Then, much more slowly, the aircraft climbs and loses speed, dives and gains it,
+          for minutes: the <b>phugoid</b>, an exchange of height for speed at almost constant angle
+          of attack. Watch the speed chart.
+        </p>
+        <p>
+          Lanchester's estimate of the phugoid treats the aircraft as a stone on a frictionless
+          roller coaster: lift proportional to <Tex>{'V^2'}</Tex>, no drag, constant angle of
+          attack. Its period depends only on the speed:
+        </p>
+        <Tex display>{'T_{ph} \\approx \\pi\\sqrt{2}\\,\\frac{V}{g}'}</Tex>
+        <Try>
+          Compute the period and enter it before 5 s. Then switch the chart window to 60 s and watch
+          the speed. Hover the two panels of the pole map: the period is{' '}
+          <Tex>{'2\\pi/\\omega_d'}</Tex>, with <Tex>{'\\omega_d'}</Tex> the imaginary part of the
+          pole.
+        </Try>
+        <Notice>
+          Two pairs of poles, a factor of 25 apart in frequency: −0.79 ± 3.24j for the short period
+          (1.9 s, ζ 0.24) and −0.006 ± 0.127j for the phugoid (49 s, ζ 0.05). Lanchester is within
+          about one per cent; the altitude, through the thinner air above, makes the true phugoid a
+          little shorter. A pilot hardly notices the phugoid: it is slow enough to correct without
+          thinking. The short period is the one a pilot feels and the one the next lesson fixes.
+        </Notice>
+      </>
+    ),
+  },
+  {
+    id: 'pitchdamper',
+    n: 12,
+    part: 4,
+    chapter: M,
+    title: 'Level 1',
+    level: 1,
+    loop: 'pitch',
+    chart: 'hq',
+    setup: flyAircraft,
+    events: (sim) => elevatorPulse(sim, 5, -2, 0.5),
+    goal: {
+      text: 'Bring the short period into the level-1 box of the handling-qualities chart with a pure pitch damper (kθ = 0), at no more than 10 % above the least gain that does it.',
+      check: ({ sim }) => {
+        const p = sim.params;
+        if (p.sim.vehicle !== 'aircraft') return 'this lesson flies the aircraft';
+        if (p.autopilot.kTheta !== 0) return 'a pure damper: set the attitude gain kθ to 0';
+        const hq = hqPoint(p);
+        if (!hq) return 'no short period: is the airframe still stable?';
+        if (hq.level !== 1)
+          return `level ${hq.level}: ζ ${hq.zeta.toFixed(2)}, CAP ${hq.cap.toFixed(2)}`;
+        const least = leastGain(p);
+        if (p.autopilot.gain > 1.1 * least)
+          return 'level 1, but more gain than it needs: every degree of damper fights the pilot too';
+        return true;
+      },
+    },
+    solution: (p) => {
+      p.autopilot.gain = leastGain(p) * 1.03;
+    },
+    body: (
+      <>
+        <p>
+          The short period of the last lesson has a damping ratio of 0.24: after a gust the nose
+          overshoots and bobs three times. Is that acceptable? Aviation does not leave it to taste.
+          A military standard [MIL-F-8785C] draws boxes on a chart of the short period's damping
+          ratio against its <b>control anticipation parameter</b>: how hard the nose starts to move
+          for the normal acceleration it will end with.
+        </p>
+        <Tex display>
+          {
+            '\\mathrm{CAP} = \\frac{\\omega_{sp}^2}{n_\\alpha}, \\qquad n_\\alpha = \\frac{\\bar q\\,S\\,C_{L_\\alpha}}{m g}'
+          }
+        </Tex>
+        <p>
+          Inside the inner box (<b>level 1</b>, ζ from 0.35 to 1.3) pilots rate the aircraft clearly
+          adequate for the task; in the second (<b>level 2</b>) they can fly it with extra workload;
+          outside, barely. This aircraft is at level 3, by its damping alone.
+        </p>
+        <p>
+          The fix is a <b>pitch damper</b>: feed the pitch rate back to the elevator,{' '}
+          <Tex>{'\\delta_e = \\delta_{e,trim} + G\\,q'}</Tex>. In the short-period approximation it
+          adds <Tex>{'-M_{\\delta_e} G'}</Tex> to the damping term <Tex>{'2\\zeta\\omega'}</Tex> and
+          hardly moves the frequency, so the point slides right along the chart.
+        </p>
+        <Try>
+          Raise <b>Pitch loop gain G</b> from zero and watch the point move along the dashed path.
+          Find the smallest gain that puts it in the level-1 box. Press <b>R</b> and compare the
+          response to the pulse at 5 s.
+        </Try>
+        <Notice>
+          The least gain is about 0.083 s: 0.083° of elevator per °/s of pitch rate. The
+          short-period estimate,{' '}
+          <Tex>{'G \\approx 2\\omega\\,(0.35 - \\zeta)/|M_{\\delta_e}|'}</Tex> with{' '}
+          <Tex>{'M_{\\delta_e} \\approx -10.7'}</Tex> per second squared, gives 0.07. It leaves out
+          that the elevator also changes the lift: the full model needs 0.079 even with an instant
+          actuator and no delay, and the actuator's lag and the 40 ms of sensor and computer delay
+          add the rest. Why not more gain? The damper cannot tell a gust from the pilot's own
+          command, and it opposes both: too much of it, and the aircraft feels sluggish. Real
+          aircraft wash the damper out at low frequency for that reason.
+        </Notice>
+      </>
+    ),
+  },
+  {
+    id: 'schedule',
+    n: 13,
+    part: 4,
+    chapter: M,
+    title: 'One gain does not fit all',
+    level: 1,
+    loop: 'pitch',
+    chart: 'envelope',
+    setup: (p) => {
+      flyAircraft(p);
+      p.aircraft.speed = 80;
+      p.autopilot = {
+        ...p.autopilot,
+        gain: 0.5,
+        kTheta: 2,
+        schedule: 'none',
+        designSpeed: 80,
+        autothrottle: true,
+        speedTarget: 160,
+        speedRate: 2,
+      };
+    },
+    events: (sim) => {
+      // A 2° step slow (6 s) and fast (46 s), each held for 6 s.
+      for (const t of [6, 46]) {
+        setAt(sim, t, 'autopilot.thetaOffset', 2);
+        setAt(sim, t + 6, 'autopilot.thetaOffset', 0);
+      }
+    },
+    goal: {
+      text: `A pitch-attitude loop that is quick and robust everywhere from 80 to 160 m/s: crossover at least ${PITCH_SPEC.wc} rad/s and phase margin at least ${PITCH_SPEC.pmDeg}° at every speed.`,
+      check: ({ sim }) => {
+        const p = sim.params;
+        if (p.sim.vehicle !== 'aircraft') return 'this lesson flies the aircraft';
+        if (!(p.autopilot.kTheta > 0)) return 'an attitude hold needs kθ above zero';
+        const r = meetsPitchSpec(p);
+        return (
+          r.ok ||
+          `worst phase margin ${r.worstPm.toFixed(0)}°, slowest crossover ${r.slowestWc.toFixed(2)} rad/s`
+        );
+      },
+    },
+    solution: (p) => {
+      p.autopilot.schedule = 'qbar';
+    },
+    body: (
+      <>
+        <p>
+          The same jet now starts slow, at 80 m/s, and the auto-throttle accelerates it to 160 m/s
+          in 40 seconds. A pitch-attitude hold keeps the nose where level flight needs it: the
+          damper of the last lesson inside, an attitude loop around it,{' '}
+          <Tex>{'\\delta_e = \\delta_{e,trim} - G\\,(k_\\theta(\\theta_{ref} - \\theta) - q)'}</Tex>
+          . The gain was tuned at 80 m/s, and a 2° step at 6 s is followed quickly and without
+          overshoot. (Not all the way: without an integral the loop leaves part of the step as an
+          error, until the slow motion of the flight path catches up. This lesson is about the
+          loop's speed and damping.)
+        </p>
+        <p>
+          The elevator's moment is proportional to the dynamic pressure{' '}
+          <Tex>{'\\bar q = \\tfrac12\\rho V^2'}</Tex>. At twice the speed it is four times as
+          strong, and so is the loop gain. The crossover moves up, the 40 ms of delay and the
+          actuator cost more phase there, and the same 2° step at 46 s makes the nose buzz at 2 Hz:
+          the damping of the short period has fallen from 0.46 to 0.25.
+        </p>
+        <p>
+          The cure is as old as autopilots: design at several speeds and let the gain follow the
+          flight condition, a <b>gain schedule</b> [Rugh 2000]. Here a single law suffices: divide
+          the gain by <Tex>{'\\bar q/\\bar q_{design}'}</Tex>, so the product of gain and elevator
+          effectiveness stays constant.
+        </p>
+        <Try>
+          Look at the margins chart: the solid line is the gain as set, the dashed the other choice.
+          Try to meet the requirement with a fixed gain first: lower <b>G</b> until the margin at
+          160 m/s is enough, and watch the crossover at 80 m/s. Then set <b>Gain schedule</b> to{' '}
+          <b>on dynamic pressure q̄</b>.
+        </Try>
+        <Notice>
+          No fixed gain meets both lines: fast enough at 80 m/s (G 0.5) leaves 30° of phase margin
+          at 160 m/s, and enough margin at 160 m/s leaves the loop sluggish at 80. Scheduled on q̄,
+          the margin stays between 55° and 78°. The crossover still rises a little with speed,
+          because the airframe's own short period gets faster; a real schedule is a table of
+          designs, not one formula. Scheduling on a slow variable like q̄ is safe. Scheduling on a
+          fast one, like the angle of attack, adds feedback that none of the point designs contained
+          (lesson IV.14 in the plan).
+        </Notice>
+      </>
+    ),
+  },
+  {
+    id: 'energy',
+    n: 17,
+    part: 4,
+    chapter: M,
+    title: 'Throttle is energy',
+    level: 1,
+    loop: 'pitch',
+    chart: 'energy',
+    setup: (p) => {
+      flyAircraft(p);
+      p.autopilot = {
+        ...p.autopilot,
+        gain: 0.25,
+        kTheta: 2,
+        schedule: 'qbar',
+        designSpeed: 110,
+        outer: 'separate',
+        speedGain: 0.05,
+        speedInt: 0.01,
+      };
+    },
+    events: (sim) => setAt(sim, IV17.at, 'autopilot.altitudeOffset', IV17.climb),
+    goal: {
+      text: `Climb ${IV17.climb} m and hold the speed within ${IV17.tol} m/s all the way, without driving the engines harder than ${IV17.maxGain} throttle per m/s of speed error.`,
+      check: ({ sim }) => {
+        const p = sim.params;
+        const ap = p.autopilot;
+        if (p.sim.vehicle !== 'aircraft') return 'this lesson flies the aircraft';
+        if (ap.outer === 'none') return 'switch the speed and altitude loops on';
+        if (ap.outer === 'separate' && (ap.speedGain > IV17.maxGain || ap.speedInt > IV17.maxGain))
+          return `the auto-throttle is too nervous: keep its gains at ${IV17.maxGain} or below`;
+        const worst = speedSpread(sim);
+        if (worst > IV17.tol)
+          return `the speed strayed ${worst.toFixed(2)} m/s from its reference: press R to try again`;
+        if (sim.t < IV17.until) return `climbing… (speed within ${worst.toFixed(2)} m/s so far)`;
+        const a = sim.aircraft!;
+        return (
+          a.h - p.aircraft.altitude > IV17.climb - 50 || 'the speed is held, but it hardly climbs'
+        );
+      },
+    },
+    solution: (p) => {
+      p.autopilot.outer = 'tecs';
+    },
+    body: (
+      <>
+        <p>
+          The jet flies at 110 m/s with the scheduled pitch hold of the last lesson. Two more loops
+          sit on top, the way a simple autopilot is built: the <b>throttle holds the speed</b> and
+          the <b>elevator holds the altitude</b>. At 5 s the altitude reference jumps 300 m. Watch
+          the speed.
+        </p>
+        <p>
+          The elevator starts the climb at once. Climbing at a flight-path angle{' '}
+          <Tex>{'\\gamma'}</Tex> costs <Tex>{'m g \\sin\\gamma'}</Tex> of extra thrust, and nobody
+          asks the engines for it: the throttle loop only answers a speed error, so the speed has to
+          drop first, and the engines take a second and a half to spool up. The two loops work on
+          the same two quantities and do not know about each other.
+        </p>
+        <p>
+          <b>Total energy control</b> [Lambregts 1983] splits the work differently. The specific
+          energy of the aircraft, height plus <Tex>{'V^2/2g'}</Tex>, changes at the rate
+        </p>
+        <Tex display>{'\\frac{\\dot E}{m g V} = \\gamma + \\frac{\\dot V}{g}'}</Tex>
+        <p>
+          and only the engines can change it. The elevator can only trade one form for the other, at
+          the rate <Tex>{'\\gamma - \\dot V/g'}</Tex>. So the throttle is given the sum, the
+          elevator the difference, and the thrust a climb needs is asked for the moment the climb is
+          commanded.
+        </p>
+        <Try>
+          Try to meet the goal with the separate loops: raise <b>Auto-throttle gain</b> and{' '}
+          <b>integral</b> up to 0.2. Then set <b>Speed and altitude</b> to{' '}
+          <b>total energy control</b> and press <b>R</b>. Set its four gains to zero: what is left?
+        </Try>
+        <Notice>
+          With the separate loops as set, the speed sags 2.5 m/s in the climb. Tuned up to 0.2 they
+          get within about half a metre per second, and beyond that the engine lag makes the speed
+          loop hunt. Total energy control holds 0.15 m/s, and still 0.4 m/s with all four of its
+          gains at zero: most of the work is done by the feedforward, the thrust{' '}
+          <Tex>{'m g\\,(\\gamma_{ref} + \\dot V_{ref}/g)'}</Tex> that the energy balance says the
+          command needs. The same structure flies on the Boeing 777 and 787, and in small drones.
         </Notice>
       </>
     ),

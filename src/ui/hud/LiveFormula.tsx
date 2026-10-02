@@ -50,7 +50,7 @@ export function LiveFormula() {
   const parts = useLoopParts(meta.id);
 
   useRaf(() => {
-    const t = sim.controller.loops()[meta.id];
+    const t = sim.loops()[meta.id];
     if (!t) return;
     const set = (k: string, s: string) => {
       const el = refs.current[k];

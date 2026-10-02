@@ -88,8 +88,21 @@ const TVC_LOOPS: LoopMeta[] = [
 ];
 
 /** Loops to offer in the inspector for these parameters. */
+/** The aircraft of Chapter M flies one loop: pitch attitude, through the elevator. */
+const PITCH: LoopMeta[] = [
+  {
+    id: 'pitch',
+    name: 'Pitch attitude',
+    unit: '°',
+    outUnit: '°',
+    outName: 'elevator',
+    truth: 'air.theta',
+  },
+];
+
 export const loopsFor = (p: Params): LoopMeta[] => {
   if (p.sim.vehicle === 'tvc') return TVC_LOOPS;
+  if (p.sim.vehicle === 'aircraft') return PITCH;
   if (p.sim.level !== 3) return LOOPS[p.sim.level];
   const geometric = p.control.l3.outer !== 'pid-cascade'; // geometric, MPC, MPPI
   // The geometric controller closes position and velocity in one law: no separate velocity loop,

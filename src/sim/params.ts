@@ -1,6 +1,7 @@
 import type { TvcControlParams } from '@/control/tvc';
 import type { RocketParams } from './vehicles/rocket';
 import type { TvcParams } from './vehicles/tvc';
+import type { SatelliteParams } from './vehicles/satellite';
 import type { VehicleId } from './vehicles/types';
 import type { AircraftParams } from './vehicles/aircraft';
 import type { AutopilotParams } from '@/control/autopilot';
@@ -557,6 +558,8 @@ export interface Params {
   /** The aircraft of Chapter M (src/sim/vehicles/aircraft.ts) and its pitch autopilot. */
   aircraft: AircraftParams;
   autopilot: AutopilotParams;
+  /** The satellite of Chapter N (src/sim/vehicles/satellite.ts) and its attitude control. */
+  satellite: SatelliteParams;
 }
 
 export const defaultParams = (): Params => ({
@@ -838,6 +841,35 @@ export const defaultParams = (): Params => ({
     kTI: 0.2,
     kEP: 1,
     kEI: 0.2,
+  },
+  satellite: {
+    inertia: { x: 4, y: 5, z: 3 },
+    wheelTorque: 0.2,
+    wheelMomentum: 0.6,
+    disturbance: { x: 0, y: 0, z: 0 },
+    thrusterTorque: 0.5,
+    minPulse: 0.1,
+    thrusterFlow: 1,
+    slewAxis: 'diagonal',
+    slewDeg: 120,
+    actuator: 'wheels',
+    kp: 1,
+    kd: 3,
+    shortest: true,
+    dump: false,
+    dumpStart: 0.4,
+    dumpStop: 0.1,
+    dumpFeedforward: false,
+    deadbandDeg: 0.1,
+    driftRateDeg: 1,
+    navigation: false,
+    gyroBiasDegH: { x: 5, y: -3, z: 4 },
+    gyroArw: 0.01,
+    trackerHz: 1,
+    trackerArcsec: 5,
+    estimateBias: false,
+    outageStart: 20,
+    outageLength: 0,
   },
 });
 

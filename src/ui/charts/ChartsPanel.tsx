@@ -45,6 +45,9 @@ const EXTRA: { value: ExtraChart; label: string }[] = [
   { value: 'hq', label: 'aircraft: handling qualities' },
   { value: 'envelope', label: 'aircraft: margins across speed' },
   { value: 'energy', label: 'aircraft: speed and altitude' },
+  { value: 'lyapunovV', label: 'satellite: Lyapunov function' },
+  { value: 'wheels', label: 'satellite: wheel momentum' },
+  { value: 'startracker', label: 'satellite: attitude knowledge' },
   { value: 'fdi', label: 'fault detection' },
   { value: 'heading', label: 'heading estimate' },
   { value: 'nav', label: 'navigation filter' },
@@ -113,6 +116,22 @@ const ALTITUDE: SeriesSpec[] = [
 ];
 const BEACON_NIS: SeriesSpec[] = [
   { key: 'rng.nis', label: 'NIS of each range', color: SIGNAL.measurement, width: 1.5 },
+];
+/** Lesson IV.18: the Lyapunov function of quaternion feedback. */
+const SAT_V: SeriesSpec[] = [
+  { key: 'sat.V', label: 'V = ½ωᵀJω + 2kp(1 − q₀)', color: SIGNAL.measurement, width: 2 },
+];
+/** Lesson IV.19: the momentum stored in each reaction wheel. */
+const WHEELS: SeriesSpec[] = (['x', 'y', 'z'] as const).map((c, i) => ({
+  key: `sat.h.${c}`,
+  label: `wheel ${c}`,
+  color: SIGNAL.windAxes[i]!,
+  width: 1.5,
+}));
+/** Lesson IV.22: attitude knowledge from the gyro and the star tracker, against the filter's 2σ. */
+const STAR: SeriesSpec[] = [
+  { key: 'st.err', label: 'knowledge error', color: SIGNAL.error, width: 2 },
+  { key: 'st.sigma2', label: 'filter 2σ', color: SIGNAL.measurement, dash: [4, 3], width: 1.5 },
 ];
 /** After a rotor loss: how far the thrust axis is from where it should point. */
 const FAULT: SeriesSpec[] = [
@@ -462,6 +481,27 @@ export function ChartsPanel() {
           analysisChart(extra)
         ) : extra === 'phase' ? (
           <PhasePortrait meta={meta} />
+        ) : extra === 'lyapunovV' ? (
+          <TimeChart title="Lyapunov function (log scale)" unit="J" series={SAT_V} logY />
+        ) : extra === 'startracker' ? (
+          <TimeChart
+            title="Attitude knowledge, log scale (shaded: tracker blind)"
+            unit="″"
+            series={STAR}
+            shadeKey="st.blind"
+            logY
+          />
+        ) : extra === 'wheels' ? (
+          <TimeChart
+            title="Wheel momentum"
+            unit="N·m·s"
+            series={WHEELS}
+            includeZero
+            hlines={() => [
+              { value: sim.params.satellite.wheelMomentum, label: 'full speed' },
+              { value: -sim.params.satellite.wheelMomentum, label: '' },
+            ]}
+          />
         ) : extra === 'ins' ? (
           <TimeChart
             title="Inertial navigator: position error (log scale)"

@@ -37,6 +37,7 @@ const n = (v: number, d = 2) =>
 /** u = Kp·e + I + D + FF with live numbers substituted — the PID equation, running. */
 export function LiveFormula() {
   const level = useParams((s) => s.params.sim.level);
+  const vehicle = useParams((s) => s.params.sim.vehicle);
   const loopId = useUi((s) => s.loop);
   const metaKey = useParams((s) => controllerKey(s.params));
   const meta = useMemo(
@@ -66,6 +67,8 @@ export function LiveFormula() {
     set('sat', t.saturated ? `saturated (wanted ${t.unsaturated.toFixed(2)})` : '');
   });
 
+  // The satellite of Chapter N has no PID to show: its law is in the lesson and the charts.
+  if (vehicle === 'satellite') return null;
   if (!isPidParts(parts)) {
     // Any other controller: its output as the sum of its named contributions.
     return (

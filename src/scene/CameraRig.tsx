@@ -37,11 +37,13 @@ export function CameraRig() {
         ? new THREE.Vector3(-14, 5, 26)
         : vehicle === 'tvc'
           ? new THREE.Vector3(4, 1, 30)
-        : vehicle === 'rocket'
-          ? new THREE.Vector3(5, 1.5, 8)
-          : level === 1
-            ? new THREE.Vector3(0.95, 0.45, 1.45)
-            : new THREE.Vector3(1.6, 0.9, 2.5);
+          : vehicle === 'rocket'
+            ? new THREE.Vector3(5, 1.5, 8)
+            : vehicle === 'satellite'
+              ? new THREE.Vector3(2.2, 1.2, 3.4)
+              : level === 1
+                ? new THREE.Vector3(0.95, 0.45, 1.45)
+                : new THREE.Vector3(1.6, 0.9, 2.5);
     c.target.copy(t);
     camera.position.copy(t).add(offset);
     c.update();

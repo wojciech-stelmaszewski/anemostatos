@@ -27,6 +27,15 @@ import { initialTvc, modeSlope, stepTvc, type TvcState } from '@/sim/vehicles/tv
 import { Autopilot } from '@/control/autopilot';
 import { atmosphere, dynamicPressure } from '@/sim/atmosphere';
 import { initialAircraft, stepAircraft, type AircraftState } from '@/sim/vehicles/aircraft';
+import { SatelliteController } from '@/control/satellite';
+import { StarNavigator } from '@/estimation/startracker';
+import {
+  errorAngle,
+  initialSatellite,
+  lyapunov,
+  stepSatellite,
+  type SatelliteState,
+} from '@/sim/vehicles/satellite';
 import { Engagement, targetState } from '@/guidance/pronav';
 import { insGyroError } from '@/estimation/ins';
 import { Tap } from './tap';
@@ -47,6 +56,8 @@ const TAKEOFF_RATE = 1;
  * Owns the whole simulated world: drone, wind, sensors, controller and telemetry.
  * Framework-free; the UI drives it with `advance(frameDt)` and reads its public fields.
  */
+const RAD_DEG = 180 / Math.PI;
+
 export class Simulation {
   params: Params;
   state: DroneState = initialState();
@@ -96,6 +107,14 @@ export class Simulation {
   /** The aircraft and its pitch autopilot, while `params.sim.vehicle` is 'aircraft' (Chapter M). */
   aircraft: AircraftState | null = null;
   autopilot = new Autopilot();
+  /** The satellite and its attitude control, while `params.sim.vehicle` is 'satellite' (Chapter N). */
+  satellite: SatelliteState | null = null;
+  satCtl = new SatelliteController();
+  /** Attitude knowledge from a gyro and a star tracker (lesson IV.22). */
+  starNav = new StarNavigator();
+  /** Largest attitude error since `satSince`, deg (lessons IV.19–IV.20 judge a window). */
+  satPeak = 0;
+  satSince = 0;
   /** A frozen earlier run, overlaid on the charts for comparison. */
   ghost: { telemetry: Telemetry; label: string } | null = null;
   /** A lesson's script: run after every reset to (re)schedule its events. */
@@ -229,6 +248,15 @@ export class Simulation {
       this.mirrorAircraft();
       this.takingOff = false;
     }
+    this.satCtl.reset();
+    this.satPeak = 0;
+    this.satSince = 0;
+    this.satellite = p.sim.vehicle === 'satellite' ? initialSatellite() : null;
+    if (this.satellite) {
+      if (p.satellite.navigation) this.starNav.reset(this.satellite, p.satellite, p.sim.seed);
+      this.mirrorSatellite();
+      this.takingOff = false;
+    }
     this.script?.(this);
     for (const fn of this.resetListeners) fn();
   }
@@ -338,6 +366,10 @@ export class Simulation {
     }
     if (this.aircraft) {
       this.stepAircraft(dt);
+      return;
+    }
+    if (this.satellite) {
+      this.stepSatellite(dt);
       return;
     }
 
@@ -512,6 +544,23 @@ export class Simulation {
     if (this.stepIndex % TELEMETRY_EVERY === 0) this.record();
   }
 
+  /** The satellite of Chapter N: its attitude mirrored into `state`, held 2 m above the floor. */
+  private stepSatellite(dt: number): void {
+    const s = this.satellite!;
+    const sp = this.params.satellite;
+    while (this.scheduled.length && this.scheduled[0]!.t <= this.t)
+      this.scheduled.shift()!.fn(this);
+    const u = this.satCtl.tick(s, sp, dt);
+    stepSatellite(s, u, dt, sp);
+    if (sp.navigation) this.starNav.tick(s, sp, this.t + dt);
+    if (this.t >= this.satSince)
+      this.satPeak = Math.max(this.satPeak, errorAngle(this.satCtl.error) * RAD_DEG);
+    this.mirrorSatellite();
+    this.t += dt;
+    this.stepIndex++;
+    if (this.stepIndex % TELEMETRY_EVERY === 0) this.record();
+  }
+
   /** The aircraft of Chapter M: like the rocket, its own state and law, mirrored into `state`. */
   private stepAircraft(dt: number): void {
     const a = this.aircraft!;
@@ -568,6 +617,18 @@ export class Simulation {
     if (this.tvc) return { pitch: this.tvcControl.last, drift: this.tvcControl.drift };
     if (this.aircraft) return { pitch: this.autopilot.last };
     return this.controller.loops();
+  }
+
+  private mirrorSatellite(): void {
+    const s = this.state;
+    s.pos = v3(0, 2, 0);
+    s.vel = v3();
+    s.q = { ...this.satellite!.q };
+    s.landed = false;
+    s.crashed = false;
+    s.motors = [0, 0, 0, 0];
+    s.rotors = [0, 0, 0, 0];
+    this.forces = { thrust: v3(), gravity: v3(), drag: v3(), external: v3(), net: v3() };
   }
 
   private mirrorRocket(): void {
@@ -628,6 +689,11 @@ export class Simulation {
 
   private record(): void {
     const tl = this.telemetry;
+    if (this.satellite) {
+      this.recordSatellite();
+      tl.commit(this.t);
+      return;
+    }
     const s = this.state;
     tl.set('pos.x', s.pos.x);
     tl.set('pos.y', s.pos.y);
@@ -792,6 +858,49 @@ export class Simulation {
     const extras = this.controller.extras();
     for (const k in extras) tl.set(k, extras[k]!);
     tl.commit(this.t);
+  }
+
+  private recordSatellite(): void {
+    const tl = this.telemetry;
+    const s = this.satellite!;
+    const sp = this.params.satellite;
+    const e = this.satCtl.error;
+    const err = errorAngle(e) * RAD_DEG;
+    tl.set('sat.err', err);
+    tl.set('sat.V', lyapunov(s, e, sp));
+    for (const c of ['x', 'y', 'z'] as const) {
+      tl.set(`sat.theta.${c}`, 2 * e[c] * RAD_DEG);
+      tl.set(`sat.w.${c}`, s.w[c] * RAD_DEG);
+      tl.set(`sat.h.${c}`, s.h[c]);
+      tl.set(`sat.tw.${c}`, s.wheelTorque[c]);
+      tl.set(`sat.thr.${c}`, Math.sign(s.thrustTorque[c]));
+    }
+    tl.set('sat.fuel', s.fuel);
+    if (sp.navigation) {
+      tl.set('st.err', this.starNav.error(s));
+      tl.set('st.sigma2', this.starNav.sigma2());
+      tl.set('st.biasErr', this.starNav.biasError(sp));
+      tl.set('st.blind', this.starNav.blind ? 1 : 0);
+    }
+    // Loops for the charts: the whole pointing error, and each axis' angle (the phase portrait).
+    const cmd = this.satCtl.command;
+    const tw = s.wheelTorque;
+    const loop = (meas: number, u: number, out: number) => ({
+      setpoint: 0,
+      measurement: meas,
+      error: -meas,
+      parts: [],
+      unsaturated: u,
+      output: out,
+      saturated: Math.abs(out) < Math.abs(u) - 1e-9,
+    });
+    recordLoop(
+      tl,
+      'point',
+      loop(err, Math.hypot(cmd.x, cmd.y, cmd.z), Math.hypot(tw.x, tw.y, tw.z)),
+    );
+    for (const c of ['x', 'y', 'z'] as const)
+      recordLoop(tl, `point.${c}`, loop(2 * e[c] * RAD_DEG, cmd[c], tw[c] + s.thrustTorque[c]));
   }
 
   /** The reference `tau` seconds ahead: the planned profile if it is followed exactly. */

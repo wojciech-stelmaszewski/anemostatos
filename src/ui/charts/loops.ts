@@ -87,6 +87,21 @@ const TVC_LOOPS: LoopMeta[] = [
   { id: 'drift', name: 'Drift', unit: 'm', outUnit: '°', outName: 'pitch sp', truth: 'tvc.x' },
 ];
 
+/** The satellite of Chapter N: the whole pointing error, and each body axis' angle. */
+const satAxis = (axis: 'x' | 'y' | 'z'): LoopMeta => ({
+  id: `point.${axis}`,
+  name: `Angle about ${axis}`,
+  unit: '°',
+  outUnit: 'N·m',
+  outName: 'torque',
+});
+const SATELLITE: LoopMeta[] = [
+  { id: 'point', name: 'Pointing error', unit: '°', outUnit: 'N·m', outName: 'torque' },
+  satAxis('x'),
+  satAxis('y'),
+  satAxis('z'),
+];
+
 /** Loops to offer in the inspector for these parameters. */
 /** The aircraft of Chapter M flies one loop: pitch attitude, through the elevator. */
 const PITCH: LoopMeta[] = [
@@ -103,6 +118,7 @@ const PITCH: LoopMeta[] = [
 export const loopsFor = (p: Params): LoopMeta[] => {
   if (p.sim.vehicle === 'tvc') return TVC_LOOPS;
   if (p.sim.vehicle === 'aircraft') return PITCH;
+  if (p.sim.vehicle === 'satellite') return SATELLITE;
   if (p.sim.level !== 3) return LOOPS[p.sim.level];
   const geometric = p.control.l3.outer !== 'pid-cascade'; // geometric, MPC, MPPI
   // The geometric controller closes position and velocity in one law: no separate velocity loop,

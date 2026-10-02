@@ -8,6 +8,7 @@ import { CameraRig } from './CameraRig';
 import { DroneRig } from './DroneRig';
 import { AircraftRig } from './Aircraft';
 import { LandingPad, RocketRig, TvcRocketRig } from './Rocket';
+import { SatelliteRig } from './Satellite';
 import { useParams } from '@/store/params';
 import { Grid } from './Grid';
 import { ForceArrows, TermArrows } from './overlays/ForceArrows';
@@ -88,6 +89,7 @@ function VehicleRig() {
   const vehicle = useParams((s) => s.params.sim.vehicle ?? 'quadrotor');
   if (vehicle === 'tvc') return <TvcRocketRig />;
   if (vehicle === 'aircraft') return <AircraftRig />;
+  if (vehicle === 'satellite') return <SatelliteRig />;
   return vehicle === 'rocket' ? (
     <>
       <LandingPad />

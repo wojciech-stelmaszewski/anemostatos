@@ -8,6 +8,7 @@ import {
 import { analyseTvc, minPitchGain, wrongWayZero, type TvcAnalysis } from '@/analysis/tvc';
 import { bangBangLimits, minimumTime } from '@/control/bangbang';
 import { designLqr } from '@/control/lqr';
+import { limitCycleFuelRate } from '@/control/satellite';
 import { insGyroError } from '@/estimation/ins';
 import type { Simulation } from '@/engine/simulation';
 import { GRAVITY, type Params } from '@/sim/params';
@@ -172,6 +173,60 @@ const speedSpread = (sim: Simulation): number => {
     if (Number.isFinite(e)) worst = Math.max(worst, e);
   }
   return worst;
+};
+
+/** Lesson IV.18: the command, the deadline and how long it must then stay within 0.1°. */
+const IV18 = { deg: 240, deadline: 20, tol: 0.1, hold: 3 };
+/** The time after which the pointing error stays below `tol`, s (NaN while it is above). */
+const settledSince = (sim: Simulation, tol: number): number => {
+  const w = sim.telemetry.window(['sat.err'], -Infinity);
+  const err = w.series[0]!;
+  let k = err.length - 1;
+  if (k < 0 || !(err[k]! <= tol)) return NaN;
+  while (k > 0 && err[k - 1]! <= tol) k--;
+  return w.t[k]!;
+};
+/** The angle the shortest rotation turns through for a command of `slewDeg`, °. */
+const shorterAngle = (p: Params): number => {
+  const a = ((p.satellite.slewDeg % 360) + 360) % 360;
+  return Math.min(a, 360 - a);
+};
+
+/** Lesson IV.19: a disturbance torque about z, and the thruster pair that dumps momentum. */
+const IV19 = { torque: 0.02, thruster: 0.08, limitDeg: 0.5, until: 40 };
+/** When the z wheel is full: it absorbs the disturbance at τ_d, so h(t) = τ_d·t. */
+const wheelFullAt = (p: Params): number =>
+  p.satellite.wheelMomentum / Math.abs(p.satellite.disturbance.z);
+/** The most momentum any wheel has held in this run, N·m·s. */
+const peakWheel = (sim: Simulation): number => {
+  const w = sim.telemetry.window(['sat.h.x', 'sat.h.y', 'sat.h.z'], -Infinity);
+  return Math.max(0, ...w.series.flatMap((s) => s.map(Math.abs)));
+};
+
+/** Lesson IV.20: judged from `from` on; pointing within `limitDeg`; fuel within `slack` of the least. */
+const IV20 = { from: 15, until: 40, limitDeg: 0.5, slack: 1.3 };
+/** The least fuel a dead band within the pointing limit can use: the band at the limit, the slowest drift, g/min. */
+const leastFuel = (p: Params): number =>
+  limitCycleFuelRate({ ...p.satellite, deadbandDeg: IV20.limitDeg, driftRateDeg: 0 }) * 60;
+/** Propellant used per minute since `IV20.from`, g/min. */
+const fuelRate = (sim: Simulation): number => {
+  const w = sim.telemetry.window(['sat.fuel'], IV20.from);
+  const f = w.series[0]!;
+  const n = f.length - 1;
+  return n > 0 ? ((f[n]! - f[0]!) / (w.t[n]! - w.t[0]!)) * 60 : NaN;
+};
+
+/** Lesson IV.22: judged from `from` to `until`; the tracker is blind for 10 s from `outage`. */
+const IV22 = { from: 15, until: 40, limit: 10, outage: 25, drift: 30 };
+/** With the tracker off and the bias not estimated, the estimate drifts at |b|: 1 °/h is 1″/s. */
+const unaidedDrift = (p: Params): number => {
+  const b = p.satellite.gyroBiasDegH;
+  return Math.hypot(b.x, b.y, b.z) * IV22.drift;
+};
+/** The largest knowledge error since `IV22.from`, arc-seconds. */
+const worstKnowledge = (sim: Simulation): number => {
+  const w = sim.telemetry.window(['st.err'], IV22.from);
+  return Math.max(0, ...w.series[0]!.filter((v) => Number.isFinite(v)));
 };
 
 /** Lessons of Part IV, in plan order (by `n`). */
@@ -1140,6 +1195,333 @@ export const PART_FOUR: Lesson[] = [
           gains at zero: most of the work is done by the feedforward, the thrust{' '}
           <Tex>{'m g\\,(\\gamma_{ref} + \\dot V_{ref}/g)'}</Tex> that the energy balance says the
           command needs. The same structure flies on the Boeing 777 and 787, and in small drones.
+        </Notice>
+      </>
+    ),
+  },
+  {
+    id: 'slew',
+    n: 18,
+    part: 4,
+    chapter: N,
+    title: 'Point the telescope',
+    level: 1,
+    loop: 'point',
+    chart: 'lyapunovV',
+    setup: (p) => {
+      p.sim.vehicle = 'satellite';
+      p.satellite.slewDeg = IV18.deg;
+      p.satellite.shortest = false;
+    },
+    predict: {
+      label: 'Angle it turns through with the shortest rotation',
+      unit: '°',
+      truth: shorterAngle,
+      tolerance: 0.05,
+    },
+    goal: {
+      text: 'Predict the angle the satellite turns through with Shortest rotation on. Then reach the target within 0.1° in under 20 s, and stay there for 3 s.',
+      check: ({ sim, prediction }) => {
+        const p = sim.params;
+        if (p.sim.vehicle !== 'satellite') return 'this lesson flies the satellite';
+        if (prediction == null) return 'first the prediction: q and −q are the same attitude';
+        const truth = shorterAngle(p);
+        if (Math.abs(prediction - truth) > 0.05 * truth)
+          return 'not within 5 %: a turn of 240° one way ends where a turn of 120° the other way does';
+        const since = settledSince(sim, IV18.tol);
+        if (Number.isNaN(since)) return 'slewing…';
+        if (since > IV18.deadline)
+          return `settled after ${since.toFixed(1)} s; the deadline is ${IV18.deadline} s. Press R`;
+        return sim.t - since >= IV18.hold || 'holding…';
+      },
+    },
+    solution: (p) => {
+      p.satellite.shortest = true;
+      p.satellite.kp = 8;
+      p.satellite.kd = 8;
+    },
+    body: (
+      <>
+        <p>
+          A satellite floats with nothing to push against. It turns with three{' '}
+          <b>reaction wheels</b>: spin a wheel one way and the body turns the other, and the total
+          angular momentum stays what it was. The wheels here give at most 0.2 N·m each and store at
+          most 0.6 N·m·s; the satellite's inertia is 4, 5 and 3 kg·m² about its axes.
+        </p>
+        <p>
+          The attitude is a quaternion <Tex>{'q'}</Tex>, and the error from the target is another
+          one, <Tex>{'q_e = q_t^{-1}\\otimes q'}</Tex>. Quaternion feedback is a PD on its vector
+          part:
+        </p>
+        <Tex display>{'\\tau = -k_p\\,\\mathbf q_e - k_d\\,\\omega'}</Tex>
+        <p>
+          It is stable for <i>any</i> rigid body, and the proof fits in two lines. Take the kinetic
+          energy plus a spring on the error,{' '}
+          <Tex>{'V = \\tfrac12\\omega^\\top J\\omega + 2k_p(1 - q_{e0})'}</Tex>. The gyroscopic term
+          does no work, and what is left is <Tex>{'\\dot V = -k_d\\,|\\omega|^2 \\le 0'}</Tex>. The
+          chart plots <Tex>{'V'}</Tex>: it only falls.
+        </p>
+        <p>
+          The command is 240° about the diagonal. But <Tex>{'q'}</Tex> and <Tex>{'-q'}</Tex> are the
+          same attitude, so a law that takes the error as it comes can go the long way round, as the
+          drone did in lesson II.10. Flip the error to the half with <Tex>{'q_{e0} \\ge 0'}</Tex>{' '}
+          and it always takes the shorter way.
+        </p>
+        <Try>
+          Press <b>R</b> and watch the satellite turn the long way. How far does it turn with{' '}
+          <b>Satellite → Shortest rotation</b> on? Enter the angle, switch it on, and tune <b>kp</b>{' '}
+          and <b>kd</b> until it settles within 0.1° in under 20 s.
+        </Try>
+        <Notice>
+          More gain stops helping. A wheel at 0.6 N·m·s cannot spin faster, so the satellite cannot
+          turn faster than about 16°/s. The long way cannot settle within 20 s with any gains (its
+          best is about 23 s); the short way can in about 15. The proof assumed every torque asked
+          for is given. A wheel at full speed does not break it here, but with gains high enough to
+          hit the torque limit <Tex>{'V'}</Tex> rises, briefly and only by a millionth: the
+          guarantee is gone, even if the flight looks the same.
+        </Notice>
+      </>
+    ),
+  },
+  {
+    id: 'wheels',
+    n: 19,
+    part: 4,
+    chapter: N,
+    title: 'Spin to turn',
+    level: 1,
+    loop: 'point',
+    chart: 'wheels',
+    setup: (p) => {
+      p.sim.vehicle = 'satellite';
+      p.satellite.slewDeg = 0;
+      p.satellite.kp = 8;
+      p.satellite.kd = 8;
+      p.satellite.disturbance = { x: 0, y: 0, z: IV19.torque };
+      p.satellite.thrusterTorque = IV19.thruster;
+    },
+    predict: {
+      label: 'Time until the z wheel is full',
+      unit: 's',
+      truth: wheelFullAt,
+      tolerance: 0.05,
+    },
+    goal: {
+      text: 'Predict when the z wheel reaches full speed. Then hold the target within 0.5° for 40 s without any wheel reaching full speed.',
+      check: ({ sim, prediction }) => {
+        const p = sim.params;
+        if (p.sim.vehicle !== 'satellite') return 'this lesson flies the satellite';
+        if (prediction == null) return 'first the prediction: the wheel absorbs the torque';
+        const truth = wheelFullAt(p);
+        if (Math.abs(prediction - truth) > 0.05 * truth)
+          return 'not within 5 %: momentum is torque times time';
+        if (peakWheel(sim) >= p.satellite.wheelMomentum - 1e-6)
+          return 'a wheel reached full speed and the target was lost. Press R';
+        if (sim.satPeak > IV19.limitDeg)
+          return `the pointing error reached ${sim.satPeak.toFixed(2)}°. Press R`;
+        return sim.t >= IV19.until || `holding: ${sim.t.toFixed(0)} of ${IV19.until} s`;
+      },
+    },
+    solution: (p) => {
+      p.satellite.dump = true;
+      p.satellite.dumpFeedforward = true;
+    },
+    body: (
+      <>
+        <p>
+          Sunlight pushes harder on one side of a satellite than on the other, and gravity pulls
+          harder on its near end. The result is a small torque that never stops. Here it is 0.02 N·m
+          about z, about a hundred times stronger than in a real orbit, so that it acts within a
+          minute.
+        </p>
+        <p>
+          The wheels hold the attitude by taking the torque on themselves: the z wheel speeds up at
+          exactly the rate the disturbance pushes, <Tex>{'h(t) = \\tau_d\\,t'}</Tex>. The chart
+          shows its momentum climbing towards the limit. Once the wheel is at full speed it cannot
+          give any more torque, and the satellite turns away.
+        </p>
+        <p>
+          The wheels only move momentum around; they cannot throw it away. A torque from outside
+          can: a pair of thrusters, or magnetic torquers pushing against the Earth's field. Firing
+          against the stored momentum, <Tex>{'\\dot H = \\tau_{thr}'}</Tex>, drains the wheel. This
+          is <b>momentum dumping</b>.
+        </p>
+        <Try>
+          Predict when the wheel is full and enter it. Press <b>R</b> and watch the target go. Then
+          turn on <b>Satellite → Dump momentum</b>, and after that <b>Tell the wheels</b>.
+        </Try>
+        <Notice>
+          Dumping alone loses the target in another way. The attitude loop sees the thruster's 0.08
+          N·m as one more disturbance, and the spring gives way until it pushes back: the error
+          jumps to 0.8°. The thruster torque is known, so the wheels can be told to cancel it
+          directly (a feedforward), and the pointing never notices. The 0.3° that is left is the
+          disturbance against a PD with no integral.
+        </Notice>
+      </>
+    ),
+  },
+  {
+    id: 'thrusters',
+    n: 20,
+    part: 4,
+    chapter: N,
+    title: 'On or off',
+    level: 1,
+    loop: 'point.x',
+    chart: 'phase',
+    setup: (p) => {
+      p.sim.vehicle = 'satellite';
+      p.satellite.actuator = 'thrusters';
+      p.satellite.slewAxis = 'x';
+      p.satellite.slewDeg = 2;
+    },
+    events: (sim) => {
+      sim.satSince = IV20.from;
+    },
+    predict: {
+      label: 'Fuel rate of the limit cycle',
+      unit: 'g/min',
+      truth: (p) => limitCycleFuelRate(p.satellite) * 60,
+      tolerance: 0.1,
+    },
+    goal: {
+      text: 'Predict the fuel rate of the limit cycle for your settings. Then point within 0.5° from 15 s on, using at most 30 % more fuel than the least possible.',
+      check: ({ sim, prediction }) => {
+        const p = sim.params;
+        if (p.sim.vehicle !== 'satellite' || p.satellite.actuator !== 'thrusters')
+          return 'this lesson flies the satellite on its thrusters';
+        if (prediction == null)
+          return 'first the prediction: drift across the band, two pulses per period';
+        const truth = limitCycleFuelRate(p.satellite) * 60;
+        if (Math.abs(prediction - truth) > 0.1 * truth)
+          return 'not within 10 %: count the time of the pulses as well as the drift';
+        if (sim.satPeak > IV20.limitDeg)
+          return `the angle reached ${sim.satPeak.toFixed(2)}°: band plus overshoot must stay within ${IV20.limitDeg}°`;
+        if (sim.t < IV20.until) return `measuring the fuel: ${sim.t.toFixed(0)} of ${IV20.until} s`;
+        const rate = fuelRate(sim);
+        const least = leastFuel(p);
+        return (
+          rate <= IV20.slack * least ||
+          `${rate.toFixed(1)} g/min; the least for ${IV20.limitDeg}° is ${least.toFixed(1)} g/min`
+        );
+      },
+    },
+    solution: (p) => {
+      p.satellite.deadbandDeg = 0.45;
+      p.satellite.driftRateDeg = 0;
+    },
+    body: (
+      <>
+        <p>
+          Thrusters are valves: open or shut. They cannot give a little torque, so they cannot hold
+          an angle exactly. Instead they let it wander inside a <b>dead band</b> of ±db. When the
+          angle reaches the edge and is still moving outward, a pulse fires until it drifts back at
+          a chosen rate <Tex>{'\\omega'}</Tex>. Then it crosses the band to the other edge, and the
+          same happens there.
+        </p>
+        <p>
+          In the phase portrait this is a <b>limit cycle</b>: two horizontal lines at{' '}
+          <Tex>{'\\pm\\omega'}</Tex> joined at the walls. Its geometry gives everything. A pulse
+          that turns <Tex>{'+\\omega'}</Tex> into <Tex>{'-\\omega'}</Tex> lasts{' '}
+          <Tex>{'t_p = 2J\\omega/\\tau'}</Tex>, and in that time the angle goes out and comes back
+          to the edge. Crossing the band takes <Tex>{'2\\,db/\\omega'}</Tex>. So
+        </p>
+        <Tex display>
+          {'T = \\frac{4\\,db}{\\omega} + 2t_p, \\qquad F = \\frac{2\\,t_p\\,\\dot m}{T}'}
+        </Tex>
+        <p>
+          The pair gives 0.5 N·m and burns 1 g/s while it fires, and <Tex>{'J_x'}</Tex> = 4 kg·m².
+          The valves cannot open for less than 0.1 s, so the slowest drift they can set is{' '}
+          <Tex>{'\\omega_{min} = \\tau\\,\\Delta t_{min}/2J'}</Tex> = 0.36°/s; asking for less gives
+          that.
+        </p>
+        <Try>
+          Compute the fuel rate for the settings in <b>Satellite</b> and enter it. Then find the
+          cheapest settings that still keep the angle within 0.5°. The goal measures the fuel from
+          15 s to 40 s.
+        </Try>
+        <Notice>
+          Fuel goes as <Tex>{'\\omega^2/db'}</Tex> while the pulses are short. A wider band saves
+          fuel in proportion; a slower drift saves it twice over. The narrow band and fast drift the
+          satellite starts with burn about sixteen times the least. The pointing pays for it: a
+          telescope that needs 0.01° cannot live on thrusters, and that is why the wheels exist.
+        </Notice>
+      </>
+    ),
+  },
+  {
+    id: 'startracker',
+    n: 22,
+    part: 4,
+    chapter: N,
+    title: 'Stars and gyros',
+    level: 1,
+    loop: 'point',
+    chart: 'startracker',
+    setup: (p) => {
+      p.sim.vehicle = 'satellite';
+      p.satellite.slewDeg = 0;
+      p.satellite.navigation = true;
+      p.satellite.trackerHz = 0;
+      p.satellite.outageStart = IV22.outage;
+      p.satellite.outageLength = 10;
+    },
+    predict: {
+      label: 'Knowledge error after 30 s on the gyro alone',
+      unit: '″',
+      truth: unaidedDrift,
+      tolerance: 0.1,
+    },
+    goal: {
+      text: 'Predict how far the estimate drifts in 30 s on the gyro alone. Then know the attitude within 10″ from 15 s to 40 s, through the 10-second outage of the tracker.',
+      check: ({ sim, prediction }) => {
+        const p = sim.params;
+        if (p.sim.vehicle !== 'satellite' || !p.satellite.navigation)
+          return 'this lesson runs the attitude estimator of the satellite';
+        if (prediction == null) return 'first the prediction: the gyro bias, integrated';
+        const truth = unaidedDrift(p);
+        if (Math.abs(prediction - truth) > 0.1 * truth)
+          return 'not within 10 %: 1 °/h is one arc-second per second';
+        if (sim.t < IV22.from) return 'converging…';
+        const worst = worstKnowledge(sim);
+        if (worst > IV22.limit) return `the knowledge error reached ${worst.toFixed(0)}″. Press R`;
+        return (
+          sim.t >= IV22.until || `within ${IV22.limit}″: ${sim.t.toFixed(0)} of ${IV22.until} s`
+        );
+      },
+    },
+    solution: (p) => {
+      p.satellite.trackerHz = 1;
+      p.satellite.estimateBias = true;
+    },
+    body: (
+      <>
+        <p>
+          A telescope must know where it points to a few arc-seconds, a thousandth of a degree. Two
+          sensors share the job. The <b>gyro</b> measures the rate a hundred times a second, but its
+          bias, a few degrees per hour, adds up. The <b>star tracker</b> photographs the sky and
+          finds the attitude from the stars it recognises, to 5″, but only once a second, and not at
+          all when the Sun or the Earth is in its view.
+        </p>
+        <p>
+          The filter is the multiplicative EKF of lesson III.23. It integrates the gyro, and each
+          star direction is a vector measurement, like gravity was for the drone. The difference is
+          a factor of a thousand in accuracy, and that a degree per hour is exactly one arc-second
+          per second.
+        </p>
+        <Try>
+          The tracker is off: the estimate rides on the gyro alone. The bias is in <b>Satellite</b>.
+          How far will the estimate be off after 30 s? Enter it and press <b>R</b> to check. Then
+          set the <b>Star tracker rate</b> to 1 Hz. Is that enough to stay within 10″? If not, turn
+          on <b>Estimate the gyro bias</b>.
+        </Try>
+        <Notice>
+          With the tracker on and the bias not estimated, the filter lags about 50″ behind the truth
+          while its own 2σ says 6″. It believes the gyro, and every second the gyro is wrong in the
+          same direction. It is confidently wrong, as the EKF of lesson IV.27 was. With the bias as
+          three more states, the filter learns it to a few tenths of a degree per hour within twenty
+          seconds. Then the gyro carries the attitude through the outage almost as well as the stars
+          do.
         </Notice>
       </>
     ),

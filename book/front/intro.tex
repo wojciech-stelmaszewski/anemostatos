@@ -1,9 +1,54 @@
-\bookchapter{0}{Why control?}{What control theory is, how it is organised, where it is used, where it came from — and why a small drone is the best place to learn it.}
+\bookchapter{0}{Why control?}{How this book began — with a helicopter on Mars — and what control theory is, where it came from and why a drone is the place to learn it.}
 \label{ch:intro}
 
-\lead{Look around you. The room you sit in is held at a comfortable temperature. Your body keeps its own temperature at \SI{37}{\celsius} whether you are in the sun or in the snow. The electricity in the socket arrives at 50 or \SI{60}{Hz}, never mind how many kettles were just switched on. A camera holds its picture still in a shaking hand. None of this happens by itself. Behind each of these facts is a \emph{control system}: something that measures, compares and acts, over and over again. This chapter is about the science of such systems.}
+\lead{This book began on Mars. On 19~April 2021 a helicopter not much bigger than a toy lifted itself off the ground of another planet, hovered for half a minute and landed again. I watched it happen, and it fascinated me completely. This chapter tells that story first. Then it says what control theory is — the science that made the flight possible, and the subject of this book.}
+
+\section{A helicopter on Mars}
+
+I followed the flights of Ingenuity, NASA's helicopter on Mars, as the news of each one arrived, and I was completely taken by them. It is hard to say how strongly a piece of engineering can move a person, but this one moved me. A machine of less than two kilograms, made by people, flying by itself through the thin air of a world where no person has ever stood — and doing it not once, as planned, but again and again. What I felt most was admiration: for the people who built it, and above all for the quiet power of the thing that kept it in the air, its control system. That admiration is the reason this book exists.
+
+\sidecapfig{\includegraphics[width=\linewidth]{photos/ingenuity-mars}}
+  {Ingenuity on the floor of Jezero crater, April 2021, photographed by the Perseverance rover. The two rotors, \SI{1.2}{m} across, turn in opposite directions; the solar panel on top charges its batteries. \hyperref[credit:ingenuity-mars]{\textsc{credit}}}
+  {fig:intro-ingenuity}
+
+Ingenuity reached Mars on 18~February 2021, folded under the belly of the Perseverance rover, which landed in Jezero crater. In early April the rover set it down on the ground (Figure~\ref{fig:intro-ingenuity}) and drove away, and the helicopter had to survive its first freezing night alone, on the power of its own small solar panel.
+
+The engineering problem was extreme. The atmosphere of Mars has less than one per cent of the density of the air on Earth: a rotor there pushes against almost nothing. Ingenuity's answer was a pair of rotors \SI{1.2}{m} across, turning in opposite directions at about 2400 revolutions per minute, above a body of \SI{1.8}{kg}. And nobody could fly it. A radio signal needs several minutes to travel between Earth and Mars, up to about twenty-two, so there could be no pilot with a joystick, not even a patient one. Ingenuity had to fly itself. A camera looking down at the ground and inertial sensors told it where it was and how it was moving, and a computer built around a processor designed for smartphones closed the loop, many times every second, from sensors to rotors and back.
+
+The first flight came on 19~April 2021. The helicopter rose about three metres, hovered and came down again, some thirty-nine seconds in all: the first powered, controlled flight of an aircraft on another planet. The patch of ground it flew from was named Wright Brothers Field, and the helicopter carried a small piece of the fabric that had covered the wings of the Wright brothers' Flyer in 1903.\marginphoto{ingenuity-wright}{The swatch of Wright Flyer fabric that flew on Ingenuity, photographed at JPL before launch.} Its own navigation camera took the first picture of Figure~\ref{fig:intro-shadows}: its shadow on the ground of Mars.
+
+Ingenuity was meant to make at most five flights in thirty days, to show that flight on Mars was possible at all. It made seventy-two, over almost three years. It flew for 128.8~minutes in total, covered \SI{17}{km}, climbed as high as \SI{24}{m}, reached \SI{10}{m/s}, and became a scout for the rover, looking ahead at the ground it would have to cross.
+
+\begin{figure}[tbp]
+  \noindent\includegraphics[height=40mm]{photos/ingenuity-shadow}\hfill
+  \includegraphics[height=40mm, trim=0 0 0 205, clip]{photos/ingenuity-blade}
+  \captionsetup{style=sidecaption}
+  \caption{Two pictures taken by Ingenuity's own camera, almost three years apart. Left: its shadow during the first flight, 19~April 2021. Right: the shadow of a broken rotor blade after the seventy-second and last, 18~January 2024. \hyperref[credit:ingenuity-shadow]{\textsc{credit}}, \hyperref[credit:ingenuity-blade]{\textsc{credit}}}
+  \label{fig:intro-shadows}
+\end{figure}
+
+The flight I think of most is the sixth, on 22~May 2021. Fifty-four seconds after take-off a single image from the navigation camera was lost, and from then on every image arrived with the wrong time attached. The navigation kept \enquote{correcting} errors that did not exist. The helicopter began to tilt back and forth, with roll and pitch swings of more than twenty degrees, large commands to the rotors and spikes in power. It did not fall. It flew the rest of its route and landed about five metres from the planned spot. Its chief pilot, Håvard Grip, explained why a few days later:
+\begin{quote}\itshape
+We designed Ingenuity to tolerate significant errors without becoming unstable, including errors in timing. This built-in margin was not fully needed in Ingenuity's previous flights, because the vehicle's behavior was in-family with our expectations, but this margin came to the rescue in Flight Six.
+\end{quote}
+A margin — of stability, against errors nobody had foreseen — saved a machine hundreds of millions of kilometres from the nearest engineer. Much of this book is about what such a margin is and how to build one.
+
+The seventy-second flight, on 18~January 2024, was the last. The helicopter crossed a stretch of smooth, featureless sand, where its navigation had little to track; on landing at least one rotor blade broke (Figure~\ref{fig:intro-shadows}, right). On 25~January NASA announced that the mission was over. Ingenuity still stands where it came down.
+
+\section{From Mars to this book}
+
+What kept Ingenuity in the air was not only its rotors, its batteries and its light carbon body. It was a loop: measure where you are, compare it with where you should be, act on the motors — and do it again, many times a second, faster than anything can go wrong. That loop is what this book is about, and almost every lesson in it is a piece of what Ingenuity had to do.
+
+To hover, a rotorcraft must hold its height against gravity with a thrust it adjusts all the time; that is where the book starts (\lessonref{les:meet} to \lessonref{les:integral}). It must do it with motors that have limits, sensors that are noisy and a computer that looks at the world in snapshots (\lessonref{les:windup} to \lessonref{les:slow}). To move, or simply to stand still in a wind, it must tilt (\lessonref{les:tilt}), and so its loops are nested: a fast loop for its attitude inside a slower one for its position (\lessonref{les:cascade}). It must work out where it is from a camera and inertial sensors, none of which can be trusted alone (\lessonref{les:kalman}). And when something unforeseen happens — a lost image, a wrong timestamp — it must stay stable anyway, because its designers left a margin (\lessonref{les:edge}, and the whole of Part~III).
+
+The drone of this book is a small cousin of Ingenuity. It has four rotors instead of two, and it flies not on Mars but in a simulator on your screen, where every experiment can be repeated, changed and broken without losing a spacecraft. The problems, though, are the same, and so are the ideas that solve them. My hope is that by the end of the book the reader will understand, in principle, how a machine like Ingenuity keeps itself in the air — and share a little of the admiration I felt watching it fly.\par
+\smallskip
+{\raggedleft\sffamily\small\color{muted}— Wojciech Stelmaszewski\par}
 
 \section{What control is}
+
+Look around you. The room you sit in is held at a comfortable temperature. Your body keeps its own temperature at \SI{37}{\celsius} whether you are in the sun or in the snow. The electricity in the socket arrives at 50 or \SI{60}{Hz}, never mind how many kettles were just switched on. A camera holds its picture still in a shaking hand. None of this happens by itself. Behind each of these facts is a \emph{control system}: something that measures, compares and acts, over and over again. This chapter is about the science of such systems.
+
 
 Most of the physical world, left to itself, drifts. A room cools down, an engine speeds up when the load is removed, a pencil standing on its tip falls over. Engineering is very often the art of making such things behave the way we want them to, although we cannot know in advance everything that will happen to them.
 

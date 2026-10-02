@@ -42,7 +42,7 @@ matplotlib, numpy, pandas and Pillow.
 book/
   main.tex        the document: front matter, parts, appendices
   style/          the design system (anemostatos-book.sty): colours, boxes, chapter openers
-  front/          cover, title page, contents, preface, Chapter 0, Prelude
+  front/          cover, title page, contents, technical preface, Chapter 0, Prelude
   part1/          Part I, one file per lesson
   part2/          Part II, one file per chapter (A–E)
   back/           mathematical toolbox (math.tex and one file per appendix in toolbox/),

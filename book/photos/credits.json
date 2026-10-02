@@ -427,5 +427,49 @@
    720,
    576
   ]
+ },
+ "ingenuity-mars": {
+  "title": "File:Ingenuity helicopter, cropped from Perseverance selfie (PIA24542).jpg",
+  "artist": "NASA/JPL-Caltech/MSSS",
+  "credit": "https://mars.nasa.gov/resources/25790/perseverances-selfie-with-ingenuity/; see also https://photojournal.jpl.nasa.gov/catalog/PIA24542",
+  "license": "Public domain",
+  "page": "https://commons.wikimedia.org/wiki/File:Ingenuity_helicopter,_cropped_from_Perseverance_selfie_(PIA24542).jpg",
+  "size": [
+   990,
+   729
+  ]
+ },
+ "ingenuity-shadow": {
+  "title": "File:Ingenuity's First Black-and-White Image From the Air.jpg",
+  "artist": "NASA/JPL-Caltech",
+  "credit": "https://mars.nasa.gov/resources/25818/ingenuitys-first-black-and-white-image-from-the-air/",
+  "license": "Public domain",
+  "page": "https://commons.wikimedia.org/wiki/File:Ingenuity%27s_First_Black-and-White_Image_From_the_Air.jpg",
+  "size": [
+   640,
+   480
+  ]
+ },
+ "ingenuity-wright": {
+  "title": "File:PIA24438-MarsIngenuityHelicopter-WrightBros1stPlaneSwatch-20210406.jpg",
+  "artist": "NASA/JPL-Caltech",
+  "credit": "https://photojournal.jpl.nasa.gov/jpeg/PIA24438.jpg",
+  "license": "Public domain",
+  "page": "https://commons.wikimedia.org/wiki/File:PIA24438-MarsIngenuityHelicopter-WrightBros1stPlaneSwatch-20210406.jpg",
+  "size": [
+   2200,
+   1650
+  ]
+ },
+ "ingenuity-blade": {
+  "title": "File:PIA26243-MarsIngenuity-DamagedRotorBladeShadow-20240118.jpg",
+  "artist": "NASA/JPL-Caltech",
+  "credit": "https://photojournal.jpl.nasa.gov/jpeg/PIA26243.jpg",
+  "license": "Public domain",
+  "page": "https://commons.wikimedia.org/wiki/File:PIA26243-MarsIngenuity-DamagedRotorBladeShadow-20240118.jpg",
+  "size": [
+   2200,
+   1631
+  ]
  }
 }

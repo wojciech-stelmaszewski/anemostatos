@@ -1,0 +1,242 @@
+\lesson{II.20}{A controller nobody designed}{A neural network watches a controller fly, learns to imitate it, then improves on it by trial and error. It flies — and shows exactly what it was never taught.}{3}{policy}{Part II · Beyond PID}
+\label{les:policy}
+
+\lead{\setupcard{\setuprow{Level}{L3}\setuprow{Controller}{a neural network: 15 inputs, two layers of 32, 4 outputs (collective thrust and body rates)}\setuprow{Scene}{calm air; a ghost flies the same script with the geometric controller}\setuprow{Events}{at $t = \SI{10}{s}$ the target moves \SI{3}{m} along $x$; at $t = \SI{20}{s}$ the mass jumps from 1.0 to \SI{1.5}{kg}}\setuprow{Goal}{none: watch and explain}}%
+Every controller in this book so far was a formula someone wrote down and could explain. This one is a table of 1700 numbers. It was made in two minutes by a script: first it watched the geometric controller fly in many conditions and learned to imitate it, then it was improved by flying variants of itself and keeping what worked. It hovers, reaches a target \SI{3}{m} away faster than its teacher — and never comes to rest. It floats \SI{20}{cm} above its target, circles it by \SI{\pm12}{cm}, and when the drone gets heavier it sags by exactly the amount a spring of its teacher's stiffness would. Each of these is a property of what it learned, and this lesson reads them off the flight.}
+
+\section{A function from what the drone senses to what the motors do}
+
+A controller is a function: from the measured state and the reference to the commands. The lessons so far built that function from physics and from a cost. A \term{policy} in the language of machine learning is the same object, and a neural network is one way to write a very flexible function with many adjustable numbers.
+
+\begin{definition}{Neural network policy}
+A \term{multilayer perceptron} with layer sizes $n_0 \to n_1 \to \dots \to n_L$ computes
+\begin{equation}\label{eq:policy-mlp}
+  \vec a_0 = \vec o,\qquad \vec a_\ell = \tanh\big(W_\ell\,\vec a_{\ell-1} + \vec b_\ell\big)\ (\ell < L),\qquad \vec\pi(\vec o) = W_L\,\vec a_{L-1} + \vec b_L ,
+\end{equation}
+with weight matrices $W_\ell \in \R^{n_\ell \times n_{\ell-1}}$ and biases $\vec b_\ell$, the $\tanh$ applied to each entry. A \term{policy} is such a network used as a controller: the observations $\vec o$ go in, the commands come out. Its weights and biases are the \term{parameters} $\symbf\vartheta$.
+\end{definition}
+
+The simulator's policy (\src{src/control/policy.ts}) observes 15 numbers, each scaled to be of order one: the position error (clipped at \SI{\pm2}{m}, divided by 2), the velocity error (divided by \SI{3}{m/s}), the drone's up and forward axes in the world frame (six numbers that describe the attitude without angles), and the three body rates (divided by \SI{4}{rad/s}). It outputs four numbers, decoded into a collective thrust and three body rates,
+\begin{equation}\label{eq:policy-decode}
+  T = \hatm g\,\big(1 + \tanh\pi_1\big), \qquad \omega_i = \SI{6}{rad/s}\cdot\tanh\pi_{i+1}\quad(i = 1, 2, 3),
+\end{equation}
+which the existing rate loop then tracks. This is the interface of the champion racing policy of Kaufmann et al. (2023): the network decides where to point the thrust and how hard to push; the rate loop, as in Part~I, makes the rotors obey.\recall{Lesson~I.13: in the cascade, each loop's output is the set-point of the next, faster loop. The network replaces the position, velocity and attitude loops at once; the rate loop stays.}
+
+\begin{example}[Counting the parameters]
+\label{ex:policy-count}
+How many numbers define the network $15 \to 32 \to 32 \to 4$?
+
+\textbf{Step 1 — first layer.} $W_1$ is $32 \times 15$, $\vec b_1$ has 32 entries: $480 + 32 = 512$.
+
+\textbf{Step 2 — second layer.} $32 \times 32 + 32 = 1056$.
+
+\textbf{Step 3 — output layer.} $4 \times 32 + 4 = 132$.
+
+\textbf{Step 4 — total.} $512 + 1056 + 132 = 1700$, as the info card says. One evaluation costs about 1700 multiplications and 64 hyperbolic tangents — less than one solve of the MPC of \lessonref{les:mpc}.
+\end{example}
+\innumbers{1700 parameters stored as 64-bit numbers: \SI{13.6}{kB}. The geometric controller it imitates has three gains.}
+
+\section{Training: imitate, then improve}
+
+Nobody chose the 1700 numbers. The script \src{scripts/train-policy.ts} (\texttt{make train}) found them in two steps.
+
+\textbf{Imitation.} The geometric controller flew 160 episodes of \SI{15}{s} in randomised conditions: the drone's mass between 0.85 and \SI{1.15}{kg}, a wind of 0 to \SI{3}{m/s} from a random direction with up to six gusts a minute, and either a target that jumped to a random point every three seconds or, in 30\,\% of the episodes, a figure-8 or a circle. At \SI{100}{Hz} the script recorded what the controller observed and what it commanded — 235\,360 pairs — and fitted the network to them by minimising the mean squared difference between its outputs and the teacher's (in the coordinates of \cref{eq:policy-decode}), with stochastic gradients on batches of 256 (Appendix~J). This is \term{behaviour cloning}, the simplest form of \term{imitation learning}.
+
+\textbf{Improvement.} The cloned policy was then trained on what matters: the flight itself. Its cost is the mean distance from the target over an episode, with a crash counted as \SI{5}{m}. That cost is not differentiable with respect to the weights — it comes out of a simulation with saturations and contacts — so the script estimates the direction of improvement by trying: it perturbs the weights in random directions, flies each perturbation, and moves towards the ones that flew better (\cref{eq:policy-es}). This is an \term{evolution strategy}, a form of \term{reinforcement learning} that needs no gradient (Salimans et al., 2017).
+
+\begin{equation}\label{eq:policy-es}
+  \hat{\vec g} = \frac{1}{2\sigma n}\sum_{i=1}^{n}\Big(J(\symbf\vartheta + \sigma\symbf\varepsilon_i) - J(\symbf\vartheta - \sigma\symbf\varepsilon_i)\Big)\,\symbf\varepsilon_i,\qquad \symbf\varepsilon_i \sim \mathcal N(0, \Id) .
+\end{equation}
+
+\begin{example}[What the training cost]
+\label{ex:policy-es-cost}
+The script uses $n = 16$ antithetic pairs with $\sigma = 0.01$, scores each candidate on three episodes of \SI{8}{s}, and takes 40 steps. How much simulated flight is that?
+
+\textbf{Step 1 — one step.} $2 \times 16 = 32$ candidates $\times$ 3 episodes $\times$ \SI{8}{s} $= \SI{768}{s}$ of flight.
+
+\textbf{Step 2 — forty steps.} $40 \times 768 = \SI{30720}{s}$, eight and a half hours of simulated flight, plus a validation on six fixed episodes of \SI{12}{s} every five steps.
+
+\textbf{Step 3 — the result.} On the validation episodes the mean distance to the target was \SI{77.8}{cm} for the geometric teacher, \SI{88.8}{cm} for the cloned network and \SI{75.9}{cm} after the evolution strategy — slightly better than the teacher, on episodes made of \SI{3}{m} target jumps (the numbers are on the info card).
+
+\textbf{Step 4 — read it.} Cloning gets close to the teacher but not to it; the closed-loop training recovers the gap and a little more. The teacher took a page of physics to design; the student took eight and a half hours of flight to learn, and it learned only what those flights measured.
+\end{example}
+\tip{Two numbers decide whether a policy was trained on the right thing: the cost it was trained on, and the conditions it was trained in. Read both before reading its flights.}
+
+\section{What it learned}
+
+\simfig{policy_hop}{The policy (blue) and the geometric controller it imitated (grey), flying the same script. Top: the error along $x$; the jump of the target at \SI{10}{s} is clipped. Middle: the error in altitude; the mass jumps to \SI{1.5}{kg} at \SI{20}{s}. Bottom: the total thrust.}{fig:policy-hop}
+
+\begin{example}[Hover]
+\label{ex:policy-hover}
+Read the first ten seconds of \cref{fig:policy-hop}.
+
+\textbf{Step 1 — the offset.} Between 5 and \SI{10}{s} the policy holds the drone \SI{20.1}{cm} above its target, on average. The geometric controller, with its integral, sits on the target.
+
+\textbf{Step 2 — the circling.} Horizontally the drone never stops: along $x$ it swings between \SI{-10}{} and \SI{+14}{cm}, along $z$ between \SI{-7}{} and \SI{+14}{cm}, with a period of about \SI{1.25}{s}. It is a \term{limit cycle}: an oscillation that neither grows nor dies, like the one of \lessonref{les:spring}.
+
+\textbf{Step 3 — why nothing removes them.} The network is a static function of the present observation: it has no memory, so it cannot integrate an offset away. And nothing in its training asked for stillness: its cost was the mean distance over episodes made of \SI{3}{m} jumps, where a constant \SI{20}{cm} and a gentle circling are small next to the distance still to go after each jump.
+
+\textbf{Step 4 — the honest conclusion.} The teacher's integral is a \emph{state} — a memory of past errors. The student was shown the teacher's commands but not that state, so it could only learn the average command for each observation. The policy is a different controller from the one it imitated: one without an integrator.
+\end{example}
+
+\begin{example}[The target jump]
+\label{ex:policy-step}
+At \SI{10}{s} the target moves \SI{3}{m}. Compare the two responses.
+
+\textbf{Step 1 — speed.} The policy rises from 10 to 90\,\% of the jump in \SI{0.68}{s}, the geometric controller in \SI{0.88}{s}. The policy reaches \SI{4.2}{m/s}; the teacher \SI{3.7}{m/s}.
+
+\textbf{Step 2 — the price.} The policy overshoots by \SI{38}{cm}; the teacher by \SI{4.5}{cm}, and the teacher is within \SI{5}{cm} of the target \SI{1.8}{s} after the jump. The policy then resumes its circling and is never within \SI{5}{cm} for long.
+
+\textbf{Step 3 — why faster.} The evolution strategy rewarded getting close quickly on exactly this kind of episode, and it does not care how the drone arrives. A careful comparison of learned and classical quadrotor controllers (Kunapuli et al., 2025) found the same division: the learned ones win on fast transients, the geometric controller on steady-state precision.
+\end{example}
+
+\begin{keyidea}[A policy is what its training rewarded]
+A learned controller reproduces what its data showed and optimises what its cost measured — nothing more. Behaviour that nobody measured, like a constant offset or a small oscillation, is left to chance; information that was not in its observations, like the teacher's integral, cannot be learned at all.
+\end{keyidea}
+
+\screen[0 0 495 998]{policy}{Lesson II.20 in the app at $t = \SI{18}{s}$, after the target jump. The information card of the position loop lists the network and the numbers of its training: \num{235360} demonstrations, the masses and winds it saw, and its imitation loss. The ghost (the geometric controller) flies the same script.}{fig:policy-screen}
+
+\section{Outside the training range}
+
+At \SI{20}{s} the mass jumps to \SI{1.5}{kg}, far above the \SI{1.15}{kg} the policy was trained on. Both controllers sag (\cref{fig:policy-hop}, middle). The geometric controller drops by \SI{56}{cm} and then climbs back slowly as its integral grows; the policy drops by \SI{43}{cm} and stays at \SI{34.5}{cm} below the target. Its circling stops.
+
+\begin{example}[A spring with its teacher's stiffness]
+\label{ex:policy-sag}
+Predict the policy's sag from its teacher's gains, and check it.
+
+\textbf{Step 1 — the teacher's stiffness.} The geometric law commands $\hatm(\vec a_{ref} - K_p\vec e_p - K_v\vec e_v + \vec g)$ with $K_p = \SI{9}{s^{-2}}$ and $\hatm = \SI{1}{kg}$: without its integral, a vertical spring of stiffness $\hatm K_p = \SI{9}{N/m}$.
+
+\textbf{Step 2 — the missing force.} The extra \SI{0.5}{kg} weighs $0.5 \cdot 9.81 = \SI{4.91}{N}$. A spring of \SI{9}{N/m} holds it at a stretch of $4.91/9 = \SI{54.5}{cm}$.
+
+\textbf{Step 3 — the flight.} The policy's altitude offset goes from $+20.1$ to \SI{-34.5}{cm}: a change of \SI{54.6}{cm}.
+
+\textbf{Step 4 — inside the range.} The same flight with the mass raised only to \SI{1.15}{kg} — the edge of the training range — moves the offset from $+20.1$ to \SI{+6.2}{cm}, a change of \SI{13.9}{cm}; the spring predicts $0.15 \cdot 9.81/9 = \SI{16.4}{cm}$ (\cref{fig:policy-sag}). The network learned its teacher's proportional gain, roughly — and with it, the sag of a controller without an integrator, which it carries even within the conditions it was trained on.
+\end{example}
+\marginfig{policy_sag}{The policy's mean hover offset at three masses (dots) and the sag of a \SI{9}{N/m} spring through the first point (dashed). Shaded: the masses of training.}{fig:policy-sag}
+
+The geometric controller's integral, for comparison, is bounded at \SI{3}{m/s^2} of correction; with \SI{4.91}{m/s^2} missing it can recover only part of the sag and would settle at $(4.91 - 3)/9 = \SI{21}{cm}$ below the target. At \SI{35}{s} it is at \SI{24.5}{cm} and still climbing.\pitfall{\enquote{Outside its training range it gets much worse} is the usual warning about learned controllers, and the app's note says so too. In this flight the policy is not much worse than its teacher after the mass jump; it behaves exactly like a spring. The real warning is that you cannot know which it will be without flying it.}
+
+Why the circling stops at the heavier mass, the flight does not tell. The network now sees observations it never saw in training — a vertical error of \SI{-35}{cm} held for many seconds — and its response there is simply different. That is the deeper problem with a controller nobody designed: its behaviour in a new condition is not wrong or right by construction; it is unknown until tested.
+
+\begin{inapp}
+\begin{itemize}[leftmargin=1.2em]
+  \item The switch is \ui{Controller\then Outer stage\then neural network policy} (\param{control.l3.outer = 'policy'}). The network bypasses the thrust-vector and attitude stages and sends thrust and body rates to the rate loop.
+  \item The inference is \texttt{PolicyOuter} in \src{src/control/policy.ts}: \texttt{observe} builds the 15 observations, \texttt{forward} evaluates \cref{eq:policy-mlp}, \texttt{decode} applies \cref{eq:policy-decode}. Plain TypeScript, no machine-learning library.
+  \item The weights are in \src{src/control/policy-weights.ts}, written by \texttt{make train} (\src{scripts/train-policy.ts}), which also records the training numbers shown on the info card.
+\end{itemize}
+\end{inapp}
+
+\begin{trythis}
+\begin{enumerate}
+  \item Watch the policy hover and count the period of its circling.
+  \item Move the target with the mouse: by small steps, then by large ones. Where is the policy better than the ghost, and where worse?
+  \item Turn on the wind at \SI{3}{m/s} (inside its training range), then at \SI{6}{m/s} (outside).
+\end{enumerate}
+\predict{the drone's mass is set to \SI{0.85}{kg}, the lower edge of training. Will the policy float higher or lower than its usual \SI{20}{cm}, and by how much?}
+\end{trythis}
+
+\section{The engineer's view: learning to control}
+
+An engineer handed a learned controller asks two things: how its training could have misled it, and what, if anything, can be proved about it. This section takes them in turn.
+
+\subsection{Imitation and its trap}
+Behaviour cloning trains the policy on the states the \emph{teacher} visited. When the student flies, its small errors take it to states the teacher never visited, where its errors are larger, which take it further away. The errors compound. Ross and Bagnell (2010) made this precise: a cloned policy that errs with probability $\varepsilon$ on the teacher's states may incur, over $T$ steps, a cost that grows like $T^2\varepsilon$, not $T\varepsilon$.\didyouknow{One of the first neural networks to steer a vehicle on a road met exactly this trap, around 1990 — and its author solved it by inventing views of the road that the human driver never showed it. See the story at the end of this lesson.}
+
+Their remedy, DAgger, lets the student fly, asks the teacher what it would have done in the states the student actually reached, and retrains (Ross, Gordon and Bagnell, 2011). The evolution strategy of this lesson attacks the same problem differently: after cloning, it trains on the student's own flights.
+
+\begin{example}[Why the trap is quadratic]
+\label{ex:policy-compound}
+A cloned policy has a probability $\varepsilon = 0.001$ per step of making a mistake from which it does not recover, after which every step costs 1. Estimate the expected cost over $T = 1000$ steps (\SI{10}{s} at \SI{100}{Hz}).
+
+\textbf{Step 1 — first mistake.} The probability of a first mistake at step $t$ is about $\varepsilon$ for each $t$ while $\varepsilon t \ll 1$.
+
+\textbf{Step 2 — its cost.} A mistake at step $t$ costs the remaining $T - t$ steps.
+
+\textbf{Step 3 — the sum.} $\sum_t\varepsilon(T - t) \approx \varepsilon T^2/2 = 0.001 \cdot 10^6/2 = 500$: half the episode.
+
+\textbf{Step 4 — compare.} A policy whose mistakes did not drive it off the teacher's states would cost $\varepsilon T = 1$. The factor $T/2 = 500$ is the price of states the teacher never showed.
+\end{example}
+
+\subsection{In formal terms}
+
+\begin{theorem}[Universal approximation]
+\label{thm:policy-uat}
+Let $K \subset \R^n$ be compact and $f\colon K \to \R^m$ continuous. For every $\epsilon > 0$ there is a network with one hidden layer of $\tanh$ units (\cref{eq:policy-mlp} with $L = 2$), of sufficient width, such that $\|\vec\pi(\vec o) - f(\vec o)\| < \epsilon$ for all $\vec o \in K$. (Cybenko, 1989; Hornik, Stinchcombe and White, 1989.)
+\end{theorem}
+
+The theorem says that a network \emph{can} represent any continuous controller on a bounded set of observations — the geometric law among them, on the observations the teacher saw. It says nothing about how wide the network must be, whether training finds the weights, or what the network does outside $K$. The next theorem is about the last of these, for the simplest case.
+
+\begin{theorem}[A static policy carries a steady offset]
+\label{thm:policy-offset}
+Let the vertical motion be $m\ddot y = T - mg$ and the thrust a static function of the observations, $T = \pi(e, \dot y)$ with $e = y - y_{ref}$, continuously differentiable, with $\partial\pi/\partial e = -k < 0$ at the equilibrium. If the mass changes from $m$ to $m + \Delta m$ and the loop stays stable, the equilibrium error changes by
+\begin{equation}\label{eq:policy-offset}
+  \Delta e = -\frac{\Delta m\,g}{k} + O(\Delta m^2) .
+\end{equation}
+\end{theorem}
+\begin{proof}
+At an equilibrium $\dot y = 0$ and $\pi(e, 0) = mg$. With $\pi(e_0, 0) = mg$, the new equilibrium satisfies $\pi(e_0 + \Delta e, 0) = (m + \Delta m)g$; expanding to first order, $-k\,\Delta e = \Delta m\,g$. No static $\pi$ can make $\Delta e = 0$ for every $\Delta m$ unless $k = \infty$: rejecting a constant disturbance exactly needs an integrator in the loop, the internal model principle of Francis and Wonham (1976) for a constant.
+\end{proof}
+
+With $k = \SI{9}{N/m}$ the theorem gives the \SI{54.5}{cm} of Example~\ref{ex:policy-sag}. A network could learn an integrator only if its observations contained one — the integral of the error, or a history of past observations. Larger policies do get a history: a stack of recent observations, or a recurrent network whose hidden state is a learned memory.
+
+\begin{theorem}[What the evolution strategy estimates]
+\label{thm:policy-es}
+Let $J\colon\R^p \to \R$ be integrable against the Gaussian and define the smoothed cost $J_\sigma(\symbf\vartheta) = \E\,J(\symbf\vartheta + \sigma\symbf\varepsilon)$, $\symbf\varepsilon \sim \mathcal N(0, \Id)$. Then $J_\sigma$ is differentiable, and the estimate $\hat{\vec g}$ of \cref{eq:policy-es} satisfies $\E\,\hat{\vec g} = \nabla J_\sigma(\symbf\vartheta)$.
+\end{theorem}
+\begin{proof}
+Write $J_\sigma(\symbf\vartheta) = \int J(\vec u)\,\varphi_\sigma(\vec u - \symbf\vartheta)\,\dd\vec u$ with the Gaussian density $\varphi_\sigma$. Differentiating under the integral, $\nabla\varphi_\sigma(\vec u - \symbf\vartheta)$ with respect to $\symbf\vartheta$ is $\varphi_\sigma(\vec u - \symbf\vartheta)(\vec u - \symbf\vartheta)/\sigma^2$, so $\nabla J_\sigma = \E[J(\symbf\vartheta + \sigma\symbf\varepsilon)\,\symbf\varepsilon]/\sigma$. Replacing $\symbf\varepsilon$ by $-\symbf\varepsilon$ gives $\nabla J_\sigma = -\E[J(\symbf\vartheta - \sigma\symbf\varepsilon)\,\symbf\varepsilon]/\sigma$; averaging the two expressions gives $\E\,\hat{\vec g}$ for each pair.
+\end{proof}
+
+The evolution strategy is therefore a stochastic gradient method (Appendix~J) on a smoothed version of the cost — smoothed over a ball of radius about $\sigma\sqrt p$ in weight space, which is why it tolerates costs with jumps, like a crash. The script replaces the raw costs by their ranks before forming $\hat{\vec g}$, a common variant that is robust to outliers and no longer exactly unbiased (Salimans et al., 2017). The price of not using derivatives is variance: with $p = 1700$ parameters and 32 samples per step, each estimate is noisy, which is why the steps are small and the best validated weights are kept.\tip{Gradient-free training needs no model and no differentiable simulator; with one, gradients through the simulation can train a policy in a small fraction of the flights.}
+
+\begin{lookahead}
+\begin{itemize}[leftmargin=1.2em]
+  \item The next lesson flies this policy against every other controller of the volume, on equal terms.
+  \item Reinforcement learning proper — value functions, policy gradients, and their link to dynamic programming — belongs to the optimal control of Part~IV, Lessons~IV.1--IV.4.
+  \item Stochastic gradients and their convergence are in Appendix~J; the internal model principle returns in Part~III.
+\end{itemize}
+\end{lookahead}
+
+\begin{remember}
+\begin{itemize}
+  \item A neural network policy is a flexible function from observations to commands; here $15 \to 32 \to 32 \to 4$, 1700 parameters, thrust and body rates out.
+  \item Behaviour cloning fits the teacher's commands; an evolution strategy then improves the closed-loop cost by perturbing the weights and keeping what flies better.
+  \item The policy rises faster than its teacher (\SI{0.68}{s} against \SI{0.88}{s}) but floats \SI{20}{cm} high and circles by about \SI{\pm12}{cm}: nothing in its cost asked for stillness, and it has no memory.
+  \item A static policy behaves like a spring: \SI{0.5}{kg} more sags it by $\Delta mg/k = \SI{54.5}{cm}$, measured \SI{54.6}{cm}.
+  \item What a learned controller does outside its data is not designed; it is discovered by flying.
+\end{itemize}
+\end{remember}
+
+\begin{curiosity}{The van that learned to steer}
+\photo{navlab}{The Navlab vehicles of Carnegie Mellon University, numbers 1 (farthest) to 5 (front).}
+In the late 1980s Dean Pomerleau, a graduate student at Carnegie Mellon University, put a small neural network in charge of the steering of Navlab, a van full of computers. His ALVINN — Autonomous Land Vehicle In a Neural Network — looked at a coarse camera image of the road, a few hundred pixels, and answered with a steering direction (Pomerleau, 1989). Nobody wrote a rule about lane markings or road edges; the network found its own cues in the images.
+
+At first it was trained on synthetic road images. Then Pomerleau trained it by letting it watch a person drive — and met the trap of this lesson's engineer's view. A good driver stays in the middle of the lane, so the network never saw what to do when the van drifted towards the edge, and once it drifted, it did not know how to come back. His remedy was to invent the missing lessons: he shifted and rotated the camera images to show the van in positions the driver had never been in, each labelled with the steering that would bring it back (Pomerleau, 1991). The network learned to recover from mistakes it had never been shown.
+
+The Navlab line continued. In 1995 Navlab~5 crossed the United States from Pittsburgh to San Diego, its steering automatic for all but 50 of 2850 miles. Today's learned drivers and flyers are millions of times larger, but they are trained against the same trap, and with the same idea: show the student the states its own mistakes will lead to.
+\end{curiosity}
+
+\begin{exercises}
+\exercise[1] How many parameters has a network $15 \to 64 \to 64 \to 4$? How does the count scale with the width of the hidden layers?
+\answer{$15\cdot64 + 64 + 64\cdot64 + 64 + 64\cdot4 + 4 = 960 + 64 + 4096 + 64 + 256 + 4 = 5444$. The middle layer dominates and grows with the square of the width.}
+\exercise[1] With \cref{eq:policy-decode} and $\hatm = \SI{1}{kg}$, what range of thrust can the policy command, and what output $\pi_1$ gives hover?
+\answer{$T = 9.81(1 + \tanh\pi_1)$ ranges from 0 to \SI{19.6}{N} (then clamped to the motors' maximum); hover at $\pi_1 = 0$.}
+\exercise[1] Why are the observations scaled to be of order one?
+\answer{The $\tanh$ units saturate for large inputs and have their useful slope near zero; inputs of very different sizes would make some dominate and others invisible to training, and the gradients poorly scaled (Appendix~J: the condition number).}
+\exercise[2]\exkind{derive} Using \cref{thm:policy-offset}, predict the policy's hover offset at \SI{0.85}{kg}, starting from \SI{+20.1}{cm} at \SI{1}{kg} with $k = \SI{9}{N/m}$.
+\answer{$\Delta m = -0.15$: $\Delta e = 0.15 \cdot 9.81/9 = \SI{+16.4}{cm}$, so about \SI{36}{cm} above the target — if the network behaves at the low edge as it did at the high edge (Example~\ref{ex:policy-sag} measured \SI{13.9}{cm} there instead of 16.4).}
+\exercise[2]\exkind{derive} Prove that for a one-dimensional $J(\vartheta) = \vartheta^2$, the antithetic estimate with one pair is exactly $2\vartheta\varepsilon^2$, and compute its mean and variance. What is $J_\sigma$?
+\answer{$J(\vartheta \pm \sigma\varepsilon) = \vartheta^2 \pm 2\vartheta\sigma\varepsilon + \sigma^2\varepsilon^2$; the difference is $4\vartheta\sigma\varepsilon$; times $\varepsilon/(2\sigma)$ gives $2\vartheta\varepsilon^2$. Mean $2\vartheta$ (since $\E\varepsilon^2 = 1$), variance $4\vartheta^2 \cdot 2 = 8\vartheta^2$. $J_\sigma = \vartheta^2 + \sigma^2$, whose gradient is $2\vartheta$.}
+\exercise[2]\exkind{derive} Repeat Example~\ref{ex:policy-compound} exactly: with a first mistake at step $t$ with probability $\varepsilon(1 - \varepsilon)^{t-1}$, show that the expected cost is $T - (1 - \varepsilon)(1 - (1 - \varepsilon)^T)/\varepsilon$ and evaluate it for $\varepsilon = 0.001$, $T = 1000$.
+\answer{$\sum_{t=1}^{T}\varepsilon(1 - \varepsilon)^{t-1}(T - t)$; summing the geometric series gives the formula. Numerically $1000 - 0.999 \cdot (1 - 0.3677)/0.001 \approx 1000 - 631.6 = 368$: smaller than $\varepsilon T^2/2 = 500$ because the approximation $\varepsilon t \ll 1$ fails late in the episode, but still hundreds of times $\varepsilon T = 1$.}
+\exercise[2]\exkind{fly} In Lesson~II.20, set the drone's mass to \SI{0.85}{kg} and check your prediction of the previous exercise.
+\answer{Measure the mean altitude error over a few seconds of hover. A value near \SI{+35}{cm} confirms the spring picture; a markedly different one shows that the network is not symmetric about its training centre.}
+\exercise[2]\exkind{fly} Give the policy a target \SI{1}{m} away, then \SI{5}{m} away. Compare its overshoot and the ghost's in both cases. Why might the larger jump look worse for the policy?
+\answer{The position error in the observations is clipped at \SI{2}{m}: beyond that the network sees the same input whatever the distance, as it did in training, where jumps were within a box of \SI{\pm3}{m}. Large jumps take it to speeds and attitudes it saw rarely.}
+\exercise[2]\exkind{code} In \texttt{observe} (\src{src/control/policy.ts}), which observation would you add to give the network a chance to remove its hover offset, and what would the training script have to record for it?
+\answer{The integral of the position error (as the geometric controller keeps it), scaled to order one. The imitation data would have to include the teacher's integral state, and the policy would have to update its own integral when flying — a memory outside the network, like the teacher's.}
+\exercise[3]\exkind{code} Change the episode cost in \texttt{episodeCost} (\src{scripts/train-policy.ts}) to add a penalty on the squared speed during the last second before each target jump, re-train with \texttt{make train}, and compare the hover circling with this lesson's.
+\answer{An open experiment. Rewarding stillness should shrink the limit cycle, at some cost in speed after jumps; report the amplitude of the circling, the rise time and the validation error, and keep the original weights for comparison.}
+\exercise[3]\exkind{derive} DAgger. A teacher $\pi^*$ and a student $\hat\pi$ visit different states. Explain why training the student on states sampled from its own flights, labelled by the teacher, removes the factor $T$ of Example~\ref{ex:policy-compound}, under the assumption that the student's error rate on its own states is $\varepsilon$.
+\answer{The $T^2$ came from errors on states the training never covered, whose cost lasts the rest of the episode. If the training distribution is the student's own state distribution, its error rate $\varepsilon$ holds on the states it actually visits, and the expected number of mistakes over $T$ steps is $\varepsilon T$; with recoverable mistakes the cost is $O(\varepsilon T)$ (Ross, Gordon and Bagnell, 2011).}
+\end{exercises}

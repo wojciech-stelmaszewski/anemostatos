@@ -70,6 +70,9 @@ PHOTOS = {
     "fermiac": "File:STAN ULAM HOLDING THE FERMIAC.jpg",
     "acat": "File:The F-16D Automatic Collision Avoidance Technology aircraft tests of the Automatic Ground Collision Avoidance System, or Auto-GCAS, included flights in areas of potentially hazardous terrain, including canyons and mount (ED09-0290-32).jpg",
     "jenkin": "File:Henry Charles Fleeming Jenkin. Etching by W. Holl, 1884. Wellcome V0003068.jpg",
+    "albatross": "File:Wandering Albatross- east of the Tasman Peninsula.jpg",
+    "navlab": "File:Navlab-1-5-autonomous-vehicles.jpg",
+    "stanley": "File:AutonomousVehicles2.jpg",
 }
 
 # Fractions to trim (left, top, right, bottom): scan borders and printed captions.

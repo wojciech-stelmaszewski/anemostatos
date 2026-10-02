@@ -1,0 +1,236 @@
+\lesson{II.19}{Learn the shape of the wind}{An integrator learns one number and must relearn it every time the drone turns. A model learns how the force depends on the motion, and then only has to remember it.}{3}{residual}{Part II · Beyond PID}
+\label{les:residual}
+
+\lead{\setupcard{\setuprow{Level}{L3}\setuprow{Controller}{geometric tracking with flatness feedforward and its own integral}\setuprow{Scene}{a steady \SI{3}{m/s} wind with light turbulence ($\sigma = \SI{0.5}{m/s}$), no gusts; rotor drag on}\setuprow{Reference}{a figure-8, \SI{2}{m} amplitude, one lap in \SI{6.5}{s}, at \SI{3}{m} altitude}\setuprow{Goal}{below \SI{5}{cm} RMS error over the last lap}}%
+A fast figure-8 through a steady wind. The force of the air on the drone is no longer a constant: flying into the wind it is four newtons, flying with it less than half a newton, and it swings between the two twice a lap. The geometric controller's integral chases it and loses, \SI{16}{cm} RMS. This lesson fits a small model of the force as a function of the drone's own velocity — four numbers, adapted continuously by least squares from the accelerometer — and cancels what it predicts. The error drops to \SI{2.3}{cm}. The interesting part is why, and what the four numbers mean.}
+
+\section{A force that depends on the motion}
+
+The wind blows along $x$ at $w \approx \SI{3}{m/s}$. The air pushes on the drone in two ways (\src{src/sim/dynamics.ts}). The body has quadratic drag on the velocity \emph{relative to the air}, $\vec v - \vec w$, with $c_h = \SI{0.12}{N.s^2/m^2}$ per horizontal axis; and the spinning rotors add \term{rotor drag}, a force against the in-plane relative velocity proportional to the thrust $T$, with $k_r = \SI{0.02}{s/m}$ (Faessler, Franchi and Scaramuzza, 2018). Along the wind, for a drone close to level,
+\begin{equation}\label{eq:residual-physics}
+  f_x = c_h\,(w - v_x)\,|w - v_x| + k_r\,T\,(w - v_x) .
+\end{equation}
+The drone never flies faster than the wind here (its top speed on the figure-8 is \SI{2.8}{m/s}), so $w - v_x > 0$ throughout.
+
+\begin{example}[The force over one lap]
+\label{ex:residual-range}
+Estimate the force along the wind when the drone flies into it at \SI{2}{m/s}, when it hovers, and when it flies with the wind at \SI{2}{m/s}. The thrust is close to the weight, $T \approx \SI{10.3}{N}$.
+
+\textbf{Step 1 — into the wind,} $v_x = \SI{-2}{m/s}$, relative speed \SI{5}{m/s}: $0.12 \cdot 25 + 0.02 \cdot 10.3 \cdot 5 = 3.0 + 1.0 = \SI{4.0}{N}$.
+
+\textbf{Step 2 — still,} relative speed \SI{3}{m/s}: $0.12 \cdot 9 + 0.02 \cdot 10.3 \cdot 3 = 1.08 + 0.62 = \SI{1.70}{N}$.
+
+\textbf{Step 3 — with the wind,} $v_x = \SI{+2}{m/s}$, relative speed \SI{1}{m/s}: $0.12 + 0.21 = \SI{0.33}{N}$.
+
+\textbf{Step 4 — the flight.} The simulator records the true disturbance force. Over the last 20 seconds it ranges from \SI{0.29}{N} to \SI{4.65}{N} along $x$, with a standard deviation of \SI{1.19}{N} around its mean: the swing of Steps 1--3, plus turbulence. Twice per lap, every \SI{3.25}{s}, the force changes by about \SI{3.5}{N} — a third of the drone's weight.
+\end{example}
+\recall{Lesson~I.5: an integral removes a \emph{constant} error. Against a disturbance that keeps changing it is always behind, by roughly the change that happened during its own time constant.}
+
+An integrator holds one number. Here the number it should hold changes by \SI{3.5}{N} every three seconds, and the geometric controller's integral, whose gain is chosen for steadiness, cannot follow. Over the last lap the error is \SI{16.1}{cm} RMS and peaks at \SI{27}{cm} (\cref{fig:residual-eight}).\aside{The lesson's text in the app says \enquote{about 14\,cm}; the recorded flight gives 16.1\,cm over the last lap and 15.6\,cm over the last twenty seconds.}
+
+\section{Learn the shape, adapt the coefficients}
+
+The force of \cref{eq:residual-physics} is not a constant, but it is a fixed \emph{function} of things the controller knows: the velocity and the thrust. Only the wind $w$, which is not measured, sets its coefficients. Expanding the square for $w > v_x$,
+\begin{equation*}
+  f_x = \underbrace{\big(c_hw^2 + k_rTw\big)}_{\text{constant}} \;-\; \underbrace{\big(2c_hw + k_rT\big)}_{\text{linear}}\,v_x \;+\; c_h\,v_x^2 ,
+\end{equation*}
+a sum of known functions of the state with unknown coefficients. That observation is the whole method.
+
+\begin{definition}{Learned residual model}
+The \term{residual force} is the part of the force on the drone that the controller's model leaves out. A \term{learned residual model} writes it as
+\begin{equation}\label{eq:residual-model}
+  \vec f \approx \Phi(\vx)\,\symbf\theta ,
+\end{equation}
+where the \term{features} $\Phi(\vx)$ are fixed functions of the measured state, and only the coefficients $\symbf\theta$ are estimated online. The controller adds $-\Phi(\vx)\hat{\symbf\theta}$ to its commanded force.
+\end{definition}
+
+In Neural-Fly (O'Connell et al., 2022) the features are the outputs of a neural network, trained offline on flights in many different winds so that, across all of them, only the linear coefficients need to change. The simulator uses four hand-made features per axis, chosen from the physics: a constant, the velocity, $|\vec v|\,v_x$ and the thrust times the in-plane velocity,
+\begin{equation}\label{eq:residual-features}
+  \Phi_x = \big(1,\; v_x,\; |\vec v|\,v_x,\; T\,v_{\perp,x}\big) ,\qquad f_x \approx \theta_1 + \theta_v\,v_x + \theta_q\,|\vec v|\,v_x + \theta_T\,T\,v_{\perp,x} .
+\end{equation}
+\tip{Features should be functions of what the controller \emph{measures}. The relative velocity $\vec v - \vec w$ would be the natural feature, but the wind is unknown; its effect ends up in the coefficients.}
+
+\begin{example}[What the coefficients should be]
+\label{ex:residual-coeffs}
+Match \cref{eq:residual-features} to the physics, with the recorded mean wind $w = \SI{3.05}{m/s}$ and mean thrust $T = \SI{10.31}{N}$.
+
+\textbf{Step 1 — the constant.} $c_hw^2 + k_rTw = 0.12 \cdot 3.05^2 + 0.02 \cdot 10.31 \cdot 3.05 = 1.12 + 0.63 = \SI{1.75}{N}$.
+
+\textbf{Step 2 — the linear part.} $-(2c_hw + k_rT) = -(0.73 + 0.21) = \SI{-0.94}{N.s/m}$. Since $T$ hardly changes (its standard deviation is \SI{0.33}{N}), the features $v_x$ and $T v_{\perp,x}$ are almost the same signal; only the combination $\theta_v + T\theta_T$ matters.
+
+\textbf{Step 3 — the quadratic part.} The physics has $+c_hv_x^2 = 0.12\,v_x^2$, which is even in $v_x$; the feature $|\vec v|\,v_x$ is odd. The model cannot represent this term exactly — a mismatch between the features and the truth, like the ones every real model has.
+
+\textbf{Step 4 — a fit by hand.} A least-squares fit of the recorded force on $(1, v_x, v_x^2)$ over the last 20 seconds gives $1.70 - 0.83\,v_x + 0.11\,v_x^2$, close to the physics, with a residual of \SI{0.27}{N} RMS — the turbulence, which no function of the drone's velocity can predict.
+\end{example}
+
+The coefficients are estimated by \term{recursive least squares} (RLS) with exponential forgetting, at \SI{100}{Hz}, separately for each axis. The measurement is the residual force the accelerometer reveals, $y$, the $x$ component of $\hatm\,\vec a - \vec F_0 - \hatm\vec g$ (the force INDI uses in \lessonref{les:indiwind}), with acceleration and thrust low-pass filtered at \SI{10}{Hz}. At every update,
+\begin{equation}\label{eq:residual-rls}
+  \begin{aligned}
+  \vec k &= \frac{P\,\symbf\phi}{\lambda + \symbf\phi^\T P\,\symbf\phi}, &\quad
+  \hat{\symbf\theta} &\leftarrow \hat{\symbf\theta} + \vec k\,\big(y - \symbf\phi^\T\hat{\symbf\theta}\big), &\quad
+  P &\leftarrow \frac{1}{\lambda}\big(P - \vec k\,\symbf\phi^\T P\big),
+  \end{aligned}
+\end{equation}
+with $\symbf\phi = \Phi_x^\T$, the forgetting factor $\lambda = 0.995$ and $P$ starting at $100\,\Id$. $P$ is, up to a scale, the covariance of the estimate: large where the data have said little.
+
+\simfig{residual_eight}{The fast figure-8 in the wind. Top left: the position error with the controller's integral alone (grey), the learned residual model, L1 adaptive control and INDI. Top right: the true force along the wind against $v_x$ over the last 20\,s (dots) and \cref{eq:residual-physics} with the mean wind and thrust (dashed). Bottom left: the force and the model's prediction over the last lap. Bottom right: the fitted coefficients; $\hat\theta_v$ alone wanders, the combination $\hat\theta_v + T\hat\theta_T$ settles near the physics' $-0.94$.}{fig:residual-eight}
+
+\begin{example}[Reading the flight]
+\label{ex:residual-flight}
+Read \cref{fig:residual-eight}.
+
+\textbf{Step 1 — the error.} With the model on, the error over the last lap is \SI{2.33}{cm} RMS and at most \SI{4.7}{cm}, against \SI{16.1}{cm} and \SI{27}{cm} with the integral alone: seven times smaller, and below the goal of \SI{5}{cm}.
+
+\textbf{Step 2 — the prediction.} Over the last 20 seconds the model's prediction of the force along $x$ differs from the truth by \SI{0.24}{N} RMS. The force itself varies by \SI{1.19}{N}: the model explains $1 - (0.24/1.19)^2 = 96\,\%$ of its variance. What remains is the turbulence (Example~\ref{ex:residual-coeffs}, Step 4).
+
+\textbf{Step 3 — the coefficients.} Averaged over the last 20 seconds, $\hat\theta_1 = \SI{1.77}{N}$ (physics: 1.75) and $\hat\theta_v + T\hat\theta_T = \SI{-0.91}{N.s/m}$ (physics: $-0.94$). The individual $\hat\theta_v$, however, wanders between $-2.9$ and $0$ during the flight, and $\hat\theta_T$ wanders with it.
+
+\textbf{Step 4 — why they wander.} The correlation of $v_x$ with $T v_x$ in this flight is $0.9995$. The data cannot tell the two features apart, so RLS may trade one for the other without changing the prediction. The prediction is well determined; the individual coefficients are not. \Cref{thm:residual-pe} says exactly this.
+\end{example}
+
+\begin{keyidea}[The shape does the work; the adaptation keeps it honest]
+An estimator of a constant must adapt as fast as the force changes. A model of the force's \emph{shape} predicts the change from the state, so its coefficients may adapt slowly — they only follow the wind, not the drone's motion.
+\end{keyidea}
+
+\section{How long to remember}
+
+The forgetting factor $\lambda$ sets the memory. A measurement $j$ updates back is weighted by $\lambda^j$; the weights add up to $\sum_j\lambda^j = 1/(1 - \lambda)$, so the estimator remembers roughly the last $1/(1 - \lambda)$ updates. At \SI{100}{Hz}, $\lambda = 0.995$ means 200 updates, \SI{2}{s}: a third of a lap.\innumbers{$\lambda = 0.95$: 20 updates, \SI{0.2}{s}. $\lambda = 0.995$: \SI{2}{s}. $\lambda = 0.9995$: \SI{20}{s}, three laps.}
+
+\simfig{residual_memory}{The same flight with three memories. Left: the error of the predicted force over the last lap. Right: the constant coefficient $\hat\theta_1$; the dashed line is the value of Example~\ref{ex:residual-coeffs}. A short memory makes the coefficients chase the turbulence; a long one makes them settle on the physics.}{fig:residual-memory}
+
+\begin{example}[Short memory, long memory]
+\label{ex:residual-lambda}
+The lesson was flown with $\lambda = 0.95$, $0.995$ and $0.9995$ (\cref{fig:residual-memory}). Explain the results.
+
+\textbf{Step 1 — the numbers.} Error over the last lap: \SI{6.2}{cm} RMS (\SI{0.2}{s} memory), \SI{2.3}{cm} (\SI{2}{s}), \SI{3.3}{cm} (\SI{20}{s}). Error of the predicted force, last 20 seconds: \SI{2.4}{N}, \SI{0.24}{N}, \SI{0.33}{N}.
+
+\textbf{Step 2 — too short.} Twenty updates of four nearly collinear features are almost no information: $P$ stays large, the gain stays large, and every gust of turbulence throws the coefficients about. The constant coefficient swings by tens of newtons (\cref{fig:residual-memory}, right); the RMS change of the total thrust between \SI{10}{ms} samples is six times larger than with the default memory (\SI{0.073}{N} against \SI{0.011}{N}).
+
+\textbf{Step 3 — long.} With \SI{20}{s} of memory the coefficients barely move: $\hat\theta_1 = 1.66 \pm 0.06$ and $\hat\theta_v + T\hat\theta_T = -1.00 \pm 0.07$ over the last 20 seconds — close to the physics, and steady. The error is \SI{3.3}{cm}: slightly worse than with \SI{2}{s}, because the model's missing even term (Example~\ref{ex:residual-coeffs}, Step 3) and the slow drift of the wind are no longer patched up by fast adaptation.
+
+\textbf{Step 4 — the comparison that matters.} An estimator of a constant with \SI{20}{s} of memory would be as slow as the integral, which gives \SI{16}{cm}. The model with \SI{20}{s} of memory gives \SI{3.3}{cm}. The difference is the shape.
+\end{example}
+\pitfall{Forgetting without excitation. While the drone hovers, $\symbf\phi$ hardly changes, and the division by $\lambda$ in \cref{eq:residual-rls} inflates $P$ without limit: when motion resumes, the first measurements throw the coefficients far. This is \emph{covariance windup}. The simulator caps the diagonal of $P$ at 100.}
+
+\screen[0 0 495 998]{residual}{Lesson II.19 in the app with the learned residual model, at $t = \SI{30}{s}$. The information card of the position loop (bottom right of the charts) shows the fitted model on the $x$ axis, $1.76 + (-2.48)\,v + 0.16\,|v|v + 0.15\,T v_\perp$ — the coefficients of \cref{fig:residual-eight} at that instant. The disturbance chart shows the estimate (dashed) over the truth.}{fig:residual-screen}
+
+\begin{inapp}
+\begin{itemize}[leftmargin=1.2em]
+  \item The switch is \ui{Controller\then Disturbance compensation\then learned residual model} (\param{control.l3.compensation = 'learned'}); the memory and the filter are \param{control.residual.forgetting} and \param{control.residual.filterHz}.
+  \item The model is \texttt{LearnedResidual} in \src{src/control/residual.ts}: the features of \cref{eq:residual-features} in \texttt{features}, the update of \cref{eq:residual-rls} in the class \texttt{Rls}, with the cap on $P$ against windup.
+  \item The rotor drag is \param{drone.rotorDrag} (off by default, so that the tunes of Part~I stay valid); its force is \texttt{rotorDragForce} in \src{src/sim/dynamics.ts}.
+\end{itemize}
+\end{inapp}
+
+\begin{trythis}
+\begin{enumerate}
+  \item Switch the compensation between \ui{none}, \ui{learned residual model}, \ui{L1 adaptive} and \ui{INDI} and compare the last lap of each.
+  \item Set the forgetting factor to 0.95 and watch the info card: the coefficients jump at every gust.
+  \item Turn the rotor drag off (\param{drone.rotorDrag = 0}). What happens to $\hat\theta_T$?
+\end{enumerate}
+\predict{with the wind reversed (heading \SI{180}{\degree}), what sign will $\hat\theta_1$ take, and will $\hat\theta_v$ change sign?}
+\end{trythis}
+
+\section{The engineer's view: models that learn}
+
+\subsection{Is a model worth it?}
+The same flight with the other two compensations of chapter~B and chapter~E gives an honest answer. With this simulator's clean accelerometer, L1 adaptive control reaches \SI{2.10}{cm} over the last lap and INDI \SI{1.92}{cm} — both better than the learned model's \SI{2.33}{cm}. They need no model: they read the force from the accelerometer every few milliseconds, and the force changes at the pace of the lap, far slower than they can follow. The learned model reads the same accelerometer, only through a \SI{10}{Hz} filter and a regression.
+
+\begin{example}[Poor sensors]
+\label{ex:residual-noisy}
+The flight was repeated with an accelerometer noise of \SI{3}{m/s^2} and \SI{30}{ms} of delay on all sensors. Compare.
+
+\textbf{Step 1 — accuracy.} Last lap, RMS: learned model \SI{5.7}{cm}, L1 adaptive \SI{5.3}{cm}, INDI \SI{5.8}{cm}. All three are now close; none reaches the goal.
+
+\textbf{Step 2 — the prediction of the force.} Over the last 20 seconds, the error of the estimated force along $x$ is \SI{0.25}{N} for the model (almost unchanged from the clean flight), \SI{0.15}{N} for L1 and \SI{0.44}{N} for INDI.
+
+\textbf{Step 3 — the motors.} The RMS change of the total thrust between \SI{5}{ms} samples is \SI{0.0076}{N} for the model, \SI{0.0072}{N} for L1 and \SI{0.056}{N} for INDI: INDI, which feeds the measured acceleration (filtered at \SI{10}{Hz}) back at every step instead of averaging it over seconds, works them seven times harder.
+
+\textbf{Step 4 — read it.} The model's estimate barely notices the noise, because a regression on 200 samples averages it away. L1 achieves the same by its filter $C(s)$ (Lesson~II.18). INDI pays for its speed in motor work.
+\end{example}
+
+\begin{watchout}
+The lesson's note in the app says that with poor sensors the learned model's thrust is \enquote{7$\times$ smoother than L1's}. The recorded flights of Example~\ref{ex:residual-noisy} do not show this: the model and L1 are equally smooth, and it is INDI that is about seven times rougher. With the settings of this lesson, the learned model's real advantage is the one of Example~\ref{ex:residual-lambda}: it stays accurate with a slow adaptation, where an estimator of a constant cannot.
+\end{watchout}
+
+Neural-Fly's own experiments make the same point at full scale: a learned representation lets the adaptation be slow and smooth, and it beat nonlinear, INDI and L1 baselines in strong winds on a real drone (O'Connell et al., 2022). The difference from this lesson lies in the features: theirs are learned from flights in many winds; ours are written down from \cref{eq:residual-physics} and are partly wrong (the odd $|\vec v|v_x$ for an even $v_x^2$).
+
+\subsection{In formal terms}
+
+\begin{theorem}[Recursive least squares]
+\label{thm:residual-rls}
+Let $P_0 \succ 0$, $0 < \lambda \le 1$, and let $\hat{\symbf\theta}_k$, $P_k$ follow \cref{eq:residual-rls} from $\hat{\symbf\theta}_0$, $P_0$ with the data $(\symbf\phi_i, y_i)$, $i = 1, \dots, k$. Then $\hat{\symbf\theta}_k$ is the unique minimiser of
+\begin{equation}\label{eq:residual-cost}
+  V_k(\symbf\theta) = \sum_{i=1}^{k}\lambda^{k-i}\big(y_i - \symbf\phi_i^\T\symbf\theta\big)^2 + \lambda^k\big(\symbf\theta - \hat{\symbf\theta}_0\big)^\T P_0^{-1}\big(\symbf\theta - \hat{\symbf\theta}_0\big),
+\end{equation}
+and $P_k^{-1} = \lambda^kP_0^{-1} + \sum_i\lambda^{k-i}\symbf\phi_i\symbf\phi_i^\T$.
+\end{theorem}
+\begin{proof}
+Let $R_k = \lambda^kP_0^{-1} + \sum_{i \le k}\lambda^{k-i}\symbf\phi_i\symbf\phi_i^\T \succ 0$, so that $R_k = \lambda R_{k-1} + \symbf\phi_k\symbf\phi_k^\T$. The minimiser of the quadratic $V_k$ solves the normal equations $R_k\symbf\theta = \vec r_k$ with $\vec r_k = \lambda\vec r_{k-1} + \symbf\phi_ky_k$ (as in \cref{thm:E-ls}). By the matrix inversion lemma (\cref{thm:I-woodbury}) with $A = \lambda R_{k-1}$, $U = \symbf\phi_k$, $C = 1$, $V = \symbf\phi_k^\T$, $R_k^{-1} = \lambda^{-1}\big(P_{k-1} - \vec k_k\symbf\phi_k^\T P_{k-1}\big)$ with $P_{k-1} = R_{k-1}^{-1}$ and $\vec k_k$ as in \cref{eq:residual-rls}: this is the update of $P$, so $P_k = R_k^{-1}$ by induction. Then $\hat{\symbf\theta}_k = P_k(\lambda R_{k-1}\hat{\symbf\theta}_{k-1} + \symbf\phi_ky_k) = P_k(R_k\hat{\symbf\theta}_{k-1} - \symbf\phi_k\symbf\phi_k^\T\hat{\symbf\theta}_{k-1} + \symbf\phi_ky_k) = \hat{\symbf\theta}_{k-1} + P_k\symbf\phi_k(y_k - \symbf\phi_k^\T\hat{\symbf\theta}_{k-1})$, and $P_k\symbf\phi_k = \vec k_k$ by the same lemma.
+\end{proof}
+
+The theorem makes the forgetting factor precise: RLS solves, at every step, the weighted least-squares problem of Appendix~E with the weights $\lambda^{k-i}$, exactly and in a fixed number of operations per step (Ljung and Söderström, 1983; Åström and Wittenmark, 1995, ch.~2). The term with $P_0$ is the prior; it fades as $\lambda^k$.
+
+\begin{theorem}[What the data determine]
+\label{thm:residual-pe}
+In the setting of \cref{thm:residual-rls} with $\lambda = 1$ and no prior ($P_0^{-1} \to 0$), let $G_k = \sum_{i \le k}\symbf\phi_i\symbf\phi_i^\T$. The minimiser of $V_k$ is unique if and only if $G_k \succ 0$. If $G_k$ is singular, the minimisers form an affine set $\hat{\symbf\theta} + \ker G_k$, and all of them give the same prediction $\symbf\phi^\T\hat{\symbf\theta}$ for every $\symbf\phi$ in the span of the data $\symbf\phi_1, \dots, \symbf\phi_k$.
+\end{theorem}
+\begin{proof}
+$V_k$ is a convex quadratic with Hessian $2G_k$; it is strictly convex if and only if $G_k \succ 0$. If $G_k\vec d = 0$ then $\sum_i(\symbf\phi_i^\T\vec d)^2 = \vec d^\T G_k\vec d = 0$, so $\symbf\phi_i^\T\vec d = 0$ for every $i$: adding $\vec d$ to a minimiser changes neither $V_k$ nor the prediction for any $\symbf\phi$ in the span of the $\symbf\phi_i$. Conversely, minimisers differ by vectors with $G_k\vec d = 0$, since the normal equations $G_k\symbf\theta = \vec r_k$ fix $\symbf\theta$ up to $\ker G_k$.
+\end{proof}
+
+A regressor sequence for which $G_k/k$ stays bounded away from singular is called \term{persistently exciting}; with it, and noise of zero mean, the estimates converge to the true coefficients (Åström and Wittenmark, 1995, ch.~2). In this lesson $v_x$ and $Tv_x$ are nearly parallel, so $G_k$ is nearly singular — its condition number over the last 20 seconds, computed with $v_{\perp,x} \approx v_x$, is about $3\times10^5$ — and Example~\ref{ex:residual-flight} shows the consequence: the prediction is good, the split between $\hat\theta_v$ and $\hat\theta_T$ arbitrary. For control only the prediction matters. For identification — learning what the physics is — the drone would have to fly so that the features separate, for instance with large changes of thrust at the same speed.\tip{Before trusting a fitted coefficient, look at the condition number of $\sum\symbf\phi\symbf\phi^\T$. Before trusting a prediction, test it on data the fit has not seen.}
+
+\begin{lookahead}
+\begin{itemize}[leftmargin=1.2em]
+  \item The next lesson drops the model altogether: a neural network maps the state straight to the motors' commands.
+  \item The grand comparison of Lesson~II.21 flies the learned residual model against every other controller of this volume.
+  \item System identification — choosing what to fly so that a model can be learned — is a lesson of Part~III; least squares itself is in Appendix~E, the matrix inversion lemma in Appendix~I.
+\end{itemize}
+\end{lookahead}
+
+\begin{remember}
+\begin{itemize}
+  \item A drag force depends on the velocity relative to the air: on a fast path it changes by several newtons every few seconds, and an integral cannot keep up (\SI{16}{cm} here).
+  \item A learned residual model writes the force as $\Phi(\vx)\symbf\theta$ with fixed features and adapts only $\symbf\theta$, by recursive least squares with forgetting: \SI{2.3}{cm}.
+  \item RLS solves the exponentially weighted least-squares problem exactly; the memory is about $1/(1 - \lambda)$ updates.
+  \item Collinear features leave the coefficients undetermined but the prediction well determined.
+  \item A good shape lets the adaptation be slow and smooth; with clean, fast sensors, direct measurement (L1, INDI) does as well or better.
+\end{itemize}
+\end{remember}
+
+\begin{curiosity}{A bird that reads the wind}
+\photo{albatross}{A wandering albatross over the Southern Ocean, east of Tasmania.}
+The wandering albatross has the longest wings of any living bird, up to \SI{3.7}{m} from tip to tip, and it crosses thousands of kilometres of ocean while hardly beating them. Tracked during the year they take off from breeding, some birds circled Antarctica two or three times, flying with the westerly winds, more than \num{120000}~km in that one year (Weimerskirch et al., 2015).
+
+How a bird could stay up without working its wings puzzled the Victorians. In 1883 Lord Rayleigh put the question in the language of mechanics, in a letter to \emph{Nature}: a bird that keeps its height without flapping must be flying downhill, or in air that rises, or in a wind that \emph{is not uniform}. Over the sea, the wind is slower near the water than higher up. Rayleigh showed that a bird that climbs while facing the wind and descends while flying with it gains speed relative to the air at each crossing of the layers — energy taken from the difference in the wind's speed with height, at no cost in work. Today this is called \emph{dynamic soaring}, and the albatross's looping flight over the waves is its textbook example.
+
+An integrator treats the wind as a number to be cancelled. The albatross treats it as a function of where it is and how it moves — and having learned its shape, it does not just resist the wind but lives on it.
+\end{curiosity}
+
+\begin{exercises}
+\exercise[1] With $c_h = 0.12$, $k_r = 0.02$, $T = \SI{10.3}{N}$ and $w = \SI{3}{m/s}$, what is the force along the wind when the drone flies into it at \SI{1}{m/s}?
+\answer{Relative speed \SI{4}{m/s}: $0.12 \cdot 16 + 0.02 \cdot 10.3 \cdot 4 = 1.92 + 0.82 = \SI{2.74}{N}$.}
+\exercise[1] How many updates does an RLS estimator with $\lambda = 0.99$ remember, and how long is that at \SI{100}{Hz}?
+\answer{$1/(1 - 0.99) = 100$ updates, \SI{1}{s}.}
+\exercise[1] Why does the simulator not use the air-relative velocity as a feature?
+\answer{The wind is not measured, so the air-relative velocity is unknown to the controller. Features must be functions of measured quantities; the wind enters through the coefficients.}
+\exercise[2]\exkind{derive} Expand \cref{eq:residual-physics} for $v_x > w$ (the drone faster than the wind). Which coefficients change, and could the features of \cref{eq:residual-features} represent both cases with one set of coefficients?
+\answer{For $v_x > w$, $(w - v_x)|w - v_x| = -(v_x - w)^2$: $f_x = -c_hw^2 + 2c_hwv_x - c_hv_x^2 + k_rT(w - v_x)$. The constant, linear and quadratic coefficients change sign in their drag part. With fixed coefficients the features cannot represent both branches exactly; the forgetting lets RLS re-fit when the regime changes, or $|v - w|$-type features would be needed, which require the wind.}
+\exercise[2]\exkind{derive} Show that with one feature, $\phi = 1$, RLS with forgetting is an exponential moving average of the measurements, and find its time constant at \SI{100}{Hz} for $\lambda = 0.995$.
+\answer{With $\phi = 1$, $P_k^{-1} = \lambda P_{k-1}^{-1} + 1 \to 1/(1 - \lambda)$, so $k \to 1 - \lambda$ and $\hat\theta \leftarrow \hat\theta + (1 - \lambda)(y - \hat\theta)$: an exponential average with weight $1 - \lambda = 0.005$ per update, time constant $1/(0.005 \cdot 100) = \SI{2}{s}$. An estimator of a constant — the integral-like behaviour the shape is meant to beat.}
+\exercise[2]\exkind{derive} Prove that $\sum_{j=0}^{\infty}\lambda^j = 1/(1 - \lambda)$ and that the weighted mean age of the data, $\sum j\lambda^j/\sum\lambda^j$, is $\lambda/(1 - \lambda)$.
+\answer{Geometric series. Differentiating $\sum\lambda^j = 1/(1 - \lambda)$ gives $\sum j\lambda^{j-1} = 1/(1 - \lambda)^2$, so $\sum j\lambda^j = \lambda/(1 - \lambda)^2$; dividing gives $\lambda/(1 - \lambda)$, \eg 199 updates for $\lambda = 0.995$.}
+\exercise[2]\exkind{derive} Two features are $\phi_1 = v$ and $\phi_2 = Tv$ with $T$ exactly constant. Show that $G_k$ is singular and find $\ker G_k$. Which combination of $\theta_1$, $\theta_2$ is determined?
+\answer{$\symbf\phi_i = v_i(1, T)^\T$, so $G_k = (\sum v_i^2)\,(1, T)^\T(1, T)$ has rank one; $\ker G_k$ is spanned by $(T, -1)^\T$. The combination $\theta_1 + T\theta_2$ is determined (\cref{thm:residual-pe}).}
+\exercise[2]\exkind{fly} In Lesson~II.19 with the learned model, fly three laps with the forgetting factor raised to 0.9995 (\param{control.residual.forgetting}). Compare the coefficients on the info card with Example~\ref{ex:residual-coeffs}.
+\answer{The constant settles near \SI{1.7}{N} and $\hat\theta_v + T\hat\theta_T$ near $-1$; they move little from lap to lap. The error grows to about \SI{3}{cm}.}
+\exercise[2]\exkind{fly} Turn the wind off (\param{wind.meanSpeed = 0}) and keep the figure-8. Predict, then check, the constant coefficient and the integral-only error.
+\answer{With $w = 0$ the constant is zero and the force is a pure drag against the motion, $-c_h|v|v - k_rTv$, which the features $v$, $|v|v$ and $Tv_\perp$ represent almost exactly (with the 3D speed in place of $|v_x|$): the model should fit it well. The integral-only error should be smaller than with wind, since the force swings less.}
+\exercise[2]\exkind{code} In \texttt{Rls.update} (\src{src/control/residual.ts}) the diagonal of $P$ is capped at 100. Explain what happens in a long hover without the cap, using \cref{eq:residual-rls}.
+\answer{With $\symbf\phi$ constant (hover: $(1, 0, 0, 0)$), $P$ shrinks only along $\symbf\phi$; along the other directions $P \leftarrow P/\lambda$ grows by $1/0.995$ per update, a factor $e^{1} $ every \SI{2}{s}. After a minute it is $10^{13}$ times larger; at the first motion the gain is huge and the coefficients jump. The cap bounds this growth.}
+\exercise[3]\exkind{code} Add the feature $v_x^2$ (computed as \texttt{v[axis] * v[axis]}) to \texttt{features} in \src{src/control/residual.ts}, re-run \texttt{make book-data residual-learned} and compare the last-lap error and the prediction error with this lesson's \SI{2.33}{cm} and \SI{0.24}{N}.
+\answer{An open experiment. The even term of Example~\ref{ex:residual-coeffs}, Step 3, is now representable, so the systematic part of the prediction error should shrink; the turbulence part (about \SI{0.27}{N} in the hand fit) remains. Report both numbers and check the condition number of the regressors, which grows with one more nearly collinear feature.}
+\exercise[3]\exkind{derive} Composite adaptation. Neural-Fly updates $\hat{\symbf\theta}$ from both the prediction error and the tracking error. For the scalar model $\dot e = -ke + \phi(\theta - \hat\theta)$ with constant $\theta$, show that $V = \tfrac12e^2 + \tfrac1{2\gamma}(\theta - \hat\theta)^2$ decreases along the adaptation law $\dot{\hat\theta} = -\gamma\phi e$, and say what this guarantees about $e$ and about $\hat\theta$.
+\answer{$\dot V = e(-ke + \phi\tilde\theta) - \tfrac1\gamma\tilde\theta\dot{\hat\theta}$ with $\tilde\theta = \theta - \hat\theta$; with $\dot{\hat\theta} = -\gamma\phi e$ the cross terms cancel and $\dot V = -ke^2 \le 0$. So $e$ and $\hat\theta$ stay bounded and $e \to 0$ (Barbalat's lemma, for bounded $\phi$ and $\dot\phi$); $\hat\theta \to \theta$ only if $\phi$ is persistently exciting. (The tracking-error law is the MRAC of Lesson~III.17.)}
+\end{exercises}

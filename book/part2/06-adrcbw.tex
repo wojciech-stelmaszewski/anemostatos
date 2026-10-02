@@ -1,0 +1,214 @@
+\lesson{II.6}{How fast should you believe?}{An observer that believes its sensor quickly catches every push — and every speck of noise. Where the balance lies, and what finally breaks it.}{1}{adrc-bw}{Part II · Beyond PID}
+\label{les:adrcbw}
+
+\lead{\setupcard{\setuprow{Level}{L1}\setuprow{Controller}{ADRC, $\omega_c = 3$, with a fast observer, $\omega_o = \SI{40}{rad/s}$}\setuprow{Altimeter}{\SI{2}{cm} of noise}\setuprow{Wind}{on, as in Lesson~1}\setuprow{Goal}{a score below 7.5: RMS error in cm plus ten times the thrust jitter in N}}%
+The observer of the last lesson had one knob, its bandwidth $\omega_o$. Turned up, it sees a disturbance sooner. But the observer cannot tell a push on the drone from an error of the altimeter: both show up as a surprise in the measurement. This lesson turns the knob from 4 to 70 radians per second and measures both sides of the trade. The score has a clear minimum, the noise side has a formula, and beyond the useful range lie two different kinds of failure.}
+
+\section{Two kinds of surprise}
+
+The observer of \cref{eq:adrc-eso} corrects its estimate with $L\,(y - \hat y)$. The difference $y - \hat y$, the innovation, has two sources: the drone moved in a way the model did not predict — a disturbance — or the sensor reported something the drone did not do — noise. The observer treats both the same way.\pitfall{Turning up an observer to catch faster disturbances also turns up every flaw of its sensor. A sharp observer on a poor sensor is worse than a dull one.} With a large $\omega_o$ its gains are large, and it reacts strongly to every surprise.
+
+The two effects have opposite trends.
+\begin{itemize}
+  \item \textbf{Disturbances} are noticed after a few $1/\omega_o$ (Example~\ref{ex:adrc-eso}). A faster observer leaves less time for a gust to push the drone: the altitude error falls.
+  \item \textbf{Noise} passes from the altimeter into $\hat f$, and $\hat f$ goes straight into the thrust. A faster observer amplifies it more: the thrust jitters.
+\end{itemize}
+The lesson's score weighs the two: the RMS altitude error in centimetres plus ten times the thrust jitter in newtons, the jitter being the RMS change of the thrust between samples \SI{10}{ms} apart.\tip{A score that adds two unlike things is a statement of priorities. \enquote{Ten times} says that a newton of jitter is as bad as ten centimetres of error. Change the factor and the best $\omega_o$ moves.}
+
+\simfig{adrcbw_score}{Twelve flights, one for each observer bandwidth, with \SI{2}{cm} of altimeter noise and the wind of Lesson~1. Left: the altitude error falls and the thrust jitter rises; the dashed line is the jitter predicted from the noise alone (Example~\ref{ex:adrcbw-jitter}). Right: the score is smallest at $\omega_o = 6$. Beyond about 35 the noise drives the motors into their limits and both halves grow.}{fig:adrcbw-score}
+
+\section{The noise side, exactly}
+
+How strongly does the observer amplify noise? Its estimate of the disturbance is, in effect, the measured altitude differentiated twice and filtered: $f$ is the part of $\ddot y$ that the thrust does not explain.
+
+\begin{example}[From altimeter noise to $\hat f$]
+\label{ex:adrcbw-path}
+Find the transfer function from the altimeter's noise $n$ to $\hat f$, and its gain at the observer's bandwidth.
+
+\textbf{Step 1 — the observer with noise.} The observer sees $y + n$. Its error equations of Example~\ref{ex:adrc-eso} get the input $n$ through $L$: in the transfer function from the measurement to $\hat f$ only the third row matters.
+
+\textbf{Step 2 — the result.} Working through the companion form (or directly: $\hat f$ is $\omega_o^3/(s + \omega_o)^3$ times the true $f$, and $f$ seen through the sensor is $s^2$ times the measurement):
+\begin{equation}\label{eq:adrcbw-G}
+  \frac{\hat f}{n}(s) = \frac{\omega_o^3\,s^2}{(s + \omega_o)^3} .
+\end{equation}
+
+\textbf{Step 3 — its gain.} At low frequency it rises like $\omega^2$ — a double differentiator. At $\omega = \omega_o$ it is $\omega_o^5/(2\sqrt2\,\omega_o^3) = \omega_o^2/2.83$. Far above it falls like $\omega_o^3/\omega$. For $\omega_o = 10$ the peak gain is about $\SI{35}{(m/s^2)/m}$; for $\omega_o = 40$, \SI{570}{(m/s^2)/m}: a centimetre of noise at that frequency becomes \SI{5.7}{N} of thrust for the \SI{1}{kg} drone.
+\end{example}
+
+\begin{theorem}[How the noise grows with the bandwidth]
+\label{thm:adrcbw-scaling}
+Let white noise of intensity $q$ enter the measurement of the observer \eqref{eq:adrc-eso}. Then the variance of the noise in $\hat f$ is
+\begin{equation}\label{eq:adrcbw-var}
+  \sigma_{\hat f}^2 = \frac{3}{16}\,q\,\omega_o^5 , \qquad\text{so}\qquad \sigma_{\hat f} \propto \omega_o^{5/2} .
+\end{equation}
+\end{theorem}
+\begin{proof}
+By \cref{thm:E-psd}, $\sigma^2 = \frac{q}{2\pi}\int|G(j\omega)|^2\,\dd\omega$ with $G$ from \cref{eq:adrcbw-G}. Substitute $\omega = \omega_o x$: $|G|^2 = \omega_o^4\,x^4/(1 + x^2)^3$ and $\dd\omega = \omega_o\,\dd x$, so $\sigma^2 = \frac{q\,\omega_o^5}{2\pi}\int_{-\infty}^\infty \frac{x^4}{(1 + x^2)^3}\,\dd x = \frac{q\,\omega_o^5}{2\pi}\cdot\frac{3\pi}{8}$.
+\end{proof}
+
+Doubling the observer bandwidth multiplies the noise in the disturbance estimate by $2^{5/2} = 5.7$. Between $\omega_o = 10$ and 20 the simulator's jitter grows by a factor of 4.9, between 20 and 30 by 2.6, where $1.5^{5/2} = 2.8$: the formula's exponent, slightly softened by the sampling.\recall{Appendix~E: a sequence of independent samples of variance $\sigma^2$ every $\Delta t$ acts like continuous white noise of intensity $q = \sigma^2\Delta t$.}
+
+\begin{example}[The jitter, sample by sample]
+\label{ex:adrcbw-jitter}
+Predict the thrust jitter of the simulator for each $\omega_o$, from the noise alone.
+
+\textbf{Step 1 — the sampled loop.} The controller runs at \SI{250}{Hz}. Put the plant (with its motor lag, discretised exactly), the observer (discretised exactly, as in \src{src/estimation/eso.ts}) and the law into one linear recursion, as in Example~\ref{ex:slow-discrete}.
+
+\textbf{Step 2 — one bad reading.} Feed it a single altimeter error of \SI{1}{m} and record the thrust command $h_k$ that follows: the impulse response from noise to thrust.
+
+\textbf{Step 3 — the jitter.} The thrust is held for \SI{4}{ms}, the jitter is measured over \SI{10}{ms}, so it spans two or three controller samples. By \cref{thm:noise-variance}, the variance of $u_{k+j} - u_k$ is $\sigma^2\sum_i(h_{i+j} - h_i)^2$; average $j = 2$ and $j = 3$, with $\sigma = \SI{2}{cm}$.
+
+\textbf{Step 4 — compare.}
+\begin{center}\small\sffamily
+\begin{tabular}{rcccccc}
+\toprule
+$\omega_o$ [rad/s] & 4 & 10 & 15 & 20 & 25 & 30\\
+\midrule
+predicted [N] & 0.057 & 0.372 & 0.925 & 1.81 & 3.09 & 4.80\\
+simulator [N] & 0.058 & 0.371 & 0.923 & 1.81 & 3.09 & 4.76\\
+\bottomrule
+\end{tabular}
+\end{center}
+The thrust jitter is the noise, through a linear filter, and nothing else.
+
+\textbf{Step 5 — where it stops.} At $\omega_o = 40$ the prediction is \SI{9.7}{N} and the simulator shows \SI{8.6}{N}. A jitter of that size swings the thrust from zero to the motor limit: the motors clip, the clipped noise has a non-zero mean (\lessonref{les:noise}, rectification), and the altitude error jumps from \SI{0.6}{cm} at $\omega_o = 30$ to \SI{4.4}{cm}, \SI{16}{cm} at 50 and \SI{55}{cm} at 70. The drone is not unstable; it is being shaken by its own observer.\innumbers{At $\omega_o = 70$ the thrust jitters by \SI{15}{N} — more than the drone's weight — for a sensor error of two centimetres.}
+\end{example}
+
+\section{The disturbance side, and the best compromise}
+
+The altitude error falls as the observer speeds up: \SI{2.6}{cm} RMS at $\omega_o = 4$, \SI{1.1}{cm} at 10, \SI{0.6}{cm} between 25 and 30 (\cref{fig:adrcbw-score}, left). Two things limit it from below. Noise itself moves the drone a little: the impulse response predicts about \SI{0.4}{cm} of noise-induced error at $\omega_o = 10$. And the wind's fast fluctuations are beyond any observer that sees them only through the altitude.
+
+\begin{example}[Finding the best bandwidth]
+\label{ex:adrcbw-best}
+Read the best $\omega_o$ off the measurements and check it against the rule of thumb.
+
+\textbf{Step 1 — the scores.} $\omega_o = 4$: $2.62 + 0.58 = 3.2$. 6: $1.79 + 1.27 = 3.05$. 8: $1.35 + 2.29 = 3.6$. 10: $1.08 + 3.71 = 4.8$. 15: $0.76 + 9.2 = 10.0$. 40: $4.4 + 86 = 91$.
+
+\textbf{Step 2 — the minimum.} At $\omega_o = 6$, with the goal of 7.5 met from 4 to about 12. The starting value of the lesson, 40, misses it twelvefold.
+
+\textbf{Step 3 — the rule of thumb.} $\omega_o$ three to ten times $\omega_c = 3$ means 9 to 30. With \SI{2}{cm} of noise and this weighting, the best is at the low end of that range and slightly below it. With a better altimeter the noise term shrinks by \cref{eq:adrcbw-var} and the optimum moves up: the rule of thumb is a starting point, the sensor decides.\tip{Tune an observer on the real sensor, not on a simulated perfect one. The best bandwidth depends on the noise more than on anything else.}
+\end{example}
+
+\section{The other limit: sampling}
+
+Remove the noise and the wind. How fast may the observer be then? The rule of thumb in the ADRC literature points at the actuator: an observer much faster than the motors, which it does not model, should eventually fail. In this simulator it fails for another reason.
+
+\begin{example}[The edge in clean air]
+\label{ex:adrcbw-edge}
+Find the largest stable $\omega_o$ of the sampled loop without noise, with and without the motor lag.
+
+\textbf{Step 1 — the loop as a matrix.} The recursion of Example~\ref{ex:adrcbw-jitter} is $\symbf z_{k+1} = M(\omega_o)\,\symbf z_k$ with a $7 \times 7$ matrix: three plant states, three observer states and the held command.
+
+\textbf{Step 2 — the edge.} Its largest eigenvalue reaches magnitude one at $\omega_o = \SI{161}{rad/s}$. Removing the motor lag from the plant ($\tau_m \to 0$) moves the edge by less than \SI{0.1}{rad/s}.
+
+\textbf{Step 3 — read it.} The lag does not limit this observer. ADRC feeds the observer the commanded thrust, and the lag, seen through it, is just a fast part of $f$, estimated and cancelled with the rest. What limits it is the sampling: at the edge $\omega_o\Delta t = 161 \cdot 0.004 = 0.65$ — the observer is trying to react within a fraction of one sample.
+
+\textbf{Step 4 — check.} Flown in calm air with a step of \SI{0.5}{m}: $\omega_o = 60$ and 100 are clean, 150 overshoots by \SI{28}{cm} and rings, 250 never leaves the ground.
+
+\textbf{Step 5 — the general rule.} A sampled observer needs $\omega_o\Delta t$ well below one; the sampled controllers of \lessonref{les:slow} had the same limit in the form \enquote{sample ten to twenty times faster than the bandwidth}.
+\end{example}
+
+\begin{keyidea}[A model can be simple, but not simpler than the bandwidth you ask of it]
+Every estimator trades speed against noise, and every sampled loop has a speed it cannot exceed. The useful bandwidth of an observer lies between the slowest disturbances it must catch and the fastest thing it can afford to believe: the noise of its sensor, the rate of its computer, the dynamics its model leaves out. Here the noise sets the practical limit near $\omega_o = 10$, the sampling a hard one near 160, and the motor lag, surprisingly, none.
+\end{keyidea}
+
+\screen[0 0 495 998]{adrcbw}{Lesson II.6 in the app with the observer at \SI{40}{rad/s}: the thrust in the motor chart is a band of noise, and the motors touch their limits.}{fig:adrcbw-screen}
+
+\begin{inapp}
+\begin{itemize}[leftmargin=1.2em]
+  \item The lesson sets \param{control.adrc.wo = 40} and \param{sensors.posNoise = 0.02}; the wind is the default.
+  \item The goal in the app computes the score over the last \SI{15}{s} from its own telemetry, sampled every \SI{5}{ms}; its jitter is therefore a little smaller than this chapter's, measured over \SI{10}{ms}, and its threshold is set accordingly.
+  \item The observer gains are recomputed whenever $\omega_o$ changes; the discretisation with the matrix exponential (\src{src/estimation/eso.ts}) keeps the observer itself stable for any $\omega_o$ — it is the loop that becomes unstable.
+\end{itemize}
+\end{inapp}
+
+\begin{trythis}
+\begin{enumerate}
+  \item Start at $\omega_o = 40$ and look at the thrust. Go down: 25, 15, 10, 6. Then up: 60, 100.
+  \item Find the best score. Then halve the altimeter noise to \SI{1}{cm} and search again.
+  \item Switch the noise off and raise $\omega_o$ to 150, then 200. Watch a setpoint step.
+\end{enumerate}
+\predict{if the altimeter noise is halved, by what factor does the thrust jitter fall at every $\omega_o$? And does the best $\omega_o$ move up or down?}
+\end{trythis}
+
+\section{The engineer's view: bandwidth is a budget}
+
+\subsection{The same trade, everywhere}
+Every feedback loop and every estimator faces the trade of this lesson, because of one identity (Appendix~C): the sensitivity $S$ and the complementary sensitivity $T$ add up to one at every frequency. Where a loop rejects disturbances ($S$ small) it must pass the sensor's signal faithfully ($T \approx 1$) — noise included. The bandwidth of a loop is the frequency up to which it believes its sensor. The Kalman filter of \lessonref{les:kalman} computed that frequency from the noise figures; here it is chosen by hand, and the score shows what the choice costs.
+
+\subsection{Three limits on a bandwidth}
+\begin{itemize}
+  \item \textbf{Sensor noise} grows into the actuators as a power of the bandwidth — $\omega_o^{5/2}$ for an observer of a double integrator.
+  \item \textbf{Sampling and delay} put a hard ceiling where the loop must react within a fraction of a sample (\lessonref{les:slow}).
+  \item \textbf{Unmodelled dynamics} — a lag, a bending mode, a delay in the actuator — limit a loop that relies on a model of them. ADRC escapes the motor lag here because it lumps it into $f$; it would not escape a structural resonance, which is not slow.
+\end{itemize}
+A design is good when its bandwidth sits well below every one of them and well above the disturbances it must reject. When there is no such room, no tuning helps: a better sensor, a faster computer or a stiffer actuator does.
+
+\begin{example}[The head of a hard-disk drive]
+\label{ex:adrcbw-hdd}
+The read head of a hard disk must stay over a track a few tens of nanometres wide while the disk spins. Its position is measured from servo marks written on the disk, read about \num{40000} times per second, and a disturbance observer cancels the forces of the air flow and of vibration. How fast can its observer be?
+
+\textbf{Step 1 — the sampling limit.} With $\Delta t = \SI{25}{\micro s}$ and the edge of Example~\ref{ex:adrcbw-edge}, $\omega_o\Delta t < 0.65$: $\omega_o < \SI{26000}{rad/s}$, about \SI{4}{kHz}.
+
+\textbf{Step 2 — the noise limit.} The position signal has noise of a few nanometres, a sizeable fraction of the tolerance. By \cref{eq:adrcbw-var}, every doubling of the bandwidth multiplies its effect on the actuator by 5.7.
+
+\textbf{Step 3 — what is done.} Disk drives use loop bandwidths of one to two kilohertz — a factor of two to four below the sampling ceiling — and spend their engineering effort on the sensor and on knowing their resonances. The numbers differ from the drone's by a factor of a hundred; the reasoning is the same.
+\end{example}
+
+\subsection{In formal terms}
+\Cref{thm:adrcbw-scaling} is one case of a general fact: for an estimator that recovers the $k$-th derivative of a measured signal with a bandwidth $\omega$, white measurement noise produces an error whose variance grows like $\omega^{2k+1}$. The observer of $f$ recovers the second derivative, hence $\omega^5$. The D term of Part~I recovers the first, hence $\omega^3$ — and \cref{eq:noise-simple}, $\sigma_D \propto f_c$, was the same law with the gain $K_d$ outside and the sample time fixed.
+
+\begin{theorem}[Noise in an estimated derivative]
+\label{thm:adrcbw-derivative}
+Let $G(s) = \omega^{k+1}s^k/(s + \omega)^{k+1}$, an estimator of the $k$-th derivative with bandwidth $\omega$, be driven by white noise of intensity $q$. Then the output variance is $c_k\,q\,\omega^{2k+1}$ with $c_k = \frac{1}{2\pi}\int_{-\infty}^\infty \frac{x^{2k}}{(1 + x^2)^{k+1}}\,\dd x$, finite for every $k \ge 0$.
+\end{theorem}
+\begin{proof}
+As for \cref{thm:adrcbw-scaling}, with the substitution $\omega' = \omega x$. The integrand decays like $x^{-2}$, so the integral converges.
+\end{proof}
+
+\begin{lookahead}
+\begin{itemize}[leftmargin=1.2em]
+  \item The accelerometer measures the second derivative directly, without amplifying the altimeter's noise: incremental dynamic inversion (Lessons~II.7 and II.8) gets the disturbance from a sensor instead of from an observer, and its noise problem becomes a filter problem (II.9).
+  \item The trade between $S$ and $T$ is made quantitative by the sensitivity integral and loop shaping (Lessons~III.5 and III.6), and the observer's effect on the margins by Lesson~III.10.
+  \item Quantisation is noise too: Lesson~III.19 sends a coarse sensor through the same derivative and finds a limit cycle; III.20 shows what aliasing adds.
+\end{itemize}
+\end{lookahead}
+
+\begin{remember}
+\begin{itemize}
+  \item An observer cannot tell a disturbance from sensor noise: a faster one catches both.
+  \item The noise in $\hat f$ grows like $\omega_o^{5/2}$; doubling the bandwidth multiplies it by 5.7.
+  \item The thrust jitter is the altimeter noise through a linear filter; the sampled loop predicts it to two digits.
+  \item With \SI{2}{cm} of noise the best $\omega_o$ is about 6; the hard ceiling, from sampling, is $\omega_o\Delta t \approx 0.65$ — here \SI{161}{rad/s}.
+  \item Bandwidth is a budget between the disturbances to reject and the noise, sampling and unmodelled dynamics to ignore.
+\end{itemize}
+\end{remember}
+
+\begin{curiosity}{Headphones that cancel the hum}
+Noise-cancelling headphones are disturbance observers that you wear. A microphone inside each cup hears what reaches the ear; a feedback loop drives the loudspeaker with the opposite, so that the two cancel. On a plane the result is uncanny: the drone of the engines disappears, while voices and the clatter of the trolley come through almost unchanged.
+
+The reason is this lesson's trade. The loop is fast — tens of thousands of samples per second — but the sound needs time to travel from the speaker to the microphone, a fraction of a millisecond, and that delay sets a ceiling on the bandwidth exactly as the sampling did for the drone. Below about a kilohertz the loop is far below its ceiling and cancels well; the low, steady hum of engines and air conditioning lives there. Above, the loop must give up, and the cups' passive padding takes over.
+
+Push the bandwidth higher and the loop would start to amplify instead of cancel — the sensitivity bulge of \lessonref{les:challenge}. Engineers tune these loops so that the bulge falls where human hearing, and the music, care least.
+\end{curiosity}
+
+\begin{exercises}
+\exercise[1] By \cref{eq:adrcbw-var}, by what factor does the noise in $\hat f$ change when $\omega_o$ goes from 10 to 15? Compare with the simulator's jitter, 0.371 and \SI{0.923}{N}.
+\answer{$1.5^{5/2} = 2.76$; the simulator: $0.923/0.371 = 2.49$.}
+\exercise[1] The altimeter noise is halved. By what factor does the thrust jitter fall at every $\omega_o$?
+\answer{By two: the jitter is proportional to the noise's standard deviation.}
+\exercise[1] What is the sampling ceiling of the observer if the controller runs at \SI{500}{Hz}? At \SI{100}{Hz}?
+\answer{$0.65/0.002 = \SI{325}{rad/s}$; $0.65/0.01 = \SI{65}{rad/s}$.}
+\exercise[2]\exkind{derive} Derive \cref{eq:adrcbw-G}: write the observer with the measurement $y + n$, take Laplace transforms, and solve for $\hat f$ in terms of $n$ (with $f = 0$, $u = 0$).
+\answer{From the three rows: $s\hat y = \hat v + l_1(n - \hat y)$, $s\hat v = \hat f + l_2(n - \hat y)$, $s\hat f = l_3(n - \hat y)$. Eliminating: $(n - \hat y)(s^3 + l_1s^2 + l_2s + l_3) = s^3n$, so $\hat f = l_3s^2n/(s^3 + l_1s^2 + l_2s + l_3) = \omega_o^3s^2n/(s + \omega_o)^3$.}
+\exercise[2]\exkind{derive} Compute $c_1$ of \cref{thm:adrcbw-derivative} and use it to estimate the noise of a velocity estimate with bandwidth \SI{20}{rad/s} from the altimeter of this lesson ($q = \sigma^2\Delta t$ with $\sigma = \SI{2}{cm}$, $\Delta t = \SI{4}{ms}$).
+\answer{$\int x^2/(1 + x^2)^2\,\dd x = \pi/2$, so $c_1 = 1/4$. $\sigma_v^2 = \tfrac14 \cdot 1.6 \times 10^{-6} \cdot 20^3 = 3.2 \times 10^{-3}$: $\sigma_v = \SI{0.057}{m/s}$.}
+\exercise[2]\exkind{derive} The best bandwidth in a model. Suppose the disturbance part of the score falls like $a/\omega_o$ and the noise part rises like $b\,\omega_o^{5/2}$. Find the minimising $\omega_o$, and how it moves when the noise is halved.
+\answer{Derivative $-a/\omega_o^2 + \tfrac52b\,\omega_o^{3/2} = 0$: $\omega_o^* = (2a/5b)^{2/7}$. Halving the noise halves $b$: $\omega_o^*$ grows by $2^{2/7} = 1.22$.}
+\exercise[2]\exkind{fly} In Lesson~II.6 switch the noise off and the wind on, and compare $\omega_o = 6$ and 30. Then switch the wind off and the noise on, and compare again. Which half of the score does each experiment isolate?
+\answer{Wind without noise: only the disturbance half; the larger $\omega_o$ wins clearly (smaller error, no jitter). Noise without wind: only the noise half; the smaller $\omega_o$ wins (far less jitter, and the error is the small noise-induced motion).}
+\exercise[2]\exkind{code} \src{src/estimation/eso.ts} discretises the observer with \texttt{c2d}, the exact zero-order-hold formula. What would happen at $\omega_o = 100$ with a forward-Euler discretisation instead? (Appendix~D, Example~\ref{ex:D-methods}.)
+\answer{Forward Euler is stable only if every observer pole satisfies $|1 + s\Delta t| < 1$. The triple pole at $-100$ gives $1 - 0.4 = 0.6$: stable, but at $\omega_o > 500$ ($s\Delta t < -2$) the observer itself would diverge; with the exact discretisation it never does.}
+\exercise[3]\exkind{derive} Why the motor lag does not matter here. The plant is $\ddot y = T$ with $\tau_m\dot T + T = u$, and the observer assumes $\ddot y = u + f$. Show that the lag appears in $f$ as $f = T - u = -\tau_m\dot T$, and argue why an observer much faster than $1/\tau_m$ can still estimate it.
+\answer{$\ddot y = T = u + (T - u)$, and $T - u = -\tau_m\dot T$ by the lag's equation. This $f$ is a filtered derivative of the thrust, which changes on the time scale $\tau_m$; an observer with $\omega_o \gg 1/\tau_m$ tracks it with small error, and cancelling it simply makes the loop ignore the lag. What it cannot track is what changes faster than the sampling allows.}
+\end{exercises}

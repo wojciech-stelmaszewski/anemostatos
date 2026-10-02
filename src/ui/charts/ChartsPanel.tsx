@@ -7,6 +7,7 @@ import { DescribingChart } from '@/ui/analysis/DescribingChart';
 import { DispersionChart } from '@/ui/analysis/DispersionChart';
 import { MimoChart } from '@/ui/analysis/MimoChart';
 import { MuChart } from '@/ui/analysis/MuChart';
+import { ValueMap } from '@/ui/analysis/ValueMap';
 import { NyquistChart } from '@/ui/analysis/NyquistChart';
 import { PoleMap } from '@/ui/analysis/PoleMap';
 import { SpectrumChart } from '@/ui/analysis/SpectrumChart';
@@ -39,6 +40,8 @@ const EXTRA: { value: ExtraChart; label: string }[] = [
   { value: 'nav', label: 'navigation filter' },
   { value: 'mrac', label: 'MRAC parameters' },
   { value: 'mu', label: 'μ analysis' },
+  { value: 'costate', label: 'costate (LQR)' },
+  { value: 'value', label: 'value function' },
   { value: 'describing', label: 'describing function' },
 ];
 /** What can stand in the motor chart's place. */
@@ -56,6 +59,13 @@ const MRAC_THETA: SeriesSpec[] = [
   { key: 'mrac.theta.g', label: 'θ̂ hover thrust', color: SIGNAL.i, width: 2 },
 ];
 /** Lesson III.23: the heading error, and the MEKF's own 2σ for it. */
+/** Lesson IV.1: the thrust the costate asks for, −R⁻¹Bᵀλ, against the thrust commanded. */
+const COSTATE: SeriesSpec[] = [
+  { key: 'alt.fb', label: 'commanded u', color: SIGNAL.output, width: 2 },
+  { key: 'lqr.u.lambda', label: '−R⁻¹Bᵀλ', color: SIGNAL.measurement, dash: [5, 4], width: 2 },
+  { key: 'lqr.lambda.v', label: 'λ_v', color: SIGNAL.d, legendOnly: true },
+  { key: 'lqr.lambda.e', label: 'λ_e', color: SIGNAL.p, legendOnly: true },
+];
 const HEADING: SeriesSpec[] = [
   { key: 'ahrs.headErr', label: 'heading error', color: SIGNAL.error, width: 2 },
   { key: 'mekf.sigma2.yaw', label: 'MEKF 2σ', color: SIGNAL.measurement, dash: [4, 3], width: 1.5 },
@@ -97,6 +107,8 @@ const analysisChart = (kind: string) =>
     <PoleMap />
   ) : kind === 'mu' ? (
     <MuChart />
+  ) : kind === 'value' ? (
+    <ValueMap />
   ) : kind === 'mimo' ? (
     <MimoChart />
   ) : kind === 'spectrum' ? (
@@ -153,7 +165,8 @@ export function ChartsPanel() {
     extra === 'fdi' ||
     extra === 'nav' ||
     extra === 'describing' ||
-    extra === 'mu';
+    extra === 'mu' ||
+    extra === 'value';
   const ctrlKey = useParams((s) => controllerKey(s.params));
   const loopOptions = useMemo(
     () => loopsFor(useParams.getState().params).map((l) => ({ value: l.id, label: l.name })),
@@ -380,6 +393,13 @@ export function ChartsPanel() {
             unit="°"
             series={HEADING}
             shadeKey="mekf.magRejected"
+            includeZero
+          />
+        ) : extra === 'costate' ? (
+          <TimeChart
+            title="Costate λ = P·x and the thrust it commands, u = −R⁻¹Bᵀλ"
+            unit="N"
+            series={COSTATE}
             includeZero
           />
         ) : extra === 'attitude' ? (

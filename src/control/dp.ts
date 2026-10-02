@@ -43,10 +43,12 @@ export function dpModel(p: Params): DpModel {
   const key = JSON.stringify([c.qPos, c.qVel, c.r, m, tMax, d]);
   const hit = cache.get(key);
   if (hit) return hit;
-  const inputs = Array.from(
-    { length: d.inputs },
-    (_, k) => uMin + ((uMax - uMin) * k) / (d.inputs - 1),
-  );
+  // Thrust levels evenly spaced through zero (hovering must cost nothing) and the two bounds.
+  const stepU = (uMax - uMin) / (d.inputs - 1);
+  const inputs = [uMin, uMax];
+  for (let u = 0; u > uMin; u -= stepU) inputs.push(u);
+  for (let u = stepU; u < uMax; u += stepU) inputs.push(u);
+  inputs.sort((a, b) => a - b);
   // Exact one-step discretisation of the double integrator (zero-order hold).
   const problem: ValueProblem = {
     step: (e, v, u) => {

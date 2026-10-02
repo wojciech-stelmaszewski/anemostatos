@@ -19,6 +19,8 @@ interface Design {
   /** Closed-loop poles, continuous-time equivalent. */
   poles: { re: number; im: number }[];
   converged: boolean;
+  /** Solution of the Riccati equation, in state order: λ = P·x is the costate (lesson IV.1). */
+  p: Mat;
 }
 
 /**
@@ -58,7 +60,7 @@ export function designLqr(p: Params, dt: number): Design {
   const res = dlqr(d.a, d.b, diag(q.map((w) => w * dt)), [[Math.max(c.r, 1e-9) * dt]], 20000);
   const k = res.k[0]!;
   const poles = eigenvalues(sub(d.a, mul(d.b, res.k))).map((z) => toContinuous(z, dt));
-  return { key, k, names, poles, converged: res.converged };
+  return { key, k, names, poles, converged: res.converged, p: res.p };
 }
 
 /**
@@ -152,6 +154,9 @@ export class LqrController implements Controller {
   private lastCmd = 0;
   /** LQG: the filter's predicted state (y, v, [T]) for the next fix, or null before the first. */
   private xPred: number[] | null = null;
+  /** The state the gains acted on at the last sample (e, v, [T], [ξ]), for the costate. */
+  private xLast: number[] = [];
+  private uLambda = NaN;
   private last: LoopTerms = {
     setpoint: 0,
     measurement: 0,
@@ -239,6 +244,14 @@ export class LqrController implements Controller {
       );
     }
     this.design = d;
+    this.xLast = [x[0]!, x[1]!, ...(c.lagState ? [x[2]!] : []), ...(c.integral ? [x[3]!] : [])];
+    // The thrust the costate asks for: −R⁻¹Bᵀλ = −λ_v/(r·m̂). Only for the plain (e, v) model,
+    // where the thrust enters the velocity directly.
+    this.uLambda =
+      !c.lagState && !c.integral
+        ? -d.p[1]!.reduce((s, v, j) => s + v * this.xLast[j]!, 0) /
+          (c.r * Math.max(p.control.model.mass, 0.05))
+        : NaN;
     const parts = this.partsFor(p, x, ff);
     const unsaturated = parts.reduce((s, q) => s + q.value, 0);
     const output = clamp(unsaturated, 0, tMax);
@@ -270,7 +283,22 @@ export class LqrController implements Controller {
 
   extras() {
     const k = this.design?.k ?? [];
-    return { 'lqr.k1': k[0] ?? NaN, 'lqr.k2': k[1] ?? NaN };
+    // The costate of the maximum principle, λ = P·x: one number per state.
+    const pm = this.design?.p;
+    const lam = (i: number) =>
+      pm && this.xLast.length === pm.length
+        ? pm[i]!.reduce((s, v, j) => s + v * this.xLast[j]!, 0)
+        : NaN;
+    return {
+      'lqr.k1': k[0] ?? NaN,
+      'lqr.k2': k[1] ?? NaN,
+      'lqr.lambda.e': lam(0),
+      'lqr.lambda.v': lam(1),
+      'lqr.x.e': this.xLast[0] ?? NaN,
+      'lqr.x.v': this.xLast[1] ?? NaN,
+      // u = −R⁻¹Bᵀλ with B = (0, 1/m̂) on (e, v), and R = r·T as in the design.
+      'lqr.u.lambda': this.uLambda,
+    };
   }
 
   describe(p: Params): InfoRow[] {

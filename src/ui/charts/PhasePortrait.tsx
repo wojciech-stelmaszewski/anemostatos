@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { attractionBoundary, brakingLimit, lyapunovEstimate } from '@/analysis/attraction';
+import { bangBangLimits, brakingDistance } from '@/control/bangbang';
 import { useParams } from '@/store/params';
 import { sim, useUi } from '@/store/sim';
 import type { Telemetry } from '@/engine/telemetry';
@@ -235,6 +236,29 @@ export function PhasePortrait({ meta, lyapunov = false }: { meta: LoopMeta; lyap
         ctx.fillStyle = INK;
         ctx.textAlign = 'left';
         ctx.fillText('s = 0', X(-span.e * 0.92), Y(lambda * span.e * 0.92) + 12 * dpr);
+      }
+
+      // Bang-bang: the switching curve, the states from which the brake stops at the target.
+      if (P.sim.level === 1 && P.control.l1.kind === 'bangbang' && meta.id === 'alt') {
+        const l = bangBangLimits(P);
+        const lead = P.control.bangbang.lead;
+        ctx.strokeStyle = 'rgba(57,135,229,0.9)';
+        ctx.lineWidth = 1.5 * dpr;
+        ctx.beginPath();
+        // v from −V to V; d = r − y on the curve; the portrait plots (e = d, ė = −v).
+        for (let k = 0; k <= 80; k++) {
+          const v = -span.de + (2 * span.de * k) / 80;
+          const d =
+            v >= 0
+              ? brakingDistance(v, l.aUp, l.k) + v * lead
+              : -brakingDistance(-v, l.aDown, l.k) + v * lead;
+          if (k) ctx.lineTo(X(d), Y(-v));
+          else ctx.moveTo(X(d), Y(-v));
+        }
+        ctx.stroke();
+        ctx.fillStyle = INK;
+        ctx.textAlign = 'left';
+        ctx.fillText('switch', X(span.e * 0.05), Y(span.de * 0.85));
       }
 
       if (ghost) {

@@ -6,7 +6,7 @@ import { sim } from '@/store/sim';
 import { SCENE } from '@/ui/colors';
 import { CameraRig } from './CameraRig';
 import { DroneRig } from './DroneRig';
-import { LandingPad, RocketRig } from './Rocket';
+import { LandingPad, RocketRig, TvcRocketRig } from './Rocket';
 import { useParams } from '@/store/params';
 import { Grid } from './Grid';
 import { ForceArrows, TermArrows } from './overlays/ForceArrows';
@@ -85,6 +85,7 @@ function KeyLight() {
 /** The vehicle being simulated: the drone, or the rocket of Part IV on its pad. */
 function VehicleRig() {
   const vehicle = useParams((s) => s.params.sim.vehicle ?? 'quadrotor');
+  if (vehicle === 'tvc') return <TvcRocketRig />;
   return vehicle === 'rocket' ? (
     <>
       <LandingPad />

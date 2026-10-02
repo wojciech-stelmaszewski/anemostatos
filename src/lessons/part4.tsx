@@ -1,3 +1,4 @@
+import { analyseTvc, minPitchGain, wrongWayZero, type TvcAnalysis } from '@/analysis/tvc';
 import { bangBangLimits, minimumTime } from '@/control/bangbang';
 import { designLqr } from '@/control/lqr';
 import { insGyroError } from '@/estimation/ins';
@@ -91,6 +92,46 @@ const worstNees = (sim: Simulation, from: number): number => {
   }
   return worst;
 };
+
+/** Chapter L: the vehicle of lessons IV.7–IV.10, frozen at one flight condition with no wind. */
+const pitchPlane = (p: Params) => {
+  p.sim.vehicle = 'tvc';
+  p.wind.enabled = false;
+};
+/** The design lesson IV.7 ends with, which IV.8 and IV.9 start from. */
+const TVC_DESIGN = { kp: 1.5, kd: 0.8 };
+/** Lesson IV.8: the gyro sits in the instrument bay, near the nose. */
+const IV8_GYRO = 0.85;
+/** Lesson IV.9: the slosh mass, its frequency and where the tank is. */
+const IV9 = { mass: 300, hz: 0.8, ahead: 2, zeta: 0.002, enough: 0.035 };
+/** Lesson IV.10: a hovering test vehicle steps sideways by this much at this time. */
+const IV10 = { at: 2, step: 2, tol: 0.1, within: 6 };
+
+/** The loop of the pitch-plane rocket, cached per parameter set (it is asked on every frame). */
+let tvcCache: { key: string; a: TvcAnalysis } | null = null;
+const tvcNow = (p: Params): TvcAnalysis => {
+  const key = JSON.stringify([p.tvc, p.control.tvc]);
+  if (tvcCache?.key !== key) tvcCache = { key, a: analyseTvc(p) };
+  return tvcCache.a;
+};
+/** Largest |value| of a telemetry channel from `from` on. */
+const peakSince = (sim: Simulation, key: string, from: number): number => {
+  const w = sim.telemetry.window([key], from);
+  return w.series[0]!.reduce((m, v) => (Number.isFinite(v) ? Math.max(m, Math.abs(v)) : m), 0);
+};
+/** Time from `t0` until the drift enters ±tol of `target` and stays there, s. */
+const driftSettle = (sim: Simulation, t0: number, target: number, tol: number): number => {
+  const { t, series } = sim.telemetry.window(['tvc.x'], t0);
+  let settle = NaN;
+  for (let i = 0; i < t.length; i++) {
+    const x = series[0]![i]!;
+    if (!Number.isFinite(x)) continue;
+    if (Math.abs(x - target) > tol) settle = NaN;
+    else if (Number.isNaN(settle)) settle = t[i]! - t0;
+  }
+  return settle;
+};
+const dB = (v: number) => `${v.toFixed(1)} dB`;
 
 /** Lessons of Part IV, in plan order (by `n`). */
 export const PART_FOUR: Lesson[] = [
@@ -405,6 +446,341 @@ export const PART_FOUR: Lesson[] = [
           aim a little high and use the throttle to correct. A booster whose engine at its lowest
           setting still lifts more than its weight cannot even do that: it cannot hover, and must
           get the timing right.
+        </Notice>
+      </>
+    ),
+  },
+  {
+    id: 'tvc',
+    n: 7,
+    part: 4,
+    chapter: L,
+    title: 'Balancing on a flame',
+    level: 1,
+    loop: 'pitch',
+    chart: 'tvc',
+    setup: (p) => {
+      pitchPlane(p);
+      p.control.tvc.kp = 0.1;
+      p.control.tvc.kd = 0.5;
+    },
+    predict: {
+      label: 'Smallest kp that holds the rocket',
+      unit: '°/°',
+      truth: minPitchGain,
+      tolerance: 0.1,
+    },
+    goal: {
+      text: 'Predict, within 10 %, the smallest pitch gain kp that holds the airframe. Then tune kp and kd so the loop keeps at least 6 dB of gain margin both ways, and fly it.',
+      check: ({ sim, prediction }) => {
+        const p = sim.params;
+        if (p.sim.vehicle !== 'tvc') return 'this lesson flies the pitch-plane rocket';
+        if (prediction == null) return 'first the prediction: the gimbal must out-push the air';
+        const truth = minPitchGain(p);
+        if (Math.abs(prediction - truth) / truth > 0.1)
+          return 'not within 10 %: compare the turning moment of the air with that of the gimbal';
+        const a = tvcNow(p);
+        if (!a.stable) return 'the loop is unstable';
+        if (a.lowDb < 6)
+          return `lower gain margin ${dB(a.lowDb)}: it would fall over if the gain sagged`;
+        if (a.highDb < 6) return `upper gain margin ${dB(a.highDb)}: too much gain`;
+        if (sim.tvc && sim.state.crashed) return 'it broke up: press R';
+        return sim.t > 8 || 'flying…';
+      },
+    },
+    solution: (p) => {
+      p.control.tvc.kp = TVC_DESIGN.kp;
+      p.control.tvc.kd = TVC_DESIGN.kd;
+    },
+    body: (
+      <>
+        <p>
+          A launch vehicle in the thick of the atmosphere is an arrow flying backwards. The air
+          pushes on it at its <b>centre of pressure</b>, here 3 m ahead of the centre of mass, so a
+          small angle of attack <Tex>{'\\alpha'}</Tex> makes a moment that turns the nose further
+          off. The only thing that pushes back is the engine, on a gimbal 5 m behind the centre of
+          mass. In the pitch plane:
+        </p>
+        <Tex display>
+          {
+            '\\ddot\\theta = \\mu_\\alpha\\,\\alpha - \\mu_c\\,\\delta,\\qquad \\mu_\\alpha = \\frac{N_\\alpha\\,l_{cp}}{I} = 4\\ \\mathrm{s^{-2}},\\qquad \\mu_c = \\frac{T\\,l_g}{I} = 8.3\\ \\mathrm{s^{-2}}'
+          }
+        </Tex>
+        <p>
+          With <Tex>{'\\mu_\\alpha > 0'}</Tex> the airframe has an unstable pole near{' '}
+          <Tex>{'\\sqrt{\\mu_\\alpha} = 2'}</Tex> rad/s: left alone, an error doubles every third of
+          a second. The rocket here is frozen at 400 m/s, and only its motion across the flight path
+          is simulated. It starts 2° off, with almost no pitch gain. Press <b>R</b> and watch it go.
+        </p>
+        <p>
+          The gimbal must at least out-push the air. If the controller answers a pitch error with{' '}
+          <Tex>{'\\delta = k_p\\,\\theta'}</Tex>, the net stiffness is{' '}
+          <Tex>{'\\mu_c k_p - \\mu_\\alpha'}</Tex>, which must be positive. So there is a{' '}
+          <b>smallest</b> gain, not only a largest one: the loop is <b>conditionally stable</b>. On
+          the Nyquist plot the curve crosses the negative real axis twice, once on each side of −1.
+          Shrink the gain and the far crossing slides in over −1; grow it and the near one slides
+          out. Each distance is a gain margin: the lower one says how much gain the loop may lose,
+          the upper one how much it may gain. Because the open loop has unstable poles, the curve is
+          not supposed to stay clear of −1: it must go around it, counter-clockwise, once for each
+          of them.
+        </p>
+        <Try>
+          Work out the smallest <Tex>{'k_p'}</Tex> from the numbers above and enter it. Then raise{' '}
+          <b>Thrust-vector control → Pitch gain kp</b> past it and press <b>R</b>; the extra chart
+          shows the loop. Push <b>kp</b> and <b>kd</b> high, five times the design, and watch the
+          upper margin go: the actuator&apos;s 50 ms lag and the 20 ms of sensor delay are what
+          limit it.
+        </Try>
+        <Notice>
+          The formula <Tex>{'k_p > \\mu_\\alpha/\\mu_c'}</Tex> leaves out that the flight path
+          itself turns: as the rocket drifts sideways the angle of attack is no longer the pitch.
+          The full model gives a smallest gain a few per cent lower, and it depends a little on{' '}
+          <Tex>{'k_d'}</Tex>, which the formula has no place for. The chart&apos;s margins scale the
+          whole loop, kp and kd together. Six decibels both ways, the gain halved or doubled, is the
+          classical requirement for the rigid body of a launch vehicle.
+        </Notice>
+      </>
+    ),
+  },
+  {
+    id: 'bending',
+    n: 8,
+    part: 4,
+    chapter: L,
+    title: 'The rocket is a noodle',
+    level: 1,
+    loop: 'pitch',
+    chart: 'tvc',
+    setup: (p) => {
+      pitchPlane(p);
+      p.control.tvc.kp = TVC_DESIGN.kp;
+      p.control.tvc.kd = TVC_DESIGN.kd;
+      p.tvc.gyroStation = IV8_GYRO;
+    },
+    goal: {
+      text: 'With the gyro in the instrument bay (0.85 of the length), gain-stabilise the bending mode: |L| at the mode at most −10 dB, a phase margin of at least 30°, and a quiet gimbal in flight.',
+      check: ({ sim }) => {
+        const p = sim.params;
+        if (p.sim.vehicle !== 'tvc') return 'this lesson flies the pitch-plane rocket';
+        if (Math.abs(p.tvc.gyroStation - IV8_GYRO) > 0.005)
+          return 'leave the gyro in the instrument bay (0.85) for the goal';
+        const a = tvcNow(p);
+        if (!a.stable) return 'the loop is unstable';
+        if (a.bendDb > -10) return `|L| at the bending mode is ${dB(a.bendDb)}`;
+        if (a.margins.pmDeg < 30)
+          return `phase margin ${a.margins.pmDeg.toFixed(0)}°: the filter costs too much phase`;
+        if (sim.t < 6) return 'flying…';
+        const buzz = peakSince(sim, 'tvc.delta', sim.t - 2);
+        return buzz < 0.3 || `the gimbal still moves ${buzz.toFixed(2)}°: press R`;
+      },
+    },
+    solution: (p) => {
+      p.control.tvc.notch = true;
+      p.control.tvc.notchHz = p.tvc.bendHz;
+      p.control.tvc.notchDepthDb = 40;
+      p.control.tvc.notchWidth = 0.3;
+    },
+    body: (
+      <>
+        <p>
+          The same rocket and the same controller, but the gyro now sits where gyros usually do, in
+          the instrument bay near the nose. Press <b>R</b>. The pitch settles, and then the gimbal{' '}
+          <b>sings</b>: a steady buzz at 5 Hz, as large as the actuator&apos;s rate limit allows.
+        </p>
+        <p>
+          A 12 m vehicle is not rigid. Its first bending mode, at 5 Hz with 1 % damping, bends the
+          middle one way and both ends the other. A rate gyro bolted to the structure measures the
+          rigid rotation plus the local <b>slope</b> of the bending:
+        </p>
+        <Tex display>{"\\omega_{gyro} = \\dot\\theta + \\phi'(x_g)\\,\\dot\\eta"}</Tex>
+        <p>
+          The slope is zero at the middle and largest towards the ends, with opposite signs fore and
+          aft. Near the nose the gyro sees the mode at full strength, and the controller pushes it
+          through the gimbal at the tail. On the |L| chart the mode is a spike 26 dB high at 5 Hz;
+          on the Nyquist plot it is a lobe that sweeps around −1.
+        </p>
+        <p>
+          There are two cures. <b>Gain stabilisation</b> takes the loop gain at the mode well below
+          1, here with a <b>notch</b> centred on it, so that whatever its phase the lobe stays
+          small.
+          <b> Phase stabilisation</b> leaves the gain but makes sure the lobe points away from −1,
+          and that depends on where the sensor is.
+        </p>
+        <Try>
+          Turn on <b>Thrust-vector control → Notch filter</b> at 5 Hz. Try depths of 20, 30 and 40
+          dB, and widths from 0.1 to 0.5: a narrow notch misses part of the spike, a wide one costs
+          phase at the 1 Hz crossover. Then switch the notch off and move{' '}
+          <b>Pitch-plane rocket → Gyro station</b> to 0.4, and then to 0.6. The two places see the
+          bending equally strongly, but with opposite signs: one sings, the other is stable with the
+          spike still at +18 dB, because the lobe now turns away from −1.
+        </Try>
+        <Notice>
+          A notch is only as good as the frequency it is centred on, and the bending frequency
+          changes as the propellant burns; a deep narrow notch is fragile. Phase stabilisation needs
+          the mode shape&apos;s sign at the sensor to be known, which it is for the first mode and
+          less so for the higher ones. Real vehicles use both: phase-stabilise the first mode,
+          gain-stabilise the rest. The uniform beam here puts the zero of the slope exactly at the
+          middle; a real vehicle&apos;s is wherever its mass and stiffness put it.
+        </Notice>
+      </>
+    ),
+  },
+  {
+    id: 'slosh',
+    n: 9,
+    part: 4,
+    chapter: L,
+    title: 'Fuel that moves',
+    level: 1,
+    loop: 'pitch',
+    chart: 'tvc',
+    setup: (p) => {
+      pitchPlane(p);
+      p.control.tvc.kp = TVC_DESIGN.kp;
+      p.control.tvc.kd = TVC_DESIGN.kd;
+      p.tvc.sloshMass = IV9.mass;
+      p.tvc.sloshHz = IV9.hz;
+      p.tvc.sloshAhead = IV9.ahead;
+      p.tvc.sloshZeta = IV9.zeta;
+    },
+    goal: {
+      text: 'Keep the tank where it is and add baffles: the least slosh damping that keeps the whole Nyquist curve at least 0.5 from −1.',
+      check: ({ sim }) => {
+        const p = sim.params;
+        if (p.sim.vehicle !== 'tvc') return 'this lesson flies the pitch-plane rocket';
+        if (p.tvc.sloshMass !== IV9.mass || p.tvc.sloshAhead !== IV9.ahead)
+          return 'leave the propellant and the tank where they are';
+        const a = tvcNow(p);
+        if (!a.stable) return 'the loop is unstable';
+        const d = 1 / a.margins.ms;
+        if (d < 0.5) return `closest approach to −1 is ${d.toFixed(2)}`;
+        if (p.tvc.sloshZeta > IV9.enough)
+          return `damping ${p.tvc.sloshZeta}: it works, but baffles are heavy. Find the least`;
+        return true;
+      },
+    },
+    solution: (p) => {
+      p.tvc.sloshZeta = 0.03;
+    },
+    body: (
+      <>
+        <p>
+          The tank 2 m ahead of the centre of mass holds liquid, and 300 kg of it can slosh. Seen
+          from the controller it is a pendulum hung inside the vehicle: at 0.8 Hz, close to the 1 Hz
+          crossover, and with 0.2 % damping, since nothing stops a liquid from moving. Press{' '}
+          <b>R</b>. The pitch loop that was fine in lesson IV.7 settles, and then a wobble at 0.8 Hz
+          comes back and grows, slowly: it doubles in about fifteen seconds.
+        </p>
+        <p>
+          On the Nyquist plot the slosh mode is a small lobe near crossover. Small, but it sits
+          where the curve passes closest to −1, and with so little damping it reaches over the
+          point. Unlike the bending mode it cannot be notched out: a notch at 0.8 Hz would take the
+          phase margin of the rigid body with it.
+        </p>
+        <p>
+          The engineering cure is mechanical: <b>baffles</b>, rings inside the tank that make the
+          liquid work to move, which adds damping and shrinks the lobe.
+        </p>
+        <Try>
+          Raise <b>Pitch-plane rocket → Slosh damping (baffles)</b> step by step and watch the lobe
+          shrink and the closest approach to −1 grow. Then put the damping back and move the tank
+          instead, behind the centre of mass, or further ahead: where the tank is decides which way
+          the lobe points, as the gyro station did for bending.
+        </Try>
+        <Notice>
+          The pendulum&apos;s frequency is set by the vehicle&apos;s acceleration and the
+          tank&apos;s size, and it rises during the flight as the acceleration grows. Large
+          launchers have several tanks, each with its own slosh modes, and the margin is checked at
+          every instant of the flight.
+        </Notice>
+      </>
+    ),
+  },
+  {
+    id: 'wrongway',
+    n: 10,
+    part: 4,
+    chapter: L,
+    title: 'First the wrong way',
+    level: 1,
+    loop: 'drift',
+    chart: 'tvc',
+    setup: (p) => {
+      pitchPlane(p);
+      // A hovering test vehicle: no air load, the thrust just holds the weight.
+      p.tvc.speed = 0;
+      p.tvc.thrust = Math.round(p.tvc.mass * GRAVITY);
+      p.tvc.startPitchDeg = 0;
+      p.control.tvc.kx = 0.5;
+      p.control.tvc.kv = 2;
+    },
+    events: (sim) => setAt(sim, IV10.at, 'control.tvc.xTarget', IV10.step),
+    predict: {
+      label: 'Zero of the drift, z',
+      unit: 'rad/s',
+      truth: wrongWayZero,
+      tolerance: 0.05,
+    },
+    goal: {
+      text: `Predict, within 5 %, where the gimbal's push and the tilt cancel. Then make the ${IV10.step} m sidestep settle within ±${IV10.tol} m in under ${IV10.within} s.`,
+      check: ({ sim, prediction }) => {
+        const p = sim.params;
+        if (p.sim.vehicle !== 'tvc') return 'this lesson flies the pitch-plane rocket';
+        if (prediction == null) return 'first the prediction: when do the two pushes cancel?';
+        const z = wrongWayZero(p);
+        if (Math.abs(prediction - z) / z > 0.05)
+          return 'not within 5 %: the side force is T·δ, the tilt it causes θ̈ = −T·l·δ/I';
+        if (sim.state.crashed) return 'it fell over: press R';
+        if (sim.t < IV10.at + IV10.within + 2) return 'stepping sideways…';
+        const ts = driftSettle(sim, IV10.at, IV10.step, IV10.tol);
+        if (!Number.isFinite(ts)) return 'it has not settled: press R';
+        return ts < IV10.within || `settled in ${ts.toFixed(1)} s`;
+      },
+    },
+    solution: (p) => {
+      p.control.tvc.kx = 1.5;
+      p.control.tvc.kv = 4;
+    },
+    body: (
+      <>
+        <p>
+          The rocket now hovers, like a vertical-landing test vehicle, with its thrust holding its
+          weight and no air load. At 2 s it is asked to move 2 m sideways. To move right it must
+          lean right, and to lean right the gimbal must push the tail <b>left</b>. That push moves
+          the whole rocket left before the lean has built up. Watch the drift chart: it first goes
+          the wrong way, by a few centimetres.
+        </p>
+        <p>
+          In the drift the gimbal acts twice: directly, with a side force <Tex>{'T\\delta'}</Tex>,
+          and through the tilt it causes, <Tex>{'\\ddot\\theta = -\\mu_c\\delta'}</Tex>, which tips
+          the thrust the other way:
+        </p>
+        <Tex display>
+          {
+            '\\frac{x(s)}{\\delta(s)} = \\frac{T}{m}\\,\\frac{s^2 - \\mu_c}{s^4},\\qquad z = \\sqrt{\\mu_c} = \\sqrt{\\frac{T\\,l_g}{I}}'
+          }
+        </Tex>
+        <p>
+          A zero in the right half-plane, at <Tex>{'z'}</Tex>. Below that frequency the tilt wins
+          and the rocket goes where it leans; above it the side force wins and it goes the other
+          way. A loop cannot be faster than its slowest right-half-plane zero allows, roughly{' '}
+          <Tex>{'z/2'}</Tex>: past that the loop pushes ever harder against a plant that answers the
+          wrong way. It is the mirror image of lesson IV.7&apos;s unstable pole, which demanded a
+          bandwidth of at least about twice itself.
+        </p>
+        <Try>
+          Enter <Tex>{'z'}</Tex>. Then raise <b>Drift gain</b> and <b>Drift-rate gain</b> in{' '}
+          <b>Thrust-vector control</b> and press <b>R</b> each time. The step gets faster, the dip
+          the wrong way gets deeper, from 2 cm to 20 cm, and somewhere around a drift gain of 5 °/m
+          the gimbal runs into its stops and the rocket falls over. A little further, and the loop
+          is unstable even without the stops.
+        </Try>
+        <Notice>
+          The pitch loop is part of the limit too: the drift loop must be slower than the pitch loop
+          inside it, and in this rocket the pitch loop&apos;s bandwidth is close to the zero. Making
+          the pitch loop faster does not help here: above the zero the drift-rate feedback changes
+          sign, and a faster pitch loop lets it through. Aircraft have the same zero, between the
+          elevator and the altitude: pull up and the aeroplane first sinks.
         </Notice>
       </>
     ),

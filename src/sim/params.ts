@@ -1,4 +1,6 @@
+import type { TvcControlParams } from '@/control/tvc';
 import type { RocketParams } from './vehicles/rocket';
+import type { TvcParams } from './vehicles/tvc';
 import type { VehicleId } from './vehicles/types';
 import { defaultGains, type PidGains } from '@/control/pid';
 
@@ -319,6 +321,8 @@ export interface ControlParams {
   fdi: FdiParams;
   /** The landing law of the rocket (src/control/rocket.ts). */
   lander: { ignitionAlt: number; touchdownSpeed: number; speedGain: number };
+  /** The thrust-vector controller of the planar rocket (src/control/tvc.ts). */
+  tvc: TvcControlParams;
   l1: { kind: L1Kind; estimator: L1Estimator };
   /** L1 LQR / LQI (docs/beyond-pid.md §4). Cost weights of J = Σ (q·x² + r·u²)·dt. */
   lqr: {
@@ -524,6 +528,8 @@ export interface Params {
   sim: { level: Level; seed: number; vehicle?: VehicleId };
   /** The 1D rocket of lesson IV.4 (src/sim/vehicles/rocket.ts). */
   rocket: RocketParams;
+  /** The planar rocket of Chapter L (src/sim/vehicles/tvc.ts). */
+  tvc: TvcParams;
   world: WorldParams;
   setpoint: {
     x: number;
@@ -559,6 +565,27 @@ export const defaultParams = (): Params => ({
     startAlt: 120,
     startVel: 0,
     crashSpeed: 1,
+  },
+  tvc: {
+    mass: 2000,
+    inertia: 24000,
+    length: 12,
+    gimbalArm: 5,
+    thrust: 40000,
+    speed: 400,
+    normalForce: 32000,
+    cpAhead: 3,
+    gimbalMaxDeg: 8,
+    gimbalRateDeg: 30,
+    actuatorTau: 0.05,
+    bendHz: 5,
+    bendZeta: 0.01,
+    gyroStation: 0.5,
+    sloshMass: 0,
+    sloshHz: 0.8,
+    sloshZeta: 0.005,
+    sloshAhead: 2,
+    startPitchDeg: 2,
   },
   world: { ceiling: 0, pillar: false, pillarX: 3, pillarZ: 0, pillarR: 0.6 },
   setpoint: {
@@ -657,6 +684,20 @@ export const defaultParams = (): Params => ({
       source: 'oracle',
     },
     lander: { ignitionAlt: 30, touchdownSpeed: 0.5, speedGain: 2 },
+    tvc: {
+      kp: 1.5,
+      kd: 0.8,
+      kx: 0,
+      kv: 0,
+      pitchCmdDeg: 0,
+      xTarget: 0,
+      notch: false,
+      notchHz: 5,
+      notchDepthDb: 20,
+      notchWidth: 0.5,
+      rolloffHz: 0,
+      delayMs: 20,
+    },
     fdi: { nisWindow: 10, nisThreshold: 45, nisLow: 0, cusumDrift: 0.02, cusumThreshold: 0.02 },
     l1: { kind: 'pid', estimator: 'none' },
     lqr: {

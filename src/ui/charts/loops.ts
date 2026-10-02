@@ -74,8 +74,22 @@ const accel = (axis: 'x' | 'y' | 'z'): LoopMeta => ({
 });
 const ACCEL = [accel('x'), accel('y'), accel('z')];
 
+/** The loops of the pitch-plane rocket (Chapter L): pitch on the gimbal, drift on the pitch. */
+const TVC_LOOPS: LoopMeta[] = [
+  {
+    id: 'pitch',
+    name: 'Pitch (TVC)',
+    unit: '°',
+    outUnit: '°',
+    outName: 'gimbal',
+    truth: 'tvc.theta',
+  },
+  { id: 'drift', name: 'Drift', unit: 'm', outUnit: '°', outName: 'pitch sp', truth: 'tvc.x' },
+];
+
 /** Loops to offer in the inspector for these parameters. */
 export const loopsFor = (p: Params): LoopMeta[] => {
+  if (p.sim.vehicle === 'tvc') return TVC_LOOPS;
   if (p.sim.level !== 3) return LOOPS[p.sim.level];
   const geometric = p.control.l3.outer !== 'pid-cascade'; // geometric, MPC, MPPI
   // The geometric controller closes position and velocity in one law: no separate velocity loop,
@@ -102,12 +116,12 @@ const partsSignature = (parts: readonly LoopPart[]) =>
  * re-renders when the list's shape changes, never for the values.
  */
 export function useLoopParts(id: string): LoopPart[] {
-  const read = () => sim.controller.loops()[id]?.parts ?? [];
+  const read = () => sim.loops()[id]?.parts ?? [];
   const [parts, setParts] = useState(read);
   useEffect(() => {
     let sig = '';
     const poll = () => {
-      const next = sim.controller.loops()[id]?.parts ?? [];
+      const next = sim.loops()[id]?.parts ?? [];
       const s = partsSignature(next);
       if (s !== sig) {
         sig = s;

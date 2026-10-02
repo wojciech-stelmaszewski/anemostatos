@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { useParams } from '@/store/params';
+import { TVC_HEIGHT } from '@/engine/simulation';
 import { sim, useUi } from '@/store/sim';
 
 const PRESETS = {
@@ -25,14 +26,16 @@ export function CameraRig() {
   useEffect(() => {
     const c = controls.current;
     if (!c) return;
-    const t = new THREE.Vector3(0, 1.85, 0);
-    // The rocket stands 2 m tall: frame it from further away.
+    const t = new THREE.Vector3(0, vehicle === 'tvc' ? TVC_HEIGHT : 1.85, 0);
+    // The rocket stands 2 m tall: frame it from further away; the pitch-plane one is 12 m.
     const offset =
-      vehicle === 'rocket'
-        ? new THREE.Vector3(5, 1.5, 8)
-        : level === 1
-          ? new THREE.Vector3(0.95, 0.45, 1.45)
-          : new THREE.Vector3(1.6, 0.9, 2.5);
+      vehicle === 'tvc'
+        ? new THREE.Vector3(4, 1, 30)
+        : vehicle === 'rocket'
+          ? new THREE.Vector3(5, 1.5, 8)
+          : level === 1
+            ? new THREE.Vector3(0.95, 0.45, 1.45)
+            : new THREE.Vector3(1.6, 0.9, 2.5);
     c.target.copy(t);
     camera.position.copy(t).add(offset);
     c.update();

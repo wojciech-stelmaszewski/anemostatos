@@ -10,7 +10,9 @@ describe('lessons', () => {
     expect(new Set(LESSONS.map((l) => l.id)).size).toBe(LESSONS.length);
   });
 
-  for (const lesson of LESSONS) {
+  // IV.7 starts below the smallest stable gain on purpose: the rocket is meant to fall over.
+  const startsFalling = ['tvc'];
+  for (const lesson of LESSONS.filter((l) => !startsFalling.includes(l.id))) {
     it(`"${lesson.title}" starts in a flyable state`, () => {
       const p = defaultParams();
       p.sim.level = lesson.level;

@@ -12,6 +12,7 @@ import { ValueMap } from '@/ui/analysis/ValueMap';
 import { NyquistChart } from '@/ui/analysis/NyquistChart';
 import { PoleMap } from '@/ui/analysis/PoleMap';
 import { SpectrumChart } from '@/ui/analysis/SpectrumChart';
+import { TvcChart } from '@/ui/analysis/TvcChart';
 import { useRaf } from '@/ui/hud/useRaf';
 import { partColor, SIGNAL } from '@/ui/colors';
 import { Select } from '@/ui/components/select';
@@ -47,6 +48,7 @@ const EXTRA: { value: ExtraChart; label: string }[] = [
   { value: 'costate', label: 'costate (LQR)' },
   { value: 'value', label: 'value function' },
   { value: 'describing', label: 'describing function' },
+  { value: 'tvc', label: 'thrust-vector loop (Nyquist)' },
 ];
 /** What can stand in the motor chart's place. */
 const SECOND: { value: AnalysisChart | 'motors'; label: string }[] = [
@@ -134,6 +136,8 @@ const analysisChart = (kind: string) =>
     <DescribingChart />
   ) : kind === 'dispersion' ? (
     <DispersionChart />
+  ) : kind === 'tvc' ? (
+    <TvcChart />
   ) : kind === 'covariance' ? (
     <TimeChart title="Filter uncertainty: 1σ of each state (log scale)" series={COVARIANCE} logY />
   ) : null;
@@ -185,7 +189,8 @@ export function ChartsPanel() {
     extra === 'mu' ||
     extra === 'value' ||
     extra === 'engagement' ||
-    extra === 'beacons';
+    extra === 'beacons' ||
+    extra === 'tvc';
   const ctrlKey = useParams((s) => controllerKey(s.params));
   const loopOptions = useMemo(
     () => loopsFor(useParams.getState().params).map((l) => ({ value: l.id, label: l.name })),

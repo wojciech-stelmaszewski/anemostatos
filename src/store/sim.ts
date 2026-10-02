@@ -32,7 +32,8 @@ export type ExtraChart =
   | 'value'
   | 'engagement'
   | 'ins'
-  | 'beacons';
+  | 'beacons'
+  | 'tvc';
 /** The analysis views of Part III, which can also take the place of the motor chart. */
 export type AnalysisChart = 'bode' | 'nyquist' | 'poles' | 'covariance';
 /**

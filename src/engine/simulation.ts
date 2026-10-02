@@ -22,12 +22,16 @@ import { profileOffset, zeroReference, type Reference } from './reference';
 import { FaultMonitor } from '@/estimation/fdi';
 import { RocketLander } from '@/control/rocket';
 import { initialRocket, stepRocket, type RocketState } from '@/sim/vehicles/rocket';
+import { TvcController } from '@/control/tvc';
+import { initialTvc, modeSlope, stepTvc, type TvcState } from '@/sim/vehicles/tvc';
 import { Engagement, targetState } from '@/guidance/pronav';
 import { insGyroError } from '@/estimation/ins';
 import { Tap } from './tap';
 import { Telemetry } from './telemetry';
 
 export const PHYS_DT = 0.001;
+/** Height at which the planar rocket of Chapter L is drawn, m. */
+export const TVC_HEIGHT = 8;
 export const TELEMETRY_HZ = 200;
 const TELEMETRY_EVERY = Math.round(1 / (TELEMETRY_HZ * PHYS_DT));
 const HISTORY_SECONDS = 60;
@@ -83,6 +87,9 @@ export class Simulation {
   /** The rocket and its landing law, while `params.sim.vehicle` is 'rocket' (Part IV). */
   rocket: RocketState | null = null;
   lander = new RocketLander();
+  /** The planar rocket of Chapter L and its thrust-vector controller, while `sim.vehicle` is 'tvc'. */
+  tvc: TvcState | null = null;
+  tvcControl = new TvcController();
   /** A frozen earlier run, overlaid on the charts for comparison. */
   ghost: { telemetry: Telemetry; label: string } | null = null;
   /** A lesson's script: run after every reset to (re)schedule its events. */
@@ -204,6 +211,12 @@ export class Simulation {
       this.mirrorRocket();
       this.takingOff = false;
     }
+    this.tvcControl.reset();
+    this.tvc = p.sim.vehicle === 'tvc' ? initialTvc(p.tvc) : null;
+    if (this.tvc) {
+      this.mirrorTvc();
+      this.takingOff = false;
+    }
     this.script?.(this);
     for (const fn of this.resetListeners) fn();
   }
@@ -305,6 +318,10 @@ export class Simulation {
     this.prevQ = { ...this.state.q };
     if (this.rocket) {
       this.stepRocket(dt);
+      return;
+    }
+    if (this.tvc) {
+      this.stepTvcRocket(dt);
       return;
     }
 
@@ -455,6 +472,54 @@ export class Simulation {
     this.t += dt;
     this.stepIndex++;
     if (this.stepIndex % TELEMETRY_EVERY === 0) this.record();
+  }
+
+  /**
+   * The planar rocket of Chapter L: frozen at one flight condition, so only the motion across the
+   * flight path is simulated. Mirrored into `state` at a fixed height for the scene and camera.
+   */
+  private stepTvcRocket(dt: number): void {
+    const r = this.tvc!;
+    const p = this.params;
+    while (this.scheduled.length && this.scheduled[0]!.t <= this.t)
+      this.scheduled.shift()!.fn(this);
+    const u = this.armed ? this.tvcControl.tick(r, p.tvc, p.control.tvc) : { delta: 0 };
+    const wind = p.wind.enabled ? this.wind.step(this.t, dt, p.wind) : v3();
+    const ext = this.poke && this.t < this.poke.until ? this.poke.force : v3();
+    if (this.poke && this.t >= this.poke.until) this.poke = null;
+    // Beyond 30° the air load breaks it up: the flight is over and the state is frozen.
+    if (!this.state.crashed) stepTvc(r, u, { wind, external: ext }, dt, p.tvc);
+    this.mirrorTvc();
+    if (this.state.crashed) this.armed = false;
+    this.t += dt;
+    this.stepIndex++;
+    if (this.stepIndex % TELEMETRY_EVERY === 0) this.record();
+  }
+
+  private mirrorTvc(): void {
+    const r = this.tvc!;
+    const s = this.state;
+    s.pos = v3(r.x, TVC_HEIGHT, 0);
+    s.vel = v3(r.u, 0, 0);
+    s.landed = false;
+    s.crashed = Math.abs(r.theta) > Math.PI / 6;
+    // Pitch towards +x is a rotation about −z.
+    s.q = { w: Math.cos(r.theta / 2), x: 0, y: 0, z: -Math.sin(r.theta / 2) };
+    const thrust = this.params.tvc.thrust;
+    this.forces = {
+      thrust: v3(thrust * Math.sin(r.theta + r.delta), thrust * Math.cos(r.theta + r.delta), 0),
+      gravity: v3(),
+      drag: v3(),
+      external: v3(),
+      net: v3(),
+    };
+  }
+
+  /** The loops of whatever flies: the drone's controller, or the law of a Part IV vehicle. */
+  loops(): Record<string, LoopTerms> {
+    if (this.rocket) return { alt: this.lander.last };
+    if (this.tvc) return { pitch: this.tvcControl.last, drift: this.tvcControl.drift };
+    return this.controller.loops();
   }
 
   private mirrorRocket(): void {
@@ -634,13 +699,32 @@ export class Simulation {
       tl.set('probe.u', this.probe.u);
       tl.set('probe.uc', this.probe.uc);
     }
-    const loops = this.rocket ? { alt: this.lander.last } : this.controller.loops();
+    const loops = this.loops();
     for (const id in loops) recordLoop(tl, id, loops[id]!);
     if (this.rocket) {
       const r = this.rocket;
       tl.set('rocket.mass', r.mass);
       tl.set('rocket.fuel', r.fuel);
       tl.set('rocket.thrust', r.thrust);
+    }
+    if (this.tvc) {
+      const r = this.tvc;
+      const DEG = 180 / Math.PI;
+      tl.set('tvc.theta', r.theta * DEG);
+      tl.set('tvc.delta', r.delta * DEG);
+      tl.set('tvc.x', r.x);
+      tl.set('tvc.eta', r.eta);
+      tl.set('tvc.slosh', r.slosh);
+      tl.set(
+        'tvc.gyro',
+        (r.omega + modeSlope(this.params.tvc.gyroStation, this.params.tvc.length) * r.etaDot) * DEG,
+      );
+      tl.set(
+        'tvc.alpha',
+        this.params.tvc.speed > 0
+          ? (r.theta - (r.u - this.wind.velocity.x) / this.params.tvc.speed) * DEG
+          : 0,
+      );
     }
     const extras = this.controller.extras();
     for (const k in extras) tl.set(k, extras[k]!);

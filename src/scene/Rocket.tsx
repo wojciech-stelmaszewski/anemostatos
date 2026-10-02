@@ -1,6 +1,7 @@
 import { useFrame } from '@react-three/fiber';
 import { useRef } from 'react';
 import * as THREE from 'three';
+import { modeShape } from '@/sim/vehicles/tvc';
 import { sim } from '@/store/sim';
 import { SCENE } from '@/ui/colors';
 
@@ -74,6 +75,79 @@ export function LandingPad() {
         <ringGeometry args={[1.6, 1.75, 48]} />
         <meshBasicMaterial color={SCENE.accent} />
       </mesh>
+    </group>
+  );
+}
+
+/** Segments of the pitch-plane rocket's body, so the bending mode can be drawn. */
+const TVC_SEGMENTS = 12;
+/** Bending is millimetres; drawn this many times larger. */
+const BEND_DRAWN = 40;
+
+/**
+ * The pitch-plane rocket of Chapter L at its true size: a slender body pitched by θ, its first
+ * bending mode drawn larger than life, and the flame turned by the gimbal angle. Its origin is
+ * the centre of mass, which is where the simulator puts `state.pos`.
+ */
+export function TvcRocketRig() {
+  const group = useRef<THREE.Group>(null);
+  const flame = useRef<THREE.Group>(null);
+  const segments = useRef<(THREE.Mesh | null)[]>([]);
+  const r = sim.params.tvc;
+  const radius = r.length / 22;
+  const seg = r.length / TVC_SEGMENTS;
+  useFrame(() => {
+    const g = group.current;
+    const s = sim.tvc;
+    if (!g || !s) return;
+    const { pos, q } = sim.renderPose();
+    g.position.set(pos.x, pos.y, pos.z);
+    g.quaternion.set(q.x, q.y, q.z, q.w);
+    segments.current.forEach((m, i) => {
+      if (!m) return;
+      const off = s.eta * modeShape((i + 0.5) / TVC_SEGMENTS) * BEND_DRAWN;
+      m.position.x = Math.max(-1, Math.min(1, off));
+    });
+    const f = flame.current;
+    if (f) {
+      f.rotation.z = -s.delta;
+      f.position.x = Math.max(-1, Math.min(1, s.eta * BEND_DRAWN));
+    }
+  });
+  const tail = -sim.params.tvc.gimbalArm;
+  return (
+    <group ref={group}>
+      {Array.from({ length: TVC_SEGMENTS }, (_, i) => (
+        <mesh
+          key={i}
+          ref={(m) => {
+            segments.current[i] = m;
+          }}
+          position={[0, tail + seg * (i + 0.5), 0]}
+          castShadow
+        >
+          <cylinderGeometry args={[radius, radius, seg * 1.02, 24]} />
+          <meshStandardMaterial
+            color={i === TVC_SEGMENTS - 1 ? SCENE.accent : '#d9dde4'}
+            metalness={0.3}
+            roughness={0.45}
+          />
+        </mesh>
+      ))}
+      <mesh position={[0, tail + r.length + radius * 1.5, 0]} castShadow>
+        <coneGeometry args={[radius, radius * 3, 24]} />
+        <meshStandardMaterial color={SCENE.accent} metalness={0.2} roughness={0.5} />
+      </mesh>
+      <group ref={flame} position={[0, tail, 0]}>
+        <mesh position={[0, -radius * 0.4, 0]}>
+          <cylinderGeometry args={[radius * 0.45, radius * 0.7, radius * 0.8, 16]} />
+          <meshStandardMaterial color="#3a3f48" metalness={0.6} roughness={0.4} />
+        </mesh>
+        <mesh position={[0, -radius * 0.8 - 2.2, 0]} rotation={[Math.PI, 0, 0]}>
+          <coneGeometry args={[radius * 0.7, 4.4, 16, 1, true]} />
+          <meshBasicMaterial color="#ffb347" transparent opacity={0.8} />
+        </mesh>
+      </group>
     </group>
   );
 }

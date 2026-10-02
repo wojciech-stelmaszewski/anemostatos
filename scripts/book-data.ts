@@ -3,6 +3,7 @@
 // Run with `make book-data` (a few minutes). Optional argument: a name filter (substring).
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
+import { ENTRIES, SCENARIOS } from '@/engine/arena';
 import { setIn } from '@/engine/schema';
 import { Simulation } from '@/engine/simulation';
 import { qFromAxisAngle, qMul } from '@/math/quat';
@@ -916,6 +917,42 @@ for (const comp of ['none', 'learned', 'l1ac', 'indi'] as const)
       p.control.l3.compensation = comp;
     },
   });
+// The same flight with poor inertial sensors: 3 m/s² accelerometer noise and a 30 ms delay.
+for (const comp of ['none', 'learned', 'l1ac', 'indi'] as const)
+  add({
+    name: `residual-noisy-${comp}`,
+    seconds: 40,
+    full: true,
+    setup: (p) => {
+      l3(p);
+      p.drone.rotorDrag = 0.02;
+      p.wind.meanSpeed = 3;
+      p.wind.gustsOn = false;
+      p.wind.turbSigma = 0.5;
+      figure8(6.5)(p);
+      p.sensors.accNoise = 3;
+      p.sensors.delayMs = 30;
+      p.control.l3.outer = 'geometric';
+      p.control.l3.compensation = comp;
+    },
+  });
+// The learned model's memory: forgetting factor λ per 100 Hz update, memory ≈ 1/(1 − λ) updates.
+for (const lam of [0.95, 0.9995])
+  add({
+    name: `residual-lambda${String(lam).slice(2)}`,
+    seconds: 40,
+    setup: (p) => {
+      l3(p);
+      p.drone.rotorDrag = 0.02;
+      p.wind.meanSpeed = 3;
+      p.wind.gustsOn = false;
+      p.wind.turbSigma = 0.5;
+      figure8(6.5)(p);
+      p.control.l3.outer = 'geometric';
+      p.control.l3.compensation = 'learned';
+      p.control.residual.forgetting = lam;
+    },
+  });
 for (const outer of ['geometric', 'policy'] as const)
   add({
     name: `policy-${outer}`,
@@ -930,6 +967,34 @@ for (const outer of ['geometric', 'policy'] as const)
       at(s, 20, 'drone.mass', 1.5);
     },
   });
+// Inside the training range: the same hover, the mass raised to 1.15 kg (its upper edge) at 10 s.
+for (const outer of ['geometric', 'policy'] as const)
+  add({
+    name: `policy-m115-${outer}`,
+    seconds: 30,
+    setup: (p) => {
+      l3(p);
+      calm(p);
+      p.control.l3.outer = outer;
+    },
+    events: (s) => at(s, 10, 'drone.mass', 1.15),
+  });
+
+// The grand comparison (lesson II.21): every arena entry through every arena scenario, exactly
+// as src/engine/arena.ts sets them up. Full rate, so that the motor jitter is measured at 200 Hz.
+for (const sc of SCENARIOS)
+  for (const entry of ENTRIES)
+    add({
+      name: `arena-${sc.id}-${entry.id}`,
+      seconds: sc.seconds,
+      full: true,
+      setup: (p) => {
+        l3(p);
+        sc.setup(p);
+        entry.setup(p);
+      },
+      events: sc.events,
+    });
 
 // ─── Run ───────────────────────────────────────────────────────────────────
 const filter = process.argv[2];

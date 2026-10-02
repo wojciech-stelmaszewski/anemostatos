@@ -719,3 +719,228 @@ def mpc_horizon():
     b.legend(loc="lower left", fontsize=6.0)
     b.grid(True, which="major", axis="both")
     save(f, "mpc_horizon")
+
+
+
+# ─── Lesson II.19 ──────────────────────────────────────────────────────────
+_RES = (("none", C["ghost"], "integral only"), ("learned", C["meas"], "learned residual model"),
+        ("l1ac", C["I"], "L1 adaptive"), ("indi", C["D"], "INDI"))
+
+
+def _thrust(d):
+    return d["motor.1"] + d["motor.2"] + d["motor.3"] + d["motor.4"]
+
+
+@fig
+def residual_eight():
+    f, ax = plt.subplots(2, 2, figsize=(TEXT_W, 96 * MM),
+                         gridspec_kw=dict(wspace=0.3, hspace=0.5, width_ratios=[1.35, 1]))
+    a, b, c, e = ax[0, 0], ax[0, 1], ax[1, 0], ax[1, 1]
+    for tag, col, lab in _RES:
+        d = win(load(f"residual-{tag}"), 20, 40)
+        a.semilogy(d.t, 100 * _poserr(d), color=col, lw=1.2 if tag == "none" else 0.8, label=lab)
+    a.set_xlim(20, 40)
+    a.set_ylim(0.1, 400)
+    a.set_yticks([0.1, 1, 10])
+    a.set_yticklabels(["0.1", "1", "10"])
+    a.minorticks_off()
+    a.set_title("Position error on the fast figure-8")
+    a.set_ylabel("cm")
+    a.legend(loc="upper center", ncol=2, fontsize=5.8, bbox_to_anchor=(0.5, 1.02))
+    xlab_time(a)
+    # the shape: the true force against the velocity along the wind
+    d = win(load("residual-learned"), 20, 40)
+    b.plot(d["vel.x"], d["dist.x"], ".", color=C["faint"], ms=0.8, alpha=0.5, rasterized=True)
+    v = np.linspace(-2.1, 2.1, 50)
+    w, T = d["wind.x"].mean(), _thrust(d).mean()
+    b.plot(v, 0.12 * (w - v) ** 2 + 0.02 * T * (w - v), color=C["ink"], lw=1.0, ls=(0, (4, 2)))
+    b.text(-2.0, 0.55, "model of the physics,\nmean wind", fontsize=5.8, color=C["ink"])
+    b.set_title("True force $x$ against $v_x$")
+    b.set_xlabel("$v_x$ [m/s]", loc="right")
+    b.set_ylabel("N")
+    t0 = 40 - 6.5
+    d = win(load("residual-learned"), t0, 40)
+    c.plot(d.t - t0, d["dist.x"], color=C["ink"], lw=1.0, label="true force")
+    c.plot(d.t - t0, d["est.dist.x"], color=C["meas"], lw=1.0, ls=(0, (4, 2)), label="$\\Phi(\\mathbf{x})\\,\\hat\\theta$")
+    c.set_xlim(0, 6.5)
+    c.set_title("Disturbance force $x$, last lap")
+    c.set_ylabel("N")
+    c.legend(loc="upper center", fontsize=6.0, ncol=2)
+    c.set_xlabel("time in the lap [s]", loc="right")
+    d = win(load("residual-learned"), 0, 40)
+    T = _thrust(d)
+    e.plot(d.t, d["residual.x.1"], color=C["FF"], lw=0.9, label="$\\hat\\theta_1$ (constant)")
+    e.plot(d.t, d["residual.x.v"], color=C["P"], lw=0.7, alpha=0.6, label="$\\hat\\theta_v$")
+    e.plot(d.t, d["residual.x.v"] + T * d["residual.x.T·v⊥"], color=C["D"], lw=0.9,
+           label="$\\hat\\theta_v + T\\hat\\theta_{T}$")
+    e.axhline(0, color=C["faint"], lw=0.4)
+    e.set_xlim(0, 40)
+    e.set_ylim(-4.5, 6)
+    e.set_title("Fitted coefficients, $x$")
+    e.legend(loc="upper center", fontsize=5.2, ncol=2, handlelength=1.0, columnspacing=0.8)
+    xlab_time(e)
+    save(f, "residual_eight")
+
+
+@fig
+def residual_memory():
+    f, (a, b) = plt.subplots(1, 2, figsize=(TEXT_W, 56 * MM), gridspec_kw=dict(wspace=0.32))
+    runs = (("lambda95", "0.95 (0.2 s)"), ("learned", "0.995 (2 s)"), ("lambda9995", "0.9995 (20 s)"))
+    cols = ramp(3, "blue")
+    t0 = 40 - 6.5
+    for (tag, lab), col in zip(runs, cols):
+        d = win(load(f"residual-{tag}"), t0, 40)
+        a.plot(d.t - t0, d["est.dist.x"] - d["dist.x"], color=col, lw=0.8, label=lab)
+        d = win(load(f"residual-{tag}"), 0, 40)
+        b.plot(d.t, d["residual.x.1"], color=col, lw=0.9, label=lab)
+    a.set_xlim(0, 6.5)
+    a.set_ylim(-4, 4)
+    a.set_title("Error of the predicted force, $x$")
+    a.set_ylabel("N")
+    a.set_xlabel("time in the last lap [s]", loc="right")
+    a.legend(loc="upper right", fontsize=5.8, title="$\\lambda$ (memory)", title_fontsize=5.8)
+    b.axhline(0.12 * 3.05**2 + 0.02 * 10.31 * 3.05, color=C["ink"], lw=0.6, ls=(0, (4, 2)))
+    b.text(1, 3.2, "physics: 1.75 N", fontsize=5.8, color=C["ink"])
+    b.set_xlim(0, 40)
+    b.set_ylim(-2, 6)
+    b.set_title("Constant coefficient $\\hat\\theta_1$")
+    b.set_ylabel("N")
+    xlab_time(b)
+    save(f, "residual_memory")
+
+
+# ─── Lesson II.20 ──────────────────────────────────────────────────────────
+@fig
+def policy_hop():
+    f, ax = plt.subplots(3, 1, figsize=(TEXT_W, 100 * MM), sharex=True, gridspec_kw=dict(hspace=0.4))
+    for tag, col, lab in (("geometric", C["ghost"], "geometric controller"), ("policy", C["meas"], "neural policy")):
+        d = load(f"policy-{tag}")
+        lw = 1.3 if tag == "geometric" else 0.9
+        ax[0].plot(d.t, 100 * (d["pos.x"] - d["sp.x"]), color=col, lw=lw, label=lab)
+        ax[1].plot(d.t, 100 * (d["pos.y"] - d["sp.y"]), color=col, lw=lw)
+        ax[2].plot(d.t, _thrust(d), color=col, lw=lw)
+    ax[0].set_ylim(-40, 45)
+    ax[0].set_title("Error in $x$ (the target jumps 3 m at 10 s; clipped)")
+    ax[0].set_ylabel("cm")
+    ax[0].legend(loc="lower left", fontsize=6.2, ncol=2)
+    ax[1].set_title("Error in altitude (the mass jumps from 1.0 to 1.5 kg at 20 s)")
+    ax[1].set_ylabel("cm")
+    ax[2].set_title("Total thrust")
+    ax[2].set_ylabel("N")
+    ax[2].set_ylim(7, 17)
+    for a in ax:
+        a.axvline(10, color=C["faint"], lw=0.5, ls=(0, (2, 2)))
+        a.axvline(20, color=C["faint"], lw=0.5, ls=(0, (2, 2)))
+    ax[2].set_xlim(0, 35)
+    xlab_time(ax[2])
+    save(f, "policy_hop")
+
+
+@fig
+def policy_sag():
+    f, a = plt.subplots(figsize=(46 * MM, 42 * MM))
+    pts = []
+    for name, m, t0, t1 in (("policy-policy", 1.0, 5, 10), ("policy-m115-policy", 1.15, 25, 30),
+                            ("policy-policy", 1.5, 30, 35)):
+        d = win(load(name), t0, t1)
+        pts.append((m, 100 * (d["pos.y"] - d["sp.y"]).mean()))
+    m = np.linspace(0.95, 1.55, 10)
+    a.plot(m, pts[0][1] - 100 * (m - 1) * 9.81 / 9, color=C["ink"], lw=0.7, ls=(0, (4, 2)))
+    a.axvspan(0.85, 1.15, color=C["mist"], lw=0, zorder=0)
+    a.text(0.87, -40, "trained", fontsize=5.6, color=C["muted"])
+    a.plot([p[0] for p in pts], [p[1] for p in pts], "o", color=C["meas"], ms=3.2)
+    a.set_xlim(0.85, 1.6)
+    a.set_ylim(-45, 30)
+    a.set_title("Hover offset", fontsize=7)
+    a.set_ylabel("cm")
+    a.set_xlabel("mass [kg]", loc="right")
+    save(f, "policy_sag")
+
+
+# ─── Lesson II.21 ──────────────────────────────────────────────────────────
+ARENA_SC = (("step", "Step", 10), ("gusts", "Gusts", 8), ("payload", "Payload", 12),
+            ("fault", "Broken\nprop", 12), ("figure8", "Figure-8", 20), ("noise", "Noisy\nsensors", 8))
+ARENA_EN = (("pid", "PID cascade (Part I)"), ("geo", "Geometric + flatness"), ("geo-indi", "Geometric + INDI"),
+            ("geo-l1", "Geometric + L1 adaptive"), ("geo-learned", "Geometric + learned residual"),
+            ("mpc", "MPC"), ("mpc-indi", "MPC + INDI"), ("mppi", "MPPI"), ("policy", "Neural policy"))
+
+
+def arena_metrics(entry, sc, t0):
+    """RMS and max 3D error (m) and RMS change of total thrust between 5 ms samples (N), as arena.ts."""
+    d = load(f"arena-{sc}-{entry}")
+    d = d[d.t >= t0 + 1e-6]
+    e = _poserr(d).values
+    T = _thrust(d).values
+    return np.sqrt((e**2).mean()), e.max(), np.sqrt((np.diff(T) ** 2).mean())
+
+
+@fig
+def arena_grid():
+    import matplotlib.colors as mcolors
+    n, m = len(ARENA_EN), len(ARENA_SC)
+    R = np.zeros((n, m))
+    J = np.zeros(n)
+    for i, (en, _) in enumerate(ARENA_EN):
+        jj = []
+        for k, (sc, _, t0) in enumerate(ARENA_SC):
+            r, _, j = arena_metrics(en, sc, t0)
+            R[i, k] = 100 * r
+            jj.append(j)
+        J[i] = np.mean(jj)
+    f, (a, b) = plt.subplots(1, 2, figsize=(TEXT_W, 70 * MM), gridspec_kw=dict(wspace=0.04, width_ratios=[6, 1.2]))
+    cmap = mcolors.LinearSegmentedColormap.from_list("arena", ["#FFFFFF", "#F6D5D0", C["err"]])
+    a.imshow(np.log10(R), cmap=cmap, vmin=np.log10(0.3), vmax=np.log10(130), aspect="auto")
+    for i in range(n):
+        for k in range(m):
+            best = R[i, k] <= R[:, k].min() + 1e-9
+            a.text(k, i, f"{R[i, k]:.1f}", ha="center", va="center", fontsize=6.4,
+                   color=C["ink"], fontweight="bold" if best else "normal")
+    a.set_xticks(range(m))
+    a.set_xticklabels([s[1] for s in ARENA_SC], fontsize=6.2)
+    a.xaxis.tick_top()
+    a.set_yticks(range(n))
+    a.set_yticklabels([e[1] for e in ARENA_EN], fontsize=6.4)
+    a.tick_params(length=0)
+    a.grid(False)
+    for s in a.spines.values():
+        s.set_visible(False)
+    b.imshow(np.log10(J)[:, None], cmap=cmap, vmin=np.log10(0.008), vmax=np.log10(0.5), aspect="auto")
+    for i in range(n):
+        b.text(0, i, f"{J[i]:.3f}", ha="center", va="center", fontsize=6.4, color=C["ink"],
+               fontweight="bold" if J[i] <= J.min() + 1e-9 else "normal")
+    b.set_xticks([0])
+    b.set_xticklabels(["Motor\njitter, N"], fontsize=6.2)
+    b.xaxis.tick_top()
+    b.set_yticks([])
+    b.tick_params(length=0)
+    b.grid(False)
+    for s in b.spines.values():
+        s.set_visible(False)
+    save(f, "arena_grid")
+
+
+@fig
+def arena_payload():
+    f, (a, b) = plt.subplots(1, 2, figsize=(TEXT_W, 58 * MM), gridspec_kw=dict(wspace=0.3))
+    runs = (("pid", C["ghost"], "PID cascade"), ("geo", C["err"], "geometric"), ("geo-l1", C["I"], "geometric + L1"),
+            ("geo-indi", C["D"], "geometric + INDI"), ("policy", C["meas"], "neural policy"))
+    for tag, col, lab in runs:
+        d = win(load(f"arena-payload-{tag}"), 11, 25)
+        a.plot(d.t - 12, 100 * _poserr(d), color=col, lw=1.2 if tag == "pid" else 0.9, label=lab)
+    a.set_xlim(-1, 13)
+    a.set_ylim(0, 68)
+    a.set_title("Payload: +300 g at 12 s")
+    a.set_ylabel("cm")
+    a.set_xlabel("time after the payload [s]", loc="right")
+    a.legend(loc="upper center", fontsize=5.6, ncol=2, columnspacing=0.8)
+    for tag, col, lab in (("geo-l1", C["I"], "geometric + L1"), ("geo-indi", C["D"], "geometric + INDI"),
+                          ("mppi", C["FF"], "MPPI")):
+        d = win(load(f"arena-noise-{tag}"), 20, 22)
+        b.plot(d.t - 20, _thrust(d), color=col, lw=0.8, label=lab)
+    b.set_xlim(0, 2)
+    b.set_ylim(6, 15.5)
+    b.set_title("Noisy sensors: total thrust, 2 s")
+    b.set_ylabel("N")
+    b.set_xlabel("time [s]", loc="right")
+    b.legend(loc="upper center", fontsize=5.6, ncol=3, columnspacing=0.8)
+    save(f, "arena_payload")

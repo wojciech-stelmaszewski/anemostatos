@@ -471,5 +471,38 @@
    2200,
    1631
   ]
+ },
+ "albatross": {
+  "title": "File:Wandering Albatross- east of the Tasman Peninsula.jpg",
+  "artist": "JJ Harrison",
+  "credit": "Own work",
+  "license": "CC BY-SA 3.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Wandering_Albatross-_east_of_the_Tasman_Peninsula.jpg",
+  "size": [
+   2200,
+   1467
+  ]
+ },
+ "navlab": {
+  "title": "File:Navlab-1-5-autonomous-vehicles.jpg",
+  "artist": "Firefly4342",
+  "credit": "Own work",
+  "license": "CC BY-SA 4.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Navlab-1-5-autonomous-vehicles.jpg",
+  "size": [
+   1500,
+   1000
+  ]
+ },
+ "stanley": {
+  "title": "File:AutonomousVehicles2.jpg",
+  "artist": "National Museum of American History",
+  "credit": "Stanley, an autonomous vehicle that won the 2005 DARPA Grand Challenge, hitches a ride from NMAH to NASM Photo id WEB12639-2012 at airandspace.si.edu",
+  "license": "Public domain",
+  "page": "https://commons.wikimedia.org/wiki/File:AutonomousVehicles2.jpg",
+  "size": [
+   2200,
+   1464
+  ]
  }
 }

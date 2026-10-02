@@ -1,0 +1,222 @@
+\lesson{II.21}{The grand comparison}{Nine controllers, six scenarios, the same wind for everyone. No controller wins every column — and the reasons are the whole of Part~II.}{3}{arena}{Part II · Beyond PID}
+\label{les:arena}
+
+\lead{\setupcard{\setuprow{Level}{L3}\setuprow{Controllers}{nine configurations: the PID cascade of Part~I, the geometric controller alone and with INDI, L1 adaptive control or the learned residual model, MPC alone and with INDI, MPPI, the neural policy}\setuprow{Scenarios}{a step, gusts, a payload, a broken propeller, a fast figure-8, noisy and delayed sensors; seeded, identical for all}\setuprow{Measured}{RMS position error; how hard the motors work; computing time}\setuprow{Goal}{none: explain every column}}%
+The end of the semester. Every L3 controller of this volume flies the same six scenarios, with the same seeds, the same wind and the same measurement. The result is a table of 54 numbers and a column for the motors, and the first thing to say about it is what the app says: no controller wins everything. INDI underneath wins every disturbance; the PID has the calmest motors because it is the most sluggish; the neural policy is fast and imprecise; the sampling optimiser pays for its generality in every column. This lesson reads the table column by column, then turns it into the question Part~II has been answering all along: which controller is best \emph{for what}, and why.}
+
+\section{The arena}
+
+\begin{definition}{The arena}
+Each of nine controller configurations flies each of six scenarios on the full quadrotor (L3), from the same parameters and the same random seeds. Measured from a fixed time in each scenario onwards: the \term{RMS 3D position error}; the \term{motor jitter}, the RMS change of the total thrust between \SI{5}{ms} samples, averaged over the six scenarios; and, separately, the computing time per \SI{1}{ms} physics step.
+\end{definition}
+
+The scenarios (\src{src/engine/arena.ts}), with the time from which they are scored:
+\begin{itemize}[leftmargin=1.2em]
+  \item \textbf{Step} — a \SI{3}{m} sideways jump of the target at \SI{10}{s}, calm air; scored from the jump.
+  \item \textbf{Gusts} — Part~I's gust challenge (\lessonref{les:challenge}), hovering; from \SI{8}{s}.
+  \item \textbf{Payload} — \SI{300}{g} more at \SI{12}{s}, in the default light turbulence with occasional gusts; from \SI{12}{s}.
+  \item \textbf{Broken prop} — motor~2 loses \SI{40}{\%} of its thrust at \SI{12}{s}, calm air; from \SI{12}{s}.
+  \item \textbf{Figure-8} — \SI{2}{m} amplitude, one lap in \SI{8.9}{s}, light turbulence; from \SI{20}{s}.
+  \item \textbf{Noisy sensors} — position noise \SI{3}{cm}, gyroscope \SI{5}{\degree/s}, accelerometer \SI{1}{m/s^2}, \SI{20}{ms} delay, and gusts; from \SI{8}{s}.
+\end{itemize}
+Every number in this lesson is computed from the 54 recorded flights (\texttt{arena-*} in \src{scripts/book-data.ts}); they agree with the table that \texttt{make bench} prints.\recall{Lesson~I.11: the gust challenge — one minute of seeded, violent wind, the same for every tune. The arena is that idea applied to every controller of the volume.}
+
+\simfig{arena_grid}{The arena. Each cell is the RMS position error in centimetres over the scored part of the scenario; the shading is logarithmic, and the best value in each column is bold. Right: the motor jitter, averaged over the scenarios.}{fig:arena-grid}
+
+\section{Reading the columns}
+
+\begin{example}[The step: a column everyone \enquote{fails}]
+\label{ex:arena-step}
+Every controller scores between 77 and \SI{88}{cm} on the step. Why so much, and what does the column measure?
+
+\textbf{Step 1 — the floor.} At the jump the error is \SI{3}{m}. Even a perfect move takes about a second (\lessonref{les:minsnap}: the bang-bang limit for \SI{3}{m} with the tilt limit is \SI{1.3}{s}), so the RMS over the ten seconds after the jump cannot be small. The column measures how fast the error is removed.
+
+\textbf{Step 2 — the ranking.} Geometric with INDI scores \SI{77.1}{cm}: within \SI{5}{cm} of the target \SI{1.47}{s} after the jump, without overshoot. The PID cascade: \SI{82.5}{cm}, overshoot \SI{20}{cm}, within \SI{5}{cm} after \SI{5.4}{s}. The neural policy is the fastest to rise (\SI{0.68}{s} from 10 to \SI{90}{\%}, against 0.80 for geometric with INDI) but overshoots by \SI{38}{cm} and never settles: \SI{87.9}{cm}.
+
+\textbf{Step 3 — the spread.} Seven of nine controllers lie within \SI{2}{cm} of each other (77.1 to \SI{78.8}{cm}). On a large step the tilt limit decides, not the controller.
+
+\textbf{Step 4 — read it.} A small difference in a column can be the whole story (the PID's \SI{5}{cm} more is four extra seconds of settling) or noise. Read the flights behind the numbers.
+\end{example}
+
+\begin{example}[Disturbances: measure, don't model]
+\label{ex:arena-dist}
+Read the columns Gusts, Payload and Broken prop.
+
+\textbf{Step 1 — the winners.} MPC with INDI wins all three: \SI{3.3}{cm} in the gusts, \SI{1.5}{cm} with the payload, \SI{0.4}{cm} with the broken prop. Geometric with INDI is next in each: 3.8, 2.4 and \SI{0.5}{cm}.
+
+\textbf{Step 2 — the force estimators.} L1 adaptive control and the learned residual model do well with gusts and payload (L1: 4.1 and \SI{2.7}{cm}) but not with the broken prop: 10.3 and \SI{10.2}{cm}, peaks of \SI{31}{cm}. In this arena they estimate a \emph{force} on the drone. A broken propeller is first a \emph{torque}: it rolls the drone, and the attitude loops underneath them are the ordinary cascade, which tilts by \SI{9}{\degree} before its integrals catch up. The INDI entries replace that inner loop too, with rate INDI (\lessonref{les:indi}), which measures the angular acceleration: \SI{2.4}{\degree} of tilt.
+
+\textbf{Step 3 — the rest.} Without any disturbance estimate, the geometric controller and MPC lose 22--\SI{24}{cm} with the payload, like the PID: an integral is an integral, whatever is built above it.
+
+\textbf{Step 4 — read it.} Against disturbances, what matters is not the outer controller but whether something in the loop \emph{measures} the disturbance, and at the right place — force or torque. That was the lesson of chapter~B.
+\end{example}
+
+\simfig{arena_payload}{Left: the payload scenario for five of the controllers. Those that estimate the disturbance (L1, INDI) hardly move; the others sag by 30--\SI{50}{cm} and recover with their integrals. A gust arrives about \SI{4}{s} after the payload. The policy starts \SI{20}{cm} off: its hover offset (\lessonref{les:policy}). Right: two seconds of total thrust in the noisy-sensor scenario.}{fig:arena-payload}
+
+\begin{example}[The figure-8: feedforward first]
+\label{ex:arena-eight}
+Explain the spread of the Figure-8 column, from \SI{0.3}{cm} to \SI{122}{cm}.
+
+\textbf{Step 1 — the PID.} \SI{121.7}{cm}: the cascade has no feedforward of the reference's acceleration, so it lags the path, by more than a metre here (\lessonref{les:flatness}).
+
+\textbf{Step 2 — the geometric controller.} With flatness feedforward, \SI{2.2}{cm}: the controller is told what acceleration and body rate the path needs before the error appears.
+
+\textbf{Step 3 — the best.} Adding INDI or L1 adaptive control removes what is left, the drag of the light turbulence: \SI{0.31}{cm} for both, a tie. MPC, which plans with a point-mass model, reaches 1.1 alone and \SI{0.6}{cm} with INDI.
+
+\textbf{Step 4 — the learned ones.} The neural policy, \SI{33.7}{cm}, saw figure-8s in training but optimised a cost dominated by target jumps; MPPI, \SI{15.1}{cm}, samples its inputs and never quite agrees with itself from one step to the next.
+\end{example}
+
+\begin{keyidea}[Each column rewards one idea of Part~II]
+The step rewards respecting the limits; the disturbances reward measuring the disturbance; the figure-8 rewards feedforward; the noisy sensors reward filtering; the motor column rewards doing little. A controller wins the columns whose idea it embodies.
+\end{keyidea}
+
+\section{The price columns}
+
+\begin{example}[Noise and the motors]
+\label{ex:arena-noise}
+Read the Noisy sensors column together with the motor jitter.
+
+\textbf{Step 1 — accuracy.} With noisy, delayed sensors MPC with INDI still wins, \SI{1.5}{cm}, then geometric with INDI \SI{1.9}{cm} and L1 \SI{2.1}{cm}; the PID \SI{15.8}{cm}.
+
+\textbf{Step 2 — what the motors pay.} In this scenario the RMS change of total thrust between \SI{5}{ms} samples is \SI{0.027}{N} for the PID, \SI{0.039}{N} for the geometric controller, \SI{0.045}{N} for geometric with INDI and \SI{0.060}{N} for MPC with INDI. The more accurate the controller, the harder it works the motors.
+
+\textbf{Step 3 — over all scenarios.} The PID has the calmest motors, \SI{0.011}{N}, and wins that column; MPC with INDI, the most accurate, has \SI{0.025}{N}; MPPI has \SI{0.318}{N}, thirty times the PID's, because each of its steps averages a fresh set of random samples (\cref{fig:arena-payload}, right).
+
+\textbf{Step 4 — read it.} Reacting quickly to a disturbance and ignoring sensor noise are opposite requests; \cref{thm:arena-st} below says why no controller can grant both at the same frequency. The PID's calm is the other side of its slowness.
+\end{example}
+\pitfall{A column that rewards doing little is easy to win by doing nothing. Never read the motor column without the accuracy columns beside it, nor the accuracy columns without the motors.}
+
+The third price is computing time. \texttt{make bench} measures it as wall-clock time per \SI{1}{ms} physics step, simulation included, so the numbers depend on the machine and on what else it is doing. On the machine that built this book (2~October~2026), every formula controller — PID, geometric, INDI, L1, learned residual, the neural policy — cost between 9.7 and \SI{10.5}{\micro s} per step, MPC 31 to \SI{33}{\micro s} and MPPI \SI{86}{\micro s}; the run recorded in \texttt{docs/arena.md} (28~September) gave 2.8 to 3.6, about 24 and \SI{74}{\micro s}. The formula controllers are indistinguishable behind the cost of the physics; the optimisers are three and eight times more expensive, and on a flight computer, where there is no physics to simulate, the ratio is larger.\innumbers{MPPI rolls out 256 sampled input sequences of 30 steps every \SI{20}{ms}: about \num{380000} model steps per second.}
+
+\section{What each family is best for}
+
+\begin{result}[Part II in one table]
+\small
+\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}p{6.6em}>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}X@{}}
+\textbf{Family} & \textbf{Best for, and why} & \textbf{Its price}\\[2pt]
+PID cascade & the default: no model, calm motors, easy to tune by hand (Part~I) & lags paths, slow on disturbances\\
+LQR, LQI, Kalman & choosing gains from a cost; fusing sensors (chapter~A) & a linear model near one operating point\\
+ADRC, INDI & disturbances and faults: they measure or estimate the total disturbance and cancel it (chapter~B) & a good accelerometer, fast actuators, busier motors\\
+Geometric + flatness & aggressive paths and large angles: exact on the rotation group, told the future by the reference (chapter~C) & needs a smooth, feasible reference\\
+MPC, MPPI, CBF & limits on inputs and states, written into the problem (chapter~D) & computation; a model; MPPI's noise\\
+L1, learned residual & a plant that changes: fast estimation behind a filter, or a model of the disturbance's shape (chapter~E) & a force estimate is not a torque estimate\\
+Neural policy & fast transients, cheap to run, problems too hard to model & no guarantees; offsets; unknown outside its data\\
+\end{tabularx}
+\end{result}
+
+The table is not a ranking. Modern flight stacks combine its rows: a planner or MPC on top, a geometric or flatness-based tracker in the middle, INDI underneath, a safety filter around the whole. The arena's two best entries are exactly such combinations, and the families that win nothing on their own — MPC alone, the learned residual — win as parts of something else. The altitude-only controllers of chapters~A and~B (LQR, LQI, ADRC) are not in the arena, which flies the full quadrotor; their lessons compared them on the altitude axis.\tip{Choose the simplest controller that meets the requirement, then add the piece that addresses the requirement it fails — a disturbance observer for the payload, feedforward for the path, a constraint for the ceiling.}
+
+\begin{inapp}
+\begin{itemize}[leftmargin=1.2em]
+  \item The lesson panel of II.21 runs the arena in the browser and fills the table as the flights finish.
+  \item The scenarios and entries are \texttt{SCENARIOS} and \texttt{ENTRIES} in \src{src/engine/arena.ts}; \texttt{runArena} flies one pair and measures it; \texttt{make bench} (\src{scripts/bench.ts}) prints the table, and \texttt{make bench} with \texttt{--write} updates \texttt{docs/arena.md}.
+  \item To add a controller to the arena, add an entry with its \texttt{setup}; to add a scenario, a \texttt{setup}, its events and the time from which it is scored.
+\end{itemize}
+\end{inapp}
+
+\begin{trythis}
+\begin{enumerate}
+  \item Run the arena in the app and find, for each column, the flight that explains its winner.
+  \item In any lesson, choose an outer stage and a compensation from the arena's list and fly Part~I's gust challenge with them. Does your combination beat the table?
+  \item In Lesson~II.7, weaken motor~2 with the geometric outer stage and L1 compensation, then with the inner stage set to INDI as well.
+\end{enumerate}
+\predict{which of the nine would win a scenario with a ceiling five centimetres above the hover point, and which would be the first to touch it?}
+\end{trythis}
+
+\section{The engineer's view: there is no best controller}
+
+\subsection{Many columns, many winners}
+A table with several columns has, in general, no best row. The careful comparisons of the research literature reach the same conclusion as this arena: nonlinear MPC and flatness-based control each win different regimes of agile flight, and an INDI inner loop makes both robust (Sun et al., 2022); learned policies win on transients and lose on steady-state precision against a well-tuned geometric controller (Kunapuli et al., 2025). The right question is not which controller is best, but which is best for a given set of weights on the columns — and that is a statement about the task, not the controller.
+
+\begin{example}[Weights decide]
+\label{ex:arena-weights}
+Two tasks weigh the columns differently. A camera drone filming in gusty weather counts the Gusts column and the motor jitter equally (in units of \SI{1}{cm} and \SI{0.01}{N}). A delivery drone counts only the Payload and Broken prop columns. Which entry wins each?
+
+\textbf{Step 1 — the camera drone,} score $=$ gusts [cm] $+$ jitter [\SI{0.01}{N}]: PID $22.2 + 1.1 = 23.3$; geometric $11.8 + 1.5 = 13.3$; geometric + INDI $3.8 + 2.1 = 5.9$; geometric + L1 $4.1 + 2.0 = 6.1$; MPC + INDI $3.3 + 2.5 = 5.8$.
+
+\textbf{Step 2 — the winner.} MPC with INDI, by a hair over geometric with INDI — and if computing time is counted too, geometric with INDI, at a third of the cost.
+
+\textbf{Step 3 — the delivery drone,} payload $+$ prop: MPC + INDI $1.5 + 0.4 = 1.9$; geometric + INDI $2.4 + 0.5 = 2.9$; L1 $2.7 + 10.3 = 13.0$; PID $24.8 + 27.1 = 51.9$.
+
+\textbf{Step 4 — read it.} The weights are a design decision. A different task, such as a toy that must be cheap to compute and gentle on its motors, would pick the PID.
+\end{example}
+
+\subsection{In formal terms}
+
+\begin{definition}{Pareto dominance}
+Entry $a$ \term{dominates} entry $b$ if $a$ is no worse than $b$ in every column and strictly better in at least one. An entry that no other dominates is \term{Pareto-optimal}.
+\end{definition}
+
+Over the six accuracy columns and the motor jitter, five of the nine entries are Pareto-optimal: the PID, geometric alone, geometric with INDI, geometric with L1 and MPC with INDI. Geometric with the learned residual is dominated by geometric with INDI; MPC alone by geometric with L1; the neural policy by three entries; MPPI by six.
+
+\begin{theorem}[Weighted sums pick Pareto-optimal entries]
+\label{thm:arena-pareto}
+Let each entry $a$ have column values $c_1(a), \dots, c_n(a)$, smaller being better, and let $w_1, \dots, w_n > 0$. Every entry that minimises $\sum_iw_ic_i(a)$ is Pareto-optimal. Conversely, a Pareto-optimal entry need not minimise any such sum.
+\end{theorem}
+\begin{proof}
+If $a^*$ minimises the sum and $b$ dominated it, then $c_i(b) \le c_i(a^*)$ for all $i$ with one strict inequality, so $\sum w_ic_i(b) < \sum w_ic_i(a^*)$ because every $w_i > 0$: a contradiction. For the converse take two columns and three entries with values $(0, 1)$, $(1, 0)$ and $(0.6, 0.6)$: all three are Pareto-optimal, but $0.6w_1 + 0.6w_2 > \min(w_2, w_1)$ for all positive weights, so the third never minimises a weighted sum.
+\end{proof}
+
+The converse is not a curiosity: a balanced, good-at-everything controller may lose every weighted contest to specialists, which is one reason why engineers state requirements as limits per column (\enquote{below \SI{5}{cm} and below \SI{0.03}{N}}) rather than as one score.
+
+\begin{theorem}[Disturbances and noise cannot both be rejected]
+\label{thm:arena-st}
+In a feedback loop with loop transfer function $L(s)$, a disturbance at the output is transmitted to the output through $S = 1/(1 + L)$ and the sensor noise through $T = L/(1 + L)$. At every frequency $S(j\omega) + T(j\omega) = 1$; in particular $|S| + |T| \ge 1$, and the two cannot both be small at the same frequency. If moreover $L$ is stable with at least two more poles than zeros, the closed loop is stable, then $\int_0^\infty\ln|S(j\omega)|\,\dd\omega = 0$ (Bode, 1945).
+\end{theorem}
+\begin{proof}
+$S + T = (1 + L)/(1 + L) = 1$, and $1 = |S + T| \le |S| + |T|$ by the triangle inequality. The integral relation is Bode's sensitivity integral; a proof by contour integration is in Doyle, Francis and Tannenbaum (1992, ch.~6).
+\end{proof}
+
+The theorem is Example~\ref{ex:arena-noise} in one line. INDI makes $|S|$ small over a wide band — it reacts to a measured acceleration within milliseconds — and therefore $|T|$ is close to one over the same band: the accelerometer's noise reaches the motors. The PID makes $|S|$ small only at low frequencies, and its motors are calm. Bode's integral adds that pushing $|S|$ down in one band pushes it up in another: sensitivity is conserved, not removed. Every controller of Part~II chooses where to spend it.
+
+\begin{lookahead}
+\begin{itemize}[leftmargin=1.2em]
+  \item Part~III makes the trade-offs of this lesson exact: robustness margins, the sensitivity functions and their limits, loop shaping, and $\mu$ analysis, in the frequency domain that Part~II has mostly avoided.
+  \item Part~IV turns optimisation into a theory — dynamic programming, the maximum principle, and reinforcement learning as their sampled form.
+  \item Part~V carries the families of this volume from a drone to aircraft and spacecraft, where the choice among them is made under certification.
+\end{itemize}
+\end{lookahead}
+
+\begin{remember}
+\begin{itemize}
+  \item Nine L3 controllers, six seeded scenarios: no controller wins every column. MPC + INDI wins four scenarios, geometric + INDI the step, geometric + L1 ties on the figure-8, the PID the motor column.
+  \item Against disturbances, what matters is whether something measures them, at the right place: a broken prop is a torque, which force estimators above an ordinary attitude loop do not see.
+  \item On paths, feedforward from a smooth reference matters most: \SI{122}{cm} without it, \SI{2.2}{cm} with it, \SI{0.3}{cm} with a disturbance estimate added.
+  \item Accuracy costs motor work, since $S + T = 1$; the PID's calm is its slowness.
+  \item Five of nine entries are Pareto-optimal; which one is best depends on the weights, and the weights come from the task.
+\end{itemize}
+\end{remember}
+
+\begin{curiosity}{Two hundred kilometres of desert}
+\photo{stanley}{Stanley, the robot car that won the 2005 DARPA Grand Challenge, on a tow truck between two Smithsonian museums in Washington, 2012.}
+In March 2004 the American defence research agency DARPA offered a million dollars to any driverless vehicle that could cover a course of about \SI{240}{km} through the Mojave Desert. None came close: the vehicle that went farthest stopped after less than \SI{12}{km}. Eighteen months later, on 8~October 2005, the race was run again over \SI{212}{km}, and five vehicles finished. The first, in just under seven hours, was Stanley, a modified Volkswagen Touareg built by a team from Stanford University led by Sebastian Thrun (Thrun et al., 2006).
+
+Stanley was a grand comparison in one car. Where the world was too varied to be described by hand — telling a drivable road from desert in a camera image — it learned: the lasers labelled the ground just ahead as drivable or not, and that labelling trained the camera's classifier to see the road far ahead, so that the car could drive fast where the road was clear. Where a guarantee was wanted, it did not: the steering followed the planned path with a short feedback law derived from the geometry of the car, and the speed was reduced wherever the terrain was rough or the road ahead unclear. Learning where modelling was hopeless, classical control where precision and predictability mattered.
+
+That is the lesson of this volume, in a car rather than a drone: the question is never which method is best, but which is best for each part of the problem, and why.
+\end{curiosity}
+
+\begin{exercises}
+\exercise[1] Which entries does the figure-8 column separate by more than a factor of ten, and what single idea of Part~II explains the gap?
+\answer{The PID (\SI{122}{cm}) from the geometric controller with feedforward (\SI{2.2}{cm}); feedforward of the reference's acceleration and jerk (Lesson~II.11).}
+\exercise[1] Why do seven of the nine controllers score within \SI{2}{cm} of each other on the step?
+\answer{On a \SI{3}{m} step the tilt limit sets the fastest possible move; the error in the first second dominates the RMS, and it is the same for every controller that uses the full tilt.}
+\exercise[1] What would happen to the motor-jitter ranking if the jitter were measured in calm air only?
+\answer{The noise and gust scenarios contribute most of the jitter of the disturbance-measuring controllers; in calm air (step, broken prop) the differences shrink, but MPPI's sampling noise remains.}
+\exercise[2]\exkind{derive} With the arena's numbers, find a weighting of the Gusts column and the motor jitter (in units of \SI{1}{cm} and \SI{0.01}{N}) for which the PID beats geometric with INDI.
+\answer{PID: $22.2w_1 + 1.1w_2$; geometric + INDI: $3.8w_1 + 2.1w_2$. The PID wins when $18.4w_1 < 1.0w_2$, i.e.\ when \SI{0.01}{N} of jitter is worth more than \SI{18.4}{cm} of error.}
+\exercise[2]\exkind{derive} Show that if every column is scaled by a positive factor, the set of Pareto-optimal entries does not change, but the minimiser of a weighted sum may.
+\answer{Dominance compares columns one at a time, and positive scaling preserves every inequality. A weighted sum with scaled columns is a weighted sum with different weights, whose minimiser may be another Pareto-optimal entry.}
+\exercise[2]\exkind{derive} For $L(s) = \omega_c/s$, compute $|S(j\omega)|$ and $|T(j\omega)|$, and find the frequency at which they are equal. What does $\omega_c$ trade?
+\answer{$S = s/(s + \omega_c)$, $T = \omega_c/(s + \omega_c)$; $|S| = \omega/\sqrt{\omega^2 + \omega_c^2}$, $|T| = \omega_c/\sqrt{\omega^2 + \omega_c^2}$, equal at $\omega = \omega_c$ (both $1/\sqrt2$). A larger $\omega_c$ rejects disturbances up to higher frequencies and passes noise up to the same frequencies.}
+\exercise[2]\exkind{fly} In an L3 lesson, choose the geometric outer stage with L1 adaptive compensation, add \SI{300}{g} to the drone's mass while it hovers, and repeat with the filter $C(s)$ lowered from \SI{5}{Hz} to \SI{1}{Hz}. How do the error and the thrust change?
+\answer{The thrust becomes calmer and the error after the payload larger and slower to vanish: the bandwidth of the estimate trades disturbance rejection against noise, as in Lesson~II.18 and \cref{thm:arena-st}.}
+\exercise[2]\exkind{fly} In an L3 lesson, set the sensors as in the noisy-sensor scenario and fly with the MPPI outer stage, then with MPC. Watch the thrust. Where does MPPI's jitter come from, and what setting of MPPI would reduce it?
+\answer{From the random samples: each step averages a fresh set of sampled sequences, so the first input changes randomly from step to step. More samples or a lower sampling variance (or a smoothing of the command) reduce it, at the price of computation or of exploration.}
+\exercise[2]\exkind{code} Add a seventh scenario to \texttt{SCENARIOS} in \src{src/engine/arena.ts}: the figure-8 with the mass raised to \SI{1.3}{kg} at \SI{20}{s}. Run \texttt{make bench} and report which entries change rank.
+\answer{An open experiment. Expect the entries without a disturbance estimate (PID, geometric, MPC, the policy) to lose the most, and those with INDI or L1 to change little.}
+\exercise[2]\exkind{code} \texttt{winners} in \src{src/engine/arena.ts} picks the best entry by RMS. Write a function that returns the Pareto-optimal entries over all the columns, and check it against this lesson's list.
+\answer{For each entry, test whether any other entry is $\le$ in every column and $<$ in one; return the entries for which none is. Over the six scenarios and the jitter: PID, geometric, geometric + INDI, geometric + L1, MPC + INDI.}
+\exercise[3]\exkind{derive} The broken prop. A torque disturbance $\tau_d$ acts on the roll axis, $J\dot\omega = \tau + \tau_d$, under a PI rate loop $\tau = -k_p\omega - k_i\int\omega$. Show that the steady state has $\omega = 0$ and find the peak response to a step in $\tau_d$ for $k_i \to 0$. Why does an outer-loop force estimator not help until the drone has tilted?
+\answer{At steady state $\dot\omega = 0$ and $\int\omega$ settles at $\tau_d/k_i$, with $\omega = 0$. For $k_i \to 0$ the rate settles at $-\tau_d/k_p$ — a constant roll rate, a growing tilt — until the integral acts. A force estimator only sees the consequence, a horizontal force from the tilted thrust, after the tilt has built up; INDI on the rate loop measures $\dot\omega$ directly and cancels $\tau_d$ within milliseconds.}
+\end{exercises}

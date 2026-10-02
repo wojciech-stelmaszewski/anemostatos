@@ -65,6 +65,9 @@ PHOTOS = {
     "ingenuity-shadow": "File:Ingenuity's First Black-and-White Image From the Air.jpg",
     "ingenuity-wright": "File:PIA24438-MarsIngenuityHelicopter-WrightBros1stPlaneSwatch-20210406.jpg",
     "ingenuity-blade": "File:PIA26243-MarsIngenuity-DamagedRotorBladeShadow-20240118.jpg",
+    "albatross": "File:Wandering Albatross- east of the Tasman Peninsula.jpg",
+    "navlab": "File:Navlab-1-5-autonomous-vehicles.jpg",
+    "stanley": "File:AutonomousVehicles2.jpg",
 }
 
 # Fractions to trim (left, top, right, bottom): scan borders and printed captions.

@@ -173,14 +173,14 @@ and completes the subject, and otherwise with the volume that needs it.
 
 | Appendix | Content                                                                             | First needed | Volume | Grows with                                |
 | -------- | ----------------------------------------------------------------------------------- | ------------ | ------ | ----------------------------------------- |
-| A        | Linear differential equations, state space, the matrix exponential                  | lesson 2     | 1      | —                                         |
-| B        | Polynomials and stability: Routh–Hurwitz, root-locus rules                          | lesson 5     | 1      | —                                         |
-| C        | Complex numbers, Fourier series, the Laplace transform, transfer functions, Nyquist | lesson 8     | 1      | Bode relations (III.5)                    |
-| D        | Sampling and the z-transform                                                        | lesson 9     | 1      | multirate loops (III.18)                  |
-| E        | Probability, random processes, spectra, least squares                               | lesson 8     | 1      | Bayesian estimation (III.24, IV.27–IV.29) |
-| F        | Numerical methods                                                                   | lesson 1     | 1      | collocation (IV.6), fixed point (V.3)     |
-| G        | Stability of nonlinear systems: Lyapunov, invariance, time scales                   | lesson 2     | 1      | describing function (III.8)               |
-| H        | Rotations and quaternions                                                           | lesson 12    | 1      | the error state of the MEKF (III.23)      |
+| A        | Linear differential equations, state space, the matrix exponential                  | lesson I.2   | 1      | —                                         |
+| B        | Polynomials and stability: Routh–Hurwitz, root-locus rules                          | lesson I.5   | 1      | —                                         |
+| C        | Complex numbers, Fourier series, the Laplace transform, transfer functions, Nyquist | lesson I.8   | 1      | Bode relations (III.5)                    |
+| D        | Sampling and the z-transform                                                        | lesson I.9   | 1      | multirate loops (III.18)                  |
+| E        | Probability, random processes, spectra, least squares                               | lesson I.8   | 1      | Bayesian estimation (III.24, IV.27–IV.29) |
+| F        | Numerical methods                                                                   | lesson I.1   | 1      | collocation (IV.6), fixed point (V.3)     |
+| G        | Stability of nonlinear systems: Lyapunov, invariance, time scales                   | lesson I.2   | 1      | describing function (III.8)               |
+| H        | Rotations and quaternions                                                           | lesson I.12  | 1      | the error state of the MEKF (III.23)      |
 | I        | Linear algebra: singular values, positive definiteness, the Riccati equation        | II.2         | 1      | — (written with Part II)                  |
 | J        | Optimisation: convexity, KKT conditions, quadratic and cone programs                | II.13        | 1      | — (written with Part II)                  |
 | K        | Norms of signals and systems                                                        | III.11       | 2      | —                                         |
@@ -189,12 +189,12 @@ and completes the subject, and otherwise with the volume that needs it.
 ### 5.3 State of volume 1, verified 2026-09-30
 
 First checked on the build of commit `8e1df9c` (127 pages): the sources,
-the build log and the rendered pages. Lessons 1–4 were then rebuilt to the
-full standard of §4, and lessons 5–14 after them; Part I is complete and
+the build log and the rendered pages. Lessons I.1–I.4 were then rebuilt to the
+full standard of §4, and lessons I.5–I.14 after them; Part I is complete and
 the book now has 288 pages with the toolbox.
 
 **What is good.** The design system is consistent and carries the app's
-colours. Chapter 0 and the Prelude are complete. Lessons 1–4 meet the
+colours. Chapter 0 and the Prelude are complete. Lessons I.1–I.4 meet the
 whole standard of §4 and are the model for the rest: five or six worked
 examples and eleven to thirteen exercises each (labelled `derive`, `fly`,
 `code`), a figure that draws each prediction over the simulator's flight,
@@ -206,18 +206,18 @@ eleven seconds.
 
 **What is missing or wrong.**
 
-| #   | Finding                                                                                                                                                                                                                                     | State                                               |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
-| 1   | Lessons 5–14 had no worked example and three to five exercises each, over five to seven pages. They did not meet §4.                                                                                                                        | fixed (rewritten to the level of 1–4)               |
-| 2   | Part II is a title page followed by nothing; its five chapter files are stubs. The cover promises thirty-five lessons.                                                                                                                      | open: 21 chapters to write                          |
-| 3   | The mathematical toolbox and the app map were stubs. Appendices A–H are written (about 80 pages, `book/back/toolbox/`); I and J follow with Part II, and the app map is still a stub. The remaining "??" are references to Part II lessons. | open: appendices I, J and the app map               |
-| 4   | The check marks of the _What to remember_ boxes were missing: the math font has no such glyph.                                                                                                                                              | fixed (drawn with TikZ)                             |
-| 5   | `main.tex` and `scripts/book-data.ts` referred to `make book`, `make book-data` and `book/README.md`, none of which existed.                                                                                                                | fixed (three make targets, the README)              |
-| 6   | The imprint named a script `book/tools/figures` that does not exist.                                                                                                                                                                        | fixed                                               |
-| 7   | No author, editor or credit anywhere in the book.                                                                                                                                                                                           | fixed (title page, imprint, colophon)               |
-| 8   | The field map of Chapter 0 listed Bode, Nyquist, root locus, Lyapunov, Pontryagin, dynamic programming and H∞ against Parts I–II, which do not teach them.                                                                                  | fixed (the map names the part that does)            |
-| 9   | Chapter 0 and the preface described a two-part course.                                                                                                                                                                                      | fixed (they describe the five parts)                |
-| 10  | Four lines were too wide by 3–11 pt (lessons 2 and 4, the motor figure).                                                                                                                                                                    | fixed in lessons 1–4; three lines under 3 pt remain |
+| #   | Finding                                                                                                                                                                                                                                     | State                                                   |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| 1   | Lessons I.5–I.14 had no worked example and three to five exercises each, over five to seven pages. They did not meet §4.                                                                                                                    | fixed (rewritten to the level of 1–4)                   |
+| 2   | Part II is a title page followed by nothing; its five chapter files are stubs. The cover promises thirty-five lessons.                                                                                                                      | open: 21 chapters to write                              |
+| 3   | The mathematical toolbox and the app map were stubs. Appendices A–H are written (about 80 pages, `book/back/toolbox/`); I and J follow with Part II, and the app map is still a stub. The remaining "??" are references to Part II lessons. | open: appendices I, J and the app map                   |
+| 4   | The check marks of the _What to remember_ boxes were missing: the math font has no such glyph.                                                                                                                                              | fixed (drawn with TikZ)                                 |
+| 5   | `main.tex` and `scripts/book-data.ts` referred to `make book`, `make book-data` and `book/README.md`, none of which existed.                                                                                                                | fixed (three make targets, the README)                  |
+| 6   | The imprint named a script `book/tools/figures` that does not exist.                                                                                                                                                                        | fixed                                                   |
+| 7   | No author, editor or credit anywhere in the book.                                                                                                                                                                                           | fixed (title page, imprint, colophon)                   |
+| 8   | The field map of Chapter 0 listed Bode, Nyquist, root locus, Lyapunov, Pontryagin, dynamic programming and H∞ against Parts I–II, which do not teach them.                                                                                  | fixed (the map names the part that does)                |
+| 9   | Chapter 0 and the preface described a two-part course.                                                                                                                                                                                      | fixed (they describe the five parts)                    |
+| 10  | Four lines were too wide by 3–11 pt (lessons I.2 and I.4, the motor figure).                                                                                                                                                                | fixed in lessons I.1–I.4; three lines under 3 pt remain |
 
 Findings 1–3 are writing work and belong to the book's own schedule.
 
@@ -226,7 +226,7 @@ Findings 1–3 are writing work and belong to the book's own schedule.
 1. **M13 and the must lessons of Part III** in the app
    ([analysis.md](analysis.md) §5). Everything later uses its charts and
    its Monte Carlo runner.
-2. **Volume 1 of the book to the standard of §4**: lessons 5–14, Part II,
+2. **Volume 1 of the book to the standard of §4**: lessons I.5–I.14, Part II,
    appendices A–J (A–H first, I and J with Part II).
 3. **The rest of Part III**, then volume 2.
 4. **M19, the vehicle abstraction**, then the must lessons of Part IV,

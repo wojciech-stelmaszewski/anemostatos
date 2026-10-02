@@ -4,7 +4,7 @@
 > Measured arena results: [arena.md](arena.md).
 > Milestones in [roadmap.md](roadmap.md) point here.
 
-Part I (lessons 1–14) teaches PID from first principles up to the full
+Part I (lessons I.1–I.14) teaches PID from first principles up to the full
 quadrotor cascade. Part II answers the question every student asks next:
 **"what do people actually fly today, and why?"** It adds the controller
 families that dominate current research and advanced autopilots, each one

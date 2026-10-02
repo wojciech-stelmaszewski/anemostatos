@@ -1,7 +1,7 @@
 \toolchapter{B}{Polynomials and stability}{Whether the roots lie in the left half-plane can be read from the coefficients. Where they go when a gain changes can be sketched without solving anything.}
 \label{app:routh}
 
-\lead{\usedcard{\setuprow{Lesson 2}{a missing coefficient means instability}\setuprow{Lessons 5, 10}{the largest stable $K_i$ and $K_p$}\setuprow{Lesson 14}{the edge of a fourth-order chain}\setuprow{Lessons 4, 5, 10}{paths of the poles}\setuprow{Part III}{the root locus as a live chart (III.2)}}%
+\lead{\usedcard{\setuprow{Lesson I.2}{a missing coefficient means instability}\setuprow{Lessons I.5, I.10}{the largest stable $K_i$ and $K_p$}\setuprow{Lesson I.14}{the edge of a fourth-order chain}\setuprow{Lessons I.4, I.5, I.10}{paths of the poles}\setuprow{Part III}{the root locus as a live chart (III.2)}}%
 A linear loop is stable exactly when all roots of its characteristic polynomial have negative real parts (\cref{thm:spring-linear}). Computing the roots of a cubic or a quartic by hand is tedious, and with a gain left as a symbol it is hopeless. The two tools of this appendix avoid it. The Routh–Hurwitz criterion decides stability from the coefficients, with symbols allowed. The root locus shows how the roots move as one gain grows.}
 
 \section{Roots and coefficients}
@@ -78,7 +78,7 @@ Each entry is a $2 \times 2$ cross product of the first column of the two rows a
 If no entry of the first column of the array \eqref{eq:B-array} is zero, the number of roots with positive real parts equals the number of changes of sign down the first column. In particular the polynomial is Hurwitz if and only if all entries of the first column have the same sign. (Routh, 1877; Gantmacher, 1959, ch.~XV.)
 \end{theorem}
 
-\begin{example}[The cascade of Lesson 14, by the array]
+\begin{example}[The cascade of Lesson I.14, by the array]
 \label{ex:B-array}
 The chain of three loops with the velocity integral has the characteristic polynomial $s^4 + K s^3 + 2.2K s^2 + 3.24K s + 0.72K$ (\cref{eq:inv-quartic}, $K = K_{att}$). Test it for $K = 3$ and $K = 1.5$.
 

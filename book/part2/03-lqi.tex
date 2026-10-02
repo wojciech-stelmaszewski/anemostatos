@@ -2,7 +2,7 @@
 \label{les:lqi}
 
 \lead{\setupcard{\setuprow{Level}{L1}\setuprow{Controller}{the LQR of Lesson~II.2, $q_e = 100$, $q_v = 10$, $r = 1$}\setuprow{Model}{$\hat m = \SI{0.8}{kg}$ for a drone of \SI{1}{kg}}\setuprow{Event}{at $t = \SI{15}{s}$ the setpoint steps from \SI{2}{m} to \SI{3}{m}}\setuprow{Goal}{steady-state error below \SI{1}{cm}, with the model still wrong}}%
-The LQR of the previous lesson was derived for a model, and the model in this lesson is wrong: it believes the drone weighs \SI{0.8}{kg}. The feedforward is two newtons short, and the optimal controller does what the P controller of Lesson~3 did — it hangs twenty centimetres low and stays there. The cure is the same idea as Part~I's integral term, done the way of Part~II: make the accumulated error a state, give it a price, and let the Riccati equation choose its gain together with the others.}
+The LQR of the previous lesson was derived for a model, and the model in this lesson is wrong: it believes the drone weighs \SI{0.8}{kg}. The feedforward is two newtons short, and the optimal controller does what the P controller of Lesson~I.3 did — it hangs twenty centimetres low and stays there. The cure is the same idea as Part~I's integral term, done the way of Part~II: make the accumulated error a state, give it a price, and let the Riccati equation choose its gain together with the others.}
 
 \section{Optimal for the wrong drone}
 

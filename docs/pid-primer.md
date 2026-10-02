@@ -127,7 +127,7 @@ Two cures, both available as toggles:
 
 ### 4.1 Why the integral always overshoots here
 
-A surprising but important fact, visible in lesson 5: with an I term, a step
+A surprising but important fact, visible in lesson I.5: with an I term, a step
 response of the altitude loop **must** overshoot. At steady state the
 integral has to hold the same value as before the step (the load has not
 changed), so over the whole response
@@ -249,7 +249,7 @@ constant_.
 
 Z–N assumes a plant that is stable on its own (a heater, a tank). A
 hovering drone is a **double integrator**: under P alone it oscillates at
-_every_ gain (lesson 2), so there is no clean ultimate gain — the recipe does
+_every_ gain (lesson I.2), so there is no clean ultimate gain — the recipe does
 not apply directly. A good lesson about why heuristics come with
 assumptions.
 

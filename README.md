@@ -83,7 +83,7 @@ motor lag.
 
 ![Windup: ghost run without anti-windup versus a run with conditional integration](docs/images/windup-charts.png)
 
-<sub>Lesson 6. The motors are weak (12 N for a 9.81 N drone) and the setpoint jumps from 2 m to 6 m. The <b>grey ghost</b> is the run without anti-windup: during the saturated climb the integral winds up and the drone overshoots. The <b>blue</b> run uses conditional integration and arrives cleanly on the same seeded wind.</sub>
+<sub>Lesson I.6. The motors are weak (12 N for a 9.81 N drone) and the setpoint jumps from 2 m to 6 m. The <b>grey ghost</b> is the run without anti-windup: during the saturated climb the integral winds up and the drone overshoots. The <b>blue</b> run uses conditional integration and arrives cleanly on the same seeded wind.</sub>
 
 ### The full cascade
 
@@ -93,22 +93,22 @@ motor lag.
 
 ## The lessons
 
-| #   | Lesson                 | Level | What you learn                                                         |
-| --- | ---------------------- | ----- | ---------------------------------------------------------------------- |
-| 1   | Meet the loop          | L1    | setpoint, measurement, error, output; what happens without feedback    |
-| 2   | Just a spring          | L1    | P alone is a spring and it oscillates forever: ωₙ = √(Kp/m)            |
-| 3   | The gravity droop      | L1    | without feedforward or I, P leaves an error e = mg/Kp                  |
-| 4   | Add a damper           | L1    | D as a shock absorber; critical damping (goal: < 2 % overshoot)        |
-| 5   | Integral to the rescue | L1    | I removes steady-state error, and why it _must_ overshoot              |
-| 6   | Windup                 | L1    | saturation + integral = overshoot; anti-windup strategies compared     |
-| 7   | Derivative kick        | L1    | D on error vs D on measurement                                         |
-| 8   | Noisy sensor           | L1    | D amplifies noise; the filter trade-off                                |
-| 9   | Too slow to react      | L1    | sampling rate and delay eat stability                                  |
-| 10  | Find the edge          | L1    | stability limits, and why Ziegler–Nichols doesn't fit a hovering drone |
-| 11  | Gust challenge         | L1    | beat the default tune on identical wind                                |
-| 12  | Why drones tilt        | L2    | independent axis PIDs; the I term holding a steady wind                |
-| 13  | The cascade            | L3    | nested loops, each one's output is the next one's setpoint             |
-| 14  | Cascade inversion      | L3    | inner loops must be faster than outer ones                             |
+| #    | Lesson                 | Level | What you learn                                                         |
+| ---- | ---------------------- | ----- | ---------------------------------------------------------------------- |
+| I.1  | Meet the loop          | L1    | setpoint, measurement, error, output; what happens without feedback    |
+| I.2  | Just a spring          | L1    | P alone is a spring and it oscillates forever: ωₙ = √(Kp/m)            |
+| I.3  | The gravity droop      | L1    | without feedforward or I, P leaves an error e = mg/Kp                  |
+| I.4  | Add a damper           | L1    | D as a shock absorber; critical damping (goal: < 2 % overshoot)        |
+| I.5  | Integral to the rescue | L1    | I removes steady-state error, and why it _must_ overshoot              |
+| I.6  | Windup                 | L1    | saturation + integral = overshoot; anti-windup strategies compared     |
+| I.7  | Derivative kick        | L1    | D on error vs D on measurement                                         |
+| I.8  | Noisy sensor           | L1    | D amplifies noise; the filter trade-off                                |
+| I.9  | Too slow to react      | L1    | sampling rate and delay eat stability                                  |
+| I.10 | Find the edge          | L1    | stability limits, and why Ziegler–Nichols doesn't fit a hovering drone |
+| I.11 | Gust challenge         | L1    | beat the default tune on identical wind                                |
+| I.12 | Why drones tilt        | L2    | independent axis PIDs; the I term holding a steady wind                |
+| I.13 | The cascade            | L3    | nested loops, each one's output is the next one's setpoint             |
+| I.14 | Cascade inversion      | L3    | inner loops must be faster than outer ones                             |
 
 **Part II — Beyond PID** (the second semester; research and plan in [docs/beyond-pid.md](docs/beyond-pid.md), measured comparison in [docs/arena.md](docs/arena.md)):
 

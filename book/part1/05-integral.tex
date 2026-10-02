@@ -1,4 +1,4 @@
-\lesson{5}{Integral to the rescue}{A term that remembers every error — and therefore can only rest when there is none.}{1}{integral}{Part I · PID}
+\lesson{I.5}{Integral to the rescue}{A term that remembers every error — and therefore can only rest when there is none.}{1}{integral}{Part I · PID}
 \label{les:integral}
 
 \lead{\setupcard{\setuprow{Level}{L1}\setuprow{Drone}{\SI{1.4}{kg}, while the controller assumes \SI{1}{kg}}\setuprow{Controller}{P, D and feedforward; I starts off}\setuprow{Goal}{steady-state error below \SI{1}{cm}}}%
@@ -284,7 +284,7 @@ The Navy did not adopt it then; helmsmen were cheap and the equipment was not. B
 \answer{$\int_0^{t_1} e\,\dd t = \sum_i c_i(e^{s_it_1} - 1)/s_i = \SI{0.574}{m.s}$; the flight has \SI{0.580}{m.s}. The negative part is then $-0.574$ by the area rule.}
 \exercise[2]\exkind{derive} In Example~\ref{ex:integral-cruise} the car's speed controller is PI on a first-order plant. Show that it is stable for all positive gains, find $K_i$ for $\zeta = 0.7$ with $K_p = 800$, and the overshoot in speed after a setpoint change of \SI{10}{km/h}, if the P term acts on the error.
 \answer{$ms^2 + K_ps + K_i$: positive coefficients, stable (\cref{thm:spring-routh}\,(i)). $K_i = K_p^2/(4\zeta^2m) = \SI{218}{N/m}$. The closed loop from setpoint has a zero at $-K_i/K_p$, so the overshoot is larger than the 4.6\,\% of \cref{eq:damper-mp}; solving the step response gives about 21\,\%, i.e.\ \SI{2.1}{km/h}.}
-\exercise[2]\exkind{fly} In Lesson~5 switch the integral on with $K_i = 5$, wait until the error is below \SI{1}{cm}, and press \key{Snapshot}. Then set $K_i = 45$ and reset. Read the period of the ringing from the chart and the ratio of two successive peaks, and compare with Example~\ref{ex:integral-limit}. Finally set \ui{Physics\then Mass} to \SI{1}{kg}: where is the limit now?
+\exercise[2]\exkind{fly} In Lesson~I.5 switch the integral on with $K_i = 5$, wait until the error is below \SI{1}{cm}, and press \key{Snapshot}. Then set $K_i = 45$ and reset. Read the period of the ringing from the chart and the ratio of two successive peaks, and compare with Example~\ref{ex:integral-limit}. Finally set \ui{Physics\then Mass} to \SI{1}{kg}: where is the limit now?
 \answer{Period about \SI{2.4}{s}, peak ratio about 0.87. With $m = 1$ the limit is 70.}
 \exercise[2]\exkind{code} In \src{src/control/pid.ts} the integral is stored already multiplied by $K_i$ (\texttt{this.integral += g.ki * error * dt}). Rewrite it to store $\int e\,\dd t$ and multiply by $K_i$ when the output is formed. Predict what the thrust does when $K_i$ is changed from 0.8 to 5 in the hover of this lesson (integral at \SI{3.92}{N}), then try it. Which of the tests in \texttt{tests/pid.test.ts} notices?
 \answer{The stored sum is $3.92/0.8 = \SI{4.9}{m.s}$; multiplied by the new gain it gives \SI{24.5}{N} at once — a jump of \SI{20.6}{N} that throws the drone upwards. The test of bumpless gain changes fails.}

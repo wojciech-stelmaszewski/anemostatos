@@ -1,8 +1,8 @@
-\lesson{4}{Add a damper}{A force against velocity drains the energy the spring cannot — and one number, ζ, says how much.}{1}{damper}{Part I · PID}
+\lesson{I.4}{Add a damper}{A force against velocity drains the energy the spring cannot — and one number, ζ, says how much.}{1}{damper}{Part I · PID}
 \label{les:damper}
 
 \lead{\setupcard{\setuprow{Level}{L1}\setuprow{Controller}{P, D and feedforward; I is off; $K_d$ starts at 0.8}\setuprow{Setpoint}{a square wave between \SI{1.5}{m} and \SI{2.5}{m}, a step every \SI{4}{s}}\setuprow{Goal}{overshoot below 2\,\%, settling within \SI{2.5}{s}}}%
-Lesson 2 left us with a drone that bounced forever. The cure is the third letter of PID. The derivative term looks at how fast the error is changing and pushes against it — the shock absorber to the proportional spring. In this lesson we solve the damped equation completely, derive the formulas that engineers use to tune it, and check every one of them against the simulator.}
+Lesson I.2 left us with a drone that bounced forever. The cure is the third letter of PID. The derivative term looks at how fast the error is changing and pushes against it — the shock absorber to the proportional spring. In this lesson we solve the damped equation completely, derive the formulas that engineers use to tune it, and check every one of them against the simulator.}
 
 \section{The derivative term is a damper}
 
@@ -213,7 +213,7 @@ A setpoint step must settle within \SI{1}{s} with at most 5\,\% overshoot. Find 
 
 The default tune of Anemostatos, $K_d = 7$, is $\zeta = 1.11$: slightly overdamped, deliberately, because the integral term — next lesson — adds some overshoot of its own.
 
-\screen[0 0 495 998]{damper}{Lesson 4 in the app, with $K_d = 0.8$: a ringing square-wave response. The info card (right) says \enquote{underdamped — overshoots} and computes $\zeta$ from the gains; the tracking chart marks the peak and the settling point.}{fig:damper-screen}
+\screen[0 0 495 998]{damper}{Lesson I.4 in the app, with $K_d = 0.8$: a ringing square-wave response. The info card (right) says \enquote{underdamped — overshoots} and computes $\zeta$ from the gains; the tracking chart marks the peak and the settling point.}{fig:damper-screen}
 
 \begin{inapp}[Step metrics and the goal]
 \begin{itemize}[leftmargin=1.2em]
@@ -369,7 +369,7 @@ Your car contains four much smaller dampers doing the same job. Car suspensions 
 \answer{$V = \tfrac12 m\dot x^2 + \tfrac12 K_p x^2 + \tfrac14 k_3 x^4$: positive except at the origin, and $\dot V = \dot x(m\ddot x + K_p x + k_3x^3) = -K_d\dot x^2$. $\dot V = 0$ only at $\dot x = 0$, where the spring force is non-zero unless $x = 0$.}
 \exercise[2]\exkind{derive} Give the satellite of Example~\ref{ex:spring-sat} ($J = \SI{12}{kg.m^2}$, $K_p = \SI{0.3}{N.m/rad}$) a rate feedback $-K_d\dot\theta$. Which $K_d$ gives $\zeta = 0.7$, and how long does a pointing error then take to settle?
 \answer{$K_d = 2\zeta\sqrt{K_pJ} = 1.4\sqrt{3.6} = \SI{2.66}{N.m.s/rad}$; $t_s \approx 4/(\zeta\omega_n) = 4/(0.7\cdot0.158) = \SI{36}{s}$.}
-\exercise[2]\exkind{fly} Fly Example~\ref{ex:damper-spec}. In Lesson~4 set $K_p = 33.6$ and $K_d = 8$. The square wave makes steps of \SI{1}{m}: read the overshoot and the settling time from the step metrics and watch the thrust chart for the red shading of saturation. Then set the amplitude of the square wave to \SI{0.2}{m}, which makes steps of \SI{0.4}{m}, and compare. Finally find, by trial, the largest step that shows no red at all, and compare it with Step~4 of the example.
+\exercise[2]\exkind{fly} Fly Example~\ref{ex:damper-spec}. In Lesson~I.4 set $K_p = 33.6$ and $K_d = 8$. The square wave makes steps of \SI{1}{m}: read the overshoot and the settling time from the step metrics and watch the thrust chart for the red shading of saturation. Then set the amplitude of the square wave to \SI{0.2}{m}, which makes steps of \SI{0.4}{m}, and compare. Finally find, by trial, the largest step that shows no red at all, and compare it with Step~4 of the example.
 \answer{About 2\,\% and \SI{0.86}{s} for the large step, 3\,\% and \SI{0.83}{s} for the small one. The red shading first appears at a step of about \SI{0.43}{m}, as Step~4 predicts.}
 \exercise[2]\exkind{code} In \src{src/engine/metrics.ts} the function \texttt{analyzeLastStep} has a parameter \texttt{band} with the default 0.02. Use the envelope argument behind \cref{eq:damper-ts} to predict the settling time of the $K_d = 3$ loop for a band of 5\,\%. Change the default, fly the lesson and compare. Then run \texttt{make test}: which expectations depended on the 2\,\% definition?
 \answer{$e^{-\zeta\omega_n t} = 0.05$ gives $t_s \approx 3/(\zeta\omega_n) = 3/1.5 = \SI{2.0}{s}$ instead of \SI{2.7}{s}. The tests of \texttt{tests/metrics.test.ts} that assert settling times, and the lesson goals that use them, are the ones to check.}

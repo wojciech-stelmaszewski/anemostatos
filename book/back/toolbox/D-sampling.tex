@@ -1,7 +1,7 @@
 \toolchapter{D}{Sampling and the z-transform}{A computer sees the world as a list of numbers. The same ideas — poles, transfer functions, stability — with $z$ in place of $s$ and a circle in place of a half-plane.}
 \label{app:sampling}
 
-\lead{\usedcard{\setuprow{Lesson 1}{the PID as a recursion}\setuprow{Lessons 7, 8}{the D filter, sample by sample}\setuprow{Lesson 9}{sample and hold, the sampled loop}\setuprow{Lesson 11}{the exact step of the turbulence}\setuprow{Part III}{the z-plane (III.18), aliasing and notch filters (III.20, III.21)}}%
+\lead{\usedcard{\setuprow{Lesson I.1}{the PID as a recursion}\setuprow{Lessons I.7, I.8}{the D filter, sample by sample}\setuprow{Lesson I.9}{sample and hold, the sampled loop}\setuprow{Lesson I.11}{the exact step of the turbulence}\setuprow{Part III}{the z-plane (III.18), aliasing and notch filters (III.20, III.21)}}%
 Every controller in this book is a program that runs at fixed instants. Between them it holds its output and sees nothing. This appendix collects what that changes: what sampling does to a signal, how the recursions of a digital controller are solved and tested for stability, how a continuous plant looks from one sample to the next, and what the hold costs.}
 
 \section{Sampling a signal}

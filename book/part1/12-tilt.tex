@@ -1,4 +1,4 @@
-\lesson{12}{Why drones tilt}{A quadrotor can only push along its own up-axis. To go sideways — or to stand still in a wind — it must lean.}{2}{tilt}{Part I · PID}
+\lesson{I.12}{Why drones tilt}{A quadrotor can only push along its own up-axis. To go sideways — or to stand still in a wind — it must lean.}{2}{tilt}{Part I · PID}
 \label{les:tilt}
 
 \lead{\setupcard{\setuprow{Level}{L2: a point mass in three dimensions}\setuprow{Controller}{three independent PIDs}\setuprow{Wind}{a mean wind of \SI{4}{m/s}, with gusts}}%
@@ -11,7 +11,7 @@ At level L2 the drone is a point mass on which the controller applies a force ve
   m\,\ddot{\vec p} = \vec F + m\vec g + \vec F_{drag} ,\qquad
   \vec F = \begin{pmatrix} \mathrm{PID}_x(x_{sp} - x)\\ \hat m g + \mathrm{PID}_y(y_{sp} - y)\\ \mathrm{PID}_z(z_{sp} - z)\end{pmatrix},
 \end{equation}
-with $\vec p = (x, y, z)$ the position and $\vec g = (0, -g, 0)$. (Anemostatos uses $y$ for up, like its 3D engine.) Written out, \cref{eq:tilt-l2} is three separate equations, one per axis, and each is a copy of the altitude loop of Lessons~1–11: a mass driven by a force. Everything you learned about $\omega_n$, $\zeta$, integral action and windup applies to each of them separately. Such axes are said to be \term{decoupled}.\didyouknow{Decoupled axes are a luxury. In most machines they disturb one another — the elbow of a robot arm moves its wrist — and much of multivariable control is about undoing that (Lesson~III.12).} The horizontal loops use $K_p = 4$, $K_i = 0.8$, $K_d = 3$ and a force limit of \SI{5}{N}.
+with $\vec p = (x, y, z)$ the position and $\vec g = (0, -g, 0)$. (Anemostatos uses $y$ for up, like its 3D engine.) Written out, \cref{eq:tilt-l2} is three separate equations, one per axis, and each is a copy of the altitude loop of Lessons~I.1–I.11: a mass driven by a force. Everything you learned about $\omega_n$, $\zeta$, integral action and windup applies to each of them separately. Such axes are said to be \term{decoupled}.\didyouknow{Decoupled axes are a luxury. In most machines they disturb one another — the elbow of a robot arm moves its wrist — and much of multivariable control is about undoing that (Lesson~III.12).} The horizontal loops use $K_p = 4$, $K_i = 0.8$, $K_d = 3$ and a force limit of \SI{5}{N}.
 
 \subsection{Holding position in a steady wind}
 The lesson blows a mean wind of \SI{4}{m/s} along $+x$, with turbulence and gusts on top. For a drone at rest the horizontal drag is $c_h w^2$ with $c_h = \SI{0.12}{N.s^2/m^2}$. That is the horizontal version of the gravity droop: a load that nothing in the model anticipates.

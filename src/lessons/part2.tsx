@@ -351,7 +351,7 @@ export const PART_TWO: Lesson[] = [
         <Try>
           Switch on <i>Integral state (LQI)</i>. The offset disappears. At <i>t</i> = 15 s the
           setpoint steps to 3 m: raise <b>q_i</b> and you will meet an old friend — the
-          integral-induced overshoot of Part I, lesson 5.
+          integral-induced overshoot of lesson I.5.
         </Try>
         <Notice>
           Optimal control does not make a wrong model right. It only makes the best of the model it

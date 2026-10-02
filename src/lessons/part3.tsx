@@ -219,7 +219,7 @@ export const PART_THREE: Lesson[] = [
           The drone is a <b>low-pass filter</b>: slow motion of the setpoint passes, fast motion
           does not. The frequency where the swing has dropped to 71 % is called the <b>bandwidth</b>
           . For this tune it is surprisingly low. Set <b>D acts on → error</b> and it rises sixfold:
-          the reason is in Part I, lesson 7.
+          the reason is in lesson I.7.
         </Notice>
       </>
     ),
@@ -492,7 +492,9 @@ export const PART_THREE: Lesson[] = [
     solution: () => {},
     body: (
       <>
-        <p>Lesson 4 proved that a PD loop comes to rest without solving its equation. The energy</p>
+        <p>
+          Lesson I.4 proved that a PD loop comes to rest without solving its equation. The energy
+        </p>
         <M display>
           {
             'V = \\tfrac12 K_p e^2 + \\tfrac12 m\\,\\dot e^2, \\qquad \\dot V = -K_d\\,\\dot e^2 \\le 0'
@@ -905,9 +907,9 @@ export const PART_THREE: Lesson[] = [
           H∞ is not magic. It is optimal against the uncertainty it is told about (perturbations of
           the coprime factors), not against yours (a heavier drone, a slower motor, a late sensor).
           The shape is where the engineer tells it what matters; the guarantee comes for free. With
-          a good shape the same method reaches 3.5 Hz, where no PID passes the test. The method
-          has flown in helicopter and jump-jet flight-control research, among others on a Bell 205
-          and the VAAC Harrier.
+          a good shape the same method reaches 3.5 Hz, where no PID passes the test. The method has
+          flown in helicopter and jump-jet flight-control research, among others on a Bell 205 and
+          the VAAC Harrier.
         </Notice>
       </>
     ),

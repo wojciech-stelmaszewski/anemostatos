@@ -410,7 +410,7 @@ const PART_ONE: Lesson[] = [
           <i>ultimate gain</i> <M>{'K_u'}</M> where oscillation is sustained, measures its period{' '}
           <M>{'T_u'}</M> and uses <M>{'K_p = 0.6K_u,\\ K_i = 1.2K_u/T_u,\\ K_d = 0.075K_uT_u'}</M>.
           It assumes a plant that is stable on its own. A hovering drone is a{' '}
-          <i>double integrator</i>: with P alone it oscillates at <i>every</i> gain (lesson 2), so
+          <i>double integrator</i>: with P alone it oscillates at <i>every</i> gain (lesson I.2), so
           there is no clean <M>{'K_u'}</M>. Heuristics come with assumptions.
         </p>
       </>
@@ -464,7 +464,7 @@ const PART_ONE: Lesson[] = [
         </p>
         <Notice>
           The <K k="i">I</K> vector points into the wind: it holds the steady drag, exactly like it
-          held the missing weight in lesson 5.
+          held the missing weight in lesson I.5.
         </Notice>
         <p className="mt-2">
           This is a cheat: a real quadrotor can only push along its own up-axis. To move sideways it

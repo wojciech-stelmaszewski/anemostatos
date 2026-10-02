@@ -1,4 +1,4 @@
-\lesson{11}{Gust challenge}{One minute of violent, repeatable wind. Beat the default tune.}{1}{challenge}{Part I · PID}
+\lesson{I.11}{Gust challenge}{One minute of violent, repeatable wind. Beat the default tune.}{1}{challenge}{Part I · PID}
 \label{les:challenge}
 
 \lead{\setupcard{\setuprow{Level}{L1}\setuprow{Wind}{strong vertical gusts and turbulence, the same for every run}\setuprow{Controller}{the default PID, to be beaten}\setuprow{Goal}{a lower RMS altitude error than the default tune}}%
@@ -73,7 +73,7 @@ A hovering drone is hit by a vertical gust of \SI{8}{m/s}. What would it take to
 
 \section{How a loop rejects a disturbance}
 
-Where does the error come from, and what can the gains do about it? Treat the gust as a force $d(t)$ on the mass. The tools are those of Lessons~8 and~9: ask what the loop does to a \emph{sinusoidal} force of each frequency.
+Where does the error come from, and what can the gains do about it? Treat the gust as a force $d(t)$ on the mass. The tools are those of Lessons~I.8 and~I.9: ask what the loop does to a \emph{sinusoidal} force of each frequency.
 
 Write the closed loop with the full PID ($r$ constant, exact feedforward, and for a moment without the motor lag): $m\ddot y = -K_p y - K_i\!\int\! y\,\dd t - K_d\dot y + d$, measuring $y$ from the setpoint. Differentiating once,
 \begin{equation}
@@ -138,7 +138,7 @@ Choose gains that at least halve the error of the default tune, and check them a
 
 The score itself can be predicted. Take everything Part~I has built — the mass, the drag on the relative wind \eqref{eq:challenge-drag}, the motor lag, the sampled PID with its filter, the saturation and the anti-windup — as a model of some thirty lines, and drive it with the recorded wind. \Cref{fig:challenge-predict} lays the result over the simulator's flight: \SI{20.9}{cm} predicted against \SI{21.0}{cm} flown for the default tune, \SI{9.9}{cm} against \SI{9.9}{cm} for the stiffer one. There is nothing in the challenge that the first ten lessons have not explained.\didyouknow{Thirty lines that predict a flight to the millimetre are what engineers call a \emph{validated model}. Once it exists, tuning moves from the airfield to the desk.}
 
-\simfig{challenge_predict}{The challenge, predicted. Colour: the altitude error flown by the simulator. Dashed: the model of Part~I (Lessons 1–10 in thirty lines of code), driven by the same wind.}{fig:challenge-predict}
+\simfig{challenge_predict}{The challenge, predicted. Colour: the altitude error flown by the simulator. Dashed: the model of Part~I (Lessons I.1–I.10 in thirty lines of code), driven by the same wind.}{fig:challenge-predict}
 
 \begin{inapp}[The challenge]
 \begin{itemize}[leftmargin=1.2em]

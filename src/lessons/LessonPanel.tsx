@@ -64,7 +64,7 @@ function Goal({ lesson }: { lesson: Lesson }) {
 }
 
 const PARTS: { part: Part; label: string; prefix: string }[] = [
-  { part: 1, label: 'Part I · PID', prefix: '' },
+  { part: 1, label: 'Part I · PID', prefix: 'I.' },
   { part: 2, label: 'Part II · Beyond PID', prefix: 'II.' },
   { part: 3, label: 'Part III · Why it works', prefix: 'III.' },
 ];

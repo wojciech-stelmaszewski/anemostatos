@@ -1,4 +1,4 @@
-\lesson{1}{Meet the loop}{Measure, compare, act — and do it again every four milliseconds.}{1}{meet}{Part I · PID}
+\lesson{I.1}{Meet the loop}{Measure, compare, act — and do it again every four milliseconds.}{1}{meet}{Part I · PID}
 \label{les:meet}
 
 \lead{\setupcard{\setuprow{Level}{L1: the drone moves up and down only}\setuprow{Controller}{the full PID with feedforward, $K_p = 10$, $K_i = 0.8$, $K_d = 7$}\setuprow{Setpoint}{\SI{2}{m}}\setuprow{Wind}{on: turbulence and gusts}}%
@@ -190,7 +190,7 @@ The drone hovers at the setpoint with $I = 0$ when a gust pushes it down. The me
 
 \Cref{fig:meet-overview} shows the first forty seconds of the lesson's run, drawn from the simulator's own telemetry. The drone takes off, climbs to its two-metre setpoint and then spends the rest of the time being pushed around by turbulence.
 
-\simfig{meet_overview}{Lesson 1 in numbers. At $t \approx \SI{16}{s}$ a gust blows upward at \SI{4}{m/s} and lifts the drone \SI{22}{cm}. The error goes negative, P (orange) and D (violet) push down together, and in two seconds it is over. I (green) hardly moves: it is built for slow, persistent errors, not for quick ones.}{fig:meet-overview}
+\simfig{meet_overview}{Lesson I.1 in numbers. At $t \approx \SI{16}{s}$ a gust blows upward at \SI{4}{m/s} and lifts the drone \SI{22}{cm}. The error goes negative, P (orange) and D (violet) push down together, and in two seconds it is over. I (green) hardly moves: it is built for slow, persistent errors, not for quick ones.}{fig:meet-overview}
 
 Look at the gust at $t \approx \SI{16}{s}$ in detail, because it contains the whole lesson:
 \begin{enumerate}
@@ -200,7 +200,7 @@ Look at the gust at $t \approx \SI{16}{s}$ in detail, because it contains the wh
   \item Once the gust is over, both terms return to zero, and the thrust returns to the feedforward value $\hat m g = \SI{9.81}{N}$.
 \end{enumerate}
 
-\screen[0 0 495 0]{meet}{The Anemostatos screen during Lesson 1. Top: the 3D scene with the drone, the translucent setpoint sphere and the coloured arrows of the P, I, D and FF contributions. Bottom left: the \emph{live formula} with the numbers being added at this instant. Bottom: the charts, in the same colours as this book.}{fig:meet-screen}
+\screen[0 0 495 0]{meet}{The Anemostatos screen during Lesson I.1. Top: the 3D scene with the drone, the translucent setpoint sphere and the coloured arrows of the P, I, D and FF contributions. Bottom left: the \emph{live formula} with the numbers being added at this instant. Bottom: the charts, in the same colours as this book.}{fig:meet-screen}
 
 \begin{inapp}[Where this lesson lives]
 Start it from the lesson panel: \ui{Part I · PID\then 1. Meet the loop\then Start}. Everything on the screen is a view of the loop in \cref{fig:meet-loop}:

@@ -1,4 +1,4 @@
-"""Prediction next to measurement (lessons 1–4): the formulas of each chapter drawn over the
+"""Prediction next to measurement (lessons I.1–I.4): the formulas of each chapter drawn over the
 simulator's own run of the same experiment."""
 
 import matplotlib.pyplot as plt
@@ -24,7 +24,7 @@ def _peaks(t, x):
     return t[k], x[k]
 
 
-# ─── Lesson 1 ──────────────────────────────────────────────────────────────
+# ─── Lesson I.1 ──────────────────────────────────────────────────────────────
 @fig
 def meet_predict():
     f, ax = plt.subplots(1, 2, figsize=(TEXT_W, 52 * MM), gridspec_kw=dict(wspace=0.3))
@@ -65,7 +65,7 @@ def meet_predict():
     save(f, "meet_predict")
 
 
-# ─── Lesson 2 ──────────────────────────────────────────────────────────────
+# ─── Lesson I.2 ──────────────────────────────────────────────────────────────
 @fig
 def spring_predict():
     f, ax = plt.subplots(1, 2, figsize=(TEXT_W, 58 * MM), gridspec_kw=dict(wspace=0.32, width_ratios=[1.35, 1]))
@@ -104,7 +104,7 @@ def spring_predict():
     save(f, "spring_predict")
 
 
-# ─── Lesson 3 ──────────────────────────────────────────────────────────────
+# ─── Lesson I.3 ──────────────────────────────────────────────────────────────
 @fig
 def droop_exact():
     """The creep after the integral is switched on: simulator, exact third-order model, quasi-static."""
@@ -170,7 +170,7 @@ def droop_type():
     save(f, "droop_type")
 
 
-# ─── Lesson 4 ──────────────────────────────────────────────────────────────
+# ─── Lesson I.4 ──────────────────────────────────────────────────────────────
 def _step_start(name):
     dd = win(load(name), 8, 24)
     return dd.t[dd["sp.y"].diff() > 0.5].iloc[0]
@@ -242,7 +242,7 @@ def damper_spec():
     save(f, "damper_spec")
 
 
-# ─── Lesson 5 ──────────────────────────────────────────────────────────────
+# ─── Lesson I.5 ──────────────────────────────────────────────────────────────
 def _pid_matrix(m, kp, ki, kd):
     """States (x, v, z): deviation, velocity, integral minus the load it must hold."""
     return [[0, 1, 0], [-kp / m, -kd / m, 1 / m], [-ki, 0, 0]]
@@ -317,7 +317,7 @@ def integral_locus():
     save(f, "integral_locus")
 
 
-# ─── Lesson 6 ──────────────────────────────────────────────────────────────
+# ─── Lesson I.6 ──────────────────────────────────────────────────────────────
 def windup_model(ki=3.0, kp=10.0, kd=7.0, tmax=12.0, cv=0.25, h=4.0, dt=0.0005, t_end=14.0):
     """The windup lesson as a model: climb at full thrust against drag while saturated, then the
     PID (ideal motors). Returns t, y − y0, integral, saturated flag."""
@@ -349,7 +349,7 @@ def windup_predict():
     a.plot(tc, 2 + vt**2 / a_ * np.log(np.cosh(a_ * tc / vt)), color=C["accent"], lw=1.1, ls=DOT)
     a.axhline(6, color=C["sp"], lw=0.8, ls=DASH)
     a.text(2.5, 3.2, "full thrust against drag:\n$\\frac{v_t^2}{a}\\ln\\cosh\\frac{a t}{v_t}$", color=C["accent"], fontsize=6.4)
-    a.text(6.0, 6.9, "simulator, and the\nmodel of Example 6.2", color=C["ink"], fontsize=6.4)
+    a.text(6.0, 6.9, "simulator, and the\nmodel of Example I.6.2", color=C["ink"], fontsize=6.4)
     a.set_xlim(-1, 14)
     a.set_title("Altitude")
     a.set_ylabel("m")
@@ -368,7 +368,7 @@ def windup_predict():
     save(f, "windup_predict")
 
 
-# ─── Lesson 7 ──────────────────────────────────────────────────────────────
+# ─── Lesson I.7 ──────────────────────────────────────────────────────────────
 def weighted_step(b, c, kp=10.0, ki=0.8, kd=7.0, m=1.0, t_end=12.0, n=4000):
     """Unit step response of m y''' + kd y'' + kp y' + ki y = c kd r'' + b kp r' + ki r (ideal loop).
     The step sets the initial conditions y(0+) = 0, y'(0+) = c kd/m, y''(0+) = b kp/m − c kd²/m²."""
@@ -421,7 +421,7 @@ def kick_predict():
     save(f, "kick_predict")
 
 
-# ─── Lesson 8 ──────────────────────────────────────────────────────────────
+# ─── Lesson I.8 ──────────────────────────────────────────────────────────────
 def d_noise_std(fc, dt=0.004, sigma=0.01, kd=7.0):
     """Standard deviation of the D term fed by white altimeter noise through the first-order filter."""
     if fc <= 0:
@@ -444,7 +444,7 @@ def noise_predict():
     d = win(load("noise-f0"), 8, 20)
     a.plot(180, d["alt.part.d"].std(), "o", color=C["D"], ms=4)
     a.text(170, 33, "no filter: $\\sqrt{2}K_d\\sigma/\\Delta t$", fontsize=6.3, color=C["ink"], ha="right")
-    a.text(1.1, 3.2, "formula of\nExample 8.2", fontsize=6.3, color=C["ink"])
+    a.text(1.1, 3.2, "formula of\nExample I.8.2", fontsize=6.3, color=C["ink"])
     a.text(6, 0.55, "simulator", fontsize=6.3, color=C["D"])
     a.set_xlim(0.7, 250)
     a.set_ylim(0.3, 60)
@@ -472,7 +472,7 @@ def noise_predict():
     save(f, "noise_predict")
 
 
-# ─── Lesson 9 ──────────────────────────────────────────────────────────────
+# ─── Lesson I.9 ──────────────────────────────────────────────────────────────
 def _pade(T, n=6):
     from math import factorial
     c = [factorial(2 * n - k) * factorial(n) / (factorial(2 * n) * factorial(k) * factorial(n - k)) for k in range(n + 1)]
@@ -555,7 +555,7 @@ def slow_predict():
     save(f, "slow_predict")
 
 
-# ─── Lesson 10 ─────────────────────────────────────────────────────────────
+# ─── Lesson I.10 ─────────────────────────────────────────────────────────────
 def edge_poles(kp, kd=7.0, m=1.0, tau=0.03, fc=20.0, zoh=0.002):
     """Poles of the P–D altitude loop with motor lag, D filter and the hold (first-order Padé)."""
     P = np.polymul
@@ -608,7 +608,7 @@ def edge_predict():
     save(f, "edge_predict")
 
 
-# ─── Lesson 11 ─────────────────────────────────────────────────────────────
+# ─── Lesson I.11 ─────────────────────────────────────────────────────────────
 def altitude_model(t_w, w, kp=10.0, ki=0.8, kd=7.0, fc=20.0, m=1.0, tau=0.03, cv=0.25, tmax=24.4, rate=250):
     """The altitude loop of Part I as a model, driven by a recorded vertical wind: drag on the
     relative velocity, motor lag, the sampled PID with its D filter, saturation and clamping."""
@@ -661,7 +661,7 @@ def challenge_predict():
     save(f, "challenge_predict")
 
 
-# ─── Lesson 12 ─────────────────────────────────────────────────────────────
+# ─── Lesson I.12 ─────────────────────────────────────────────────────────────
 @fig
 def tilt_predict():
     f, ax = plt.subplots(1, 2, figsize=(TEXT_W, 56 * MM), gridspec_kw=dict(wspace=0.34))
@@ -694,7 +694,7 @@ def tilt_predict():
     save(f, "tilt_predict")
 
 
-# ─── Lessons 13 and 14 ─────────────────────────────────────────────────────
+# ─── Lessons I.13 and I.14 ─────────────────────────────────────────────────────
 def cascade_model(att_kp=8.0, pos_kp=1.2, vel=(2.2, 0.6, 0.1), rate=(18.0, 6.0, 0.25), tau=0.03, vmax=4.0,
                   tilt_max=np.radians(35), t_end=6.0, step=1.0, ideal_inner=False, cv=0.12):
     """One horizontal axis of the L3 cascade as a chain of simple loops (continuous time, 1 ms steps).
@@ -792,5 +792,5 @@ def inversion_predict():
     a.set_ylim(0, 11)
     a.set_xlabel("position gain $K_x$  [1/s]", loc="right")
     a.set_ylabel("attitude gain $K_{att}$  [1/s]")
-    a.set_title("The edge of Example 14.2")
+    a.set_title("The edge of Example I.14.2")
     save(f, "inversion_predict")

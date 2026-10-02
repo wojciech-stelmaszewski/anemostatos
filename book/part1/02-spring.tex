@@ -1,4 +1,4 @@
-\lesson{2}{Just a spring}{A proportional controller pulls like a spring — and a spring alone never comes to rest.}{1}{spring}{Part I · PID}
+\lesson{I.2}{Just a spring}{A proportional controller pulls like a spring — and a spring alone never comes to rest.}{1}{spring}{Part I · PID}
 \label{les:spring}
 
 \lead{\setupcard{\setuprow{Level}{L1}\setuprow{Controller}{P and feedforward only; I and D are off}\setuprow{Event}{at $t = \SI{6}{s}$ the setpoint jumps from \SI{2}{m} to \SI{3}{m}}\setuprow{Wind}{off}}%
@@ -168,7 +168,7 @@ Estimate the amplitude at which drag and motor lag balance, for $K_p = 10$.
   A = \frac{3\pi\,K_p\,\tau_m}{8\,c_v\,\omega}.
 \end{equation*}
 
-\textbf{Step 5 — numbers.} With $K_p = 10$, $\tau_m = \SI{0.03}{s}$ plus about \SI{2}{ms} of controller sampling (Lesson 9) — $\tau \approx \SI{0.032}{s}$ — $c_v = 0.25$ and $\omega = 3.16$: $A = 3\pi\cdot0.32/(8\cdot0.25\cdot3.16) = 3.02/6.32 = \SI{0.48}{m}$.
+\textbf{Step 5 — numbers.} With $K_p = 10$, $\tau_m = \SI{0.03}{s}$ plus about \SI{2}{ms} of controller sampling (Lesson I.9) — $\tau \approx \SI{0.032}{s}$ — $c_v = 0.25$ and $\omega = 3.16$: $A = 3\pi\cdot0.32/(8\cdot0.25\cdot3.16) = 3.02/6.32 = \SI{0.48}{m}$.
 
 \textbf{Step 6 — check.} In \cref{fig:spring-run} the peaks at the end of the twenty-second run are at \SI{3.49}{m}, i.e.\ an amplitude of \SI{0.49}{m}, and still sinking. Flown for a full minute (\cref{fig:spring-predict}), the oscillation settles at \SI{0.46}{m}. A back-of-the-envelope energy balance predicts a nonlinear effect of the simulator to within 4\,\%.
 \end{example}
@@ -184,7 +184,7 @@ Every formula in this lesson — $\omega_n$, the period, the pole positions — 
 
 To see the linear behaviour at $K_p = 40$, keep the step small: press \key{↑} once (\SI{0.1}{m}) instead of jumping a whole metre. The thrust then stays within its limits and the period comes out close to \SI{1}{s}.\tip{Test a loop twice: with small steps to see its linear behaviour, with large ones to see what it does in real life.}
 
-\screen[0 0 495 998]{spring}{Lesson 2 in the app: the undamped oscillation in the tracking chart and the P term alone in the PID-terms chart. The info card (bottom right) computes $\omega_n$ and $\zeta$ from the current gains — the theory next to the measurement.}{fig:spring-charts}
+\screen[0 0 495 998]{spring}{Lesson I.2 in the app: the undamped oscillation in the tracking chart and the P term alone in the PID-terms chart. The info card (bottom right) computes $\omega_n$ and $\zeta$ from the current gains — the theory next to the measurement.}{fig:spring-charts}
 
 \begin{inapp}
 \begin{itemize}[leftmargin=1.2em]
@@ -405,7 +405,7 @@ In the language of this lesson, the poles of the bridge moved from just left of 
 \answer{$s^3 + (a+b)s^2 + (ab + c)s + ac$. The roots of $s^3+s^2+s+10$ are $-2.37$ and $+0.68 \pm 1.94j$. Positive coefficients are necessary, not sufficient; for a cubic $a_3s^3+a_2s^2+a_1s+a_0$ the full condition adds $a_2a_1 > a_3a_0$, here $1 < 10$.}
 \exercise[2]\exkind{derive} Verify that $A(t) = A^*/(1 + (A^*/A_0 - 1)e^{-\sigma t})$ solves \cref{eq:spring-amp}. With $\sigma = 0.16$ and $A^* = \SI{0.48}{m}$, how long does an oscillation need to grow from \SI{0.1}{m} to \SI{0.4}{m}?
 \answer{Substitute, or note that $\ln\big(A/(A^*-A)\big)$ grows linearly at the rate $\sigma$. $t = \tfrac{1}{0.16}\ln\tfrac{0.4/0.08}{0.1/0.38} = 6.25\ln 19 = \SI{18.4}{s}$.}
-\exercise[2]\exkind{fly} Watch an oscillation grow out of nothing. In Lesson~2, let the drone reach its limit cycle, then switch \Dt on until it rests at the setpoint. Switch \Dt off again and press \key{↑} once. Open the \ui{phase portrait} and watch for a minute. Read the amplitude of three peaks ten seconds apart and estimate $\sigma$ as in the previous exercise.
+\exercise[2]\exkind{fly} Watch an oscillation grow out of nothing. In Lesson~I.2, let the drone reach its limit cycle, then switch \Dt on until it rests at the setpoint. Switch \Dt off again and press \key{↑} once. Open the \ui{phase portrait} and watch for a minute. Read the amplitude of three peaks ten seconds apart and estimate $\sigma$ as in the previous exercise.
 \answer{The peaks grow from about \SI{0.1}{m} to \SI{0.46}{m}; $\ln\big(A/(A^*-A)\big)$ rises by about 1.5 every ten seconds, $\sigma \approx \SI{0.15}{s^{-1}}$.}
 \exercise[2]\exkind{code} \src{src/ui/charts/InfoCard.tsx} computes the $\omega_n = \sqrt{K_p/m}$ that the info card shows. Which mass does it use: the true mass of the drone or the mass the controller assumes? Which is right for predicting the period, and why could a real flight computer not do the same?
 \answer{The true mass, \texttt{params.drone.mass}: the period is a property of the real plant. A flight computer only has its estimate $\hat m$; the simulator can look at the truth.}

@@ -1,4 +1,4 @@
-\lesson{8}{Noisy sensor}{A derivative is a magnifying glass for fast things — and noise is the fastest thing there is.}{1}{noise}{Part I · PID}
+\lesson{I.8}{Noisy sensor}{A derivative is a magnifying glass for fast things — and noise is the fastest thing there is.}{1}{noise}{Part I · PID}
 \label{les:noise}
 
 \lead{\setupcard{\setuprow{Level}{L1}\setuprow{Sensor}{altimeter noise of \SI{1}{cm}}\setuprow{Controller}{full PID with no D filter}}%
@@ -174,7 +174,7 @@ A useful rule: the filter time constant should be several times shorter than the
 \Lessonref{les:kick} moved the derivative from the error to the measurement. That removes the kick from setpoint steps, but not the noise: the noise is in the measurement.
 \end{watchout}
 
-\screen[0 0 495 998]{noise}{Lesson 8 in the app: with the D filter off, the violet D term in the \ui{PID terms} chart is a hairball and the motor thrusts chatter.}{fig:noise-screen}
+\screen[0 0 495 998]{noise}{Lesson I.8 in the app: with the D filter off, the violet D term in the \ui{PID terms} chart is a hairball and the motor thrusts chatter.}{fig:noise-screen}
 
 \begin{inapp}
 \begin{itemize}[leftmargin=1.2em]
@@ -197,7 +197,7 @@ A useful rule: the filter time constant should be several times shorter than the
 \section{The engineer's view: every block is a filter}
 
 \subsection{Frequency response}
-\Cref{fig:noise-bode} answered a question that Lessons 2–7 never asked: what does a block do to a sinusoid? For linear blocks the answer is always of the same kind, and it is found by the method of \lessonref{les:spring} — try an exponential. Feed the filter $T_f\dot D + D = x$ with $x = e^{j\omega t}$ and look for a response $D = H\,e^{j\omega t}$. Substituting, $(j\omega T_f + 1)\,H = 1$:
+\Cref{fig:noise-bode} answered a question that Lessons I.2–I.7 never asked: what does a block do to a sinusoid? For linear blocks the answer is always of the same kind, and it is found by the method of \lessonref{les:spring} — try an exponential. Feed the filter $T_f\dot D + D = x$ with $x = e^{j\omega t}$ and look for a response $D = H\,e^{j\omega t}$. Substituting, $(j\omega T_f + 1)\,H = 1$:
 \begin{equation}\label{eq:noise-H}
   H(j\omega) = \frac{1}{1 + j\omega T_f}, \qquad |H| = \frac{1}{\sqrt{1 + \omega^2T_f^2}}, \qquad \angle H = -\arctan(\omega T_f) .
 \end{equation}
@@ -302,7 +302,7 @@ They are also noisy. Their noise is specified as a density — micro-$g$ or degr
 \answer{The sum telescopes. $\sigma_D = \sqrt2K_d\sigma/(N\Delta t)$; delay about $N\Delta t/2$. $24.7/N = 6.4$ gives $N = 4$: a delay of \SI{8}{ms}, the same as $T_f$ of the filter.}
 \exercise[2]\exkind{derive} Repeat Step~3 of Example~\ref{ex:noise-rect} for motors twice as strong, $u_{max} = \SI{48.8}{N}$. Which way is the bias now, and why?
 \answer{$b = 1.575$: $\Phi(b) = 0.942$, $\varphi(b) = 0.115$. $\mathbb{E} = 48.8 \cdot 0.058 + 9.81 \cdot 0.596 + 24.7 \cdot 0.254 = 2.81 + 5.85 + 6.28 = \SI{14.9}{N}$: an even larger upward bias, because now almost only the lower limit clips. The bias vanishes when the limits are symmetric about the hover thrust, $u_{max} = \SI{19.6}{N}$.}
-\exercise[2]\exkind{fly} In Lesson~8, without a filter, read the altitude after \SI{6}{s}. Then set the noise to \SI{0.5}{cm} and reset. Predict the new offset first: repeat Steps 3–5 of Example~\ref{ex:noise-rect} with $s = \SI{12.4}{N}$.
+\exercise[2]\exkind{fly} In Lesson~I.8, without a filter, read the altitude after \SI{6}{s}. Then set the noise to \SI{0.5}{cm} and reset. Predict the new offset first: repeat Steps 3–5 of Example~\ref{ex:noise-rect} with $s = \SI{12.4}{N}$.
 \answer{With $s = 12.4$: at $\mu = 9.81$, $a = -0.79$, $b = 1.18$; the clipped mean is \SI{10.6}{N}, a bias of \SI{0.8}{N}; $\mu^* \approx 8.6$, so an offset of about \SI{12}{cm} — less than a third for half the noise.}
 \exercise[2]\exkind{code} In \src{src/control/pid.ts} the filter uses \texttt{lowPassAlpha(g.dFilterHz, dt)}. Replace the first-order filter by two of them in series (a second-order filter) with the same cutoff. Using \cref{thm:noise-freq}, predict the gain at \SI{125}{Hz} for a \SI{20}{Hz} cutoff before and after, and the phase lag at \SI{0.5}{Hz}. Fly the lesson with both.
 \answer{First order: $|H| = 1/\sqrt{1 + 6.25^2} = 0.158$; second order: $0.025$. Lag at \SI{0.5}{Hz}: $1.4^\circ$ and $2.9^\circ$. Six times less noise at the top of the band for twice the (small) delay.}

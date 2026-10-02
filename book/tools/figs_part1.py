@@ -1,4 +1,4 @@
-"""Figures for Part I (lessons 1–14), drawn from the simulator runs in book/data."""
+"""Figures for Part I (lessons I.1–I.14), drawn from the simulator runs in book/data."""
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -7,7 +7,7 @@ from figlib import (C, FULL_W, MM, SEQ, TEXT_W, fig, label_end, load, note, ramp
                     save, step_metrics, win, xlab_time)
 
 
-# ─── Lesson 1 ──────────────────────────────────────────────────────────────
+# ─── Lesson I.1 ──────────────────────────────────────────────────────────────
 @fig
 def meet_overview():
     d = win(load("meet"), 4, 40)
@@ -61,7 +61,7 @@ def _setpoint(a, d, **kw):
     a.plot(d.t, d["sp.y"], color=C["sp"], ls=(0, (4, 2.5)), lw=0.9, **kw)
 
 
-# ─── Lesson 2 ──────────────────────────────────────────────────────────────
+# ─── Lesson I.2 ──────────────────────────────────────────────────────────────
 @fig
 def spring_run():
     f, ax = plt.subplots(2, 1, figsize=(TEXT_W, 78 * MM), sharex=True,
@@ -87,7 +87,7 @@ def spring_run():
     save(f, "spring_run")
 
 
-# ─── Lesson 3 ──────────────────────────────────────────────────────────────
+# ─── Lesson I.3 ──────────────────────────────────────────────────────────────
 @fig
 def droop_run():
     f, ax = plt.subplots(1, 2, figsize=(TEXT_W, 50 * MM), gridspec_kw=dict(wspace=0.32))
@@ -142,7 +142,7 @@ def droop_ion():
     save(f, "droop_ion")
 
 
-# ─── Lesson 4 ──────────────────────────────────────────────────────────────
+# ─── Lesson I.4 ──────────────────────────────────────────────────────────────
 @fig
 def damper_sweep():
     f, a = plt.subplots(figsize=(TEXT_W, 62 * MM))
@@ -166,7 +166,7 @@ def damper_sweep():
     save(f, "damper_sweep")
 
 
-# ─── Lesson 5 ──────────────────────────────────────────────────────────────
+# ─── Lesson I.5 ──────────────────────────────────────────────────────────────
 @fig
 def integral_run():
     f, ax = plt.subplots(2, 1, figsize=(TEXT_W, 74 * MM), sharex=True, gridspec_kw=dict(hspace=0.35))
@@ -220,7 +220,7 @@ def integral_area():
     save(f, "integral_area")
 
 
-# ─── Lesson 6 ──────────────────────────────────────────────────────────────
+# ─── Lesson I.6 ──────────────────────────────────────────────────────────────
 @fig
 def windup_compare():
     f, ax = plt.subplots(3, 1, figsize=(FULL_W, 104 * MM), sharex=True,
@@ -252,7 +252,7 @@ def windup_compare():
     save(f, "windup_compare")
 
 
-# ─── Lesson 7 ──────────────────────────────────────────────────────────────
+# ─── Lesson I.7 ──────────────────────────────────────────────────────────────
 @fig
 def kick_compare():
     f = plt.figure(figsize=(FULL_W, 62 * MM))
@@ -292,7 +292,7 @@ def kick_compare():
     save(f, "kick_compare")
 
 
-# ─── Lesson 8 ──────────────────────────────────────────────────────────────
+# ─── Lesson I.8 ──────────────────────────────────────────────────────────────
 @fig
 def noise_filters():
     runs = [("noise-f0", "no filter", C["err"]), ("noise-f20", "20 Hz", C["P"]),
@@ -346,7 +346,7 @@ def noise_bode():
     save(f, "noise_bode")
 
 
-# ─── Lesson 9 ──────────────────────────────────────────────────────────────
+# ─── Lesson I.9 ──────────────────────────────────────────────────────────────
 @fig
 def slow_rates():
     f, ax = plt.subplots(1, 2, figsize=(FULL_W, 58 * MM), gridspec_kw=dict(wspace=0.18))
@@ -415,7 +415,7 @@ def slow_margin():
     save(f, "slow_margin")
 
 
-# ─── Lesson 10 ─────────────────────────────────────────────────────────────
+# ─── Lesson I.10 ─────────────────────────────────────────────────────────────
 @fig
 def edge_runs():
     kps = [30, 100, 200, 400]
@@ -470,7 +470,7 @@ def edge_region():
     save(f, "edge_region")
 
 
-# ─── Lesson 11 ─────────────────────────────────────────────────────────────
+# ─── Lesson I.11 ─────────────────────────────────────────────────────────────
 @fig
 def challenge_runs():
     f, ax = plt.subplots(2, 1, figsize=(FULL_W, 70 * MM), sharex=True,
@@ -494,7 +494,7 @@ def challenge_runs():
     save(f, "challenge_runs")
 
 
-# ─── Lesson 12 ─────────────────────────────────────────────────────────────
+# ─── Lesson I.12 ─────────────────────────────────────────────────────────────
 @fig
 def tilt_compare():
     f, ax = plt.subplots(1, 2, figsize=(FULL_W, 50 * MM), gridspec_kw=dict(wspace=0.25))
@@ -519,7 +519,7 @@ def tilt_compare():
     save(f, "tilt_compare")
 
 
-# ─── Lesson 13 ─────────────────────────────────────────────────────────────
+# ─── Lesson I.13 ─────────────────────────────────────────────────────────────
 @fig
 def cascade_loops():
     d = win(load("cascade-step"), 9.5, 14)
@@ -554,7 +554,7 @@ def cascade_noi():
     save(f, "cascade_noi")
 
 
-# ─── Lesson 14 ─────────────────────────────────────────────────────────────
+# ─── Lesson I.14 ─────────────────────────────────────────────────────────────
 @fig
 def inversion_runs():
     f, ax = plt.subplots(2, 1, figsize=(FULL_W, 78 * MM), sharex=True, gridspec_kw=dict(hspace=0.4))

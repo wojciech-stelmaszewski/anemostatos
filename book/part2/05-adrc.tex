@@ -1,7 +1,7 @@
 \lesson{II.5}{Everything is a disturbance}{Keep the crudest model there is, call everything it leaves out one unknown force, estimate that force like a state — and subtract it.}{1}{adrc}{Part II · Beyond PID}
 \label{les:adrc}
 
-\lead{\setupcard{\setuprow{Level}{L1}\setuprow{Controller}{ADRC with $\omega_c = \SI{3}{rad/s}$, $\omega_o = \SI{15}{rad/s}$}\setuprow{Ghost}{the default PID}\setuprow{Wind}{on, as in Lesson~1}\setuprow{Event}{at $t = \SI{12}{s}$ a payload of \SI{300}{g} lands on the drone}\setuprow{Chart}{the disturbance force, true and estimated}}%
+\lead{\setupcard{\setuprow{Level}{L1}\setuprow{Controller}{ADRC with $\omega_c = \SI{3}{rad/s}$, $\omega_o = \SI{15}{rad/s}$}\setuprow{Ghost}{the default PID}\setuprow{Wind}{on, as in Lesson~I.1}\setuprow{Event}{at $t = \SI{12}{s}$ a payload of \SI{300}{g} lands on the drone}\setuprow{Chart}{the disturbance force, true and estimated}}%
 The integral term learns a load only after the load has pushed the drone off its setpoint, and it learns slowly. Active disturbance rejection control turns the problem round. It keeps the simplest model there is — thrust accelerates mass — and lumps everything else, the wind, the drag, a wrong mass, a payload, into a single unknown force. An observer estimates that force from the motion, as if it were one more state, and the controller subtracts it. When the payload lands, the PID needs two seconds and drops \SI{28}{cm}; ADRC needs half a second and drops ten.}
 
 \section{One model, one unknown}

@@ -68,7 +68,7 @@ the same seed reproduces the same wind exactly (tested).
 - Snapshot/ghost trace comparison, CSV export.
 - Setpoint profiles (square, ramp, sine) and dragging the setpoint ghost.
 - URL-shareable state. Lessons double as presets (no separate preset library).
-- Lesson runner + lessons 1–11 (written as TSX with KaTeX instead of MDX:
+- Lesson runner + lessons I.1–I.11 (written as TSX with KaTeX instead of MDX:
   fewer build plugins, type-checked content).
 - Tooltips with explanations for every parameter.
 
@@ -89,7 +89,7 @@ without any other material.
 - Mixer with desaturation; motor saturation glow.
 - Cascade: position P → velocity PID → thrust vector → attitude P → rate PID.
 - Per-loop rates; inspector for all loops; attitude chart.
-- Lessons 12–14.
+- Lessons I.12–14.
 - Tests: torque signs, mixer round-trip, hover stability, step convergence.
 
 **Done when:** the full quadrotor holds position in gusty wind with a

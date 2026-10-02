@@ -1,4 +1,4 @@
-\lesson{7}{Derivative kick}{Differentiate the error and every setpoint step becomes an infinite spike. Differentiate the drone instead.}{1}{kick}{Part I · PID}
+\lesson{I.7}{Derivative kick}{Differentiate the error and every setpoint step becomes an infinite spike. Differentiate the drone instead.}{1}{kick}{Part I · PID}
 \label{les:kick}
 
 \lead{\setupcard{\setuprow{Level}{L1}\setuprow{Controller}{full PID with D on the error and no D filter}\setuprow{Setpoint}{a square wave of $\pm\SI{0.5}{m}$, a step every \SI{3}{s}}}%
@@ -119,7 +119,7 @@ If the setpoint follows a smooth trajectory, $\dot r$ carries useful information
 \subsection{Ramping the setpoint}
 Anemostatos offers one more cure: a \ui{rate limit} on the setpoint, which turns a step into a ramp. With a limit of \SI{1}{m/s} the setpoint's part of the D term is $K_d\,\dot r = 7 \cdot 1 = \SI{7}{N}$ while the ramp lasts — finite, and useful: it is exactly the force the damper will take away from a drone climbing at \SI{1}{m/s}. In the simulator's run the D term peaks at \SI{7.0}{N} and the drone follows the ramp with an error of at most \SI{12}{cm}, where derivative on measurement would lag by $K_dv_r/K_p = \SI{70}{cm}$.
 
-\screen[0 0 495 998]{kick}{Lesson 7 in the app. In the \ui{PID terms} chart the violet D term shows the kick at every setpoint step; the motor-thrust chart shows the commands hitting their limit.}{fig:kick-screen}
+\screen[0 0 495 998]{kick}{Lesson I.7 in the app. In the \ui{PID terms} chart the violet D term shows the kick at every setpoint step; the motor-thrust chart shows the commands hitting their limit.}{fig:kick-screen}
 
 \begin{inapp}
 \begin{itemize}[leftmargin=1.2em]
@@ -153,7 +153,7 @@ The gains $K_p, K_i, K_d$ decide the left-hand side and the load's path. The wei
 \subsection{The practice}
 This suggests a working order that professionals follow:
 \begin{enumerate}
-  \item Tune the gains for the disturbances — as stiff and as well damped as the noise, the delays and the actuators allow (Lessons~8–11). Do not look at setpoint steps while doing so.
+  \item Tune the gains for the disturbances — as stiff and as well damped as the noise, the delays and the actuators allow (Lessons~I.8–I.11). Do not look at setpoint steps while doing so.
   \item Then shape the command: weights, a ramp, a filter on the setpoint, or a planned trajectory, until the response to the setpoint is what the mission needs.
 \end{enumerate}
 The second step cannot destabilise anything, since it does not touch the left-hand side. It is where overshoot after a setpoint step should be removed\pitfall{Judging a loop by its setpoint step alone is a classic tuning mistake. A loop can step beautifully and hold its position poorly, and the other way round.} — not by detuning the loop, which would weaken it against the wind as well.
@@ -245,7 +245,7 @@ The round Honeywell thermostat of 1953 is a nice reminder of how long this has b
 \answer{The rule only uses the integrator and the equilibria: $\int e = 0$, so the error must change sign. With $K_i = 0.8$ the response is dominated by the slow pole; the undershoot of the error is tiny and spread over a very long time (the model gives a peak of 0.9935 before 30 s and a very slow, shallow overshoot later).}
 \exercise[2]\exkind{derive} In Example~\ref{ex:kick-cruise}, find the weight $b$ for which the jump of acceleration after the \SI{20}{km/h} step is exactly \SI{1}{m/s^2}.
 \answer{$bK_p\Delta v/m = 1$: $b = 1500/(800 \cdot 5.56) = 0.34$.}
-\exercise[2]\exkind{fly} In Lesson~7 keep D on the error, set the D filter to \SI{5}{Hz} and read from the motor chart for how long the thrust is at its limit after a step. Compare with Step~5 of Example~\ref{ex:kick-filter}. Then set the rate limit to \SI{1}{m/s}: what is the largest value of the D term now?
+\exercise[2]\exkind{fly} In Lesson~I.7 keep D on the error, set the D filter to \SI{5}{Hz} and read from the motor chart for how long the thrust is at its limit after a step. Compare with Step~5 of Example~\ref{ex:kick-filter}. Then set the rate limit to \SI{1}{m/s}: what is the largest value of the D term now?
 \answer{About \SI{0.11}{s}. With the ramp: \SI{7}{N}, $K_d$ times the ramp rate.}
 \exercise[2]\exkind{code} Add a setpoint weight $c$ to \src{src/control/pid.ts}: a number between 0 and 1 in \texttt{PidGains} so that the raw derivative is \texttt{c * (setpoint - prevSetpoint)/dt - (measurement - prevMeasurement)/dt}. Which two existing options does it replace? Predict the first D sample after a \SI{1}{m} step for $c = 0.1$ and check it with a unit test modelled on the kick test in \texttt{tests/pid.test.ts}.
 \answer{It replaces \texttt{derivativeOn: 'error'} ($c = 1$) and \texttt{'measurement'} ($c = 0$). First sample: $0.1 \cdot 1750 = \SI{175}{N}$ without filter.}

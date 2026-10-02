@@ -1,4 +1,4 @@
-\lesson{6}{Windup}{When the motors are at their limit, the integral keeps counting — and pays it all back later.}{1}{windup}{Part I · PID}
+\lesson{I.6}{Windup}{When the motors are at their limit, the integral keeps counting — and pays it all back later.}{1}{windup}{Part I · PID}
 \label{les:windup}
 
 \lead{\setupcard{\setuprow{Level}{L1}\setuprow{Motors}{weak: \SI{3}{N} each, \SI{12}{N} in all}\setuprow{Controller}{full PID with $K_i = 3$ and no anti-windup}\setuprow{Event}{at $t = \SI{8}{s}$ the setpoint jumps to \SI{6}{m}}}%
@@ -140,7 +140,7 @@ back-calc., $K_b = 2$ & \SI{18.3}{N} & \SI{6.00}{m} & \SI{0.94}{s} & \SI{9.7}{s}
 While an actuator is saturated, the loop is open: the plant receives the same input whatever the controller computes. Any controller state that keeps integrating the error in this phase — an integral, a filter, an observer — collects nonsense. Anti-windup is the discipline of keeping controller states consistent with what the actuator \emph{actually} did. We will meet the same idea again in Part II: an observer must be fed the saturated input (\lessonref{les:adrc}), and model predictive control plans with the limits from the start (\lessonref{les:mpc}).
 \end{keyidea}
 
-\screen[0 0 495 998]{windup}{Lesson 6 in the app, a few seconds after the step: the PID-terms chart is shaded red where the output is saturated, and the integral (green) is still high after the drone has reached the setpoint.}{fig:windup-screen}
+\screen[0 0 495 998]{windup}{Lesson I.6 in the app, a few seconds after the step: the PID-terms chart is shaded red where the output is saturated, and the integral (green) is still high after the drone has reached the setpoint.}{fig:windup-screen}
 
 \begin{inapp}
 \begin{itemize}[leftmargin=1.2em]
@@ -164,7 +164,7 @@ While an actuator is saturated, the loop is open: the plant receives the same in
 \section{The engineer's view: a loop that opens and closes}
 
 \subsection{Two systems in one}
-A loop with a saturating actuator is two different systems that take turns. Inside the limits it is the linear loop of \lessonref{les:integral}, with three poles in the left half-plane. At a limit it is the drone under a constant force, \cref{eq:windup-climb} — and a controller that runs on unobserved, because nothing it does reaches the plant. The state of the whole loop is $(x, \dot x, I)$ in both phases; what changes is the equation. Such a system is called \term{piecewise linear} or \term{switched},\didyouknow{A thermostat with a relay, a bouncing ball and a gearbox are switched systems too. Each phase is simple; the surprises are in the switching.} and none of the tools of Lessons 2–5 applies to it as a whole: it has no poles. Example~\ref{ex:windup-size} analysed it the only way possible, phase by phase, passing the state from one to the next.
+A loop with a saturating actuator is two different systems that take turns. Inside the limits it is the linear loop of \lessonref{les:integral}, with three poles in the left half-plane. At a limit it is the drone under a constant force, \cref{eq:windup-climb} — and a controller that runs on unobserved, because nothing it does reaches the plant. The state of the whole loop is $(x, \dot x, I)$ in both phases; what changes is the equation. Such a system is called \term{piecewise linear} or \term{switched},\didyouknow{A thermostat with a relay, a bouncing ball and a gearbox are switched systems too. Each phase is simple; the surprises are in the switching.} and none of the tools of Lessons I.2–I.5 applies to it as a whole: it has no poles. Example~\ref{ex:windup-size} analysed it the only way possible, phase by phase, passing the state from one to the next.
 
 \subsection{Why the integrator is the problem}
 In the saturated phase the drone's own state behaves well: the altitude simply approaches the setpoint as fast as the motors allow, which is the best that can be done. P and D behave well too: they are functions of the present state and forget the past. Only the integral carries something out of the saturated phase that it should not — the memory of an error that no amount of pushing could have reduced. This gives a test for any controller with internal states: \emph{what does each state do while the actuator is not listening?}

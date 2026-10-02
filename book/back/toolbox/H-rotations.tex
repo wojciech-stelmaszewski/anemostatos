@@ -1,8 +1,8 @@
 \toolchapter{H}{Rotations and quaternions}{Positions add. Rotations do not: they multiply, and the order matters. Three ways to write a rotation down, and why flight computers choose the one with four numbers.}
 \label{app:quat}
 
-\lead{\usedcard{\setuprow{Prelude}{the rigid body: $R(q)$, $\dot q$, Euler's equation}\setuprow{Lesson 12}{the thrust axis $\hat b$, tilt}\setuprow{Lesson 13}{attitude setpoint and attitude error}\setuprow{Part II}{large rotations (II.10), trajectories (II.11)}\setuprow{Parts III, IV}{attitude estimation (III.22, III.23), spacecraft (IV.18–IV.23)}}%
-From Lesson~12 on the drone is a rigid body, and its controller must say in which direction it points, how far that is from where it should point, and how fast it is turning. This appendix builds the three descriptions of orientation in use — the rotation matrix, the axis with its angle, and the unit quaternion — with the conventions of the simulator: the world frame has $y$ up; the body frame has $x$ forward, $y$ up (the thrust axis) and $z$ to the right; roll is about $x$, pitch about $z$, yaw about $y$.}
+\lead{\usedcard{\setuprow{Prelude}{the rigid body: $R(q)$, $\dot q$, Euler's equation}\setuprow{Lesson I.12}{the thrust axis $\hat b$, tilt}\setuprow{Lesson I.13}{attitude setpoint and attitude error}\setuprow{Part II}{large rotations (II.10), trajectories (II.11)}\setuprow{Parts III, IV}{attitude estimation (III.22, III.23), spacecraft (IV.18–IV.23)}}%
+From Lesson~I.12 on the drone is a rigid body, and its controller must say in which direction it points, how far that is from where it should point, and how fast it is turning. This appendix builds the three descriptions of orientation in use — the rotation matrix, the axis with its angle, and the unit quaternion — with the conventions of the simulator: the world frame has $y$ up; the body frame has $x$ forward, $y$ up (the thrust axis) and $z$ to the right; roll is about $x$, pitch about $z$, yaw about $y$.}
 
 \section{Rotation matrices}
 

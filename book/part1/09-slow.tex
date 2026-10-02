@@ -1,4 +1,4 @@
-\lesson{9}{Too slow to react}{A digital controller looks at the world in snapshots. Between them it is blind — and blindness is delay.}{1}{slow}{Part I · PID}
+\lesson{I.9}{Too slow to react}{A digital controller looks at the world in snapshots. Between them it is blind — and blindness is delay.}{1}{slow}{Part I · PID}
 \label{les:slow}
 
 \lead{\setupcard{\setuprow{Level}{L1}\setuprow{Controller}{the default PID at \SI{250}{Hz}}\setuprow{Setpoint}{a square wave of $\pm\SI{0.5}{m}$, a step every \SI{4}{s}}\setuprow{To change}{the controller rate and the sensor delay}}%
@@ -141,7 +141,7 @@ Find the lowest controller rate at which the default altitude loop is stable.
 
 The rule of thumb (\SI{6.5}{Hz}) and the exact calculation (\SI{5.9}{Hz}) agree well enough for design. The controller's \SI{250}{Hz} is forty times above the edge.
 
-\screen[0 0 495 998]{slow}{Lesson 9 at \SI{7}{Hz}: the thrust in the motor chart is a visible staircase, one step per controller period.}{fig:slow-screen}
+\screen[0 0 495 998]{slow}{Lesson I.9 at \SI{7}{Hz}: the thrust in the motor chart is a visible staircase, one step per controller period.}{fig:slow-screen}
 
 \begin{inapp}
 \begin{itemize}[leftmargin=1.2em]
@@ -163,7 +163,7 @@ The rule of thumb (\SI{6.5}{Hz}) and the exact calculation (\SI{5.9}{Hz}) agree 
 \section{The engineer's view: margins}
 
 \subsection{Why a second way of looking at stability}
-Lessons 2–8 judged a loop by its poles. That works when the loop is a differential equation of finite order. A delay is not: $e^{-sT}$ is not a polynomial, and a loop with delay has infinitely many poles. The frequency response does not mind. It needs only the gain and the phase of each block at each frequency — numbers that can even be \emph{measured} on a real vehicle, by shaking it with sinusoids, without any model at all.\didyouknow{Aircraft are tested this way. In a \emph{frequency sweep} a control is moved sinusoidally, from slow to fast, while everything is recorded; the margins are read off the data.} That is why engineers who certify flight control systems think in margins.
+Lessons I.2–I.8 judged a loop by its poles. That works when the loop is a differential equation of finite order. A delay is not: $e^{-sT}$ is not a polynomial, and a loop with delay has infinitely many poles. The frequency response does not mind. It needs only the gain and the phase of each block at each frequency — numbers that can even be \emph{measured} on a real vehicle, by shaking it with sinusoids, without any model at all.\didyouknow{Aircraft are tested this way. In a \emph{frequency sweep} a control is moved sinusoidally, from slow to fast, while everything is recorded; the margins are read off the data.} That is why engineers who certify flight control systems think in margins.
 
 Two margins are quoted for every loop:
 \begin{itemize}
@@ -278,10 +278,10 @@ Delay has an even more extreme form. A radio signal needs between 4 and 24 minut
 \exercise[2]\exkind{derive} Double both gains, $K_p = 20$, $K_d = 14$. Compute the new crossover frequency (ignore the lag in the magnitude), the phase margin including the motor lag, and the delay margin. Compare with the default tune.
 \answer{$\omega^4 = 196\omega^2 + 400$ gives $\omega_c = \SI{14.1}{rad/s}$. Lead $84.2^\circ$, lag $22.9^\circ$: $\mathrm{PM} = 61.3^\circ$, almost unchanged. Delay margin $1.07/14.1 = \SI{76}{ms}$, less than half: a faster loop tolerates less delay.}
 \exercise[2]\exkind{derive} Show that for the pure double integrator with P–D control (no lag, no delay) the phase margin is $\arctan(K_d\omega_c/K_p)$ and that it tends to $90^\circ$ as $K_d \to \infty$ and to $0$ as $K_d \to 0$. Relate the second limit to \lessonref{les:spring}.
-\answer{$\angle L = \arctan(K_d\omega/K_p) - 180^\circ$. With $K_d \to 0$ the margin vanishes: the P-only loop is marginally stable, the undamped oscillation of Lesson 2 — and any lag or delay makes it unstable.}
+\answer{$\angle L = \arctan(K_d\omega/K_p) - 180^\circ$. With $K_d \to 0$ the margin vanishes: the P-only loop is marginally stable, the undamped oscillation of Lesson I.2 — and any lag or delay makes it unstable.}
 \exercise[2]\exkind{derive} Barkhausen's condition. Show that if $L(j\omega_0) = -1$ then $y(t) = \sin\omega_0 t$ circulates in the closed loop with zero reference.
 \answer{With $r = 0$ the error is $e = -y$. The loop maps $e = -\sin\omega_0t$ to $|L|\sin(\omega_0t + \angle L)\cdot(-1) = -\sin(\omega_0t - 180^\circ) = \sin\omega_0t = y$: the signal reproduces itself.}
-\exercise[2]\exkind{fly} In Lesson~9 set the sensor delay to \SI{140}{ms} and time ten periods of the ringing after a step. Compare with the model's \SI{0.85}{s}. Then find, to within \SI{5}{ms}, the delay at which the ringing neither grows nor decays (use small steps with \key{↑} so that the motors do not saturate), and compare with \cref{eq:slow-dm}.
+\exercise[2]\exkind{fly} In Lesson~I.9 set the sensor delay to \SI{140}{ms} and time ten periods of the ringing after a step. Compare with the model's \SI{0.85}{s}. Then find, to within \SI{5}{ms}, the delay at which the ringing neither grows nor decays (use small steps with \key{↑} so that the motors do not saturate), and compare with \cref{eq:slow-dm}.
 \answer{About \SI{0.83}{s}. The threshold is close to \SI{155}{ms}.}
 \exercise[2]\exkind{code} The sensor delay in \src{src/sim/sensors.ts} is a ring buffer of past states (\texttt{HISTORY = 1001}). What is the longest delay it can represent, and what happens if \texttt{delayMs} asks for more? Add a \SI{20}{ms} delay to the \emph{actuator} instead: where in \src{src/engine/simulation.ts} would it go? Predict from the phase budget whether the loop cares which side of the plant the delay is on.
 \answer{\SI{1}{s}; larger values are clamped to the length of the history. An actuator delay would buffer \texttt{this.actuation} before \texttt{stepDynamics}. The loop transfer function is a product, so the order of the blocks does not matter for stability: \SI{20}{ms} costs $8^\circ$ either way. (It does matter for what a disturbance does before the loop reacts.)}

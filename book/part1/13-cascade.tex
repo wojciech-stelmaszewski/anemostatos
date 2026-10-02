@@ -1,4 +1,4 @@
-\lesson{13}{The cascade}{Four loops, each one's output the next one's setpoint — and each much faster than the one around it.}{3}{cascade}{Part I · PID}
+\lesson{I.13}{The cascade}{Four loops, each one's output the next one's setpoint — and each much faster than the one around it.}{3}{cascade}{Part I · PID}
 \label{les:cascade}
 
 \lead{\setupcard{\setuprow{Level}{L3: the full quadrotor}\setuprow{Controller}{the cascade of four loops}\setuprow{Wind}{a steady \SI{5}{m/s} with light turbulence}\setuprow{Chart}{the horizontal velocity loop}}%
@@ -15,7 +15,7 @@ In a \term{cascade}, the chain is cut at variables that can be measured, and a s
 \begin{figure}[h]
 \begin{fullwidth}
   \centering\input{tikz/cascade}
-  \caption{The L3 cascade of Anemostatos. Each block is a small controller from Lessons~1–11; each arrow is the setpoint of the next block. The rates in grey are how often each loop runs.}
+  \caption{The L3 cascade of Anemostatos. Each block is a small controller from Lessons~I.1–I.11; each arrow is the setpoint of the next block. The rates in grey are how often each loop runs.}
   \label{fig:cascade-diagram}
 \end{fullwidth}
 \end{figure}
@@ -174,7 +174,7 @@ Put the pieces of this lesson in a row for one horizontal axis: position P, velo
 
 The model predicts an overshoot of 10.9\,\% after \SI{2.25}{s} (simulator: 11.2\,\% after \SI{2.26}{s}), 90\,\% of the step after \SI{1.41}{s} (\SI{1.43}{s}) and a largest tilt of $14.5^\circ$ ($14.9^\circ$). With the attitude assumed instant, the dotted curve, the overshoot is 9.1\,\% — most of the behaviour is decided by the two outer loops, and the inner ones add a delay of a tenth of a second. That is time-scale separation at work, and it is what makes a cascade easy to reason about.
 
-\screen[0 0 495 998]{cascade}{Lesson 13 in the app. The loop selector (chart header) is set to \texttt{vel.x}; the amber arrow at the drone is the desired thrust vector from \cref{eq:cascade-fdes}, the white one the actual thrust.}{fig:cascade-screen}
+\screen[0 0 495 998]{cascade}{Lesson I.13 in the app. The loop selector (chart header) is set to \texttt{vel.x}; the amber arrow at the drone is the desired thrust vector from \cref{eq:cascade-fdes}, the white one the actual thrust.}{fig:cascade-screen}
 
 \begin{inapp}
 \begin{itemize}[leftmargin=1.2em]
@@ -295,7 +295,7 @@ The same structure appears in electric drives (a position loop around a speed lo
 \answer{$\omega_n^2 = K/\tau_m$, $2\zeta\omega_n = 1/\tau_m$. $\zeta \ge 0.5$ needs $K \le 1/\tau_m = \SI{33}{s^{-1}}$. With $\tau_m = \SI{60}{ms}$ the limit halves: the actuator sets the speed of the innermost loop, and through the ratios the speed of all the others.}
 \exercise[2]\exkind{derive} In Example~\ref{ex:cascade-aircraft} the altitude and vertical-speed loops are P loops with gains 0.1 and \SI{0.3}{s^{-1}}. What are $\zeta$ and the overshoot of the pair (\cref{thm:cascade-nested})? Which altitude gain would remove the overshoot?
 \answer{$\zeta = \tfrac12\sqrt{3} = 0.87$, overshoot $e^{-\pi \cdot 0.87/0.5} = 0.4\,\%$. None for $K_h \le 0.3/4 = \SI{0.075}{s^{-1}}$.}
-\exercise[2]\exkind{fly} In Lesson~13 switch the wind off and make a \SI{1}{m} step in $x$ (drag the sphere, or use the square-wave profile on the $x$ axis). Read the overshoot. Then set \ui{Position P — horizontal} to 0.55 and repeat; then to 2.2. Compare the three overshoots with \cref{eq:cascade-zeta}.
+\exercise[2]\exkind{fly} In Lesson~I.13 switch the wind off and make a \SI{1}{m} step in $x$ (drag the sphere, or use the square-wave profile on the $x$ axis). Read the overshoot. Then set \ui{Position P — horizontal} to 0.55 and repeat; then to 2.2. Compare the three overshoots with \cref{eq:cascade-zeta}.
 \answer{About 11\,\%, then none, then about 30\,\%: the formula gives $\zeta = 0.68$, $1.0$ and $0.5$ (overshoots of 5\,\%, 0 and 16\,\% for the two loops alone; the integral and the inner loops add the rest).}
 \exercise[2]\exkind{code} Read \texttt{cascade\_model} in \src{book/tools/figs\_predict.py}, the twenty-line model of \cref{fig:cascade-predict}, and find in \src{src/control/cascade.ts} the line that corresponds to each of its lines. Which features of the real cascade does the model leave out? Remove the velocity integral from the model and compute the overshoot.
 \answer{Left out: the three-dimensional rotation and the quaternion error, the mixer and its saturation logic, the sampling of each loop, the D filters of the rate loop, the projection of the thrust on the current axis. Without the velocity integral the model's overshoot falls from 10.9\,\% to about 7\,\%.}

@@ -1,8 +1,8 @@
-\lesson{10}{Find the edge}{Stiffer is faster — until the lags in the loop decide otherwise.}{1}{edge}{Part I · PID}
+\lesson{I.10}{Find the edge}{Stiffer is faster — until the lags in the loop decide otherwise.}{1}{edge}{Part I · PID}
 \label{les:edge}
 
 \lead{\setupcard{\setuprow{Level}{L1}\setuprow{Controller}{P, D and feedforward; I is off}\setuprow{Setpoint}{a square wave of $\pm\SI{0.3}{m}$, a step every \SI{3}{s}}\setuprow{To change}{$K_p$, from 30 to 400}}%
-Lesson 3 said that a stiffer spring sags less, and Lesson 4 that a damper can tame any spring. So why not use $K_p = 1000$? This lesson raises the proportional gain step by step, with the damper fixed, until the drone starts to shake by itself. Then it computes, from the motor lag alone, where that edge must be, checks the prediction to within a few percent — and finds that a classic tuning recipe does not apply to drones at all.}
+Lesson I.3 said that a stiffer spring sags less, and Lesson I.4 that a damper can tame any spring. So why not use $K_p = 1000$? This lesson raises the proportional gain step by step, with the damper fixed, until the drone starts to shake by itself. Then it computes, from the motor lag alone, where that edge must be, checks the prediction to within a few percent — and finds that a classic tuning recipe does not apply to drones at all.}
 
 \section{The experiment}
 
@@ -118,7 +118,7 @@ Now try step 1 on a hovering drone. With P alone the cubic \eqref{eq:edge-cubic}
 The Ziegler–Nichols rules were derived for plants that are stable on their own and have some delay: temperatures, levels, pressures in process plants — the systems Ziegler and Nichols worked with. A hovering drone is a \emph{double integrator}: without control it simply falls. Always ask what a recipe assumes about the plant before you use it.
 \end{watchout}
 
-\screen[0 0 495 998]{edge}{Lesson 10 at $K_p = 200$: every step rings for many periods, and the thrust swings between the motor limits.}{fig:edge-screen}
+\screen[0 0 495 998]{edge}{Lesson I.10 at $K_p = 200$: every step rings for many periods, and the thrust swings between the motor limits.}{fig:edge-screen}
 
 \begin{inapp}
 \begin{itemize}[leftmargin=1.2em]
@@ -234,7 +234,7 @@ What the X-29 made extreme is now routine. Modern fighters are designed slightly
 \answer{$(\tau_ms + 1)(ms^2 + K_d/\tau_m) = \tau_mms^3 + ms^2 + K_ds + K_d/\tau_m$, the cubic with $K_p = K_d/\tau_m$. At the edge the spring force $K_px$ and the lagged damper cancel in such a way that the thrust decouples: the mass oscillates freely and the motor relaxes with its own time constant.}
 \exercise[2]\exkind{derive} Apply the Ziegler–Nichols recipe to two equal lags with a delay, $L(s) = K\,e^{-0.5s}/(s + 1)^2$: find $K_u$ and $T_u$ from the conditions $\angle L = -180^\circ$ and $|L| = 1$ (solve the phase condition numerically), and the PID gains.
 \answer{$2\arctan\omega + 0.5\,\omega = \pi$ gives $\omega = \SI{1.92}{rad/s}$ ($T_u = \SI{3.27}{s}$); $K_u = 1 + \omega^2 = 4.69$. ZN: $K_p = 2.8$, $K_i = 1.72$, $K_d = 1.15$.}
-\exercise[2]\exkind{fly} In Lesson~10, set \ui{Physics\then Motor time constant} to \SI{60}{ms} and find, with small steps (\key{↑}), the $K_p$ at which the ringing neither grows nor decays. Compare with \cref{eq:edge-limit}, and explain the sign of the difference.
+\exercise[2]\exkind{fly} In Lesson~I.10, set \ui{Physics\then Motor time constant} to \SI{60}{ms} and find, with small steps (\key{↑}), the $K_p$ at which the ringing neither grows nor decays. Compare with \cref{eq:edge-limit}, and explain the sign of the difference.
 \answer{\Cref{eq:edge-limit} gives 117; the simulator's edge is near 104, lower because of the D filter and the hold.}
 \exercise[2]\exkind{code} The function \texttt{\_max\_re} in \src{book/tools/figs\_part1.py} builds the characteristic polynomial of the loop with the motor lag, the D filter and a first-order approximation of the hold, and returns the largest real part of its roots. Use it to find the edge for $K_d = 7$ with a \SI{5}{Hz} D filter. Then fly it. Which costs more gain margin, the slower filter or doubling the motor lag?
 \answer{With $T_f = \SI{31.8}{ms}$ the edge falls from 201 to about $K_p = 148$; doubling $\tau_m$ (with the \SI{20}{Hz} filter) gives about 104. The motor lag costs more: it delays the whole command, the filter only the D term.}

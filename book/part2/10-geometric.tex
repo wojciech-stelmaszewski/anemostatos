@@ -1,0 +1,185 @@
+\lesson{II.10}{Flying on a sphere}{An attitude is not three numbers. Treat it as three numbers and a drone that has been turned upside down takes the long way back.}{3}{geometric}{Part II · Beyond PID}
+\label{les:geometric}
+
+\lead{\setupcard{\setuprow{Level}{L3}\setuprow{Controller}{the cascade, with the naive Euler-angle attitude law}\setuprow{Set-point}{hover at \SI{6}{m}; no wind}\setuprow{Event}{at $t = \SI{10}{s}$ the drone is flipped by $170^\circ$ about a horizontal diagonal axis and stopped}\setuprow{Goal}{recover losing less than \SI{1.8}{m} of altitude}}%
+Something flips the drone almost upside down, six metres above the ground. Its thrust now points at the ground, and every tenth of a second it spends turning back costs height. Part~I's attitude loop worked with an error that was small; this one is not. The lesson compares three ways to compute the attitude error — from Euler angles, from a quaternion, and split into tilt and yaw — and shows that the first, the most natural to write, is the one that loses: \SI{2.6}{m} against \SI{1.4}{m}. The difference is not in the gains but in the geometry.}
+
+\section{Three numbers for a rotation}
+
+The display of the simulator describes an attitude by three angles: yaw $\psi$ about the vertical, then pitch $\theta$, then roll $\varphi$ (\cref{eq:H-euler}). An obvious attitude law subtracts them from their setpoints and commands each difference as a rate about the corresponding body axis:
+\begin{equation*}
+  \omega_{sp,x} = K\,(\varphi_{sp} - \varphi), \qquad \omega_{sp,z} = K\,(\theta_{sp} - \theta), \qquad \omega_{sp,y} = K_\psi\,(\psi_{sp} - \psi) .
+\end{equation*}
+For small errors this is Part~I's law. For a large one it makes two mistakes at once. The rates of the three angles are not the body rates (\cref{thm:H-gimbal}): the roll, pitch and yaw axes of the angles are three different axes, and only one of them is a body axis.\recall{Yaw is about the world's vertical, pitch about an axis that has already been yawed, roll about the body's own forward axis (Appendix~H, \cref{eq:H-euler}).} And three angles may describe a simple rotation in a strange way.
+
+\begin{example}[The flip in three angles]
+\label{ex:geometric-euler}
+The drone is level with zero yaw and is turned by $170^\circ$ about the horizontal axis $\hat n = (1, 0, 1)/\sqrt2$, halfway between its forward and right axes. Find its Euler angles and the command of the Euler law ($K = 8$, $K_\psi = \SI{3}{s^{-1}}$, rates limited to \SI{360}{\degree/s} per axis).
+
+\textbf{Step 1 — the quaternion.} By \cref{eq:H-q},
+\begin{equation*}
+  q = (\cos85^\circ,\ \hat n\sin85^\circ) = (0.0872,\ 0.7044,\ 0,\ 0.7044) .
+\end{equation*}
+
+\textbf{Step 2 — the angles.} With the formulas of \src{src/math/quat.ts}: $\sin\theta = 2(wz + xy) = 0.123$, so $\theta = 7.1^\circ$; $\varphi = \operatorname{atan2}(2(wx - yz),\ 1 - 2(x^2 + z^2)) = \operatorname{atan2}(0.123, -0.985) = 172.9^\circ$; $\psi = \operatorname{atan2}(2(wy - xz),\ 1 - 2(y^2 + z^2)) = \operatorname{atan2}(-0.992, 0.008) = -89.6^\circ$. A pure tilt, with no turn about the vertical at all, reads as a roll of $173^\circ$, a pitch of $7^\circ$ and a \emph{yaw} of $-90^\circ$.
+
+\textbf{Step 3 — the command.} Roll $8 \cdot (-172.9) \to -360$ (limited), yaw $3 \cdot 89.6 = 269$, pitch $8 \cdot (-7.1) = \SI{-57}{\degree/s}$. The rotation that is needed is about $-\hat n$, with equal roll and pitch rates and no yaw. The angle between the commanded and the needed axis is $\arccos\big((360 + 57)/(\sqrt2 \cdot 453)\big) = 49^\circ$.
+
+\textbf{Step 4 — read it.} Almost half of the command turns the drone about its own vertical axis — which now points at the ground — to remove a yaw error that exists only in the description. The part that tilts the thrust back up is smaller, and about the wrong axis.
+\end{example}
+\pitfall{Euler angles are excellent for a display and for small errors. Code that subtracts them is usually correct in every test near hover, and wrong the first time the drone is upset.}
+
+\section{One rotation, the short way}
+
+Appendix~H gives the alternative: the difference of two attitudes is the rotation that leads from one to the other, $q_e = q^{-1} \otimes q_{sp}$, and its vector part points along that rotation's axis (\cref{eq:H-thetae}).
+
+\begin{result}[Attitude laws on the rotation group]
+\emph{Quaternion error:}
+\begin{equation}\label{eq:geometric-quat}
+  \vec\omega_{sp} = K\,\vec\theta_e, \qquad \vec\theta_e = 2\,\sign(q_{e,w})\,\vec q_{e,xyz},
+\end{equation}
+with the gain $K_\psi$ instead of $K$ on the body's vertical component. \emph{Tilt-prioritised:} split $q_e = q_{tilt} \otimes q_{yaw}$, where $q_{tilt}$ is the shortest rotation that brings the thrust axis where it must point and $q_{yaw}$ the remaining turn about it; command each with its own gain, the tilt with the exact angle rather than $2\sin(\theta/2)$.
+\end{result}
+
+For the flip of Example~\ref{ex:geometric-euler}, $q_e = q^{-1}$ has $w = 0.087 > 0$ and $\vec\theta_e = 2 \cdot (-0.704, 0, -0.704)$\,rad, $-81^\circ$ on each horizontal axis: both rates hit the limit of \SI{360}{\degree/s}, and the drone turns about exactly $-\hat n$, with no yaw. For this flip the error has no yaw part, and the two laws on the rotation group are identical.\innumbers{The limit of \SI{360}{\degree/s} applies per axis, so about the diagonal the drone turns at $\sqrt2 \cdot 360 = \SI{509}{\degree/s}$.}
+
+\simfig{geometric_flip}{The flip at $t = 0$, flown with the three attitude laws. Left: the angle between the thrust axis and the vertical. Right: the altitude. The quaternion and tilt-prioritised laws lie on top of each other; the Euler law turns back later, overshoots, and loses \SI{2.6}{m}.}{fig:geometric-flip}
+
+\begin{example}[Where the height goes]
+\label{ex:geometric-height}
+Account for the \SI{1.4}{m} lost with the quaternion law, and for the extra \SI{1.2}{m} lost with the Euler law.
+
+\textbf{Step 1 — the dark interval.} The cascade's thrust is the desired force projected on the body's thrust axis (\lessonref{les:cascade}). While the axis points below the horizon the projection is negative and the commanded thrust is zero. The thrust axis passes $90^\circ$ after \SI{0.23}{s}, and the thrust is back from \SI{0.245}{s} on.
+
+\textbf{Step 2 — falling faster than free fall.} By then the drone is moving down at \SI{3.2}{m/s} and has dropped \SI{0.48}{m} — more than free fall's $\tfrac12 g t^2 = \SI{0.29}{m}$. The motors cannot stop at once: for the first \SI{30}{ms} they still give about \SI{10}{N}, and to start the rotation the mixer raises one motor to \SI{4.9}{N}. Upside down, all of that pushes the drone \emph{down}.
+
+\textbf{Step 3 — braking.} The speed peaks at \SI{3.5}{m/s} at \SI{0.31}{s} and the full thrust of \SI{24}{N} then brakes at about \SI{10}{m/s^2}; the drone stops after another \SI{0.35}{s} and $\tfrac12 \cdot 3.5 \cdot 0.35 = \SI{0.6}{m}$. With the transition between, $0.48 + 0.23 + 0.6 \approx \SI{1.3}{m}$; measured: \SI{1.39}{m}, lowest at \SI{0.66}{s}.
+
+\textbf{Step 4 — the Euler law.} Its thrust returns only at \SI{0.335}{s}: the drone is then at \SI{4.5}{m/s} and \SI{0.95}{m} down, and braking from $4.5$ takes $4.5^2/(2 \cdot 10) \approx \SI{1}{m}$ more. It then overshoots the level by $23^\circ$, and the total is \SI{2.55}{m}, lowest at \SI{0.94}{s}. Every tenth of a second in the dark costs about a metre per second of speed and the height needed to brake it.\didyouknow{Racing and freestyle pilots flip their drones on purpose. Their controllers run the rate loop only — the pilot commands body rates directly — so no attitude error is ever computed.}
+\end{example}
+
+\begin{keyidea}[Control the rotation, not its coordinates]
+Euler angles are coordinates on the set of rotations, and like the coordinates of a map they distort the space far from where they are centred. The attitude error is a rotation; computed on the rotation group, it gives the axis and the angle of the shortest turn, and a law that commands that turn needs no small-angle assumption.
+\end{keyidea}
+
+\section{When the error has a yaw part}
+
+Tilt-prioritised control earns its keep when the error is not a pure tilt. The quaternion law turns about a single axis that mixes the tilt with the yaw, and the slow yaw gain distorts that axis; the tilt-prioritised law sends the thrust axis home first and lets the yaw follow.\tip[-20pt]{When the actuators cannot do everything at once, decide what matters most. For a multirotor it is almost always the direction of the thrust; the heading can wait.}
+
+\begin{center}\small\sffamily
+\begin{tabular}{lccc}
+\toprule
+flip & Euler & quaternion & tilt-prioritised\\
+\midrule
+$170^\circ$ about $(1, 0, 1)$: height lost & \SI{2.55}{m} & \SI{1.39}{m} & \SI{1.40}{m}\\
+\phantom{$170^\circ$ about $(1, 0, 1)$:} level within $10^\circ$ & \SI{1.40}{s} & \SI{0.66}{s} & \SI{0.65}{s}\\
+$170^\circ$ about $(1, 1, 1)$: height lost & \SI{0.83}{m} & \SI{1.39}{m} & \SI{0.88}{m}\\
+\phantom{$170^\circ$ about $(1, 1, 1)$:} level within $10^\circ$ & \SI{3.6}{s} & \SI{1.36}{s} & \SI{0.88}{s}\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The second flip — about an axis $35^\circ$ above the horizontal, a tilt of $109^\circ$ and a large turn about the vertical — costs the quaternion law as much height as the first, while the tilt-prioritised law loses \SI{0.9}{m} and is level twice as fast. The Euler law happens to lose little height here, but wobbles for three and a half seconds before it settles.
+
+\screen[0 0 495 998]{flip}{Lesson II.10 in the app after the flip, with the quaternion attitude law. The attitude chart shows the error per body axis; the drone is level about half a second after the flip.}{fig:geometric-screen}
+
+\begin{inapp}
+\begin{itemize}[leftmargin=1.2em]
+  \item The switch is \ui{Controller\then Attitude law} (\param{control.l3.attitude}): \texttt{euler}, \texttt{quaternion} or \texttt{tilt}. The gains are \param{control.l3.attKpRP} and \param{attKpYaw}, the rate limit \param{control.l3.maxRateDeg}.
+  \item The three laws are \texttt{attitudeRates} in \src{src/control/geometric.ts}; the tilt-yaw split uses \texttt{qFromTo} of \src{src/math/quat.ts}.
+  \item The flip is a scripted event that replaces the attitude and stops the rotation at $t = \SI{10}{s}$; the goal measures the lowest altitude after it.
+\end{itemize}
+\end{inapp}
+
+\begin{trythis}
+\begin{enumerate}
+  \item Watch the recovery with the Euler law a few times (\key{R}). Open the attitude chart: which error is largest right after the flip?
+  \item Switch to the quaternion law and reset. Then to tilt-prioritised.
+  \item Lower \param{control.l3.maxRateDeg} to 180. How much more height does each law lose?
+\end{enumerate}
+\predict{with a rate limit of \SI{180}{\degree/s} per axis, how long does the quaternion law need to bring the thrust axis above the horizon?}
+\end{trythis}
+
+\section{The engineer's view: attitude lives on a sphere}
+
+\subsection{Why three numbers cannot work}
+The set of rotations is three-dimensional, but it is not a flat space. Turn by $180^\circ$ about any axis and you arrive at the same place as turning $-180^\circ$; follow a full turn and you come back. Any three coordinates on this set have a place where they fail. For Euler angles it is a pitch of $\pm90^\circ$, where yaw and roll become the same rotation and the angle rates blow up (\cref{thm:H-gimbal}); for the flip of this lesson the failure is milder — the angles exist, but their differences are not rotations.
+
+\begin{example}[An aircraft climbing vertically]
+\label{ex:geometric-gimbal}
+A fighter pulls up into a vertical climb, $\theta = 89^\circ$, wings level, and rolls about its own vertical body axis — which now points horizontally — at \SI{10}{\degree/s}. How fast does its yaw angle change?
+
+\textbf{Step 1 — the formula.} By \cref{thm:H-gimbal}, $\dot\psi = (\omega_y\cos\varphi - \omega_z\sin\varphi)/\cos\theta$, with $\varphi = 0$: $\dot\psi = \omega_y/\cos\theta$.
+
+\textbf{Step 2 — the number.} $10/\cos 89^\circ = 10/0.0175 = \SI{573}{\degree/s}$. A gentle body rate is a violent rate of the heading angle; at $\theta = 90^\circ$ it is undefined.
+
+\textbf{Step 3 — what a controller sees.} An Euler-angle autopilot holding heading would read a heading error that swings through $180^\circ$ in a third of a second and command the corresponding rates. This is why aerobatic and military autopilots, and every spacecraft, represent attitude by a quaternion or a rotation matrix, and keep Euler angles for the pilot's display.\didyouknow{Aircraft instruments show the attitude on an \enquote{attitude ball}, which simply rolls over at the vertical. Simulators and autopilots behind it integrate quaternions.}
+\end{example}
+
+\subsection{Laws written on the rotation group}
+The \emph{geometric} controllers of Lee, Leok and McClamroch (2010) write the attitude error directly with rotation matrices, $e_R = \tfrac12(R_{sp}^\T R - R^\T R_{sp})^\vee$, and prove that the closed loop converges from almost every attitude. The quaternion law of this lesson is the same idea with quaternions, and it has a remarkably simple solution.
+
+\subsection{In formal terms}
+
+\begin{theorem}[The quaternion attitude law with ideal rates]
+\label{thm:geometric-tanh}
+Let the body rate follow $\vec\omega = K\vec\theta_e$ exactly, with \cref{eq:geometric-quat}, a constant setpoint and a uniform gain $K > 0$, and let $q_{e,w}(0) > 0$ (the sign already chosen). Then the body rotates about the fixed axis of $\vec q_{e,xyz}(0)$, and
+\begin{equation*}
+  q_{e,w}(t) = \tanh\big(Kt + \operatorname{artanh} q_{e,w}(0)\big) \to 1 .
+\end{equation*}
+Every attitude error except an error of exactly $180^\circ$ is removed along the shortest rotation.
+\end{theorem}
+\begin{proof}
+From $\dot q = \tfrac12 q \otimes (0, \vec\omega)$ (\cref{eq:H-qdot}), $\frac{d}{dt}q^{-1} = -\tfrac12(0, \vec\omega) \otimes q^{-1}$, so $\dot q_e = -\tfrac12(0, \vec\omega) \otimes q_e$. Write $q_e = (w, \vec v)$ and use the product rule \cref{eq:H-product}: $\dot w = \tfrac12\vec\omega\cdot\vec v$ and $\dot{\vec v} = -\tfrac12(w\vec\omega + \vec\omega\times\vec v)$. With $\vec\omega = 2K\vec v$ the cross product vanishes: $\dot{\vec v} = -Kw\vec v$, so $\vec v$ keeps its direction, and $\dot w = K\|\vec v\|^2 = K(1 - w^2)$. This equation has the solution stated, which increases to 1 for every $w(0) > 0$.
+\end{proof}
+
+For the flip, $q_{e,w}(0) = \cos 85^\circ = 0.087$. Without a rate limit the thrust axis would pass the horizon ($q_{e,w} = \cos45^\circ$) after $(\operatorname{artanh}0.707 - \operatorname{artanh}0.087)/8 = \SI{0.10}{s}$ and be level within $10^\circ$ after \SI{0.38}{s}. The flight needs 0.23 and \SI{0.65}{s}: the rate limit and the time the motors need to spin the drone up stretch the ideal by about a quarter of a second.
+
+The exception at $180^\circ$ is not a weakness of this law. Bhat and Bernstein (2000) proved that no continuous feedback can bring \emph{every} attitude to rest at a target: the set of rotations cannot be continuously contracted to a point. Every law has a set of attitudes where it must hesitate or jump; the good ones keep that set as small as an exact half-turn, where the sign choice of \cref{eq:geometric-quat} breaks the tie.\tip{A discontinuous law can chatter at its switching set when the measurement is noisy. Robust implementations add a little hysteresis to the sign choice.}
+
+\begin{lookahead}
+\begin{itemize}[leftmargin=1.2em]
+  \item The next lesson gives the attitude loop its setpoints in advance: from a desired path, differential flatness computes the attitude and body rates the drone will need, and the geometric loop tracks them.
+  \item Attitude estimation on the rotation group, where the error of the estimate is also a rotation (the multiplicative Kalman filter), is in Lessons~III.22--III.24.
+  \item Spacecraft attitude control, with large slews and no gravity to fight, returns with the satellites of Part~IV (IV.18--IV.23).
+\end{itemize}
+\end{lookahead}
+
+\begin{remember}
+\begin{itemize}
+  \item Euler angles are coordinates, not rotations: their differences are not body rates, and a pure tilt can read as a large yaw.
+  \item The attitude error is the rotation $q_e = q^{-1} \otimes q_{sp}$; commanding $K\cdot 2\,\sign(w)\,\vec q_{e,xyz}$ turns the drone the short way about a fixed axis.
+  \item After the $170^\circ$ flip: \SI{2.6}{m} lost with Euler angles, \SI{1.4}{m} with the quaternion law. Each tenth of a second with the thrust pointing down costs about a metre per second.
+  \item Tilt-prioritised control fixes the thrust direction first: with a yaw component in the flip, \SI{0.9}{m} against 1.4.
+  \item Ideal quaternion control: $q_{e,w}(t) = \tanh(Kt + \operatorname{artanh} q_{e,w}(0))$. No continuous law can handle every attitude; the exception is the exact half-turn.
+\end{itemize}
+\end{remember}
+
+\begin{curiosity}{A fourth gimbal for Christmas}
+The Apollo spacecraft navigated with an inertial platform: a cluster of gyroscopes and accelerometers held still in space by three nested gimbals while the spacecraft turned around it. Three gimbals are the mechanical form of three Euler angles, and they share their defect. When the middle gimbal reached $90^\circ$, the inner and outer gimbals lined up, the platform lost one degree of freedom, and it would tumble and lose its alignment with the stars — gimbal lock.
+
+A fourth gimbal would have removed the problem, and platforms with four were built. Apollo's designers chose three, for weight, size and reliability, and accepted a forbidden zone instead. The guidance computer watched the middle gimbal's angle and lit a warning when it passed $70^\circ$; at $85^\circ$ it was considered lost. The astronauts flew their manoeuvres around that zone, and on Apollo~11 Michael Collins, alone in the command module, asked the ground whether they could send him a fourth gimbal for Christmas.
+
+The modern answer has no gimbals at all. In a \enquote{strapdown} system the sensors are fixed to the vehicle, and the attitude exists only in the computer — as a quaternion or a rotation matrix, integrated from the gyroscopes as in Appendix~H. It has no forbidden zone, because the description has none. The flight controller of a drone that flips for fun is a strapdown system; for it, Collins's Christmas wish came true.
+\end{curiosity}
+
+\begin{exercises}
+\exercise[1] Write the quaternion of a rotation by $90^\circ$ about the body's forward axis, and its Euler angles in this book's convention.
+\answer{$q = (\cos45^\circ, \sin45^\circ, 0, 0) = (0.707, 0.707, 0, 0)$; roll $90^\circ$, pitch 0, yaw 0.}
+\exercise[1] For an attitude error of $170^\circ$, how long is the vector $\vec\theta_e$ of \cref{eq:geometric-quat}, and what rate does $K = 8$ command without a limit?
+\answer{$2\sin85^\circ = \SI{1.99}{rad}$; $8 \cdot 1.99 = \SI{15.9}{rad/s} = \SI{913}{\degree/s}$.}
+\exercise[1] In Example~\ref{ex:geometric-height}, if the thrust were back after \SI{0.15}{s} at a downward speed of \SI{2}{m/s}, about how much height would the braking need, at \SI{10}{m/s^2}?
+\answer{$v^2/(2a) = 4/20 = \SI{0.2}{m}$, plus about \SI{0.2}{m} fallen before: some \SI{0.4}{m} in all.}
+\exercise[2]\exkind{derive} Show that the flip of Example~\ref{ex:geometric-euler} with the angle $\alpha$ in place of $170^\circ$ has the yaw angle $\psi = \operatorname{atan2}(-2xz,\ 1 - 2z^2)$ with $x = z = \sin(\alpha/2)/\sqrt2$, and find $\psi$ for $\alpha = 30^\circ$, $90^\circ$ and $170^\circ$. When does the spurious yaw become large?
+\answer{$y = 0$ gives the formula; $2xz = \sin^2(\alpha/2)$, $1 - 2z^2 = 1 - \sin^2(\alpha/2) = \cos^2(\alpha/2)$, so $\psi = -\operatorname{atan}(\tan^2(\alpha/2))$: $-4.1^\circ$, $-45^\circ$, $-89.6^\circ$. It is small for small tilts and grows to $-90^\circ$ as the tilt approaches $180^\circ$.}
+\exercise[2]\exkind{derive} Using \cref{thm:geometric-tanh}, find the time for an error of $90^\circ$ to fall to $5^\circ$ with $K = 8$, and compare with the linear law $\dot\theta = -K\theta$.
+\answer{$q_{e,w}$ from $\cos45^\circ = 0.707$ to $\cos2.5^\circ = 0.99905$: $(\operatorname{artanh}0.99905 - \operatorname{artanh}0.707)/8 = (3.83 - 0.88)/8 = \SI{0.37}{s}$. Linear: $\ln(90/5)/8 = \SI{0.36}{s}$. Nearly the same: below $90^\circ$ the law is close to linear in the angle.}
+\exercise[2]\exkind{derive} Prove that $q$ and $-q$ give the same rotation of every vector, and explain what the law $\vec\omega = 2K\vec q_{e,xyz}$ \emph{without} the sign factor would do for an error of $10^\circ$ written with $w < 0$.
+\answer{$(-q) \otimes v \otimes (-q)^{-1} = q \otimes v \otimes q^{-1}$, the signs cancel. With $w < 0$ the vector part describes a rotation of $350^\circ$ about the opposite axis; the law would turn the drone almost a full turn the other way (unwinding).}
+\exercise[2]\exkind{fly} Choose the tilt-prioritised law in Lesson~II.10. Set the yaw gain, \param{control.l3.attKpYaw}, to 1, then raise it to 6. Does the height lost after the flip change? Why not?
+\answer{Hardly: this flip is a pure tilt, its yaw error is zero, and the tilt-prioritised law sends the tilt through the roll-pitch gain alone. With a flip that has a yaw component the yaw gain would matter only after the thrust is up.}
+\exercise[2]\exkind{code} In \texttt{attitudeRates} (\src{src/control/geometric.ts}) the tilt-prioritised branch uses the exact angle $2\operatorname{atan2}(\|\vec v\|, w)$ instead of $2\|\vec v\|$. For a tilt error of $170^\circ$ compute both, and the commanded rates with $K = 8$. Does it matter here, given the rate limit?
+\answer{Exact: $170^\circ = \SI{2.97}{rad}$; $2\sin85^\circ = \SI{1.99}{rad}$. Commands \SI{1360}{\degree/s} against \SI{913}{\degree/s}; both far above the \SI{360}{\degree/s} limit, so not here. It matters with a high rate limit, or near $180^\circ$ where $2\sin(\theta/2)$ is flat.}
+\exercise[3]\exkind{derive} The obstruction in one dimension. A planar body has the angle $\phi$ on a circle, and a law $\dot\phi = f(\phi)$ with $f$ continuous and $2\pi$-periodic. Show that if $\phi = 0$ is the only equilibrium, $f$ cannot have the same sign on both sides of the target in the way a globally attracting law requires — and hence that some other equilibrium must exist. Relate the result to the $180^\circ$ exception.
+\answer{Global attraction requires $f > 0$ just below 0 and $f < 0$ just above 0 (mod $2\pi$). Going round the circle from $0^+$ to $2\pi^-$, $f$ passes from negative to positive, so by continuity it is zero somewhere: another equilibrium, at which the law \enquote{hesitates}. For the quaternion law it is the half-turn, where the sign function jumps instead.}
+\end{exercises}

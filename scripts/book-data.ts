@@ -719,6 +719,23 @@ for (const [tag, sync, hz] of [
   });
 
 // ─── Part II · C ───────────────────────────────────────────────────────────
+// The same flip with a yaw component: 170° about an axis tilted 35° up from the horizontal.
+for (const law of ['euler', 'quaternion', 'tilt'] as const)
+  add({
+    name: `flipyaw-${law}`,
+    seconds: 16,
+    setup: (p) => {
+      l3(p);
+      calm(p);
+      p.setpoint.y = 6;
+      p.control.l3.attitude = law;
+    },
+    events: (s) =>
+      s.schedule(10, (x) => {
+        x.state.q = qMul(qFromAxisAngle(v3(1, 1, 1), (170 * Math.PI) / 180), x.state.q);
+        x.state.omega = v3();
+      }),
+  });
 for (const law of ['euler', 'quaternion', 'tilt'] as const)
   add({
     name: `flip-${law}`,

@@ -515,3 +515,39 @@ def indisync():
     b.set_ylabel("N")
     b.grid(True, which="major", axis="both")
     save(f, "indisync")
+
+
+def _tilt_deg(d):
+    r, p = np.radians(d["roll"]), np.radians(d["pitch"])
+    return np.degrees(np.arccos(np.clip(np.cos(r) * np.cos(p), -1, 1)))
+
+
+@fig
+def geometric_flip():
+    f, (a, b) = plt.subplots(1, 2, figsize=(TEXT_W, 60 * MM), gridspec_kw=dict(wspace=0.3))
+    for law, col, lab in (
+        ("euler", C["err"], "Euler angles"),
+        ("quaternion", C["meas"], "quaternion error"),
+        ("tilt", C["I"], "tilt-prioritised"),
+    ):
+        d = win(load(f"flip-{law}"), 9.8, 12.5)
+        ls = (0, (3, 2)) if law == "tilt" else "-"
+        a.plot(d.t - 10, _tilt_deg(d), color=col, lw=0.9, ls=ls, label=lab)
+        b.plot(d.t - 10, d["pos.y"], color=col, lw=0.9, ls=ls, label=lab)
+    a.axhline(90, color=C["faint"], lw=0.5, ls=(0, (2, 2)))
+    a.text(1.0, 94, "thrust points sideways", fontsize=6.0, color=C["muted"])
+    a.set_xlim(-0.2, 2.5)
+    a.set_ylim(0, 180)
+    a.set_yticks([0, 45, 90, 135, 180])
+    a.set_title("Tilt after the flip")
+    a.set_ylabel("deg")
+    a.set_xlabel("time after the flip [s]", loc="right")
+    a.legend(loc="upper right", fontsize=6.2)
+    b.axhline(6, color=C["faint"], lw=0.5, ls=(0, (2, 2)))
+    b.axhline(6 - 1.8, color=C["I"], lw=0.7, ls=(0, (4, 2.5)))
+    b.text(1.4, 4.0, "goal: lose < 1.8 m", fontsize=6.2, color=C["I"])
+    b.set_xlim(-0.2, 2.5)
+    b.set_title("Altitude")
+    b.set_ylabel("m")
+    b.set_xlabel("time after the flip [s]", loc="right")
+    save(f, "geometric_flip")

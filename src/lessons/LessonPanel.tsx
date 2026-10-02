@@ -67,6 +67,7 @@ const PARTS: { part: Part; label: string; prefix: string }[] = [
   { part: 1, label: 'Part I · PID', prefix: 'I.' },
   { part: 2, label: 'Part II · Beyond PID', prefix: 'II.' },
   { part: 3, label: 'Part III · Why it works', prefix: 'III.' },
+  { part: 4, label: 'Part IV · Aerospace GNC', prefix: 'IV.' },
 ];
 const partOf = (l: Lesson): Part => l.part ?? 1;
 
@@ -167,6 +168,14 @@ export function LessonPanel() {
                 <Goal key={lesson.id} lesson={lesson} />
               </div>
             </>
+          ) : part === 4 ? (
+            <div className="space-y-1.5 text-muted">
+              <p className="text-fg">The fourth semester is being built.</p>
+              <p>
+                Part IV takes the ideas of the first three to the vehicles of aerospace: optimal
+                control and guidance on the drone, then a rocket, an aircraft and a satellite.
+              </p>
+            </div>
           ) : part === 3 ? (
             <div className="space-y-1.5 text-muted">
               <p className="text-fg">The third semester is being built.</p>

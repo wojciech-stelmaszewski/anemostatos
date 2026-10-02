@@ -51,7 +51,7 @@ describe('Part II and III lesson goals', () => {
   // III.29's goal needs a 300-flight campaign; tests/dispersion.test.ts checks it.
   const heavy = ['montecarlo', 'freqid'];
   for (const lesson of LESSONS.filter(
-    (l) => (l.part === 2 || l.part === 3) && l.goal && !heavy.includes(l.id),
+    (l) => (l.part === 2 || l.part === 3 || l.part === 4) && l.goal && !heavy.includes(l.id),
   )) {
     it(`"${lesson.title}" needs work, and its solution reaches the goal`, () => {
       expect(lesson.solution, 'a lesson with a goal documents a solution').toBeDefined();

@@ -888,6 +888,42 @@ for (const [tag, outer, safety, gamma] of [
       if (gamma) p.control.cbf.gamma = gamma;
     },
   });
+// II.17: the lesson without the safety margin.
+add({
+  name: 'cbf-m0',
+  seconds: 40,
+  setup: (p) => {
+    l3(p);
+    calm(p);
+    pillar(p);
+    p.setpoint.profile = 'sine';
+    p.setpoint.profileAxis = 'x';
+    p.setpoint.profileAmplitude = 4;
+    p.setpoint.profilePeriod = 10;
+    p.control.l3.outer = 'geometric';
+    p.control.l3.safety = 'cbf';
+    p.control.cbf.margin = 0;
+  },
+});
+// II.17: a set-point held behind the pillar — the pillar 15 cm off the line (as in the lesson),
+// and exactly on it.
+for (const [tag, z] of [
+  ['off', 0.15],
+  ['on', 0],
+] as const)
+  add({
+    name: `cbfstep-${tag}`,
+    seconds: 30,
+    setup: (p) => {
+      l3(p);
+      calm(p);
+      pillar(p);
+      p.world.pillarZ = z;
+      p.control.l3.outer = 'geometric';
+      p.control.l3.safety = 'cbf';
+    },
+    events: (s) => at(s, 3, 'setpoint.x', 6),
+  });
 
 // ─── Part II · E ───────────────────────────────────────────────────────────
 for (const hz of [50, 10, 3, 1])
@@ -901,6 +937,45 @@ for (const hz of [50, 10, 3, 1])
     },
     events: (s) => at(s, 12, 'drone.mass', 1.3),
   });
+// II.18: the filter sweep at full telemetry rate (the lesson's own jitter metric), and the payload
+// in calm air without sensor noise, for the comparison with the linear model.
+for (const hz of [0.5, 1, 2, 3, 5, 7, 10, 15, 20, 30, 50])
+  add({
+    name: `l1sweep-f${hz}`,
+    seconds: 25,
+    full: true,
+    setup: (p) => {
+      p.control.l1.kind = 'l1ac';
+      p.control.l1ac.filterHz = hz;
+      p.sensors.velNoise = 0.1;
+    },
+    events: (s) => at(s, 12, 'drone.mass', 1.3),
+  });
+for (const hz of [1, 3, 10, 50])
+  add({
+    name: `l1calm-f${hz}`,
+    seconds: 20,
+    full: true,
+    setup: (p) => {
+      calm(p);
+      p.control.l1.kind = 'l1ac';
+      p.control.l1ac.filterHz = hz;
+    },
+    events: (s) => at(s, 12, 'drone.mass', 1.3),
+  });
+// II.18: a faster predictor pole, calm air (the steady-state factor e^(a_s T)).
+add({
+  name: 'l1calm-as100',
+  seconds: 20,
+  full: true,
+  setup: (p) => {
+    calm(p);
+    p.control.l1.kind = 'l1ac';
+    p.control.l1ac.filterHz = 3;
+    p.control.l1ac.as = 100;
+  },
+  events: (s) => at(s, 12, 'drone.mass', 1.3),
+});
 for (const comp of ['none', 'learned', 'l1ac', 'indi'] as const)
   add({
     name: `residual-${comp}`,

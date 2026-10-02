@@ -719,3 +719,177 @@ def mpc_horizon():
     b.legend(loc="lower left", fontsize=6.0)
     b.grid(True, which="major", axis="both")
     save(f, "mpc_horizon")
+
+
+# ─── Lesson II.17 ──────────────────────────────────────────────────────────
+_PIL = dict(x=3.0, z=0.15, r=0.6, margin=0.3)
+
+
+def _pillar(ax, zc=0.15):
+    from matplotlib.patches import Circle
+    ax.add_patch(Circle((_PIL["x"], zc), _PIL["r"] + _PIL["margin"], fc="none", ec=C["err"], lw=0.6,
+                        ls=(0, (3, 2))))
+    ax.add_patch(Circle((_PIL["x"], zc), _PIL["r"], fc=C["sat"], ec=C["err"], lw=0.7))
+
+
+@fig
+def cbf_paths():
+    f, (a, b) = plt.subplots(2, 1, figsize=(TEXT_W, 96 * MM), gridspec_kw=dict(hspace=0.42))
+    _pillar(a)
+    d = win(load("cbf-geo"), 20, 30)
+    a.plot(d["pos.x"], d["pos.z"], color=C["ghost"], lw=1.3, label="no filter")
+    for (name, lab), col in zip((("cbf-cbf-g1", "γ = 1"), ("cbf-cbf", "γ = 2.5"), ("cbf-cbf-g4", "γ = 4")),
+                                ramp(3, "blue")):
+        d = win(load(name), 20, 30)
+        a.plot(d["pos.x"], d["pos.z"], color=col, lw=1.0, label=lab)
+    a.set_title("The lesson: the set-point swings from −4 to 4 m along x")
+    a.legend(loc="lower left", ncol=4, fontsize=6.2)
+    for k, (name, zc, col, lab) in enumerate((("cbfstep-on", 0.0, C["P"], "pillar on the line"),
+                                              ("cbfstep-off", 0.15, C["meas"], "pillar 15 cm off the line"))):
+        if k == 0:
+            _pillar(b, 0.0)
+        d = win(load(name), 2.9, 30)
+        b.plot(d["pos.x"], d["pos.z"], color=col, lw=1.1, label=lab)
+    from matplotlib.patches import Circle
+    b.add_patch(Circle((3.0, 0.15), 0.6, fc="none", ec=C["meas"], lw=0.6, ls=(0, (1, 1.5))))
+    b.plot([6], [0], marker="x", color=C["ink"], ms=4, lw=0)
+    b.text(6.0, 0.18, "set-point", fontsize=6.0, color=C["muted"], ha="center")
+    b.text(2.05, 0.18, "stops at 2.10 m", fontsize=6.0, color=C["P"], ha="right")
+    b.set_title("A set-point held behind the pillar (x = 6 m from t = 3 s)")
+    b.legend(loc="lower left", fontsize=6.2)
+    for ax in (a, b):
+        ax.set_aspect("equal")
+        ax.set_xlim(-0.3, 6.6)
+        ax.set_ylim(-1.35, 0.95)
+        ax.set_ylabel("z  [m]")
+        ax.grid(True, axis="both")
+    b.set_xlabel("x  [m]", loc="right")
+    save(f, "cbf_paths")
+
+
+@fig
+def cbf_barrier():
+    f, (a, b) = plt.subplots(1, 2, figsize=(TEXT_W, 58 * MM), gridspec_kw=dict(wspace=0.32))
+    g = 2.5
+    d = load("cbfstep-on")
+    h = (d["pos.x"] - 3) ** 2 - 0.81
+    hd = 2 * (d["pos.x"] - 3) * d["vel.x"]
+    k = d.index[d["cbf.active"] > 0][0]
+    t0 = d.t[k]
+    tt = np.linspace(0, 5, 300)
+    hp = (h[k] + (hd[k] + g * h[k]) * tt) * np.exp(-g * tt)
+    a.plot(d.t - t0, h, color=C["meas"], lw=1.1, label="flight")
+    a.plot(tt, hp, color=C["ink"], lw=0.7, ls=(0, (3, 2)), label=r"$\ddot h + 2\gamma\dot h + \gamma^2 h = 0$")
+    a.set_xlim(-0.3, 4.5)
+    a.set_ylim(-0.3, 8.6)
+    a.axhline(0, color=C["err"], lw=0.6)
+    a.set_title("Barrier h, pillar on the line")
+    a.set_ylabel(r"h  [m$^2$]")
+    a.set_xlabel("time after the filter wakes [s]", loc="right")
+    a.legend(loc="upper right", fontsize=6.0)
+    for (name, lab), col in zip((("cbf-cbf-g1", "γ = 1"), ("cbf-cbf", "γ = 2.5"), ("cbf-cbf-g4", "γ = 4")),
+                                ramp(3, "blue")):
+        d = win(load(name), 9, 16)
+        b.plot(d.t - 10, d["zone.dist"], color=col, lw=1.0, label=lab)
+    d = win(load("cbf-geo"), 9, 16)
+    b.plot(d.t - 10, d["zone.dist"], color=C["ghost"], lw=1.2, label="no filter")
+    b.axhspan(0, 0.3, color=C["sat"], alpha=0.45, lw=0)
+    b.axhline(0, color=C["err"], lw=0.7)
+    b.text(5.9, 0.05, "margin", fontsize=6.0, color=C["err"], ha="right")
+    b.set_ylim(-0.55, 3.6)
+    b.set_xlim(-1, 6)
+    b.set_title("Distance to the pillar's surface")
+    b.set_ylabel("m")
+    b.set_xlabel("time [s]  (set-point at 0 m, rising, at t = 0)", loc="right")
+    b.legend(loc="upper center", ncol=2, fontsize=6.0)
+    save(f, "cbf_barrier")
+
+
+# ─── Lesson II.18 ──────────────────────────────────────────────────────────
+def _l1_model(fc, rho=np.exp(-0.08), tau=0.03, wc=3.0, mh=1.0, m=1.3, g=9.81, T=6.0, dt=1e-4):
+    """Payload event with an exact (but scaled by rho) estimate, the filter C(s) and the motor lag."""
+    y = v = sf = 0.0
+    th = u = mh * g
+    wf = 2 * np.pi * fc
+    out = []
+    for k in range(int(T / dt)):
+        a = (th - m * g) / m
+        sig = mh * a - (u - mh * g)  # what the predictor sees: the commanded force is the "known" one
+        sf += wf * (rho * sig - sf) * dt
+        u = mh * g + mh * (-wc * wc * y - 2 * wc * v) - sf
+        th += (u - th) / tau * dt
+        v += a * dt
+        y += v * dt
+        out.append((k * dt, y))
+    return np.array(out)
+
+
+@fig
+def l1ac_payload():
+    f, (a, b) = plt.subplots(2, 1, figsize=(TEXT_W, 86 * MM), sharex=True, gridspec_kw=dict(hspace=0.32))
+    for hz, col in zip((1, 3, 10), ramp(3, "blue")):
+        d = win(load(f"l1calm-f{hz}"), 11, 18)
+        a.plot(d.t - 12, 100 * (d["pos.y"] - 2), color=col, lw=1.1, label=f"{hz} Hz")
+        m = _l1_model(hz)
+        a.plot(m[:, 0], 100 * m[:, 1], color=col, lw=0.7, ls=(0, (3, 2)))
+    a.plot([], [], color=C["ink"], lw=0.7, ls=(0, (3, 2)), label="model")
+    a.axhline(-2.51, color=C["faint"], lw=0.5)
+    a.text(5.9, -2.3, "−2.5 cm", fontsize=6.0, color=C["muted"], ha="right", va="bottom")
+    a.axvline(0, color=C["faint"], lw=0.6)
+    a.set_ylim(-7.5, 1)
+    a.set_title("Payload in calm air, no sensor noise: altitude error by filter C(s)")
+    a.set_ylabel("cm")
+    a.legend(loc="lower right", ncol=4, fontsize=6.2)
+    for hz, col, lw in ((3, C["meas"], 0.7), (1, C["P"], 1.0)):
+        d = win(load(f"l1sweep-f{hz}"), 11, 18)
+        b.plot(d.t - 12, d["est.dist.y"], color=col, lw=lw, label=f"σ̂ through C(s), {hz} Hz")
+    b.plot(d.t - 12, d["dist.y"], color=C["ink"], lw=1.0, label="true disturbance")
+    b.set_ylim(-12, 5)
+    b.set_xlim(-1, 6)
+    b.set_title("The lesson (wind, 0.1 m/s velocity noise): what the estimator sees")
+    b.set_ylabel("N")
+    b.legend(loc="lower right", ncol=3, fontsize=6.0)
+    xlab_time(b, "time after the payload lands  [s]")
+    save(f, "l1ac_payload")
+
+
+@fig
+def l1ac_tradeoff():
+    f, (a, b) = plt.subplots(1, 2, figsize=(TEXT_W, 60 * MM), gridspec_kw=dict(wspace=0.36))
+    hz = [0.5, 1, 2, 3, 5, 7, 10, 15, 20, 30, 50]
+    T, asl, sv = 0.004, -20.0, 0.1
+    K = np.exp(asl * T) / ((np.exp(asl * T) - 1) / asl)
+    ff = np.geomspace(0.4, 60, 100)
+    al = T / (1 / (2 * np.pi * ff) + T)
+    a.loglog(ff, np.sqrt(2 * sv**2 * K**2 * al**2 / (2 - al)), color=C["meas"], lw=0.8, ls=(0, (3, 2)),
+             label="formula")
+    sd, emax, jit = [], [], []
+    for h in hz:
+        d = load(f"l1sweep-f{h}")
+        sd.append(win(d, 5, 11.99)["est.dist.y"].std())
+        w = d[d.t >= 12]
+        emax.append(100 * (w["sp.y"] - w["pos.y"]).abs().max())
+        jit.append(np.sqrt((np.diff(w["thrust"].values) ** 2).mean()))
+    a.loglog(hz, sd, "o", color=C["meas"], ms=3, label="flight")
+    a.set_title("Noise in the filtered estimate")
+    a.set_ylabel("standard deviation  [N]")
+    a.set_xlabel("filter C(s)  [Hz]", loc="right")
+    a.legend(loc="upper left", fontsize=6.0)
+    a.grid(True, which="major", axis="both")
+    a.set_yticks([0.3, 1, 3, 10])
+    a.set_yticklabels(["0.3", "1", "3", "10"])
+    b.semilogx(hz, emax, "o-", color=C["P"], ms=3, lw=0.8, label="max error  [cm]")
+    b.semilogx(hz, [10 * j for j in jit], "s-", color=C["I"], ms=3, lw=0.8, label="thrust jitter  [×0.1 N]")
+    b.axhline(6, color=C["P"], lw=0.6, ls=(0, (4, 2.5)))
+    b.axhline(3, color=C["I"], lw=0.6, ls=(0, (4, 2.5)))
+    b.axvspan(2, 3, color=C["I"], alpha=0.12, lw=0)
+    b.text(2.45, 7.2, "goal\nmet", fontsize=6.0, color=C["I"], ha="center")
+    b.set_ylim(0, 24)
+    b.set_title("The lesson's two scores")
+    b.set_xlabel("filter C(s)  [Hz]", loc="right")
+    b.legend(loc="upper left", fontsize=6.0)
+    for ax in (a, b):
+        ax.set_xticks([0.5, 1, 2, 5, 10, 20, 50])
+        ax.set_xticklabels(["0.5", "1", "2", "5", "10", "20", "50"])
+        ax.minorticks_off()
+    save(f, "l1ac_tradeoff")

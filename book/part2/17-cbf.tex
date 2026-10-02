@@ -1,0 +1,246 @@
+\lesson{II.17}{The safety filter}{Let any controller fly. Between it and the motors, change its command as little as possible, and only when keeping out of a forbidden region requires it.}{3}{cbf}{Part II · Beyond PID}
+\label{les:cbf}
+
+\lead{\setupcard{\setuprow{Level}{L3}\setuprow{Controller}{geometric tracking (Lee) of Lesson~II.10, attitude P and rate PID below}\setuprow{Scene}{a vertical pillar of radius \SI{0.6}{m} at $x = \SI{3}{m}$, \SI{15}{cm} beside the line of flight; no wind}\setuprow{Set-point}{swings along $x$ from $-4$ to \SI{4}{m} and back, with a period of \SI{10}{s}}\setuprow{Goal}{for \SI{20}{s}: never inside the pillar, and still reach $x < \SI{-3.5}{m}$ on the free side}}%
+The set-point swings straight through a pillar, as a careless pilot or a buggy planner might ask. The geometric controller obeys perfectly: in every ten-second swing, there and back, it spends a second and a half inside the pillar, up to \SI{45}{cm} deep. Now add one block between the controller and the motors. It leaves the command alone when the drone is far away. Near the pillar it removes just the part of the command that would carry the drone in too fast, and nothing else. The drone brakes, slides along the edge of the pillar, never gets inside it, and still follows the set-point on the free side. The block does not know which controller sits above it. That is what makes it a \emph{safety filter}.}
+
+\section{A number that says \enquote{safe}}
+
+Describe the forbidden region by a function of the position that is positive outside it and negative inside. For a vertical pillar with its axis at $(x_c, z_c)$, radius $R_p$ and a safety margin $\delta$ added, with $\vec p = (x, z)$ the horizontal position:
+\begin{equation}\label{eq:cbf-h}
+  h(\vec p) = \|\vec p - \vec c\|^2 - R^2, \qquad R = R_p + \delta .
+\end{equation}
+The \term{safe set} is $\mathcal C = \{h \ge 0\}$. In the lesson $\vec c = (3, 0.15)\,\si{m}$, $R_p = \SI{0.6}{m}$ and $\delta = \SI{0.3}{m}$, so $R = \SI{0.9}{m}$. The square avoids a square root, and $h$ is smooth everywhere.\tip{Any smooth function that is positive exactly on the safe set will do. A different choice changes how the filter behaves near the edge, but not where the edge is.}
+
+Safety means that $h$ never becomes negative. Away from the boundary nothing needs to happen. Close to it, $h$ must not fall too fast. The filter cannot set $h$ directly, though. It commands an acceleration $\vec a$, and the acceleration reaches $h$ only through two derivatives. With $\vec d = \vec p - \vec c$ and the horizontal velocity $\vec v$:
+\begin{equation}\label{eq:cbf-derivs}
+  \dot h = 2\,\vec d\cdot\vec v, \qquad \ddot h = 2\|\vec v\|^2 + 2\,\vec d\cdot\vec a .
+\end{equation}
+$\ddot h$ is \emph{affine} in the acceleration, a constant plus a linear term. That is the whole trick.\recall{Lesson~II.11: for the flat quadrotor the acceleration is the input of the translational motion. The thrust vector and the attitude loop deliver it.}
+
+A first-order system $\dot h = -\gamma h$ decays to zero but never crosses it. Ask the same of the second-order dynamics of $h$, with a double pole at $-\gamma$, and turn the equality into an inequality:
+\begin{equation}\label{eq:cbf-cond}
+  \ddot h + 2\gamma\,\dot h + \gamma^2 h \;\ge\; 0 .
+\end{equation}
+Insert \cref{eq:cbf-derivs}, and the condition becomes one linear inequality on the acceleration:
+\begin{equation}\label{eq:cbf-row}
+  \underbrace{2\,\vec d}_{\vec g}{}^{\T}\vec a \;\ge\; \underbrace{-2\|\vec v\|^2 - 2\gamma\,\dot h - \gamma^2 h}_{b} .
+\end{equation}
+Geometrically, $\vec g$ points away from the pillar's axis, and $b$ is the outward acceleration the drone must have at least. When the drone is far away, $b$ is very negative and any reasonable acceleration satisfies the condition. Near the pillar and moving towards it, $b$ grows, and the drone may no longer accelerate inwards as freely as before.
+
+\begin{definition}{Safety filter}
+Given a requested acceleration $\vec a_{des}$ from any controller, a \term{safety filter} returns
+\begin{equation}\label{eq:cbf-qp}
+  \vec a^* = \arg\min_{\vec a}\ \tfrac12\|\vec a - \vec a_{des}\|^2 \quad\text{subject to}\quad \vec g_i^{\T}\vec a \ge b_i \ \text{for every zone } i,
+\end{equation}
+the acceleration closest to the request among those that keep every barrier condition \cref{eq:cbf-row}. With a barrier function $h$ in the condition, it is a \term{control barrier function} (CBF) filter.
+\end{definition}
+
+With one zone, \cref{eq:cbf-qp} is the small problem solved in full in Example~\ref{ex:J-filter} of Appendix~J. Write it in the form used there, $(-\vec g)^\T\vec a \le -b$. Its solution moves the request along $\vec g$ just far enough:
+\begin{equation}\label{eq:cbf-closed}
+  \vec a^* = \vec a_{des} + \max\!\Big(0,\ \frac{b - \vec g^\T\vec a_{des}}{\|\vec g\|^2}\Big)\,\vec g .
+\end{equation}
+If the request already satisfies the condition, nothing changes. Otherwise only the component of the request along $\vec g$, towards the pillar's axis, is edited. The component along the edge stays as it was.
+
+\begin{example}[The moment the filter wakes up]
+\label{ex:cbf-wake}
+In the flight of \cref{fig:cbf-paths} (bottom, orange) the pillar is moved onto the line of flight, $z_c = 0$, and at $t = \SI{3}{s}$ the set-point jumps from $x = 0$ to $x = \SI{6}{m}$, behind the pillar. The geometric controller asks for its largest acceleration, \SI{6.87}{m/s^2}: the \SI{35}{\degree} tilt limit allows $g\tan 35^\circ = \SI{6.87}{m/s^2}$. At the filter's update at $t = \SI{3.20}{s}$ the drone is at $x = \SI{0.0176}{m}$ and moves at \SI{0.3625}{m/s}. Does the filter act, and how much? Use $\gamma = \SI{2.5}{1/s}$.
+
+\textbf{Step 1 — the barrier.} $d = x - 3 = \SI{-2.9824}{m}$. $h = 2.9824^2 - 0.81 = \SI{8.0848}{m^2}$, and $\dot h = 2\,d\,v = 2(-2.9824)(0.3625) = \SI{-2.1623}{m^2/s}$.
+
+\textbf{Step 2 — the row.} $g = 2d = -5.9648$. $b = -2(0.3625)^2 - 2(2.5)(-2.1623) - 2.5^2(8.0848) = -0.263 + 10.812 - 50.530 = -39.981$.
+
+\textbf{Step 3 — the bound.} $-5.9648\,a \ge -39.981$, so $a \le \SI{6.703}{m/s^2}$. The request, \SI{6.869}{m/s^2}, is above the bound: the filter acts.
+
+\textbf{Step 4 — the correction.} By \cref{eq:cbf-closed}, $a^* = \SI{6.703}{m/s^2}$, a correction of \SI{-0.166}{m/s^2}. The simulator logged \SI{-0.164}{m/s^2}. The 2\,mm/s$^2$ come from interpolating the state between two log samples \SI{10}{ms} apart.
+
+\textbf{Step 5 — read it.} The drone is still \SI{2.08}{m} from the edge of the margin and has moved less than two centimetres, yet the filter already acts. Speed is what matters: at $d = \SI{3}{m}$ every \SI{1}{m/s} of approach adds $2\gamma\cdot 2d = 30$ to $b$. That takes \SI{5}{m/s^2} off the allowed acceleration.
+\end{example}
+\innumbers{The filter solves its problem every \SI{20}{ms}, at the rate of the position loop. With one zone its answer is the formula \cref{eq:cbf-closed}, a few multiplications.}
+
+\section{What the filter guarantees}
+
+\begin{example}[Where the drone stops]
+\label{ex:cbf-stop}
+In the same flight, find where the drone comes to rest. Then predict $h(t)$ after the filter wakes, assuming the commanded acceleration is delivered exactly.
+
+\textbf{Step 1 — the rest point.} At rest, $\vec v = 0$ and $\dot h = 0$, so the row reads $2d\,a \ge -\gamma^2 h$. With $d < 0$ and a request $a_{des} > 0$, the drone is held at rest ($a^* = 0$) only where $-\gamma^2 h = 0$, that is $h = 0$: $|d| = R$, $x = 3 - 0.9 = \SI{2.100}{m}$.
+
+\textbf{Step 2 — the correction at rest.} There $b = 0$ and $a^* = 0$: the filter removes the whole request, a correction of \SI{-6.87}{m/s^2}. The flight comes to rest at $x = \SI{2.100}{m}$ with a logged correction of \SI{-6.869}{m/s^2}, and stays there until the end, \SI{27}{s} later.
+
+\textbf{Step 3 — the approach.} While the filter acts, the condition holds with equality, $\ddot h + 2\gamma\dot h + \gamma^2 h = 0$: a critically damped system. From the state at waking, $h_0 = \SI{8.074}{m^2}$ and $\dot h_0 = \SI{-2.314}{m^2/s}$ at the logged sample $t = \SI{3.205}{s}$, its solution is
+\begin{equation*}
+  h(t) = \big(h_0 + (\dot h_0 + \gamma h_0)\,t\big)\,e^{-\gamma t} = (8.074 + 17.87\,t)\,e^{-2.5t} .
+\end{equation*}
+
+\textbf{Step 4 — check} (\cref{fig:cbf-barrier}, left). Half a second after waking the formula gives \SI{4.87}{m^2} ($x = \SI{0.62}{m}$); the flight has \SI{4.23}{m^2} ($x = \SI{0.75}{m}$). Two seconds after waking: \SI{0.295}{m^2} against \SI{0.271}{m^2}. After four seconds both are below \SI{0.01}{m^2}, a few millimetres from $x = \SI{2.1}{m}$. The flight runs slightly ahead because the drone cannot change its acceleration instantly. To brake, it must first tilt back, and for that time it keeps accelerating towards the pillar.
+\end{example}
+
+\simfig{cbf_paths}{Top view of the flights. Top: one swing of the lesson, $t = 20$--\SI{30}{s}. Without the filter (grey) the drone flies through the pillar (filled) and its margin (dashed). With the filter it brakes and slides along the margin. The smaller $\gamma$, the earlier it brakes. Bottom: a set-point held at $x = \SI{6}{m}$. With the pillar exactly on the line (orange, the pillar drawn filled) the drone stops at \SI{2.10}{m} and stays there. With the pillar \SI{15}{cm} off the line, as in the lesson (dotted outline), it slides round and reaches the set-point in \SI{3.6}{s}.}{fig:cbf-paths}
+
+The guarantee behind this behaviour is a statement about the double pole of \cref{eq:cbf-cond}. Factor the condition as $(\tfrac{\dd}{\dd t} + \gamma)(\tfrac{\dd}{\dd t} + \gamma)h \ge 0$ and give the inner bracket a name, $\psi = \dot h + \gamma h$. Then the condition says $\dot\psi + \gamma\psi \ge 0$: $\psi$ cannot fall faster than $e^{-\gamma t}$, so a positive $\psi$ stays positive. And $\psi \ge 0$ says $\dot h \ge -\gamma h$: $h$ cannot fall faster than $e^{-\gamma t}$, so a positive $h$ stays positive (Theorem~\ref{thm:cbf-invariance} below). The second condition, $\psi \ge 0$, bounds the speed of approach: \emph{close to the edge, slowly}.
+
+\begin{keyidea}[Safety as a condition on the input, one step at a time]
+A barrier function turns \enquote{never enter the region} into a condition on the present input that can be checked now: \emph{do not let $h$ decrease faster than a stable linear system would}. The filter enforces that condition and changes nothing else. The future enters only through the shape of $h$ and the rate $\gamma$, not through a prediction.
+\end{keyidea}
+\didyouknow{In 1829 Gauss stated mechanics in the same form: a constrained system moves at every instant so that its accelerations deviate as little as possible from those of the free motion, the deviations squared and weighted by the masses. The safety filter is Gauss's principle with the controller's request as the \enquote{free motion}.}
+
+\section{Sliding, braking and stopping}
+
+\begin{example}[Why the drone slides round the pillar]
+\label{ex:cbf-slide}
+In the lesson the pillar's axis is at $z_c = \SI{0.15}{m}$, beside the line $z = 0$ along which the drone flies. Take the drone at rest on the margin at $z = 0$, with the request $\vec a_{des} = (6.87, 0)\,\si{m/s^2}$ towards $+x$. Decompose what the filter keeps.
+
+\textbf{Step 1 — the point.} On the margin at $z = 0$: $d_z = -0.15$, $d_x = -\sqrt{0.81 - 0.0225} = -0.887$. The outward unit normal is $\vec n = \vec d/R = (-0.986, -0.167)$.
+
+\textbf{Step 2 — the inward part.} $\vec a_{des}\cdot\vec n = 6.87 \cdot (-0.986) = \SI{-6.77}{m/s^2}$, a push into the pillar. At rest on the boundary $b = 0$, so the filter removes all of it.
+
+\textbf{Step 3 — what remains.} $\vec a^* = \vec a_{des} - (\vec a_{des}\cdot\vec n)\,\vec n$, which is $(6.87, 0) - 6.77\,(0.986, 0.167) = (0.19, -1.13)\,\si{m/s^2}$. That is \SI{1.1}{m/s^2} along the edge, towards $-z$, round the side of the pillar.
+
+\textbf{Step 4 — and on.} As the drone moves round, the request points less and less into the pillar and more and more along it. The sideways part grows, the drone speeds up round the side, and once past the pillar the request no longer points inwards at all. With the set-point held at $x = \SI{6}{m}$ the drone goes as far as $z = \SI{-1.06}{m}$, never closer than \SI{0.54}{m} to the pillar's surface, and is within \SI{10}{cm} of the set-point \SI{3.6}{s} after the jump (\cref{fig:cbf-paths}, bottom).
+
+\textbf{Step 5 — the special case.} With the pillar exactly on the line, $d_z = 0$ and the request points straight at the axis. Nothing is left after the projection, and the drone stops for good. This is the \emph{deadlock} the app warns about. It needs the request to be exactly normal to the edge. That holds on a line of measure zero, but in practice a symmetric scene sits right on it.
+\end{example}
+\pitfall{A safety filter does not plan. It removes the part of the command that approaches the edge, and whatever is left decides where the drone goes. Behind a wide obstacle the leftover may be nothing. Getting round is the job of a planner above the filter (Lesson~II.16).}
+
+\begin{example}[What $\gamma$ buys]
+\label{ex:cbf-gamma}
+Compare the lesson's flight for $\gamma = 1$, $2.5$ and \SI{4}{1/s} (\cref{fig:cbf-barrier}, right).
+
+\textbf{Step 1 — the prediction.} At rest at a distance where $h > 0$, the row is $2d\,a \ge -\gamma^2 h$. Approaching at speed $s$, the term $-2\gamma\dot h = 4\gamma|d|s$ raises the bar. A small $\gamma$ makes $\gamma^2 h$ small, so the filter acts far away. Approach speed is penalised linearly in $\gamma$, distance quadratically. The drone should brake early and gently with $\gamma = 1$, and late and hard with $\gamma = 4$.
+
+\textbf{Step 2 — the flights, distance.} The closest approach to the pillar's surface over the run is \SI{0.81}{m} for $\gamma = 1$, \SI{0.22}{m} for $2.5$ and \SI{0.21}{m} for $4$. With $\gamma = 1$ the drone never even reaches the margin; it gets no further than $x = \SI{1.80}{m}$.
+
+\textbf{Step 3 — the flights, effort.} The largest correction is \SI{6.9}{m/s^2}, \SI{8.3}{m/s^2} and \SI{9.1}{m/s^2}. The filter is active 57\,\%, 43\,\% and 38\,\% of the time after $t = \SI{10}{s}$. A larger $\gamma$ means corrections that are rarer but harder.
+
+\textbf{Step 4 — the margin.} Both $\gamma = 2.5$ and $\gamma = 4$ end up a few centimetres \emph{inside} the \SI{0.3}{m} margin. The guarantee of the next section says $h \ge 0$, yet $h$ falls to \SI{-0.142}{m^2}, \SI{8}{cm} inside the margin. The reason is the same lag as in Example~\ref{ex:cbf-stop}. Here the request changes quickly, when the set-point turns back while the drone slides round the pillar, and the tilt, still well below its limit at \SI{24}{\degree}, cannot follow. The margin absorbs it: the pillar itself is never touched.
+\end{example}
+
+\simfig{cbf_barrier}{Left: the barrier $h$ after the filter wakes, pillar on the line of flight. Dashed: the critically damped solution of \cref{eq:cbf-cond} with equality, from the state at waking. The flight runs slightly ahead while the drone tilts back to brake. Right: distance to the pillar's surface during one swing of the lesson. Without the filter (grey) the drone passes through twice, \SI{45}{cm} deep. With the filter it never goes below zero; with $\gamma = 2.5$ and $4$ it dips a few centimetres into the margin (shaded).}{fig:cbf-barrier}
+
+\screen[0 0 495 998]{cbf}{Lesson II.17 in the app with the filter on, at $t = \SI{13.2}{s}$, while the drone slides round the pillar. The red arrow at the drone is the filter's correction. The position-$x$ chart shows the measured $x$ falling behind the set-point near the pillar. The selector \ui{Safety filter} is at the bottom of the controller panel.}{fig:cbf-screen}
+
+\begin{inapp}
+\begin{itemize}[leftmargin=1.2em]
+  \item The switch is \ui{Controller\then Safety filter\then control barrier function} (\param{control.l3.safety = 'cbf'}). The rate and the margin are \param{control.cbf.gamma} and \param{control.cbf.margin}. The pillar is \param{world.pillar}, \param{pillarX}, \param{pillarZ}, \param{pillarR}, and a ceiling (\param{world.ceiling}) adds a second constraint.
+  \item The filter is \texttt{safetyFilter} in \src{src/control/cbf.ts}. It builds one row \cref{eq:cbf-row} per zone and returns the request untouched if no row is violated. Otherwise it solves \cref{eq:cbf-qp} with the ADMM solver of Appendix~J (\src{src/math/qp.ts}).
+  \item In \src{src/control/cascade.ts} the filter sits after the outer stage (geometric, MPC or MPPI) and before the disturbance compensation and the tilt limit. The correction is logged as \param{cbf.dx}, \param{cbf.dz}, and \param{cbf.active} counts the active rows.
+\end{itemize}
+\end{inapp}
+
+\begin{trythis}
+\begin{enumerate}
+  \item Watch one swing without the filter, then switch it on and press \key{R}.
+  \item Set \param{control.cbf.gamma} to 1, then to 6. Where does the drone turn back, and how hard is the red arrow?
+  \item Move the pillar onto the line: \param{world.pillarZ} = 0. What happens when the set-point is behind it?
+  \item Keep the filter on and change \ui{Outer stage} to MPPI (Lesson~II.16).
+\end{enumerate}
+\predict{with the pillar exactly on the line and the set-point behind it, where will the drone stop, to the centimetre?}
+\end{trythis}
+
+\section{The engineer's view: a supervisor with a formula}
+
+In industry the same idea goes under several names: \emph{run-time assurance}, \emph{envelope protection}, a \emph{safety monitor}, a \emph{geofence}. Each sits between a capable but unverified function and the actuators, and intervenes only when its own simple and verifiable rule demands it. The rule can then be certified, and the function above it can change without being certified again. A CBF filter is the version with a formula: it acts continuously, by the smallest change, and the guarantee follows from a scalar inequality.
+
+\begin{example}[The same filter on a car]
+\label{ex:cbf-acc}
+A car at $v = \SI{25}{m/s}$ follows another car at $v_L = \SI{20}{m/s}$, $D = \SI{50}{m}$ behind it. The rule is a time headway of \SI{1.8}{s}: $h = D - 1.8\,v \ge 0$. The input is the car's acceleration $a$. What may the cruise control command?
+
+\textbf{Step 1 — the barrier.} $h = 50 - 1.8 \cdot 25 = \SI{5}{m}$: safe, but close.
+
+\textbf{Step 2 — its derivative.} $\dot h = \dot D - 1.8\,a = (v_L - v) - 1.8\,a = -5 - 1.8\,a$. The acceleration appears in the first derivative: the barrier has relative degree one, and a first-order condition $\dot h \ge -\gamma h$ is enough.
+
+\textbf{Step 3 — the bound.} $-5 - 1.8a \ge -\gamma \cdot 5$ gives $a \le (5\gamma - 5)/1.8$. With $\gamma = \SI{1}{1/s}$: $a \le 0$, so no acceleration is allowed. With $\gamma = \SI{0.5}{1/s}$: $a \le \SI{-1.39}{m/s^2}$, so the car must brake.
+
+\textbf{Step 4 — read it.} The cruise control can be anything, a PID or a learned policy, and the filter only clips its acceleration to the bound. Ames, Grizzle and Tabuada (2014) introduced the CBF quadratic program with this application.
+\end{example}
+
+\keeptogether{12\baselineskip}
+\subsection{In formal terms}
+
+\begin{definition}{Control barrier function}
+For a system $\dot{\vx} = f(\vx) + G(\vx)\symbf{u}$ with $f$, $G$ locally Lipschitz, and a continuously differentiable $h$ with safe set $\mathcal C = \{\vx : h(\vx) \ge 0\}$, $h$ is a \term{control barrier function} if there is an extended class-$\mathcal K$ function $\alpha$ (continuous, strictly increasing, $\alpha(0) = 0$) such that for all $\vx$ in an open set containing $\mathcal C$
+\begin{equation*}
+  \sup_{\symbf{u}}\ \big[\nabla h(\vx)^\T\big(f(\vx) + G(\vx)\symbf{u}\big)\big] \ \ge\ -\alpha\big(h(\vx)\big)
+\end{equation*}
+(Ames, Xu, Grizzle and Tabuada, 2017; Ames et al., 2019). A set is \term{forward invariant} if every solution that starts in it stays in it.
+\end{definition}
+
+For $\dot h$ to contain the input, $\nabla h^\T G \ne 0$. For the pillar it is zero: the position does not feel the acceleration directly, and $h$ has \term{relative degree} two. The construction of \cref{eq:cbf-cond} is the standard remedy, the exponential CBF of Nguyen and Sreenath (2016), and in general form the high-order CBF of Xiao and Belta (2019).
+
+\begin{theorem}[Invariance with a relative-degree-two barrier]
+\label{thm:cbf-invariance}
+Let $h(t)$ be twice continuously differentiable, $\gamma > 0$, and suppose that at all times
+\begin{equation*}
+  \ddot h + 2\gamma\dot h + \gamma^2 h \ge 0 .
+\end{equation*}
+If $h(0) \ge 0$ and $\psi(0) = \dot h(0) + \gamma h(0) \ge 0$, then $\psi(t) \ge 0$ and $h(t) \ge 0$ for all $t \ge 0$. More precisely, $h(t) \ge \big(h(0) + \psi(0)\,t\big)e^{-\gamma t}$, with equality when the condition holds with equality.
+\end{theorem}
+\begin{proof}
+With $\psi = \dot h + \gamma h$ the condition reads $\dot\psi + \gamma\psi \ge 0$. Then $\tfrac{\dd}{\dd t}(e^{\gamma t}\psi) = e^{\gamma t}(\dot\psi + \gamma\psi) \ge 0$, so $e^{\gamma t}\psi(t) \ge \psi(0)$, that is, $\psi(t) \ge \psi(0)e^{-\gamma t} \ge 0$. Next, $\tfrac{\dd}{\dd t}(e^{\gamma t}h) = e^{\gamma t}\psi \ge \psi(0)$, and integrating from 0 to $t$ gives $e^{\gamma t}h(t) \ge h(0) + \psi(0)t$. With equality in the condition, every inequality becomes an equality.
+\end{proof}
+
+\begin{theorem}[The filter with one constraint]
+\label{thm:cbf-proj}
+For $\vec g \ne 0$, the unique minimiser of $\tfrac12\|\vec a - \vec a_{des}\|^2$ subject to $\vec g^\T\vec a \ge b$ is \cref{eq:cbf-closed}. It is the Euclidean projection of $\vec a_{des}$ onto the half-space, and it is a Lipschitz function of $\vec a_{des}$, $\vec g$ and $b$ wherever $\vec g$ stays away from zero.
+\end{theorem}
+\begin{proof}
+The problem is convex with a strictly convex cost, so it has one minimiser, characterised by the KKT conditions (Theorem~\ref{thm:J-kkt}): $\vec a - \vec a_{des} - \mu\vec g = 0$, $\mu \ge 0$, $\mu(\vec g^\T\vec a - b) = 0$. If $\vec g^\T\vec a_{des} \ge b$, then $\mu = 0$ and $\vec a = \vec a_{des}$. Otherwise the constraint is active: $\vec g^\T(\vec a_{des} + \mu\vec g) = b$ gives $\mu = (b - \vec g^\T\vec a_{des})/\|\vec g\|^2 > 0$. Both cases are \cref{eq:cbf-closed}, and the map $\max(0, \cdot)$ is Lipschitz.
+\end{proof}
+
+The Lipschitz property matters: it makes the filtered closed loop an ordinary differential equation with unique solutions, which the invariance argument needs. With several zones the filter is the QP \cref{eq:cbf-qp}. Its solution is still locally Lipschitz under a regularity condition on the active constraints, as Ames et al.\ (2017) discuss. It can be \emph{infeasible} when the constraints contradict each other: two pillars close together, or a pillar and a ceiling with the drone wedged between them.
+
+Behind both theorems stands an older result. A closed set $\{h \ge 0\}$ with $\nabla h \ne 0$ on its boundary is forward invariant for a Lipschitz system if and only if, on the boundary, the velocity never points out of the set (Nagumo's theorem; Blanchini, 1999). A barrier condition is a way to make sure of that without solving the motion. It acts already in the interior, with a strength that grows as $h$ shrinks.
+
+\paragraph{Which hypothesis fails here.} The theorems assume that the acceleration the filter returns is the acceleration the drone has. In the simulator it is a set-point for the thrust vector, reached through the attitude loop with a lag of the order of a tenth of a second. Hence the drone runs ahead of the prediction in \cref{fig:cbf-barrier} and dips \SI{8}{cm} into the margin in Example~\ref{ex:cbf-gamma}. The theorems also allow any acceleration. The real drone has its tilt limit, which is applied \emph{after} the filter and can shorten the filtered command. The margin $\delta$ is the engineer's answer to both: a barrier for a slightly larger pillar than the real one. The robust and input-constrained versions of CBFs make the margin part of the theory. Finally, the equilibria: wherever the request points straight into the boundary, the filtered system has an equilibrium on the boundary that is not the set-point. Reis, Aguiar and Tabuada (2021) show that such equilibria can even be asymptotically stable. In our flights an offset of \SI{15}{cm} was enough to slide away from it; with no offset, the drone stayed.\tip{Test a safety filter with the set-point exactly behind the obstacle. A symmetric scene is where a deadlock lives.}
+
+\begin{lookahead}
+\begin{itemize}[leftmargin=1.2em]
+  \item The planner that goes round the obstacle, MPPI, is Lesson~II.16. With the filter below it, it is the usual combination: plan with a cost, guarantee with a constraint.
+  \item The lag that the filter ignores, and the margin it needs, return as the delay margin of Lesson~III.4 and the robustness of Lesson~III.11.
+  \item Envelope protection on an aircraft, and the rules that govern when automation may take over from a pilot, are Lesson~V.5.
+  \item On another vehicle: the car of Example~\ref{ex:cbf-acc}, a barrier of relative degree one.
+\end{itemize}
+\end{lookahead}
+
+\begin{remember}
+\begin{itemize}
+  \item A barrier function $h$ is positive where it is safe. The condition $\ddot h + 2\gamma\dot h + \gamma^2 h \ge 0$ is linear in the acceleration: one row $\vec g^\T\vec a \ge b$ per zone.
+  \item The filter returns the acceleration closest to the request that keeps every row. With one zone, the request moves along $\vec g$ just far enough.
+  \item If $h \ge 0$ and $\dot h + \gamma h \ge 0$ at the start, they stay so: near the edge, only slowly towards it.
+  \item In the lesson: never inside the pillar, closest \SI{22}{cm} from it with $\gamma = 2.5$; the attitude lag costs \SI{8}{cm} of the \SI{30}{cm} margin.
+  \item The filter guarantees safety, not progress. Where the request points straight into the edge it stops; otherwise the drone slides along the edge.
+\end{itemize}
+\end{remember}
+
+\begin{curiosity}{A fighter that pulls up by itself}
+\photo{acat}{The F-16D of the Automatic Collision Avoidance Technology programme over mountainous terrain, flown by NASA Dryden and the Air Force Research Laboratory. Photo: NASA, ED09-0290-32.}
+Controlled flight into terrain is one of the oldest ways to lose a fighter. A pilot loses the horizon in cloud, misjudges a valley, or blacks out in a hard turn, and the aircraft flies into the ground. A warning helps only if the pilot can still react. A system that takes over too readily is no better: it annoys the pilots who must fly with it.
+
+The answer, developed over many years by the US Air Force Research Laboratory, NASA's Dryden (now Armstrong) Flight Research Center and Lockheed Martin, was the Automatic Ground Collision Avoidance System, Auto-GCAS. It continuously predicts the path of an automatic recovery manoeuvre and compares it with a terrain map on board. It does nothing while that recovery remains possible. Only at the last moment, when the predicted recovery would touch the terrain, does it take over: it pulls the aircraft up at five g, then hands it back to the pilot. The design goal was a system that never intervenes when it is not needed — \enquote{nuisance free}. In September 2014 the retrofit of the US Air Force's F-16 Block 40/50 fleet began, and within four months two pilots' lives had been saved (Church, 2016).
+
+Auto-GCAS is not a control barrier function. It decides by predicting a trajectory, not by checking an inequality at the current instant. But it shares the architecture of this lesson: an unverified controller above, here the pilot, and a small, verifiable rule below, which leaves the command alone until safety requires otherwise.
+\end{curiosity}
+
+\begin{exercises}
+\exercise[1] The drone is at $\vec p = (1.5, 0)\,\si{m}$, moving at $\vec v = (2, 0)\,\si{m/s}$, with the pillar of the lesson but on the line ($\vec c = (3, 0)$, $R = \SI{0.9}{m}$). Compute $h$, $\dot h$ and $\psi = \dot h + \gamma h$ for $\gamma = 2.5$. Is the state in the set where Theorem~\ref{thm:cbf-invariance} applies?
+\answer{$d = -1.5$; $h = 2.25 - 0.81 = \SI{1.44}{m^2}$; $\dot h = 2(-1.5)(2) = \SI{-6}{m^2/s}$; $\psi = -6 + 3.6 = -2.4 < 0$. No: the drone is already approaching too fast. The filter can still brake it, but the theorem no longer guarantees $h \ge 0$.}
+\exercise[1] The ceiling: $h = y_c - \delta - y$ with $y$ up. Show that the condition \cref{eq:cbf-cond} becomes $a_y \le \gamma^2 h - 2\gamma v_y$, and compare with the ceiling row in \src{src/control/cbf.ts}.
+\answer{$\dot h = -v_y$, $\ddot h = -a_y$. $-a_y - 2\gamma v_y + \gamma^2 h \ge 0$. In the code: $\vec g = (0, -1, 0)$, $b = k_1 v_y - k_0 h$ with $k_1 = 2\gamma$, $k_0 = \gamma^2$: $-a_y \ge 2\gamma v_y - \gamma^2 h$, the same.}
+\exercise[1] With the request \SI{6.87}{m/s^2} straight at the pillar's axis, at what distance from the axis may a drone at rest still be released without the filter acting, for $\gamma = 2.5$?
+\answer{At rest $b = -\gamma^2 h$; the row is $2d\,a \ge -\gamma^2(d^2 - R^2)$ with $d < 0$: $6.87 \le \gamma^2(d^2 - 0.81)/(2|d|)$, i.e.\ $6.25 d^2 - 13.74|d| - 5.06 \ge 0$, so $|d| \ge \SI{2.52}{m}$.}
+\exercise[2]\exkind{derive} Generalise Example~\ref{ex:cbf-stop}, Step 3. With equality in the condition, show that $h$ decreases monotonically when $\dot h(0) < 0$ and $\psi(0) \ge 0$, and that the drone reaches the margin only as $t \to \infty$.
+\answer{$h(t) = (h_0 + \psi_0 t)e^{-\gamma t}$, so $\dot h = (\psi_0 - \gamma h_0 - \gamma\psi_0 t)e^{-\gamma t} = (\dot h_0 - \gamma\psi_0 t)e^{-\gamma t} < 0$ for all $t \ge 0$. $h > 0$ for every finite $t$, and $h \to 0$.}
+\exercise[2]\exkind{derive} The filter with a weight. If the outer loop cares more about one axis, it may minimise $\tfrac12(\vec a - \vec a_{des})^\T W(\vec a - \vec a_{des})$ with $W \succ 0$. Show that the solution with one active constraint is $\vec a^* = \vec a_{des} + \frac{b - \vec g^\T\vec a_{des}}{\vec g^\T W^{-1}\vec g}\,W^{-1}\vec g$. Which choice of $W$ makes it Gauss's principle of least constraint?
+\answer{KKT: $W(\vec a - \vec a_{des}) = \mu\vec g$, so $\vec a = \vec a_{des} + \mu W^{-1}\vec g$; activity gives $\mu$. With $W$ the mass matrix of the system, the cost is Gauss's \enquote{constraint} $\sum m_i|\vec a_i - \vec a_i^{free}|^2$ up to a factor.}
+\exercise[2]\exkind{derive} The car of Example~\ref{ex:cbf-acc}: at what gap $D$ may the car still hold its speed ($a = 0$) with $\gamma = \SI{0.5}{1/s}$?
+\answer{$-5 \ge -0.5(D - 45)$, so $D \ge \SI{55}{m}$.}
+\exercise[2]\exkind{fly} In Lesson~II.17 set \param{world.pillarZ} = 0 and \param{setpoint.profile} = none, then put the set-point at $x = \SI{6}{m}$. Where does the drone stop? Now set the set-point to $z = \SI{0.2}{m}$. Explain what happens with Example~\ref{ex:cbf-slide}.
+\answer{It stops at $x = \SI{2.10}{m}$, where $h = 0$ (Example~\ref{ex:cbf-stop}). With the set-point off the line the request has a component along the edge and the drone slides round, as in Example~\ref{ex:cbf-slide}.}
+\exercise[2]\exkind{fly} With the filter on, set \param{control.cbf.margin} to 0 and press \key{R}. Before flying: will the drone enter the pillar? Then watch the goal line of the lesson.
+\answer{It enters. In the recorded flight (\texttt{cbf-m0}) the drone is inside the pillar for \SI{1.85}{s} in \SI{40}{s}, up to \SI{14}{cm} deep: without a margin nothing absorbs the attitude lag of Example~\ref{ex:cbf-gamma}, which already cost \SI{8}{cm} with the margin in place.}
+\exercise[2]\exkind{code} \texttt{safetyFilter} (\src{src/control/cbf.ts}) calls the QP solver even when only one row is violated. Replace that case by \cref{eq:cbf-closed}, and say why the result is identical.
+\answer{With one row, and in the case of several rows only one active, the QP's solution is the projection onto that half-space (Theorem~\ref{thm:cbf-proj}): \texttt{a = aDes + max(0, (b - g·aDes)/|g|²)·g}. Identical up to the solver's tolerance; faster and exact.}
+\exercise[3]\exkind{derive} The lag. Suppose the delivered acceleration follows the command as a first-order lag, $\tau\dot{\vec a} = \vec a^* - \vec a$. At rest at the margin, the filter returns $a^* = 0$ while the drone still accelerates towards the pillar at $a_0$. Estimate how far the drone overshoots into the margin, and the margin you would choose for $\tau = \SI{0.1}{s}$, $a_0 = \SI{6.87}{m/s^2}$.
+\answer{Ignoring the filter's reaction during the overshoot, $a(t) = a_0e^{-t/\tau}$, $v_\infty = a_0\tau$, distance $a_0\tau^2 = \SI{6.9}{cm}$; the filter reacts and reduces it, but a margin of about $a_0\tau^2$ — here 7 to \SI{10}{cm} — is the right order; the lesson's \SI{30}{cm} is generous, and the flight used \SI{8}{cm} of it.}
+\end{exercises}

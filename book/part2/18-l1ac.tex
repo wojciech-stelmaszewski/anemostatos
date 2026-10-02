@@ -1,0 +1,268 @@
+\lesson{II.18}{Adapt fast, act smooth}{Estimate the missing force as fast as the computer allows, and decide separately, with a filter, how much of the estimate the motors may feel.}{1}{l1ac}{Part II · Beyond PID}
+\label{les:l1ac}
+
+\lead{\setupcard{\setuprow{Level}{L1}\setuprow{Controller}{L1 adaptive: a PD baseline with a double pole at $-\SI{3}{rad/s}$, a state predictor with pole $a_s = -\SI{20}{1/s}$, and a low-pass filter $C(s)$ at \SI{50}{Hz}}\setuprow{Sensors}{velocity noise \SI{0.1}{m/s}}\setuprow{Wind}{on, as in Lesson~I.1}\setuprow{Event}{at $t = \SI{12}{s}$ a payload of \SI{300}{g} lands on the drone}\setuprow{Goal}{after the payload lands: error below \SI{6}{cm} and thrust jitter below \SI{0.3}{N}}}%
+The controller in this lesson learns the missing force again at every sample, every four milliseconds. Its estimate follows the true force, and with it every grain of noise in the velocity sensor. With the filter wide open at \SI{50}{Hz}, that noise reaches the motors. The thrust swings so hard that it hits its limits nearly half of the time, and the drone hovers \SI{23}{cm} too high before the payload has even landed. Lower the filter to \SI{3}{Hz} and nothing changes in how fast the controller learns. Only what reaches the motors changes. The thrust calms down, the payload costs four centimetres, and both goals are met. L1 adaptive control is built on that separation.}
+
+\section{A predictor that is told the truth}
+
+As in Lesson~II.5, write the vertical motion with the controller's belief $\hat m$ and lump everything else into one unknown force $\sigma$:
+\begin{equation}\label{eq:l1-model}
+  \hat m\,\dot v = \underbrace{u - \hat m g}_{F} + \sigma .
+\end{equation}
+Here $u$ is the commanded thrust and $F$ the force the controller knows about. $\sigma$ is everything it does not know: the payload, the drag, the motor lag, the wind.\recall{Lesson~II.5: ADRC estimated the same lumped force with an observer of bandwidth $\omega_o$. There the speed of the estimate and its noise were tied to one number.}
+
+L1 adaptive control runs a copy of \cref{eq:l1-model}, the \term{state predictor}, next to the drone, with its own estimate $\hat\sigma$:
+\begin{equation}\label{eq:l1-pred}
+  \hat m\,\dot{\hat v} = F + \hat\sigma + \hat m\,a_s\,(\hat v - v), \qquad a_s < 0 .
+\end{equation}
+The last term pulls the prediction towards the measured velocity, at the rate $|a_s|$. Subtract \cref{eq:l1-model}. The prediction error $\tilde v = \hat v - v$ obeys
+\begin{equation}\label{eq:l1-err}
+  \dot{\tilde v} = a_s\,\tilde v + \frac{\hat\sigma - \sigma}{\hat m} .
+\end{equation}
+If $\hat\sigma = \sigma$, the error decays at the rate $|a_s|$ and stays at zero. A wrong $\hat\sigma$ drives it away from zero. So the prediction error is a direct measurement of how wrong the estimate is.
+
+How should $\hat\sigma$ change? The classical answer, a gradient law $\dot{\hat\sigma} = -\Gamma\tilde v$, learns at a rate set by the gain $\Gamma$ (Lesson~III.17). L1 control usually takes a more radical route, the \term{piecewise-constant adaptation law}. Hold $\hat\sigma$ constant over each sample of length $T$. Over that sample \cref{eq:l1-err} is a linear equation with a constant input, and its exact solution is
+\begin{equation}\label{eq:l1-step}
+  \tilde v_{k+1} = e^{a_sT}\,\tilde v_k + \Phi\,\frac{\hat\sigma_k - \sigma}{\hat m}, \qquad \Phi = \frac{e^{a_sT} - 1}{a_s} .
+\end{equation}
+Choose $\hat\sigma_k$ so that the predictor would come back to zero error at the end of the sample if $\sigma$ were zero. That means cancelling the first term:
+\begin{equation}\label{eq:l1-law}
+  \hat\sigma_k = -\frac{\hat m\,e^{a_sT}}{\Phi}\,\tilde v_k .
+\end{equation}
+There is no adaptation gain to tune. The estimate is recomputed from scratch at every sample, as fast as the computer runs (Hovakimyan and Cao, 2010).\tip{\enquote{Adaptation} here means a fresh estimate at every sample. Nothing is integrated slowly, so there is nothing to wind up.}
+
+\begin{example}[The numbers of one step]
+\label{ex:l1-step}
+With $T = \SI{4}{ms}$ (the \SI{250}{Hz} control rate), $a_s = \SI{-20}{1/s}$ and $\hat m = \SI{1}{kg}$, compute the gain of \cref{eq:l1-law}. What estimate does a prediction error of \SI{1}{cm/s} produce?
+
+\textbf{Step 1 — the exponential.} $a_sT = -0.08$, $e^{-0.08} = 0.9231$.
+
+\textbf{Step 2 — $\Phi$.} $\Phi = (0.9231 - 1)/(-20) = \SI{3.844}{ms}$, slightly less than $T$. Without the pull of $a_s$, $\Phi$ would be $T$ itself.
+
+\textbf{Step 3 — the gain.} $K = \hat m\,e^{a_sT}/\Phi = 0.9231/0.003844 = \SI{240.1}{N\per(m/s)}$.
+
+\textbf{Step 4 — read it.} A prediction error of \SI{1}{cm/s} gives $\hat\sigma = \SI{-2.4}{N}$. That is a quarter of the drone's weight, from one centimetre per second. The gain is roughly $\hat m/T$: whatever velocity change the model did not predict within one sample is converted into the force that would have caused it.
+\end{example}
+
+\begin{example}[What the payload looks like to the predictor]
+\label{ex:l1-payload}
+The drone of mass \SI{1}{kg} hovers, and a payload of \SI{300}{g} lands on it. The controller still believes $\hat m = \SI{1}{kg}$. Find $\sigma$, and the sag a PD baseline alone would suffer.
+
+\textbf{Step 1 — the truth.} With the true mass $m$, $m\dot v = u - mg$. Solve for $\dot v$ and insert it into \cref{eq:l1-model}: $\sigma = \hat m\dot v - (u - \hat mg) = (\hat m/m - 1)\,u$.
+
+\textbf{Step 2 — at hover.} The new hover thrust is $u = 1.3 \cdot 9.81 = \SI{12.75}{N}$, so $\sigma = (1/1.3 - 1)\cdot 12.75 = \SI{-2.943}{N}$: the payload's weight, $0.3 \cdot 9.81$, as it should be.
+
+\textbf{Step 3 — without adaptation.} The baseline is a PD with both poles at $-\omega_c$, $\omega_c = \SI{3}{rad/s}$: $u = \hat mg + \hat m\omega_c^2(r - y) - 2\hat m\omega_c v$. A constant $\sigma$ is held by the proportional part alone, at an error $\sigma/(\hat m\omega_c^2) = 2.943/9 = \SI{32.7}{cm}$.
+
+\textbf{Step 4 — with it.} The adaptive controller subtracts its estimate, $u = u_{base} - \hat\sigma$. If $\hat\sigma$ equalled $\sigma$ instantly, the drone would not move at all.
+\end{example}
+
+\section{Fast and noisy}
+
+The law \cref{eq:l1-law} turns the prediction error into a force with a gain of \SI{240}{N\per(m/s)}. The prediction error contains the measured velocity, and so its noise as well.
+
+\begin{example}[The noise in the raw estimate]
+\label{ex:l1-raw}
+The velocity sensor adds independent noise $n_k$ of standard deviation $\sigma_n = \SI{0.1}{m/s}$ to every sample. Estimate the scatter of $\hat\sigma$ while the drone hovers.
+
+\textbf{Step 1 — where the predictor is.} After one step of \cref{eq:l1-pred} with the law \cref{eq:l1-law}, the predicted velocity is the \emph{measured} velocity of the previous sample carried one step forward by the model. It contains $n_{k-1}$, almost exactly. (The leftover factor is $T/\Phi - 1 = 0.04$, which we neglect.)
+
+\textbf{Step 2 — the error.} The next prediction error then contains the noise twice: $\tilde v_k \approx n_{k-1} - n_k$.
+
+\textbf{Step 3 — the estimate.} $\hat\sigma_k \approx K(n_k - n_{k-1})$, a difference of two independent noises, with standard deviation $\sqrt2\,K\sigma_n = 1.414 \cdot 240.1 \cdot 0.1 = \SI{34.0}{N}$.
+
+\textbf{Step 4 — check.} Between \SI{5}{s} and \SI{12}{s} of the lesson's flights the raw estimate scatters by 33.7 to \SI{35.4}{N}, depending on the filter. That is more than three times the weight of the drone. The estimate is fast, and it is no use on its own.
+\end{example}
+\innumbers{Noise of \SI{0.1}{m/s} in the velocity, divided by \SI{4}{ms}, looks like an acceleration of \SI{25}{m/s^2}. Any law that learns within one sample sees it as a force of that size.}
+
+The remedy is the second half of the method. The motors do not receive $\hat\sigma$, only a low-pass filtered version of it:
+\begin{equation}\label{eq:l1-u}
+  u = u_{base} - C(s)\,\hat\sigma, \qquad C(s) = \frac{\omega_f}{s + \omega_f}, \quad \omega_f = 2\pi f_c .
+\end{equation}
+In the simulator $C$ is a first-order discrete low-pass filter, $y_k = (1 - \alpha)\,y_{k-1} + \alpha\,x_k$ with $\alpha = T/(\tau + T)$ and $\tau = 1/\omega_f$.
+
+\begin{example}[The noise that gets through]
+\label{ex:l1-filtered}
+Predict the scatter of $C(s)\hat\sigma$ for $f_c = \SI{3}{Hz}$.
+
+\textbf{Step 1 — the filter constant.} $\tau = 1/(2\pi \cdot 3) = \SI{53.1}{ms}$, $\alpha = 4/(53.1 + 4) = 0.0701$.
+
+\textbf{Step 2 — the response to one noise sample.} The input is $K(n_k - n_{k-1})$. A single $n_0$ enters with $+K$ and leaves one sample later with $-K$. The filter's output to it is $K\alpha$ at $k = 0$, then $K\alpha(\beta - 1)\beta^{k-1}$ for $k \ge 1$, with $\beta = 1 - \alpha$.
+
+\textbf{Step 3 — the variance.} The noises are independent, so the variance is $\sigma_n^2$ times the sum of the squares of that response: $\sigma_n^2K^2\alpha^2\big(1 + \alpha^2/(1 - \beta^2)\big) = \sigma_n^2K^2\cdot 2\alpha^2/(2 - \alpha)$.
+
+\textbf{Step 4 — the number.} $\sqrt{2 \cdot 0.0701^2/1.930} \cdot 240.1 \cdot 0.1 = \SI{1.71}{N}$. The flight shows \SI{1.65}{N}. At \SI{50}{Hz} ($\alpha = 0.557$) the formula gives \SI{15.7}{N}, and the flight \SI{15.6}{N} (\cref{fig:l1-tradeoff}, left).
+
+\textbf{Step 5 — read it.} For a narrow filter $2\alpha^2/(2 - \alpha) \approx \alpha^2$, so the scatter is about $K\sigma_n\,\omega_fT \approx \sigma_n\hat m\,\omega_f$. It grows in proportion to the filter's bandwidth, and does not depend on the sample time at all.
+\end{example}
+
+\begin{keyidea}[Two speeds, two knobs]
+In L1 adaptive control the estimate is as fast as the sampling allows, and the filter $C(s)$ alone decides how much of it acts. How fast the controller \emph{knows} and how fast it \emph{acts} are two separate choices. The price of acting fast is set by the filter's bandwidth: noise in proportion to $\omega_f$, and the robustness to delay that the filter leaves.
+\end{keyidea}
+
+\begin{definition}{L1 adaptive controller}
+An \term{L1 adaptive controller} consists of a state predictor with a Hurwitz matrix $A_s$, an adaptation law that drives the prediction error to zero (here the piecewise-constant law \cref{eq:l1-law}), and a control law that applies the estimate through a strictly proper low-pass filter $C(s)$ with $C(0) = 1$ (Cao and Hovakimyan, 2008; Hovakimyan and Cao, 2010). The name comes from the $\mathcal L_1$ norm of a system, the integral of the absolute value of its impulse response. A condition on it guarantees stability (Theorem~\ref{thm:l1-bounds}).
+\end{definition}
+
+\section{What reaches the motors}
+
+\begin{example}[How the filter sets the payload error]
+\label{ex:l1-peak}
+Assume an ideal estimate, $\hat\sigma = \sigma$ at all times, and the filter \cref{eq:l1-u}. Find the error after the payload of Example~\ref{ex:l1-payload} lands.
+
+\textbf{Step 1 — the leftover force.} The motors receive $C(s)\hat\sigma$, so the drone feels $\sigma - C(s)\sigma = (1 - C(s))\sigma$. For a step of size $\Delta = \SI{-2.943}{N}$ that leftover is $\Delta\,e^{-\omega_ft}$: the full step at first, fading at the rate of the filter.
+
+\textbf{Step 2 — the response.} The baseline closes the loop with a double pole at $-\omega_c$. The altitude error is the response of $1/(\hat m(s + \omega_c)^2)$ to that fading force:
+\begin{equation*}
+  Y(s) = \frac{\Delta}{\hat m}\,\frac{1}{(s + \omega_f)(s + \omega_c)^2} .
+\end{equation*}
+
+\textbf{Step 3 — a fast filter.} For $\omega_f \gg \omega_c$ the leftover is a short pulse of area $\Delta/\omega_f$. The loop's response to a pulse of area $A$ is $(A/\hat m)\,t\,e^{-\omega_ct}$, with its peak $A/(e\,\hat m\,\omega_c)$ at $t = 1/\omega_c$. So the peak error is
+\begin{equation*}
+  |y|_{max} \approx \frac{|\Delta|}{e\,\hat m\,\omega_c\,\omega_f} .
+\end{equation*}
+
+\textbf{Step 4 — the numbers.} At \SI{3}{Hz}, $\omega_f = \SI{18.85}{rad/s}$: $2.943/(2.718 \cdot 3 \cdot 18.85) = \SI{1.9}{cm}$; the exact response of Step~2 gives \SI{1.88}{cm}. At \SI{1}{Hz} the approximation gives \SI{5.7}{cm} and the exact response \SI{5.1}{cm}, since $\omega_f = 6.3$ is no longer much larger than $\omega_c = 3$.
+
+\textbf{Step 5 — compare.} In calm air without noise the flights dip \SI{3.2}{cm} at \SI{3}{Hz} and \SI{6.6}{cm} at \SI{1}{Hz}, about \SI{1.3}{cm} more than predicted, and \emph{all} of them settle \SI{2.5}{cm} low instead of returning to zero (\cref{fig:l1-payload}, top). The ideal estimate of Step~1 is not what the law delivers.
+\end{example}
+
+\simfig{l1ac_payload}{Top: the payload in calm air without sensor noise, flown with the filter at 1, 3 and \SI{10}{Hz} (solid). Dashed: the model of Example~\ref{ex:l1-bias}, with the estimate's gain $e^{a_sT}$ and the motor lag. Every flight settles \SI{2.5}{cm} low. Bottom: the lesson's flight with wind and velocity noise. The filtered estimate at \SI{3}{Hz} and \SI{1}{Hz} against the true disturbance force. The raw estimate, not drawn, scatters by \SI{34}{N}.}{fig:l1-payload}
+
+\begin{example}[The estimate that falls short by eight percent]
+\label{ex:l1-bias}
+Find the steady state of the predictor and the law for a constant $\sigma$, and explain the \SI{2.5}{cm}.
+
+\textbf{Step 1 — a fixed point.} In steady state $\tilde v_{k+1} = \tilde v_k = \tilde v$. Insert the law \cref{eq:l1-law} into \cref{eq:l1-step}: $\tilde v = e^{a_sT}\tilde v - e^{a_sT}\tilde v - \Phi\sigma/\hat m$, so $\tilde v = -\Phi\sigma/\hat m$.
+
+\textbf{Step 2 — the estimate.} $\hat\sigma = -(\hat m e^{a_sT}/\Phi)(-\Phi\sigma/\hat m) = e^{a_sT}\,\sigma = 0.923\,\sigma$.
+
+\textbf{Step 3 — the payload.} $\hat\sigma = 0.923 \cdot (-2.943) = \SI{-2.717}{N}$. The flight's estimate settles at \SI{-2.717}{N} (\texttt{l1calm} flights, after $t = \SI{18}{s}$), against a true \SI{-2.943}{N}.
+
+\textbf{Step 4 — the offset.} The missing \SI{0.226}{N} is held by the baseline's proportional part, at $0.226/(\hat m\omega_c^2) = 0.226/9 = \SI{2.51}{cm}$. The flights settle \SI{2.51}{cm} low.
+
+\textbf{Step 5 — the transient.} Add this gain of 0.923 and the motor lag of \SI{30}{ms} to the model of Example~\ref{ex:l1-peak}. Note that the predictor counts the \emph{commanded} thrust as the known force, so the lag is part of what it estimates. The model's dips are then \SI{6.3}{cm} at \SI{1}{Hz} and \SI{2.9}{cm} at \SI{3}{Hz}, against \SI{6.6}{cm} and \SI{3.2}{cm} flown. The remaining 3\,mm are the sampling and the one-sample delay of the estimate, which the continuous model leaves out.
+\end{example}
+\pitfall{The factor $e^{a_sT}$ grows worse with a larger $|a_s|$, a faster pull of the predictor: at $a_s = -100$ it is 0.67. Theory promises $\hat\sigma \to \sigma$ as $T \to 0$. At a finite rate, without an integrator in the baseline, a small offset remains.}
+
+\simfig{l1ac_tradeoff}{Left: scatter of the filtered estimate before the payload, against the filter's bandwidth. Dashed: the formula of Example~\ref{ex:l1-filtered}. Dots: the lesson's flights. Right: the lesson's two scores over a sweep of the filter, with their limits (dashed). The largest error after the payload, set by a gust at $t = \SI{17.6}{s}$ for filters up to \SI{7}{Hz}; above \SI{10}{Hz}, by the hover offset of Example~\ref{ex:l1-rect}. The thrust jitter, the RMS change of the thrust between \SI{5}{ms} samples. Only 2 and \SI{3}{Hz} meet both goals.}{fig:l1-tradeoff}
+
+\begin{example}[Why the drone hovers 23 cm high at 50 Hz]
+\label{ex:l1-rect}
+With the filter at \SI{50}{Hz}, the drone hovers above its set-point even before the payload lands: \SI{22.7}{cm} on average between \SI{5}{s} and \SI{12}{s}. Predict this offset.
+
+\textbf{Step 1 — the command is noisy.} Over that interval the unclipped thrust command scatters by $s = \SI{16.1}{N}$. Most of it is the filtered estimate of Example~\ref{ex:l1-filtered}, \SI{15.6}{N}; the baseline's D term, acting on the noisy velocity, adds the rest. The motors deliver only between 0 and \SI{24.4}{N}.
+
+\textbf{Step 2 — the clipping is lopsided.} Around a mean of \SI{9.81}{N}, the clipped mean of a Gaussian of scatter \SI{16.1}{N} (the formula of Example~\ref{ex:noise-rect}) is \SI{10.89}{N}. The motors deliver more than was asked for, and the drone climbs.
+
+\textbf{Step 3 — the new balance.} The mean thrust delivered must equal the weight, so the mean command $\mu$ must satisfy $\mathbb E[\sat(u)] = 9.81$. Bisection gives $\mu^* = \SI{7.82}{N}$. The estimate is unbiased, because the predictor uses the clipped thrust as its known force. The missing \SI{1.99}{N} must therefore come from the baseline's proportional part, at an error of $1.99/9 = \SI{22.1}{cm}$.
+
+\textbf{Step 4 — check.} The flight: mean command \SI{7.85}{N}, offset \SI{22.7}{cm}, command clipped 46\,\% of the time; the formula predicts 45\,\%. This offset alone, not the payload, makes the \SI{50}{Hz} filter fail the goal.
+\end{example}
+\didyouknow{The same rectification lifted the PID of Lesson~I.8 by \SI{40}{cm}, and there the integral slowly took it back. The L1 controller has no integral apart from $\hat\sigma$, and $\hat\sigma$ is correct: it is the requested thrust that is not delivered.}
+
+\screen[0 0 495 998]{l1ac}{Lesson II.18 in the app at the start, with the filter at \SI{50}{Hz}. The contributions chart is a band of noise: the adaptive part \enquote{$-\hat\sigma$} swings by tens of newtons, and the live readout shows the thrust clipped at zero. The disturbance chart draws the true force and the estimate. The altitude chart shows the drone above \SI{2}{m} before the payload lands.}{fig:l1-screen}
+
+\begin{inapp}
+\begin{itemize}[leftmargin=1.2em]
+  \item The switch is \ui{Controller\then Altitude controller\then L1 adaptive} (\param{control.l1.kind = 'l1ac'}). The knobs are \param{control.l1ac.filterHz} ($f_c$), \param{control.l1ac.as} ($|a_s|$) and \param{control.l1ac.wc} (the baseline's $\omega_c$). The sensor noise is \param{sensors.velNoise}.
+  \item \texttt{L1Axis} in \src{src/control/l1ac.ts} is the predictor, the law \cref{eq:l1-law} and the filter, one axis at a time, in the velocity-predictor form of Wu et al.\ (2025). \texttt{L1AdaptiveController} adds the PD baseline for the altitude. \texttt{L1Compensation} uses three \texttt{L1Axis} as the compensation stage of Level~3 (\ui{Disturbance compensation\then L1 adaptive}).
+  \item The raw estimate is logged as \param{l1.sigma.raw}, the filtered one as \param{est.dist.y}, and the disturbance chart shows the latter against the true force.
+\end{itemize}
+\end{inapp}
+
+\begin{trythis}
+\begin{enumerate}
+  \item Start at \SI{50}{Hz} and watch the thrust chart and the altitude before the payload lands.
+  \item Lower the filter to 20, 10, 5, 3 and \SI{1}{Hz}, pressing \key{R} after each. Read both scores.
+  \item At \SI{3}{Hz}, change $|a_s|$ from 20 to 5 and to 100. Watch where the drone settles after the payload.
+\end{enumerate}
+\predict{the raw estimate stays as noisy at \SI{1}{Hz} as at \SI{50}{Hz}. Why does the thrust become so much calmer?}
+\end{trythis}
+
+\section{The engineer's view: a bandwidth budget}
+
+An engineer reads the lesson as a budget. The loop as a whole may have only so much bandwidth before noise and delay take over. Classical adaptive control spends it on the adaptation: a high gain $\Gamma$ learns fast but rings, and its robustness is hard to state. L1 adaptive control spends nothing there, since the estimate is as fast as the sampling allows, and puts the whole budget into one transfer function, $C(s)$, which can be analysed like any linear filter. The question \enquote{how robust is the adaptive loop?} becomes \enquote{how much delay and noise does $C(s)$ tolerate?}, and that question has a classical answer.
+
+\begin{example}[A car on a hill]
+\label{ex:l1-car}
+A cruise control of a car of believed mass $\hat m = \SI{1500}{kg}$ has a proportional baseline that returns speed errors at the rate $\lambda = \SI{0.5}{1/s}$. The car enters a 3\,\% grade. Compare the speed loss without adaptation and with an L1 estimate of ideal speed through a filter at \SI{0.5}{Hz}.
+
+\textbf{Step 1 — the force.} $\Delta = -\hat m g \cdot 0.03 = \SI{-441}{N}$, an acceleration of $\Delta/\hat m = \SI{-0.294}{m/s^2}$.
+
+\textbf{Step 2 — without adaptation.} $\dot e = -\lambda e + \Delta/\hat m$ settles at $e = 0.294/0.5 = \SI{0.59}{m/s}$, for as long as the hill lasts.
+
+\textbf{Step 3 — with it.} The leftover is $(\Delta/\hat m)\,e^{-\omega_ft}$ with $\omega_f = 2\pi \cdot 0.5 = \SI{3.14}{rad/s}$. The error $e(t) = (\Delta/\hat m)\,(e^{-\lambda t} - e^{-\omega_ft})/(\omega_f - \lambda)$ peaks at $t^* = \ln(\omega_f/\lambda)/(\omega_f - \lambda) = \SI{0.70}{s}$, where $e = 0.294 \cdot (0.706 - 0.112)/2.64 = \SI{0.066}{m/s}$, and then returns to zero.
+
+\textbf{Step 4 — read it.} Everything is six times slower than on the drone, and the picture is the same: the dip shrinks in proportion to $1/\omega_f$, and the filter is chosen by what the actuator and the passengers will accept, here the throttle's noise and the jerk.
+\end{example}
+
+\subsection{In formal terms}
+
+\begin{theorem}[The steady state of the piecewise-constant law]
+\label{thm:l1-ss}
+For the error dynamics \cref{eq:l1-err} sampled with period $T$, a constant $\sigma$, and the law \cref{eq:l1-law}, the prediction error converges to $-\Phi\sigma/\hat m$ and the estimate to $e^{a_sT}\sigma$, both in one step. The same holds when the predictor is integrated by Euler's method, as in \src{src/control/l1ac.ts}.
+\end{theorem}
+\begin{proof}
+Exact form: inserting \cref{eq:l1-law} into \cref{eq:l1-step} cancels $e^{a_sT}\tilde v_k$, so $\tilde v_{k+1} = -\Phi\sigma/\hat m$ for every $k \ge 0$, and then $\hat\sigma_{k+1} = e^{a_sT}\sigma$. Euler form: $\tilde v_{k+1} = (1 + a_sT)\tilde v_k + T(\hat\sigma_k - \sigma)/\hat m = (1 + a_sT - Te^{a_sT}/\Phi)\tilde v_k - T\sigma/\hat m$. From $\Phi = (e^{a_sT} - 1)/a_s$ follows $Te^{a_sT}/\Phi - a_sT = T/\Phi$, so the factor is $1 - T/\Phi$, of magnitude $0.04$ here, and the error converges geometrically to $\tilde v = -\Phi\sigma/\hat m$, with the same estimate.
+\end{proof}
+
+\begin{theorem}[Uniform bounds of L1 adaptive control]
+\label{thm:l1-bounds}
+Consider $\dot{\vx} = A_m\vx + \symbf{b}\,(\omega u + \sigma(t, \vx))$ with $A_m$ Hurwitz, $\omega$ in a known interval, and $\sigma$ Lipschitz in $\vx$ with constant $L$ and with bounded derivatives. Let $H(s) = (s\Id - A_m)^{-1}\symbf{b}$ and $G(s) = H(s)(1 - C(s))$. If $C(s)$ is strictly proper and stable with $C(0) = 1$, and the \term{$\mathcal L_1$-norm condition} $\|G\|_{\mathcal L_1}L < 1$ holds, then the closed loop of the L1 controller stays within a uniform distance of a non-adaptive \emph{reference system}, at all times, input and state alike. With the piecewise-constant law the distance tends to zero as $T \to 0$. The time-delay margin of the loop is set by $C(s)$ and stays bounded away from zero as the adaptation is made faster. (Cao and Hovakimyan, 2008; Hovakimyan and Cao, 2010, which state the bounds precisely.)
+\end{theorem}
+
+The reference system is the loop that would result if $\hat\sigma$ were exact and filtered by $C(s)$. Its error in our case is the response of Example~\ref{ex:l1-peak}. The theorem says that the real loop follows it as closely as one likes, provided the sampling is fast enough, whatever the speed of $\sigma$ within its bounds. The classical alternative, a gradient law $\dot{\hat\sigma} = -\Gamma\tilde v$ with projection, is proven with a Lyapunov function and Barbalat's lemma (Theorem~\ref{thm:G-barbalat}). It guarantees that the prediction error goes to zero and that the estimate stays bounded, but says little about the transient. That is the topic of Lesson~III.17.
+
+\paragraph{Which hypothesis fails here.} The theorem assumes exact measurements. Ours carry noise, which the fast estimate amplifies and only $C(s)$ attenuates (Examples~\ref{ex:l1-raw} and~\ref{ex:l1-filtered}). It assumes an unbounded input. Our motors saturate, and the noise, rectified by the limits, shifts the hover (Example~\ref{ex:l1-rect}). It speaks of the limit $T \to 0$. At $T = \SI{4}{ms}$ the estimate settles at $e^{a_sT}$ of the truth (Theorem~\ref{thm:l1-ss}). Finally, the wind is not a slowly varying $\sigma$: the gust at $t = \SI{17.6}{s}$, not the payload, sets the lesson's largest error for every filter up to \SI{7}{Hz}. For comparison, in the flight of Lesson~II.5, with the same wind and payload and no velocity noise, the PID lost \SI{27.7}{cm} to the payload and ADRC's largest error was \SI{12.2}{cm}, at the same gust. With the filter at \SI{3}{Hz}, the L1 controller loses \SI{4.1}{cm} to the payload and \SI{5.0}{cm} to the gust.
+
+\begin{lookahead}
+\begin{itemize}[leftmargin=1.2em]
+  \item The same estimate, on three axes, is a compensation stage at Level~3. Lesson~II.19 learns the shape of the wind instead of a lumped $\sigma$; Lesson~II.21 sets L1 against the others.
+  \item Gradient laws, their Lyapunov proofs and how they can diverge: Lesson~III.17. The delay margin that $C(s)$ leaves: Lesson~III.4.
+  \item Plants that change across the flight envelope return with gain scheduling in Lessons~IV.13 and IV.14. On another vehicle: the car of Example~\ref{ex:l1-car}.
+\end{itemize}
+\end{lookahead}
+
+\begin{remember}
+\begin{itemize}
+  \item A state predictor runs beside the drone. The piecewise-constant law resets the estimate at every sample, $\hat\sigma = -(\hat m e^{a_sT}/\Phi)\,\tilde v$, so the estimate is as fast as the sampling.
+  \item That speed carries the sensor's noise: \SI{34}{N} of scatter from \SI{0.1}{m/s}.
+  \item Only $C(s)\hat\sigma$ reaches the motors. The noise that passes grows with the filter's bandwidth; the payload's error shrinks with it, as $|\Delta|/(e\,\hat m\,\omega_c\,\omega_f)$.
+  \item At a finite sample time the estimate settles at $e^{a_sT}\sigma$: here 92\,\%, a \SI{2.5}{cm} offset.
+  \item In the lesson only 2 and \SI{3}{Hz} meet both goals. At \SI{50}{Hz} the clipped noise lifts the drone \SI{23}{cm}.
+\end{itemize}
+\end{remember}
+
+\begin{curiosity}{The dancing governor}
+\sidephoto{jenkin}{34mm}{Fleeming Jenkin (1833--1885), etching by W. Holl.}
+In 1868 James Clerk Maxwell published the paper with which this book began, \emph{On Governors}. Among the machines it describes is a governor built by the engineer Fleeming Jenkin and \enquote{used in electrical experiments}. Jenkin's governor had adjustments by which its regulating power could be changed, and Maxwell reports what happened when it was turned up: \enquote{By altering these adjustments the regulation could be made more and more rapid, till at last a dancing motion of the governor, accompanied with a jerking motion of the main shaft, shewed that an alteration had taken place among the impossible roots of the equation.} Faster regulation had bought a shaking machine.
+
+A hundred and forty years later, NASA Langley flew L1 adaptive control on a jet-powered model airliner. The AirSTAR test aircraft was a 5.5\,\% dynamically scaled transport with a wingspan of 6.5~feet and a take-off weight of 54~pounds, flown remotely by a research pilot from a mobile ground station at Fort Pickett, Virginia. The controller was asked to hold the aircraft's angle of attack precisely near and beyond the stall, where the aerodynamics turn nonlinear and asymmetric. To get that precision the team widened one filter, the low-pass filter on the angle of attack. They reported the cost in a single sentence: \enquote{The penalty for this improved performance was decreased tolerance to time delay (from 146 msec to 116 msec total latency) which is consistent with and is predicted by theory} (Gregory, Xargay, Cao and Hovakimyan, 2011).
+
+Jenkin turned a knob and watched his governor dance. The AirSTAR team turned theirs and could say beforehand what it would cost.
+\end{curiosity}
+
+\begin{exercises}
+\exercise[1] Compute $e^{a_sT}$, $\Phi$ and the gain $K$ of \cref{eq:l1-law} for $a_s = \SI{-5}{1/s}$ and for $a_s = \SI{-100}{1/s}$, with $T = \SI{4}{ms}$ and $\hat m = \SI{1}{kg}$. What fraction of a constant $\sigma$ does the estimate reach in each case?
+\answer{$a_s = -5$: $e^{-0.02} = 0.980$, $\Phi = \SI{3.96}{ms}$, $K = \SI{247}{N\per(m/s)}$, 98\,\%. $a_s = -100$: $e^{-0.4} = 0.670$, $\Phi = \SI{3.30}{ms}$, $K = \SI{203}{N\per(m/s)}$, 67\,\%.}
+\exercise[1] A payload of \SI{500}{g} lands on the \SI{1}{kg} drone. What is $\sigma$ at the new hover, and how far would the PD baseline alone sag?
+\answer{$\sigma = -0.5 \cdot 9.81 = \SI{-4.905}{N}$; sag $4.905/9 = \SI{54.5}{cm}$.}
+\exercise[1] Using Example~\ref{ex:l1-peak}, Step 3, which filter bandwidth limits the payload's peak error of Example~\ref{ex:l1-payload} to \SI{1}{cm}, with an ideal estimate?
+\answer{$\omega_f = 2.943/(2.718 \cdot 1 \cdot 3 \cdot 0.01) = \SI{36}{rad/s}$, $f_c \approx \SI{5.7}{Hz}$.}
+\exercise[2]\exkind{derive} Prove the variance formula of Example~\ref{ex:l1-filtered}, Step 3, by summing the squared impulse response. Then show that for $\alpha \ll 1$ the scatter is $\approx \sigma_n\hat m\,\omega_f$ and does not depend on $T$.
+\answer{$\sum h_k^2 = K^2\alpha^2[1 + (1 - \beta)^2\sum_{k\ge0}\beta^{2k}] = K^2\alpha^2[1 + \alpha^2/(1 - \beta^2)] = K^2\alpha^2[1 + \alpha/(2 - \alpha)] = K^2\cdot 2\alpha^2/(2 - \alpha)$. For small $\alpha$: $\approx K^2\alpha^2$, with $K \approx \hat m/T$ and $\alpha \approx \omega_fT$: scatter $\approx \sigma_n\hat m\omega_f$.}
+\exercise[2]\exkind{derive} With $\omega_f = \omega_c$ the partial fractions of Example~\ref{ex:l1-peak} change. Show that the error is then $y(t) = (\Delta/\hat m)\,\tfrac12 t^2e^{-\omega_ct}$, and find its peak.
+\answer{$Y = (\Delta/\hat m)/(s + \omega_c)^3$, inverse transform $\tfrac12t^2e^{-\omega_ct}$; peak at $t = 2/\omega_c$, value $(\Delta/\hat m)\,2e^{-2}/\omega_c^2$: for the payload, $2.943 \cdot 0.271/9 = \SI{8.9}{cm}$.}
+\exercise[2]\exkind{derive} Theorem~\ref{thm:l1-ss} says the estimate settles at $e^{a_sT}\sigma$. Show first that no law of the form $\hat\sigma_k = -c\,\tilde v_k$ with finite $c$ settles at $\sigma$ exactly. Then propose a change that makes the force applied to the motors settle at $\sigma$, and say what it costs.
+\answer{With $\hat\sigma = -c\tilde v$ in \cref{eq:l1-step}: $\tilde v(1 - e^{a_sT} + \Phi c/\hat m) = -\Phi\sigma/\hat m$, so $\hat\sigma = \sigma\,\Phi c/(\hat m(1 - e^{a_sT}) + \Phi c) < \sigma$ for every finite $c$: the estimate needs a nonzero error to exist. Keep the law in the predictor, but send $\hat\sigma/e^{a_sT}$ to $C(s)$: it settles at $\sigma$. The cost: the noise that reaches the motors grows by the same factor, $1/0.923$, about 8\,\%. (Alternatively, an integral in the baseline removes the offset, at the price of a slow pole.)}
+\exercise[2]\exkind{fly} In Lesson~II.18 at \SI{3}{Hz}, set $|a_s|$ to 100 (\param{control.l1ac.as}). Predict from Theorem~\ref{thm:l1-ss} where the drone settles after the payload in calm air, then fly with the wind off.
+\answer{$e^{-0.4} = 0.670$: the estimate reaches \SI{-1.97}{N}, the remaining \SI{0.97}{N} is held at $0.97/9 = \SI{10.8}{cm}$ below the set-point. The recorded flight (\texttt{l1calm-as100}) settles at \SI{10.8}{cm} below, with an estimate of \SI{-1.97}{N}.}
+\exercise[2]\exkind{fly} Find the widest filter at which the lesson's goal is still met, and explain from \cref{fig:l1-tradeoff} which score fails first above it.
+\answer{\SI{3}{Hz}; at \SI{5}{Hz} the jitter, \SI{0.40}{N}, exceeds \SI{0.3}{N} while the error, \SI{4.2}{cm}, is fine. Below \SI{2}{Hz} the error fails first (\SI{8.8}{cm} at \SI{1}{Hz}).}
+\exercise[2]\exkind{code} In \texttt{L1Axis.update} (\src{src/control/l1ac.ts}) the predictor is integrated with Euler's method. Replace it by the exact step \cref{eq:l1-step}, written for $\hat v$. Does the steady state change (Theorem~\ref{thm:l1-ss})?
+\answer{$\hat v_{k+1} = v_k + e^{a_sT}(\hat v_k - v_k) + \Phi(F + \hat\sigma_k)/\hat m$ (the exact solution of \cref{eq:l1-pred} with $v$ held over the sample). The steady state is the same, $\hat\sigma = e^{a_sT}\sigma$; only the transient of the error, already one step long, changes.}
+\exercise[3]\exkind{derive} Combine Examples~\ref{ex:l1-filtered} and~\ref{ex:l1-rect}: with the D term's noise neglected, find the largest filter bandwidth at which the thrust command, with standard deviation $\sigma_n\hat m\omega_f$, is clipped at zero less than 1\,\% of the time.
+\answer{Clipping at zero below 1\,\%: $9.81/s > 2.33$, so $s < \SI{4.2}{N}$; $\omega_f < 4.2/(0.1 \cdot 1) = \SI{42}{rad/s}$, $f_c < \SI{6.7}{Hz}$. (Measured: at \SI{7}{Hz} the command is clipped 1.1\,\% of the time.)}
+\end{exercises}

@@ -2,6 +2,8 @@ import type { TvcControlParams } from '@/control/tvc';
 import type { RocketParams } from './vehicles/rocket';
 import type { TvcParams } from './vehicles/tvc';
 import type { SatelliteParams } from './vehicles/satellite';
+import type { LanderParams } from './vehicles/lander';
+import type { PdgSettings } from '@/guidance/pdg';
 import type { VehicleId } from './vehicles/types';
 import type { AircraftParams } from './vehicles/aircraft';
 import type { AutopilotParams } from '@/control/autopilot';
@@ -541,7 +543,16 @@ export interface Params {
     yawDeg: number;
     rateLimit: number;
     /** Automatic setpoint motion added on top of the base value. */
-    profile: 'none' | 'square' | 'sine' | 'triangle' | 'circle' | 'figure8' | 'corners' | 'minsnap';
+    profile:
+      | 'none'
+      | 'square'
+      | 'sine'
+      | 'triangle'
+      | 'circle'
+      | 'figure8'
+      | 'corners'
+      | 'minsnap'
+      | 'plan';
     profileAxis: 'y' | 'x';
     profileAmplitude: number;
     profilePeriod: number;
@@ -560,6 +571,25 @@ export interface Params {
   autopilot: AutopilotParams;
   /** The satellite of Chapter N (src/sim/vehicles/satellite.ts) and its attitude control. */
   satellite: SatelliteParams;
+  /** The 3D lander of lesson IV.5 (src/sim/vehicles/lander.ts) and its guidance. */
+  lander: LanderParams;
+  pdg: PdgSettings;
+  /** The planned manoeuvre of lesson IV.6 (src/guidance/collocation.ts), flown as `setpoint.profile = 'plan'`. */
+  plan: PlanParams;
+}
+
+/** Lesson IV.6: rest to rest along x past the pillar, planned by min-snap or by collocation. */
+export interface PlanParams {
+  method: 'minsnap' | 'collocation';
+  /** Duration of the manoeuvre, s (collocation with `minTime` finds its own). */
+  duration: number;
+  minTime: boolean;
+  /** How far it goes along x, m. */
+  distance: number;
+  /** Fraction of the controller's horizontal acceleration limit the plan may use. */
+  accelFraction: number;
+  /** Seconds after take-off at which it starts. */
+  delay: number;
 }
 
 export const defaultParams = (): Params => ({
@@ -881,6 +911,39 @@ export const defaultParams = (): Params => ({
     estimateBias: false,
     outageStart: 20,
     outageLength: 0,
+  },
+  lander: {
+    dryMass: 25,
+    fuel: 1.75,
+    thrustMin: 150,
+    thrustMax: 600,
+    isp: 200,
+    start: { x: 60, y: 100, z: 30 },
+    startVel: { x: -6, y: -18, z: 3 },
+    dispersionCase: 0,
+    dispersePos: 40,
+    disperseVel: 10,
+    windForce: { x: 0, y: 0, z: 0 },
+    thrustScale: 1,
+    glideSlopeDeg: 30,
+    crashSpeed: 1,
+  },
+  pdg: {
+    nodes: 16,
+    throttle: 0.9,
+    replanEvery: 0.5,
+    freezeBefore: 0.5,
+    gateAltitude: 3,
+    gateSpeed: 1.5,
+    reserve: 0.45,
+  },
+  plan: {
+    method: 'minsnap',
+    duration: 3,
+    minTime: false,
+    distance: 6,
+    accelFraction: 0.8,
+    delay: 1,
   },
 });
 

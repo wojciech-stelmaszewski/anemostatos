@@ -1,3 +1,4 @@
+import { manoeuvreFor } from '@/guidance/collocation';
 import { evalSpline, minSnap, type Spline } from '@/math/poly';
 import { v3, type Vec3 } from '@/math/vec3';
 import type { Level, Params } from '@/sim/params';
@@ -20,7 +21,7 @@ export const zeroReference = (pos: Vec3): Reference => ({
 });
 
 /** Profiles that move in the horizontal plane (L2/L3). */
-export const PLANAR = ['circle', 'figure8', 'corners', 'minsnap'] as const;
+export const PLANAR = ['circle', 'figure8', 'corners', 'minsnap', 'plan'] as const;
 export const isPlanar = (profile: string): boolean =>
   (PLANAR as readonly string[]).includes(profile);
 
@@ -84,6 +85,13 @@ export function profileOffset(p: Params, level: Level, t: number, start: number)
   }
 
   const tl = Math.max(t - start, 0);
+  if (sp.profile === 'plan') {
+    // Lesson IV.6: one planned manoeuvre, after a pause, then hold the end point.
+    // An infeasible plan is not flown: the drone holds the start.
+    const tp = tl - p.plan.delay;
+    const m = manoeuvreFor(p);
+    return tp <= 0 || m.status !== 'optimal' ? out : m.at(tp);
+  }
   if (sp.profile === 'circle') {
     // Circle of radius a through the base point, centre at base − (a, 0, 0).
     const th = w * tl;

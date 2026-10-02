@@ -12,7 +12,9 @@ import { bangBangLimits, minimumTime } from '@/control/bangbang';
 import { designLqr } from '@/control/lqr';
 import { limitCycleFuelRate } from '@/control/satellite';
 import { insGyroError } from '@/estimation/ins';
-import type { Simulation } from '@/engine/simulation';
+import { TELEMETRY_HZ, type Simulation } from '@/engine/simulation';
+import { manoeuvreFor } from '@/guidance/collocation';
+import { finishedLandings } from '@/guidance/pdgCampaign';
 import { GRAVITY, type Params } from '@/sim/params';
 import { ignitionAltitude } from '@/sim/vehicles/rocket';
 import { panelFreeHz } from '@/sim/vehicles/satellite';
@@ -297,6 +299,32 @@ const unshaped = (p: Params): number => {
   const key = JSON.stringify({ ...p.satellite, shaper: 'none', shaperHz: 0 });
   if (panelCache?.key !== key) panelCache = { key, r: unshapedResidual(p, IV21.from, IV21.until) };
   return panelCache.r;
+};
+
+/** Lesson IV.5: the engine 5 % weak and a sideways push the guidance does not know about. */
+const IV5 = { thrustScale: 0.95, wind: { x: 15, y: 0, z: -10 } };
+
+/** Lesson IV.6: the dash past the pillar, and the time it must take at most. */
+const IV6 = { distance: 6, pillarX: 3, pillarR: 0.5, within: 2.55 };
+/** The least time with the acceleration limit alone (bang-bang, no pillar, no jerk limit), s. */
+const bangBangTime = (p: Params): number =>
+  2 *
+  Math.sqrt(
+    p.plan.distance /
+      (p.plan.accelFraction * GRAVITY * Math.tan((p.control.l3.maxTiltDeg * Math.PI) / 180)),
+  );
+/** Saturated samples of the position loops and the closest approach to the pillar, in a window. */
+const manoeuvreRecord = (sim: Simulation, from: number, to: number) => {
+  const w = sim.telemetry.window(['pos.x.sat', 'pos.z.sat', 'zone.dist'], from);
+  let saturated = 0;
+  let closest = Infinity;
+  w.t.forEach((t, i) => {
+    if (t > to) return;
+    if (w.series[0]![i]! > 0 || w.series[1]![i]! > 0) saturated++;
+    const d = w.series[2]![i]!;
+    if (Number.isFinite(d)) closest = Math.min(closest, d);
+  });
+  return { saturated, closest };
 };
 
 /** Lessons of Part IV, in plan order (by `n`). */
@@ -612,6 +640,200 @@ export const PART_FOUR: Lesson[] = [
           aim a little high and use the throttle to correct. A booster whose engine at its lowest
           setting still lifts more than its weight cannot even do that: it cannot hover, and must
           get the timing right.
+        </Notice>
+      </>
+    ),
+  },
+  {
+    id: 'pdg',
+    n: 5,
+    part: 4,
+    chapter: K,
+    title: 'Convex landing',
+    level: 1,
+    loop: 'alt',
+    chart: 'pdg',
+    setup: (p) => {
+      p.sim.vehicle = 'lander';
+      p.wind.enabled = false;
+      p.lander.thrustScale = IV5.thrustScale;
+      p.lander.windForce = { ...IV5.wind };
+      p.pdg.replanEvery = 0;
+    },
+    goal: {
+      text: 'Fly the campaign of 20 dispersed starts with no failure: every case lands on the pad below 1 m/s without leaving the glide-slope cone, or is reported infeasible before it flies.',
+      check: ({ sim }) => {
+        const p = sim.params;
+        if (p.sim.vehicle !== 'lander') return 'this lesson flies the 3D lander';
+        const runs = finishedLandings(p);
+        if (!runs) return 'press Fly 20 cases in the chart and wait for the campaign to finish';
+        const failed = runs.filter((r) => !r.passed);
+        if (failed.length)
+          return `${failed.length} of ${runs.length} failed (${failed
+            .slice(0, 5)
+            .map((r) => `case ${r.case}: ${r.outcome}`)
+            .join(', ')})`;
+        return true;
+      },
+    },
+    solution: (p) => {
+      p.pdg.replanEvery = 0.5;
+    },
+    body: (
+      <>
+        <p>
+          The rocket of IV.4 now starts 100 m up and 70 m to the side, falling at 19 m/s, and must
+          land on the pad inside a <b>glide-slope cone</b>: seen from the pad it stays at least 30°
+          above the horizon, so it never skims the ground. The thrust can point anywhere, between
+          150 and 600 N while the engine burns.
+        </p>
+        <p>
+          The fuel-optimal path is a nonconvex problem: the thrust has a lower bound, and the set{' '}
+          <Tex>{'\\rho_1 \\le \\|T\\| \\le \\rho_2'}</Tex> is a ball with a hole in it. Açıkmeşe and
+          Blackmore found the way out. With <Tex>{'u = T/m'}</Tex>, a slack{' '}
+          <Tex>{'\\sigma \\ge \\|u\\|'}</Tex> and <Tex>{'z = \\ln m'}</Tex>, the bounds move onto{' '}
+          <Tex>{'\\sigma'}</Tex> and the problem becomes a <b>second-order cone program</b>:
+        </p>
+        <Tex display>
+          {
+            '\\min \\sum \\sigma_k \\quad \\text{s.t.}\\quad \\|u_k\\| \\le \\sigma_k,\\;\\; \\rho_1 e^{-z} \\lesssim \\sigma_k \\lesssim \\rho_2 e^{-z},\\;\\; \\ddot r = u + g,\\;\\; \\|r_{xz}\\|\\tan\\gamma \\le r_y'
+          }
+        </Tex>
+        <p>
+          Convex, so an interior-point method finds the global optimum in a few dozen Newton steps.
+          And the relaxation is <b>lossless</b>: at the optimum <Tex>{'\\|u\\| = \\sigma'}</Tex>{' '}
+          again, so the answer obeys the real bounds. The readout shows the gap: zero to the
+          solver's precision. The thrust chart shows the shape the maximum principle predicts: full,
+          least, full.
+        </p>
+        <p>
+          The flight time is not part of the convex problem; the guidance tries several and keeps
+          the cheapest. If none works (not enough propellant, or too low and too fast), it{' '}
+          <b>says so before it flies</b>. That is half of the value of convex guidance: a solver
+          that cannot find a solution has proved that there is none.
+        </p>
+        <Try>
+          Press <b>Start</b>. The engine gives 5 % less than commanded, and a steady wind pushes the
+          lander sideways; the guidance knows neither. It measures the engine's shortfall from its
+          own acceleration, but it plans once and flies that plan open loop, and the wind carries it
+          off. Press <b>Fly 20 cases</b>: the dispersed starts crash one after another. Then set{' '}
+          <b>Re-plan every</b> to 0.5 s and fly the campaign again.
+        </Try>
+        <Notice>
+          Every re-plan starts from where the lander really is, so the wind's work is undone twice a
+          second. A plan ends 3 m above the pad, descending at 1.5 m/s, and a simple feedback law
+          flies the last metres, as real landers do: the fuel-optimal plan rides its thrust limit to
+          the very end and leaves nothing for surprises. Re-planning is what turns an optimiser into
+          a controller, and it is how Mars landers divert and boosters return to their pads.
+        </Notice>
+      </>
+    ),
+  },
+  {
+    id: 'collocation',
+    n: 6,
+    part: 4,
+    chapter: K,
+    title: 'Plan the whole flight',
+    level: 3,
+    loop: 'pos.x',
+    chart: 'plan',
+    setup: (p) => {
+      p.wind.enabled = false;
+      p.setpoint.x = 0;
+      p.setpoint.y = 2;
+      p.setpoint.z = 0;
+      p.world.pillar = true;
+      p.world.pillarX = IV6.pillarX;
+      p.world.pillarZ = 0;
+      p.world.pillarR = IV6.pillarR;
+      p.control.l3.outer = 'geometric';
+      p.control.geometric.feedforward = true;
+      p.setpoint.profile = 'plan';
+      p.plan = {
+        ...p.plan,
+        method: 'minsnap',
+        duration: 2.5,
+        distance: IV6.distance,
+        accelFraction: 0.9,
+      };
+    },
+    predict: {
+      label: 'Least time, acceleration limit only',
+      unit: 's',
+      truth: bangBangTime,
+      tolerance: 0.05,
+    },
+    goal: {
+      text: `Predict the least time for the 6 m with the acceleration limit alone (within 5 %). Then dash past the pillar in at most ${IV6.within} s with a plan the controller never saturates on, without entering the pillar's zone.`,
+      check: ({ sim, prediction }) => {
+        const p = sim.params;
+        if (p.setpoint.profile !== 'plan') return 'this lesson flies the planned manoeuvre';
+        if (prediction == null)
+          return 'first the prediction: full acceleration to half way, full braking after';
+        const truth = bangBangTime(p);
+        if (Math.abs(prediction - truth) / truth > 0.05)
+          return 'not within 5 %: x = a t²/4 at the middle of a bang-bang move of length t';
+        const plan = manoeuvreFor(p);
+        if (plan.status !== 'optimal')
+          return `no plan within the limits in ${plan.duration.toFixed(2)} s: the drone holds the start`;
+        if (plan.duration > IV6.within + 1e-6)
+          return `the plan takes ${plan.duration.toFixed(2)} s`;
+        const from = sim.profileStart + p.plan.delay;
+        const to = from + plan.duration + 0.5;
+        if (sim.takingOff || sim.t < to) return 'flying the manoeuvre… (press R to fly it again)';
+        const { saturated, closest } = manoeuvreRecord(sim, from, to);
+        if (closest < 0) return 'it went through the pillar';
+        return (
+          saturated === 0 ||
+          `the position loops saturated for ${(saturated / TELEMETRY_HZ).toFixed(2)} s: the plan asks for more than the drone can tilt`
+        );
+      },
+    },
+    solution: (p) => {
+      p.plan.method = 'collocation';
+      p.plan.minTime = true;
+    },
+    body: (
+      <>
+        <p>
+          A pillar stands half way along a 6 m dash. The geometric controller of lesson II.11 flies
+          whatever reference it is given, with feedforward; the question is the reference. Lesson
+          II.12 planned with <b>min-snap</b>: here a waypoint beside the pillar, two polynomial
+          pieces, as smooth as possible. It knows nothing of limits. The tilt limit of 35° allows{' '}
+          <Tex>{'g\\tan 35^\\circ = 6.87'}</Tex> m/s² of horizontal acceleration; in 2.5 s min-snap
+          asks for 7.5, and the controller saturates (shaded red).
+        </p>
+        <p>
+          <b>Direct transcription</b> turns the planning itself into an optimisation. The jerk is
+          held constant over 20 intervals, the state follows exactly, and the limits become
+          constraints at every node:
+        </p>
+        <Tex display>
+          {
+            '\\min_{j_k,\\,T} \\; T \\quad\\text{s.t.}\\quad \\|a_k\\| \\le a_{max},\\;\\; \\|j_k\\| \\le j_{max},\\;\\; \\|p_k - c\\| \\ge R,\\;\\; \\text{rest to rest}'
+          }
+        </Tex>
+        <p>
+          Collocation methods keep every node's state as a variable and the dynamics as equality
+          constraints; for this simple model the states can be eliminated exactly, which leaves the
+          40 jerks and the time. The keep-out circle is not convex, so this is a{' '}
+          <b>nonlinear program</b>, solved here by an augmented Lagrangian method. It finds a local
+          optimum near its starting guess (the pillar's left side); a convex problem would promise
+          the global one.
+        </p>
+        <Try>
+          Predict the least time with only the acceleration limit, 90 % of 6.87 m/s²: accelerate
+          flat out to half way, brake flat out. Then switch <b>Planned manoeuvre → Planner</b> to
+          transcription, tick <b>Least time</b>, and press <b>R</b>.
+        </Try>
+        <Notice>
+          The least time comes out about a quarter above your bang-bang bound: the detour round the
+          pillar is longer, and the jerk limit (20 m/s³, how fast the drone can tilt) rounds every
+          corner of the acceleration. Min-snap is not slow: with feedforward it flies cleanly up to
+          about 2.6 s, where its peak meets the tilt limit. But it cannot be pushed further, because
+          its shape is fixed; a plan built around the limits uses them fully and leaves 10 % for
+          feedback by construction.
         </Notice>
       </>
     ),

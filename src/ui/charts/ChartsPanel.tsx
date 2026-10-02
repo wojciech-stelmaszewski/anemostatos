@@ -14,6 +14,8 @@ import { NyquistChart } from '@/ui/analysis/NyquistChart';
 import { PoleMap } from '@/ui/analysis/PoleMap';
 import { SpectrumChart } from '@/ui/analysis/SpectrumChart';
 import { TvcChart } from '@/ui/analysis/TvcChart';
+import { PdgChart } from '@/ui/analysis/PdgChart';
+import { PlanChart } from '@/ui/analysis/PlanChart';
 import { useRaf } from '@/ui/hud/useRaf';
 import { partColor, SIGNAL } from '@/ui/colors';
 import { Select } from '@/ui/components/select';
@@ -50,6 +52,8 @@ const EXTRA: { value: ExtraChart; label: string }[] = [
   { value: 'lyapunovV', label: 'satellite: Lyapunov function' },
   { value: 'wheels', label: 'satellite: wheel momentum' },
   { value: 'startracker', label: 'satellite: attitude knowledge' },
+  { value: 'pdg', label: 'powered descent' },
+  { value: 'plan', label: 'planned manoeuvre' },
   { value: 'fdi', label: 'fault detection' },
   { value: 'heading', label: 'heading estimate' },
   { value: 'nav', label: 'navigation filter' },
@@ -239,7 +243,9 @@ export function ChartsPanel() {
     extra === 'hq' ||
     extra === 'envelope' ||
     extra === 'energy' ||
-    extra === 'pio';
+    extra === 'pio' ||
+    extra === 'pdg' ||
+    extra === 'plan';
   const ctrlKey = useParams((s) => controllerKey(s.params));
   const loopOptions = useMemo(
     () => loopsFor(useParams.getState().params).map((l) => ({ value: l.id, label: l.name })),
@@ -398,6 +404,10 @@ export function ChartsPanel() {
                   <PioChart />
                 </div>
               </div>
+            ) : extra === 'pdg' ? (
+              <PdgChart />
+            ) : extra === 'plan' ? (
+              <PlanChart />
             ) : extra === 'hq' ? (
               <HqChart />
             ) : extra === 'envelope' ? (

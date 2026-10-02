@@ -11,7 +11,8 @@ describe('lessons', () => {
   });
 
   // IV.7 starts below the smallest stable gain on purpose: the rocket is meant to fall over.
-  const startsFalling = ['tvc'];
+  // IV.5's lander ends its flight on the ground (and open loop, as it starts, crashes there).
+  const startsFalling = ['tvc', 'pdg'];
   for (const lesson of LESSONS.filter((l) => !startsFalling.includes(l.id))) {
     it(`"${lesson.title}" starts in a flyable state`, () => {
       const p = defaultParams();
@@ -51,7 +52,8 @@ const reachesGoal = (lesson: Lesson, withSolution: boolean, seconds = 45): boole
 
 describe('Part II and III lesson goals', () => {
   // III.29's goal needs a 300-flight campaign; tests/dispersion.test.ts checks it.
-  const heavy = ['montecarlo', 'freqid'];
+  // IV.5's needs a campaign of 20 guided landings; tests/pdg.test.ts checks it.
+  const heavy = ['montecarlo', 'freqid', 'pdg'];
   for (const lesson of LESSONS.filter(
     (l) => (l.part === 2 || l.part === 3 || l.part === 4) && l.goal && !heavy.includes(l.id),
   )) {

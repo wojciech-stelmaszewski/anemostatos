@@ -1,7 +1,7 @@
 import { controllerKey, makeController } from '@/control/registry';
 import type { Controller, LoopTerms, Setpoint } from '@/control/types';
 import { headingError, tiltError } from '@/estimation/attitude';
-import { qFromAxisAngle, qRotate, qToEuler, type Quat } from '@/math/quat';
+import { qFromAxisAngle, qFromTo, qRotate, qToEuler, type Quat } from '@/math/quat';
 import { clone, length, scale, sub, add, v3, type Vec3 } from '@/math/vec3';
 import { ARM_LENGTH, FOOT_HEIGHT } from '@/sim/drone';
 import {
@@ -37,6 +37,8 @@ import {
   type SatelliteState,
 } from '@/sim/vehicles/satellite';
 import { Engagement, targetState } from '@/guidance/pronav';
+import { PdgGuidance } from '@/guidance/pdg';
+import { initialLander, stepLander, type LanderState } from '@/sim/vehicles/lander';
 import { insGyroError } from '@/estimation/ins';
 import { Tap } from './tap';
 import { Telemetry } from './telemetry';
@@ -115,6 +117,10 @@ export class Simulation {
   /** Largest attitude error since `satSince`, deg (lessons IV.19–IV.20 judge a window). */
   satPeak = 0;
   satSince = 0;
+  /** The 3D lander of lesson IV.5 and its powered-descent guidance, while `sim.vehicle` is 'lander'. */
+  pdgLander: LanderState | null = null;
+  pdg = new PdgGuidance();
+  private pdgLoop: LoopTerms | null = null;
   /** A frozen earlier run, overlaid on the charts for comparison. */
   ghost: { telemetry: Telemetry; label: string } | null = null;
   /** A lesson's script: run after every reset to (re)schedule its events. */
@@ -257,6 +263,13 @@ export class Simulation {
       this.mirrorSatellite();
       this.takingOff = false;
     }
+    this.pdg.reset();
+    this.pdgLoop = null;
+    this.pdgLander = p.sim.vehicle === 'lander' ? initialLander(p.lander) : null;
+    if (this.pdgLander) {
+      this.mirrorLander();
+      this.takingOff = false;
+    }
     this.script?.(this);
     for (const fn of this.resetListeners) fn();
   }
@@ -370,6 +383,10 @@ export class Simulation {
     }
     if (this.satellite) {
       this.stepSatellite(dt);
+      return;
+    }
+    if (this.pdgLander) {
+      this.stepLander(dt);
       return;
     }
 
@@ -614,9 +631,74 @@ export class Simulation {
   /** The loops of whatever flies: the drone's controller, or the law of a Part IV vehicle. */
   loops(): Record<string, LoopTerms> {
     if (this.rocket) return { alt: this.lander.last };
+    if (this.pdgLander && this.pdgLoop) return { alt: this.pdgLoop };
     if (this.tvc) return { pitch: this.tvcControl.last, drift: this.tvcControl.drift };
     if (this.aircraft) return { pitch: this.autopilot.last };
     return this.controller.loops();
+  }
+
+  /**
+   * The lander of lesson IV.5: guidance plans (and re-plans) the descent; the vehicle flies the
+   * thrust it commands. Mirrored into `state` like the rocket.
+   */
+  private stepLander(dt: number): void {
+    const s = this.pdgLander!;
+    const p = this.params;
+    while (this.scheduled.length && this.scheduled[0]!.t <= this.t)
+      this.scheduled.shift()!.fn(this);
+    const u =
+      this.armed && !s.crashed ? this.pdg.tick(s, this.t, p.lander, p.pdg) : { thrust: v3() };
+    const ext = this.poke && this.t < this.poke.until ? this.poke.force : v3();
+    if (this.poke && this.t >= this.poke.until) this.poke = null;
+    stepLander(s, u, ext, dt, p.lander);
+    const plan = this.pdg.plan;
+    const k =
+      plan?.status === 'optimal'
+        ? Math.min((this.t - this.pdg.planStart) / plan.dt, plan.r.length - 1)
+        : NaN;
+    const i = Math.floor(k);
+    const sp =
+      plan && Number.isFinite(k)
+        ? plan.r[i]!.y + (k - i) * (plan.r[Math.min(i + 1, plan.r.length - 1)]!.y - plan.r[i]!.y)
+        : NaN;
+    const thrust = length(s.thrust);
+    this.pdgLoop = {
+      setpoint: sp,
+      measurement: s.pos.y,
+      error: sp - s.pos.y,
+      parts: [{ key: 'p', label: 'thrust', value: thrust, like: 'p' }],
+      unsaturated: length(u.thrust) * p.lander.thrustScale,
+      output: thrust,
+      saturated: thrust >= p.lander.thrustMax * p.lander.thrustScale - 1e-6,
+    };
+    this.mirrorLander();
+    this.t += dt;
+    this.stepIndex++;
+    if (this.stepIndex % TELEMETRY_EVERY === 0) this.record();
+  }
+
+  private mirrorLander(): void {
+    const r = this.pdgLander!;
+    const s = this.state;
+    s.pos = { ...r.pos };
+    s.vel = { ...r.vel };
+    s.landed = r.landed;
+    s.crashed = r.crashed;
+    // The body points along the thrust (straight up with the engine off).
+    const t = length(r.thrust);
+    const up = t > 1e-6 ? v3(r.thrust.x / t, r.thrust.y / t, r.thrust.z / t) : v3(0, 1, 0);
+    s.q = qFromTo(v3(0, 1, 0), up);
+    const quarter = t / 4;
+    s.motors = [quarter, quarter, quarter, quarter];
+    s.rotors = [quarter, quarter, quarter, quarter];
+    if (r.crashed) this.armed = false;
+    this.forces = {
+      thrust: { ...r.thrust },
+      gravity: v3(0, -r.mass * GRAVITY, 0),
+      drag: v3(),
+      external: v3(),
+      net: v3(r.thrust.x, r.thrust.y - r.mass * GRAVITY, r.thrust.z),
+    };
   }
 
   private mirrorSatellite(): void {
@@ -815,6 +897,15 @@ export class Simulation {
     }
     const loops = this.loops();
     for (const id in loops) recordLoop(tl, id, loops[id]!);
+    if (this.pdgLander) {
+      const r = this.pdgLander;
+      tl.set('pdg.thrust', length(r.thrust));
+      tl.set('pdg.fuel', r.fuel);
+      tl.set('pdg.speed', length(r.vel));
+      tl.set('pdg.range', Math.hypot(r.pos.x, r.pos.z));
+      tl.set('pdg.slope', (Math.atan2(r.pos.y, Math.hypot(r.pos.x, r.pos.z)) * 180) / Math.PI);
+      tl.set('pdg.efficiency', this.pdg.efficiency);
+    }
     if (this.rocket) {
       const r = this.rocket;
       tl.set('rocket.mass', r.mass);

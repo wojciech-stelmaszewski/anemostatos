@@ -27,23 +27,25 @@ export function CameraRig() {
     const c = controls.current;
     if (!c) return;
     const t =
-      vehicle === 'aircraft'
+      vehicle === 'aircraft' || vehicle === 'lander'
         ? new THREE.Vector3(sim.state.pos.x, sim.state.pos.y, sim.state.pos.z)
         : new THREE.Vector3(0, vehicle === 'tvc' ? TVC_HEIGHT : 1.85, 0);
     // The rocket stands 2 m tall, the pitch-plane one 12 m and the aircraft is 13 m long:
     // frame them from further away.
     const offset =
-      vehicle === 'aircraft'
-        ? new THREE.Vector3(-14, 5, 26)
-        : vehicle === 'tvc'
-          ? new THREE.Vector3(4, 1, 30)
-          : vehicle === 'rocket'
-            ? new THREE.Vector3(5, 1.5, 8)
-            : vehicle === 'satellite'
-              ? new THREE.Vector3(2.2, 1.2, 3.4)
-              : level === 1
-                ? new THREE.Vector3(0.95, 0.45, 1.45)
-                : new THREE.Vector3(1.6, 0.9, 2.5);
+      vehicle === 'lander'
+        ? new THREE.Vector3(10, 4, 18)
+        : vehicle === 'aircraft'
+          ? new THREE.Vector3(-14, 5, 26)
+          : vehicle === 'tvc'
+            ? new THREE.Vector3(4, 1, 30)
+            : vehicle === 'rocket'
+              ? new THREE.Vector3(5, 1.5, 8)
+              : vehicle === 'satellite'
+                ? new THREE.Vector3(2.2, 1.2, 3.4)
+                : level === 1
+                  ? new THREE.Vector3(0.95, 0.45, 1.45)
+                  : new THREE.Vector3(1.6, 0.9, 2.5);
     c.target.copy(t);
     camera.position.copy(t).add(offset);
     c.update();
@@ -65,7 +67,7 @@ export function CameraRig() {
     if (!c) return;
     const { pos } = sim.renderPose();
     drone.current.set(pos.x, pos.y, pos.z);
-    if (vehicle === 'aircraft') {
+    if (vehicle === 'aircraft' || vehicle === 'lander') {
       // At a hundred metres per second a smoothed follow falls behind: keep it locked on.
       const delta = drone.current.clone().sub(c.target);
       c.target.add(delta);

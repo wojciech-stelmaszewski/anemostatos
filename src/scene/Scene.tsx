@@ -8,6 +8,7 @@ import { CameraRig } from './CameraRig';
 import { DroneRig } from './DroneRig';
 import { AircraftRig } from './Aircraft';
 import { LandingPad, RocketRig, TvcRocketRig } from './Rocket';
+import { LanderScene } from './Lander';
 import { SatelliteRig } from './Satellite';
 import { useParams } from '@/store/params';
 import { Grid } from './Grid';
@@ -90,6 +91,7 @@ function VehicleRig() {
   if (vehicle === 'tvc') return <TvcRocketRig />;
   if (vehicle === 'aircraft') return <AircraftRig />;
   if (vehicle === 'satellite') return <SatelliteRig />;
+  if (vehicle === 'lander') return <LanderScene />;
   return vehicle === 'rocket' ? (
     <>
       <LandingPad />

@@ -4,7 +4,7 @@
 \lead{\setupcard{\setuprow{Level}{L2: a point mass in three dimensions}\setuprow{Controller}{three independent PIDs}\setuprow{Wind}{a mean wind of \SI{4}{m/s}, with gusts}}%
 Until now the drone lived on a vertical line. Level 2 lets it move in three dimensions — with a cheat that makes the physics easy, and that this lesson exposes. The cheat is instructive twice: first because three independent PIDs work surprisingly well, and then because a real quadrotor cannot do what they ask. Seeing exactly why it cannot is the way into the second half of Part~I.}
 
-\section{Three PIDs for three axes}
+\section{Three PIDs for three axes}\index{PID controller!on three axes}
 
 At level L2 the drone is a point mass on which the controller applies a force vector $\vec F$ directly. Newton's law is the same as in \cref{eq:meet-plant}, now as a vector equation,
 \begin{equation}\label{eq:tilt-l2}
@@ -37,7 +37,7 @@ What does the $x$ loop of the L2 drone do in this wind?
 In the 3D view the green I arrow of the L2 drone points upwind. It is the controller's learned estimate of the wind force — the only place in the loop where the wind is \enquote{known}, and it was learned purely from the error.
 \end{keyidea}
 
-\section{The cheat}
+\section{The cheat}\index{quadrotor!why it tilts}
 
 A quadrotor's four propellers all push along one direction, the body's up-axis. Call the unit vector along it $\hat b$. The total force the propellers produce is
 \begin{equation}\label{eq:tilt-thrust}

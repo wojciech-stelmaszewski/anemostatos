@@ -53,7 +53,7 @@ The \term{loop transfer function} $L(s)$ is the product of the transfer function
 
 Each factor comes from its block's equation by the rule of \cref{thm:noise-freq}: $m\ddot y = T$ gives $1/(ms^2)$; $\tau_m\dot T + T = u$ gives $1/(\tau_ms + 1)$; $u = K_pe + K_d\dot e$ gives $K_p + K_ds$. The delay needs one line: $e^{s(t - T)} = e^{-sT}\,e^{st}$, so delaying an exponential multiplies it by $e^{-sT}$.
 
-Now the key observation. The loop feeds its output back with a minus sign ($e = r - y$). Suppose that at some frequency $\omega_0$ a sinusoid comes back around the loop with the \emph{same amplitude} and a phase lag of exactly \emph{half a period}, $180^\circ$. A half-period lag is a change of sign; the minus sign of the feedback changes it back. The signal that returns is exactly the signal that was sent. The loop can then sustain that oscillation by itself, with no input at all. In symbols: $L(j\omega_0) = -1$. That is the boundary of stability.\didyouknow{Harry Nyquist found this condition in 1932, asking why Black's feedback amplifiers sometimes \enquote{sang} on their own.}
+Now the key observation. The loop feeds its output back with a minus sign ($e = r - y$). Suppose that at some frequency $\omega_0$ a sinusoid comes back around the loop with the \emph{same amplitude} and a phase lag of exactly \emph{half a period}, $180^\circ$. A half-period lag is a change of sign; the minus sign of the feedback changes it back. The signal that returns is exactly the signal that was sent. The loop can then sustain that oscillation by itself, with no input at all. In symbols: $L(j\omega_0) = -1$. That is the boundary of stability.\didyouknow{Harry Nyquist found this condition in 1932\index{Nyquist, Harry}, asking why Black's feedback amplifiers sometimes \enquote{sang} on their own.}
 
 \begin{definition}{Crossover frequency, phase margin, delay margin}
 The \term{crossover frequency} $\omega_c$ is where the loop gain is one: $|L(j\omega_c)| = 1$. The \term{phase margin} is how far the phase is from $-180^\circ$ there:
@@ -87,7 +87,7 @@ Compute $\omega_c$ and the phase margin for the default gains, without delay.
 \textbf{Step 6 — read it.} The drone itself contributes $-180^\circ$ at every frequency: a double integrator alone has no margin at all, which is the marginal stability of \lessonref{les:spring}. All of the margin comes from the phase \emph{lead} of the D term. That is the frequency-domain way of saying that D is the damper.
 \end{example}
 
-\section{Delay eats phase}
+\section{Delay eats phase}\index{transport delay!and phase}
 
 A pure delay has the frequency response $e^{-j\omega T}$. Its magnitude is 1: a delay does not change any amplitude. Its phase is $-\omega T$: a lag that grows in proportion to the frequency. A delay leaves $\omega_c$ where it was and subtracts $\omega_cT$ from the margin.\pitfall{$\omega_cT$ is an angle in radians. Multiply by $180/\pi = 57.3$ before comparing it with a margin in degrees.}
 
@@ -220,7 +220,7 @@ $e^{j\omega(t - T)} = e^{-j\omega T}e^{j\omega t}$. A rational transfer function
 
 \begin{theorem}[Stability from the margins]
 \label{thm:slow-bode}
-Let $L(s)$ be a loop transfer function with no poles in the open right half-plane, whose gain $|L(j\omega)|$ crosses 1 exactly once, at $\omega_c$, and decreases through the crossing, and whose phase crosses $-180^\circ$ at most once, at a frequency above $\omega_c$. Then the closed loop is asymptotically stable if and only if its phase margin is positive. (A special case of the Nyquist criterion: Åström and Murray, 2021, ch.~10.)
+Let $L(s)$ be a loop transfer function with no poles in the open right half-plane, whose gain $|L(j\omega)|$ crosses 1 exactly once, at $\omega_c$, and decreases through the crossing, and whose phase crosses $-180^\circ$ at most once, at a frequency above $\omega_c$. Then the closed loop is asymptotically stable if and only if its phase margin is positive. (A special case of the Nyquist criterion\index{Nyquist criterion}: Åström and Murray, 2021, ch.~10.)
 \end{theorem}
 
 The altitude loop meets the hypotheses: its open-loop poles are at the origin and at $-1/\tau_m$, and its gain falls steadily. The full Nyquist criterion, which needs no such hypotheses, is Lesson~III.3. A loop whose gain crosses 1 several times, or which is unstable when opened — an aircraft designed unstable, a rocket — can have a positive phase margin at one crossing and still be unstable; for those the full criterion is needed.
@@ -261,7 +261,7 @@ An eigenvalue $\lambda$ of the sampled loop corresponds to a continuous-time pol
 
 \begin{curiosity}{Flying with the Moon's computer}
 \photopair{f8}{NASA's F-8 Digital Fly-By-Wire in flight, 1970s. From 1972 it flew with no mechanical link between the stick and the control surfaces.}{dsky}{The display and keyboard of the Apollo Guidance Computer used on the F-8.}{42mm}
-In 1972 NASA took a Navy F-8 Crusader fighter, removed the mechanical connections between the pilot's stick and the control surfaces, and replaced them with a digital computer — the only one then trusted enough to fly: a surplus Apollo Guidance Computer, the same machine that had landed on the Moon. It was the first aircraft to fly with a digital fly-by-wire system and no mechanical backup.
+In 1972 NASA took a Navy F-8 Crusader fighter, removed the mechanical connections between the pilot's stick and the control surfaces, and replaced them with a digital computer — the only one then trusted enough to fly: a surplus Apollo Guidance Computer\index{Apollo guidance computer}, the same machine that had landed on the Moon. It was the first aircraft to fly with a digital fly-by-wire\index{fly-by-wire} system and no mechanical backup.
 
 The Apollo computer was astonishingly slow by modern standards, and its lunar-module autopilot ran its control laws only about ten times per second. In this lesson's terms, the designers had to live with a sampling delay of tens of milliseconds, and to tune the loops so that their crossover frequencies stayed far below the sampling rate. The F-8 programme proved that it could be done, and fly-by-wire became the standard for fighters, the Space Shuttle and, from the Airbus A320 onwards, airliners.
 

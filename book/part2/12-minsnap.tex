@@ -14,7 +14,7 @@ Estimate the fastest possible move over \SI{3}{m} from rest to rest with the til
 
 \textbf{Step 1 — bang-bang.} Accelerate at $a = \SI{6.9}{m/s^2}$ for half the distance, brake for the other half: each half takes $\sqrt{L/a} = \sqrt{3/6.9} = \SI{0.66}{s}$, the whole move \SI{1.32}{s}, with a peak speed of $\sqrt{La} = \SI{4.5}{m/s}$.
 
-\textbf{Step 2 — what it costs.} The switch from full acceleration to full braking is a reversal of the tilt by $70^\circ$; done in a tenth of a second it needs \SI{700}{\degree/s}. Bang-bang is the limit of what a drone with unlimited body rates could do.\didyouknow[-75pt]{Bang-bang control is time-optimal for a double integrator with bounded acceleration: always at full force, one switch. Pontryagin's maximum principle proves it (Lessons~IV.1--IV.4).}
+\textbf{Step 2 — what it costs.} The switch from full acceleration to full braking is a reversal of the tilt by $70^\circ$; done in a tenth of a second it needs \SI{700}{\degree/s}. Bang-bang is the limit of what a drone with unlimited body rates could do.\didyouknow[-75pt]{Bang-bang control is time-optimal for a double integrator with bounded acceleration: always at full force, one switch. Pontryagin's maximum principle\index{Pontryagin's maximum principle} proves it (Lessons~IV.1--IV.4).}
 
 \textbf{Step 3 — the flight.} The controller is gentler than bang-bang — its gains, the rate limit and the motors smooth the reversal — and it arrives within \SI{10}{cm} of the corner after \SI{1.7}{s}, at a peak speed of \SI{3.7}{m/s}. The body rate peaks at \SI{247}{\degree/s} and the tilt at $38^\circ$, beyond the limit by the overshoot of the attitude loop.
 

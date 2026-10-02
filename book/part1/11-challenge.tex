@@ -4,7 +4,7 @@
 \lead{\setupcard{\setuprow{Level}{L1}\setuprow{Wind}{strong vertical gusts and turbulence, the same for every run}\setuprow{Controller}{the default PID, to be beaten}\setuprow{Goal}{a lower RMS altitude error than the default tune}}%
 Everything you have learned so far comes together in one game. Strong, mostly vertical gusts hit the drone for a minute, always exactly the same gusts, because the random generator starts from a fixed seed. Your score is the root-mean-square altitude error. The default tune scores \SI{21}{cm}. This chapter explains where that number comes from — it can be predicted to the millimetre — what limits it, and how far you can go.}
 
-\section{The wind of Anemostatos}
+\section{The wind of Anemostatos}\index{wind model}
 
 The simulated air velocity $\vec w(t)$ is the sum of three parts:\innumbers{The turbulence of this lesson, $\sigma_w = \SI{1.2}{m/s}$, is a light breeze. Its gusts, up to \SI{10}{m/s}, are about the limit that a small camera drone is rated for.}
 \begin{equation}
@@ -14,7 +14,7 @@ The simulated air velocity $\vec w(t)$ is the sum of three parts:\innumbers{The 
 \subsection{Turbulence: the Ornstein–Uhlenbeck process}
 Turbulence is random but not arbitrary: the wind now is similar to the wind a moment ago. White noise (\lessonref{les:noise}) would be a poor model — it forgets everything between one instant and the next. The simulator models each component of the turbulence as a velocity that is constantly pulled back towards zero and constantly kicked by white noise:\didyouknow{The same equation models interest rates in finance and the voltage of a nerve cell between two spikes: anything that is pulled towards a mean and jostled at random.}
 
-\begin{definition}{Ornstein–Uhlenbeck process}
+\begin{definition}{Ornstein–Uhlenbeck process}\index{Ornstein–Uhlenbeck process}
 \begin{equation}\label{eq:challenge-ou}
   \dd w = -\frac{w}{\tau_w}\,\dd t + \sigma_w\sqrt{\frac{2}{\tau_w}}\,\dd W ,
 \end{equation}
@@ -115,7 +115,7 @@ A force of \SI{1}{N} amplitude oscillates at \SI{0.4}{Hz}, the rhythm of the lon
 A feedback loop can only reject disturbances that are slower than itself. To fight faster gusts you need a faster loop: higher $K_p$ with enough $K_d$ to damp it and enough $K_i$ to remove what remains. Every earlier lesson sets a limit on how far you can go: saturation (\lessonref{les:windup}), sensor noise amplified by D (\lessonref{les:noise}), delay (\lessonref{les:slow}) and actuator lag (\lessonref{les:edge}).
 \end{keyidea}
 
-\section{A tune that wins — and a prediction of the score}
+\section{A tune that wins — and a prediction of the score}\index{PID controller!tuning}
 
 \begin{example}[Designing the orange run]
 \label{ex:challenge-tune}
@@ -221,7 +221,7 @@ Let the loop \eqref{eq:challenge-S} be asymptotically stable. For a force $d = d
 \Cref{thm:noise-freq} applied to \cref{eq:challenge-sens}; the limits by inspection of its second form.
 \end{proof}
 
-\begin{theorem}[Bode's sensitivity integral]
+\begin{theorem}[Bode's sensitivity integral]\index{Bode, Hendrik}\index{Bode's sensitivity integral}
 \label{thm:challenge-bode}
 Let $L(s)$ be a loop transfer function with at least two more poles than zeros and no poles in the open right half-plane, and let the closed loop be stable. Then
 \begin{equation*}

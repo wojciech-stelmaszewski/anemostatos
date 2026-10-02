@@ -101,7 +101,7 @@ An observer can estimate anything that leaves a trace in the measurements. ADRC 
 \predict{with $\omega_o = 30$ instead of 15, how long does $\hat f$ need to reach 90\,\% of a new force?}
 \end{trythis}
 
-\section{The engineer's view: disturbance observers}
+\section{The engineer's view: disturbance observers}\index{disturbance observer}
 
 \subsection{An integrator in disguise}
 The observer state $\hat f$ is driven by $\omega_o^3(y - \hat y)$: it is an integrator of a measurement error. ADRC therefore contains integral action — it must, by the internal model principle (\cref{thm:integral-imp}), since it removes constant loads — but the integrator is placed where it can act fast. The PID's integral sees only the position error, which a load produces slowly, through two integrations of the plant. The observer's integral sees the \emph{innovation}, the difference between where the model says the drone should be and where it is, which appears at once.
@@ -166,7 +166,7 @@ The proof never used the value of $b_0$, nor that $\hat f$ equals the true $f$: 
 \end{remember}
 
 \begin{curiosity}{A controller from Beijing in your motor drive}
-When the Chinese mathematician Han Jingqing published the ideas of active disturbance rejection in the 1990s, he presented them as a challenge to the model-based control theory of his time: if a controller can estimate whatever its model gets wrong, perhaps it needs hardly any model at all. His original design was nonlinear, with functions that switched shape near zero, and it had many parameters. It was hard to analyse and hard to tune, and it spread slowly.
+When the Chinese mathematician Han Jingqing\index{Han Jingqing} published the ideas of active disturbance rejection in the 1990s, he presented them as a challenge to the model-based control theory of his time: if a controller can estimate whatever its model gets wrong, perhaps it needs hardly any model at all. His original design was nonlinear, with functions that switched shape near zero, and it had many parameters. It was hard to analyse and hard to tune, and it spread slowly.
 
 The turn came in 2003, when Zhiqiang Gao at Cleveland State University showed that a linear version — the one of this lesson — loses little, and that all its gains follow from two bandwidths. Engineers who would never tune nine coefficients could set two frequencies. A start-up commercialised the method for motor control, and around 2013 it reached the motor-control processors of a large semiconductor manufacturer, where it runs today in washing machines, pumps and industrial drives whose owners have never heard its name.
 

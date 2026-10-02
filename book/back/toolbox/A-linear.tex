@@ -151,7 +151,7 @@ A gust pushes the \SI{1}{kg} drone with the force $\sin\omega t$ newtons at \SI{
 \textbf{Step 5 — the answer.} $x(t) = 0.0556\,\sin(\omega t - 78.2^\circ)$: the drone swings by \SI{5.6}{cm} and lags the force by almost a quarter of a period. Example~\ref{ex:challenge-freq} does the same calculation with the integral included.
 \end{example}
 
-\section{State space}
+\section{State space}\index{state space|(}
 
 An equation of order $n$ can always be rewritten as $n$ equations of first order. Take the third-order loop of \lessonref{les:edge}, $\tau_m m\,\dddot x + m\,\ddot x + K_d\,\dot x + K_p\,x = 0$, and give names to the derivatives: $x_1 = x$, $x_2 = \dot x$, $x_3 = \ddot x$. Then $\dot x_1 = x_2$ and $\dot x_2 = x_3$ by definition, and the equation itself, solved for the highest derivative, gives $\dot x_3$:
 \begin{equation}\label{eq:A-companion}
@@ -197,9 +197,9 @@ Any invertible matrix $T$ defines new coordinates $\symbf z = T\vx$, in which
 \begin{equation}
   \dot{\symbf z} = T A T^{-1}\,\symbf z + T B\,\symbf u, \qquad \symbf y = C T^{-1}\,\symbf z .
 \end{equation}
-The same system, described by different numbers. The matrices $A$ and $TAT^{-1}$ are called \emph{similar}; they have the same eigenvalues, because $\det(s\Id - TAT^{-1}) = \det\big(T(s\Id - A)T^{-1}\big) = \det(s\Id - A)$. Poles belong to the system, not to the coordinates. The freedom is used all the time: position and velocity are natural for a drone, but a controller design may prefer coordinates in which $A$ is diagonal, and an estimator may carry extra states of its own.\tip{When two people get different matrices for the same system, compare the eigenvalues of $A$ first. If they agree, the two descriptions probably differ only by a change of coordinates.}
+The same system, described by different numbers. The matrices $A$ and $TAT^{-1}$ are called \emph{similar}; they have the same eigenvalues, because $\det(s\Id - TAT^{-1}) = \det\big(T(s\Id - A)T^{-1}\big) = \det(s\Id - A)$. Poles belong to the system, not to the coordinates. The freedom is used all the time: position and velocity are natural for a drone, but a controller design may prefer coordinates in which $A$ is diagonal, and an estimator may carry extra states of its own.\tip{When two people get different matrices for the same system, compare the eigenvalues of $A$ first. If they agree, the two descriptions probably differ only by a change of coordinates.}\index{state space|)}
 
-\section{The matrix exponential}
+\section{The matrix exponential}\index{matrix exponential|(}
 
 The scalar equation $\dot x = ax$ has the solution $e^{at}x_0$. The vector equation $\dot{\vx} = A\vx$ has the solution $e^{At}\vx_0$, provided the exponential of a matrix is defined by the same power series:
 \begin{equation}\label{eq:A-expm}
@@ -260,7 +260,7 @@ Property (iii) has a picture (\cref{fig:A-phase}). If the state starts on an eig
 \begin{equation}
   \vx(t) = \sum_i c_i\,e^{\lambda_i t}\,\symbf v_i .
 \end{equation}
-The modes do not interact; each runs at its own rate. In the top-left panel the fast mode ($\lambda = -5$) dies first, and every trajectory ends by sliding in along the slow eigenvector $(1, -2)^\T$: near the end of a response the velocity is always $-2$ times the distance to the setpoint. That is what a \emph{dominant pole} looks like in the plane.
+The modes do not interact; each runs at its own rate. In the top-left panel the fast mode ($\lambda = -5$) dies first, and every trajectory ends by sliding in along the slow eigenvector $(1, -2)^\T$: near the end of a response the velocity is always $-2$ times the distance to the setpoint. That is what a \emph{dominant pole} looks like in the plane.\index{matrix exponential|)}
 
 \section{The response to an input}
 

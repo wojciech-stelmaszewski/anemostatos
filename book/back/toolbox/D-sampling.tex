@@ -4,7 +4,7 @@
 \lead{\usedcard{\setuprow{Lesson I.1}{the PID as a recursion}\setuprow{Lessons I.7, I.8}{the D filter, sample by sample}\setuprow{Lesson I.9}{sample and hold, the sampled loop}\setuprow{Lesson I.11}{the exact step of the turbulence}\setuprow{Part III}{the z-plane (III.18), aliasing and notch filters (III.20, III.21)}}%
 Every controller in this book is a program that runs at fixed instants. Between them it holds its output and sees nothing. This appendix collects what that changes: what sampling does to a signal, how the recursions of a digital controller are solved and tested for stability, how a continuous plant looks from one sample to the next, and what the hold costs.}
 
-\section{Sampling a signal}
+\section{Sampling a signal}\index{sampling|(}
 
 A sampler reads a continuous signal $x(t)$ at the instants $t_k = k\,\Delta t$ and produces the sequence $x_k = x(t_k)$. The \term{sample rate} is $f_s = 1/\Delta t$, and half of it, $f_s/2$, is the \term{Nyquist frequency}. The controller of the altitude loop has $\Delta t = \SI{4}{ms}$, $f_s = \SI{250}{Hz}$ and a Nyquist frequency of \SI{125}{Hz}.
 
@@ -14,7 +14,7 @@ Sampling loses information, and it loses it in a specific way. Sample $\cos 2\pi
 \end{equation}
 because the extra term is $2\pi n k$, a whole number of turns. \emph{The samples of a sinusoid at $f$ and of one at $f + nf_s$ are identical.} Since also $\cos$ is even, every frequency has an impostor in the band from 0 to $f_s/2$:
 
-\begin{result}[The alias of a frequency]
+\begin{result}[The alias of a frequency]\index{aliasing}
 A sinusoid of frequency $f$, sampled at the rate $f_s$, is indistinguishable from one at
 \begin{equation}\label{eq:D-alias}
   f_a = |f - n f_s|, \qquad n \text{ the integer nearest to } f/f_s ,
@@ -35,7 +35,7 @@ A rotor of the drone turns at 7\,800 revolutions per minute and shakes the frame
 \textbf{Step 3 — the faster rotor.} $14\,400/60 = \SI{240}{Hz}$; $f_a = |240 - 250| = \SI{10}{Hz}$. Now the vibration appears as a slow wobble, below the \SI{20}{Hz} cutoff of the D filter and not far above the loop's own frequencies. No digital filter can remove it: in the samples it \emph{is} a \SI{10}{Hz} signal.
 
 \textbf{Step 4 — the cure.} Remove the vibration before the sampler, with an analogue low-pass filter in the sensor (an \term{anti-aliasing filter}) or by sampling the sensor much faster than the controller runs and averaging. Flight controllers do both (Lesson~III.20).
-\end{example}
+\end{example}\index{sampling|)}
 
 \section{Difference equations}
 
@@ -84,7 +84,7 @@ integrator & pole at $s = 0$ & pole at $z = 1$\\
 \end{center}
 \end{keyidea}
 
-\section{The z-transform}
+\section{The z-transform}\index{z-transform|(}
 
 \begin{definition}{z-transform}
 The \term{z-transform} of a sequence $x_0, x_1, x_2, \dots$ is
@@ -140,7 +140,7 @@ The \SI{20}{Hz} filter of \lessonref{les:noise} has $a = \alpha = 0.666$, $b = 1
 \textbf{Step 4 — at the Nyquist frequency.} $z = -1$: $H = (1 - \alpha)/(1 + \alpha) = 0.20$. The analogue filter has $0.158$ at \SI{125}{Hz}, and keeps falling beyond it; the digital one cannot do better than 0.20 anywhere.
 
 \textbf{Step 5 — read it.} At low frequencies the two agree to a fraction of a percent (at \SI{1}{Hz}: 0.9981 against 0.9988). Near the Nyquist frequency they differ, because there are only a few samples per period left. A digital filter is a good copy of an analogue one only well below $f_s/2$.
-\end{example}
+\end{example}\index{z-transform|)}
 
 \section{A continuous plant, seen at the samples}
 
@@ -188,7 +188,7 @@ method & $\dot x(t_k)$ is replaced by & write for $s$ & a stable pole becomes\\
 \midrule
 forward Euler & $(x_{k+1} - x_k)/\Delta t$ & $\dfrac{z - 1}{\Delta t}$ & unstable if $\Delta t$ is too long\\
 backward Euler & $(x_k - x_{k-1})/\Delta t$ & $\dfrac{1 - z^{-1}}{\Delta t}$ & always stable\\
-Tustin (trapezoid) & the mean of the two & $\dfrac{2}{\Delta t}\,\dfrac{z - 1}{z + 1}$ & always stable\\
+Tustin\index{Tustin transform} (trapezoid) & the mean of the two & $\dfrac{2}{\Delta t}\,\dfrac{z - 1}{z + 1}$ & always stable\\
 \bottomrule
 \end{tabular}
 \end{center}

@@ -122,6 +122,20 @@
 \DeclareCaptionStyle{margintable}{font={footnotesize,sf,color=muted},labelfont={bf,color=ink},
   labelsep=period,justification=raggedright,singlelinecheck=false}
 \renewcommand{\sidenotetext}[2][]{\marginnote{\sffamily\footnotesize\color{muted}\makebox[0pt][r]{\textsuperscript{\color{accent}\thesidenote}\,}#2}}
+% the index: imakeidx writes build/main.idx, the Makefile sorts it with upmendex (style/index.ist)
+% between the LaTeX passes, \printindex (back/index.tex) sets it in two columns. Load before hyperref.
+\RequirePackage[noautomatic]{imakeidx}
+\makeindex[columns=2, columnsep=7mm]
+% (theindex is a group, and its last page is shipped out after the group ends: the running head
+% must be set globally)
+\newcommand{\anem@indexchapter}[1]{\bookchapter{}{#1}{Where a term is defined and where a method or a name is discussed.}%
+  \gdef\lessontitle{#1}\gdef\lessonlabel{}\gdef\lessonpart{}}
+\indexsetup{level=\anem@indexchapter, headers={{Index}{Index}}, firstpagestyle=plain,
+  othercode={\small\linespread{1.02}\selectfont}}
+% a letter heading of the index (written by style/index.ist), and the gap before it
+\newcommand{\indexletter}[1]{\par\vspace{0.7\baselineskip plus 2pt}%
+  {\sffamily\bfseries\color{accent}#1}\par\nopagebreak\vspace{0.15\baselineskip}}
+\renewcommand{\indexspace}{\par}
 \RequirePackage{hyperref}
 \hypersetup{colorlinks=true, linkcolor=deepblue, urlcolor=deepblue, citecolor=deepblue,
   pdftitle={Anemostatos — A course in feedback control},
@@ -262,8 +276,15 @@
   \end{tikzpicture}%
   \vspace*{73mm}%
   \anem@quote{#1}%
+  \anem@openlessonindex
   \@afterindentfalse\@afterheading
 }
+% A lesson that is one index entry from its first page to its last, as a page range:
+% \indexedlesson{part2/04-kalman}{Kalman filter} in place of \input{part2/04-kalman}.
+\newcommand{\anem@lessonindex}{}
+\newcommand{\anem@openlessonindex}{\ifdefempty{\anem@lessonindex}{}{%
+  \expandafter\index\expandafter{\anem@lessonindex|(}\gdef\anem@lessonindex{}}}
+\newcommand{\indexedlesson}[2]{\gdef\anem@lessonindex{#2}\input{#1}\index{#2|)}}
 
 % A lesson-free chapter (preface, prelude, appendices) with the same opener.
 \newcommand{\bookchapter}[3]{% {toc label}{title}{subtitle}
@@ -506,7 +527,18 @@
 \newcommand{\Dt}[1][D]{{\color{sigD}\sffamily\bfseries #1}\xspace}
 \newcommand{\FFt}[1][FF]{{\color{sigFF}\sffamily\bfseries #1}\xspace}
 \newcommand{\sig}[2]{{\color{#1}\sffamily\bfseries #2}}
-\newcommand{\term}[1]{\textbf{#1}}
+% A defined term: bold, and an index entry. The entry is the term as written unless the optional
+% argument gives it in index form: \term[pole]{poles}, \term[stability!marginal]{marginally stable}.
+% Terms whose index form differs from the text everywhere (plurals, adjectives, capitals) are
+% mapped once in style/index-terms.tex with \termindex{text}{index form}.
+\NewDocumentCommand{\term}{om}{\textbf{#2}\IfNoValueTF{#1}{\anem@termindex{#2}}{\index{#1}}}
+\newcommand{\termindex}[2]{\expandafter\def\csname anem@tk@\detokenize{#1}\endcsname{#2}}
+\newcommand{\anem@termindex}[1]{%
+  \ifcsname anem@tk@\detokenize{#1}\endcsname
+    \expandafter\expandafter\expandafter\index\expandafter\expandafter\expandafter
+      {\csname anem@tk@\detokenize{#1}\endcsname}%
+  \else\index{#1}\fi}
+\input{style/index-terms}
 \newcommand{\lessonref}[1]{\hyperref[#1]{Lesson~\ref*{#1}}}
 \newcommand{\Lessonref}[1]{\hyperref[#1]{Lesson~\ref*{#1}}}
 % A marginal paragraph, so that marginfix can move it up when it would run off the foot of the page.

@@ -52,10 +52,13 @@ report: node_modules ## Build the robustness report card (lesson III.30), severa
 	$(NODE_TS) scripts/report.ts --write
 
 LATEX := lualatex -interaction=nonstopmode -halt-on-error -output-directory=build
+# the index: sorted between the passes (the second pass knows the final page numbers, the third prints them)
+INDEX := upmendex -q -s style/index.ist -t build/main.ilg -o build/main.ind build/main.idx
 
-book: ## Build the book into book/anemostatos.pdf (needs LuaLaTeX)
+book: ## Build the book into book/anemostatos.pdf (needs LuaLaTeX and upmendex)
 	mkdir -p book/build
-	cd book && $(LATEX) main.tex > build/latex.out && $(LATEX) main.tex > build/latex.out || (tail -30 build/latex.out; exit 1)
+	cd book && $(LATEX) main.tex > build/latex.out && $(INDEX) && $(LATEX) main.tex > build/latex.out \
+	  && $(INDEX) && $(LATEX) main.tex > build/latex.out || (tail -30 build/latex.out; exit 1)
 	cp book/build/main.pdf book/anemostatos.pdf
 	@grep -c "undefined" book/build/main.log | xargs -I{} echo "book: {} lines mention undefined references (see book/build/main.log)"
 

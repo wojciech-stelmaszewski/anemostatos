@@ -34,7 +34,7 @@ Derive the equation of the P–D loop with the motor lag, and the largest stable
 \end{equation}
 For $\tau_m = 0$ this is the mass–spring–damper. The lag has added a third pole.
 
-\textbf{Step 3 — Routh–Hurwitz.} All coefficients are positive; \cref{thm:spring-routh}\,(ii) further requires $a_2a_1 > a_3a_0$:
+\textbf{Step 3 — Routh–Hurwitz.} All coefficients are positive; \cref{thm:spring-routh}\,(ii) further requires $a_2a_1 > a_3a_0$:\index{Routh–Hurwitz criterion!examples}
 \begin{equation}\label{eq:edge-limit}
   m\,K_d > \tau_m m\,K_p \qquad\Longleftrightarrow\qquad K_p < \frac{K_d}{\tau_m} = \frac{7}{0.03} = 233 .
 \end{equation}
@@ -90,9 +90,9 @@ The edge depends on $K_d$ too: \cref{eq:edge-limit} is a straight line in the pl
 
 \simfig{edge_region}{The stability region of the altitude loop in the $(K_d, K_p)$ plane. Dashed: the motor lag alone, \cref{eq:edge-limit}. Solid: with the \SI{20}{Hz} D filter and the \SI{250}{Hz} sample-and-hold. The dots are the lesson's runs; the square is the default tune, deep inside.}{fig:edge-region}
 
-\section{About Ziegler and Nichols}
+\section{About Ziegler and Nichols}\index{Ziegler–Nichols rules|(}
 
-In 1942 John Ziegler and Nathaniel Nichols of the Taylor Instrument Company published a recipe that is still taught everywhere:\didyouknow{Ziegler and Nichols found their numbers by experiment, on pneumatic controllers. Their aim was a \emph{quarter decay}: each overshoot a quarter of the one before. By today's taste that is far too lively.}
+In 1942 John Ziegler and Nathaniel Nichols\index{Nichols, Nathaniel}\index{Ziegler, John} of the Taylor Instrument Company published a recipe that is still taught everywhere:\didyouknow{Ziegler and Nichols found their numbers by experiment, on pneumatic controllers. Their aim was a \emph{quarter decay}: each overshoot a quarter of the one before. By today's taste that is far too lively.}
 \begin{enumerate}
   \item switch off I and D and raise $K_p$ until the loop oscillates with constant amplitude; call that gain the \emph{ultimate gain} $K_u$, and the period $T_u$;
   \item set $K_p = 0.6\,K_u$, $K_i = 1.2\,K_u/T_u$, $K_d = 0.075\,K_uT_u$.
@@ -136,7 +136,7 @@ The Ziegler–Nichols rules were derived for plants that are stable on their own
   \item At $K_p = 200$, raise $K_d$ to 12. Why does the ringing calm down? (\cref{fig:edge-region}.)
 \end{enumerate}
 \predict{with $\tau_m = \SI{60}{ms}$, is the default tune ($K_p = 10$, $K_d = 7$) still stable? With how much margin?}
-\end{trythis}
+\end{trythis}\index{Ziegler–Nichols rules|)}
 
 \section{The engineer's view: gain margin}
 

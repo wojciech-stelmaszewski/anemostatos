@@ -4,7 +4,7 @@
 \lead{\setupcard{\setuprow{Level}{L1}\setuprow{Controller}{P, D and feedforward; I is off; $K_d$ starts at 0.8}\setuprow{Setpoint}{a square wave between \SI{1.5}{m} and \SI{2.5}{m}, a step every \SI{4}{s}}\setuprow{Goal}{overshoot below 2\,\%, settling within \SI{2.5}{s}}}%
 Lesson I.2 left us with a drone that bounced forever. The cure is the third letter of PID. The derivative term looks at how fast the error is changing and pushes against it — the shock absorber to the proportional spring. In this lesson we solve the damped equation completely, derive the formulas that engineers use to tune it, and check every one of them against the simulator.}
 
-\section{The derivative term is a damper}
+\section{The derivative term is a damper}\index{PID controller!derivative term}
 
 With a constant setpoint, the error changes only because the drone moves: $\dot e = \dot r - \dot y = -\dot y$. The derivative term is therefore
 \begin{equation}
@@ -41,7 +41,7 @@ We follow the recipe of \lessonref{les:spring} step by step.
 \end{equation}
 The sign of $\zeta^2 - 1$ decides everything: three cases follow.\recall{$as^2 + bs + c = 0$ has the roots $\big({-b} \pm \sqrt{b^2 - 4ac}\,\big)/2a$. The sign under the root separates real roots from complex ones.}
 
-\begin{definition}{The three kinds of damping}
+\begin{definition}{The three kinds of damping}\index{damping!under-, over- and critical}
 \begin{description}[leftmargin=0pt, itemsep=3pt, font=\sffamily\small\bfseries]
   \item[Underdamped, $0<\zeta<1$.] The square root is imaginary: complex poles $-\zeta\omega_n \pm j\omega_d$ with the \emph{damped frequency} $\omega_d = \omega_n\sqrt{1-\zeta^2}$. The motion is a decaying oscillation, $x(t) = e^{-\zeta\omega_n t}(A\cos\omega_d t + B\sin\omega_d t)$. The response overshoots.
   \item[Critically damped, $\zeta = 1$.] The root is zero: a double real pole at $-\omega_n$, and $x(t) = (A + Bt)\,e^{-\omega_n t}$. The fastest approach that never overshoots.
@@ -72,7 +72,7 @@ The setpoint jumps by \SI{1}{m} and $K_d = 3$ ($K_p = 10$, $m = 1$). Find the mo
 
 To compare controllers we need numbers, not adjectives. The simulator measures four of them after every setpoint step, and shows them in the \ui{step metrics} table.
 
-\begin{definition}{Step-response metrics}
+\begin{definition}{Step-response metrics}\index{step response!metrics}
 For a step of the setpoint from $y_0$ to $y_1$:
 \begin{description}[leftmargin=0pt, itemsep=2pt, font=\sffamily\small\bfseries]
   \item[Rise time $t_r$] from 10\,\% to 90\,\% of the step.
@@ -84,7 +84,7 @@ For a step of the setpoint from $y_0$ to $y_1$:
 
 For the second-order loop these metrics follow from the solution. We derive the two most used ones.
 
-\begin{example}[Deriving the overshoot formula]
+\begin{example}[Deriving the overshoot formula]\index{overshoot}
 \label{ex:damper-mp}
 Show that the overshoot of an underdamped second-order loop after a unit step is $M_p = e^{-\pi\zeta/\sqrt{1-\zeta^2}}$.
 
@@ -106,7 +106,7 @@ Show that the overshoot of an underdamped second-order loop after a unit step is
 It depends on $\zeta$ only.\innumbers{Worth knowing by heart: $\zeta = 0.5$ gives 16\,\% overshoot, $\zeta = 0.6$ about 10\,\%, $\zeta = 0.7$ about 5\,\%.} For $\zeta = 0.474$: $M_p = e^{-\pi\cdot0.474/0.881} = e^{-1.69} = 0.184$, i.e.\ 18.4\,\%, reached at $t_p = \pi/2.784 = \SI{1.13}{s}$.
 \end{example}
 
-\paragraph{The settling time.} The oscillation in Step 1 is multiplied by the envelope $e^{-\zeta\omega_n t}$ (times a factor close to one). The response is inside the 2\,\% band once the envelope has fallen below 0.02, i.e.\ when $\zeta\omega_n t = \ln 50 \approx 3.9$. Rounding up gives the rule
+\paragraph{The settling time.} The oscillation in Step 1 is multiplied by the envelope $e^{-\zeta\omega_n t}$ (times a factor close to one). The response is inside the 2\,\% band once the envelope has fallen below 0.02, i.e.\ when $\zeta\omega_n t = \ln 50 \approx 3.9$. Rounding up gives the rule\index{settling time}
 \begin{equation}\label{eq:damper-ts}
   t_s \approx \frac{4}{\zeta\,\omega_n}.
 \end{equation}
@@ -233,7 +233,7 @@ The default tune of Anemostatos, $K_d = 7$, is $\zeta = 1.11$: slightly overdamp
 \predict{with $K_p = 40$ and critical damping, what settling time do you expect? (Use Example~\ref{ex:damper-crit}.)}
 \end{trythis}
 
-\section{The engineer's view: pole placement and Lyapunov}
+\section{The engineer's view: pole placement and Lyapunov}\index{pole placement}
 
 \subsection{The state matrix and the path of its poles}
 In state form the loop \eqref{eq:damper-msd} is
@@ -244,7 +244,7 @@ In state form the loop \eqref{eq:damper-msd} is
 \end{equation}
 The two gains are the two entries of the bottom row: each gain multiplies one state variable. A P–D controller on this plant is \emph{state feedback}, a name that Part~II takes literally.
 
-Look again at the left panel of \cref{fig:zeta-family}, this time as a journey. As $K_d$ grows from zero, the eigenvalues leave $\pm j\omega_n$, travel along the circle of radius $\omega_n$, meet at $-\omega_n$ and separate along the real axis. A drawing of where the poles go as one gain changes is called a \term{root locus}.\didyouknow{Walter Evans invented the root locus in 1948 while designing aircraft autopilots. He also sold a plastic tool for drawing the curves by hand, the Spirule.} Engineers read it as we just did: every point of the path is a behaviour, and tuning is choosing a point.
+Look again at the left panel of \cref{fig:zeta-family}, this time as a journey. As $K_d$ grows from zero, the eigenvalues leave $\pm j\omega_n$, travel along the circle of radius $\omega_n$, meet at $-\omega_n$ and separate along the real axis. A drawing of where the poles go as one gain changes is called a \term{root locus}.\didyouknow{Walter Evans invented the root locus\index{Evans, Walter} in 1948 while designing aircraft autopilots. He also sold a plastic tool for drawing the curves by hand, the Spirule.} Engineers read it as we just did: every point of the path is a behaviour, and tuning is choosing a point.
 
 \subsection{Pole placement}
 Example~\ref{ex:damper-spec} ran the argument backwards: from the wanted behaviour to the pole positions to the gains.
@@ -266,7 +266,7 @@ Return to the energy calculation at the start of this lesson. It proved that the
   \item along every motion $V$ does not increase: $\dot V = -K_d\dot x^2 \le 0$;
   \item $\dot V$ is zero only where $\dot x = 0$, and the system cannot stay at such a point unless $x = 0$ too, because the spring would set it moving.
 \end{enumerate}
-A function with the first two properties is called a \term{Lyapunov function}, after Aleksandr Lyapunov, who introduced the method in 1892.\didyouknow{Lyapunov's thesis of 1892 was little read outside Russia for half a century. Western control engineers discovered it around 1960, and it has been the main tool of nonlinear control ever since.} The third step is known as LaSalle's invariance principle; both are stated exactly below. Together they prove stability for systems whose equations cannot be solved at all: springs that are not linear, motors that saturate, a rigid body tumbling in three dimensions.
+A function with the first two properties is called a \term{Lyapunov function}, after Aleksandr Lyapunov\index{Lyapunov, Aleksandr}, who introduced the method in 1892.\didyouknow{Lyapunov's thesis of 1892 was little read outside Russia for half a century. Western control engineers discovered it around 1960, and it has been the main tool of nonlinear control ever since.} The third step is known as LaSalle's invariance principle\index{LaSalle's invariance principle}; both are stated exactly below. Together they prove stability for systems whose equations cannot be solved at all: springs that are not linear, motors that saturate, a rigid body tumbling in three dimensions.
 
 The right panel of \cref{fig:damper-predict} shows $V$ measured in flight. It falls in steps: steeply while the drone moves fast, and not at all at the turning points, where $\dot x = 0$ — exactly what $\dot V = -K_d\dot x^2$ says. The measured curve lies a little below the formula, because the air removes some energy too. And in four hundred samples it rises five times, by less than \SI{0.00004}{J} out of five: small enough to be the motor lag and the sampling, which the ideal loop does not have.
 

@@ -45,7 +45,7 @@ Three methods for $f(x) = 0$ appear in the lessons. They differ in what they nee
 \begin{enumerate}[label=(\roman*)]
   \item \emph{Bisection.} If $f$ is continuous on $[a, b]$ and $f(a)$, $f(b)$ have opposite signs, halving the interval and keeping the half on which the sign changes encloses a root in an interval of length $(b - a)/2^n$ after $n$ steps.
   \item \emph{Fixed-point iteration.} If the equation is written as $x = g(x)$ and $|g'(x)| \le L < 1$ on an interval that $g$ maps into itself, then $x_{n+1} = g(x_n)$ converges to the unique solution $x^*$ there from any start in the interval, and $|x_n - x^*| \le L^n|x_0 - x^*|$.
-  \item \emph{Newton's method.} If $f$ is twice continuously differentiable and $f'(x^*) \ne 0$ at a root $x^*$, then $x_{n+1} = x_n - f(x_n)/f'(x_n)$ converges for every start close enough to $x^*$, and $|x_{n+1} - x^*| \le C\,|x_n - x^*|^2$.
+  \item \emph{Newton's method.} If $f$ is twice continuously differentiable and $f'(x^*) \ne 0$ at a root $x^*$, then $x_{n+1} = x_n - f(x_n)/f'(x_n)$ converges for every start close enough to $x^*$, and $|x_{n+1} - x^*| \le C\,|x_n - x^*|^2$.\index{Newton's method}
 \end{enumerate}
 (Quarteroni, Sacco and Saleri, 2007, ch.~6.)
 \end{theorem}
@@ -124,7 +124,7 @@ A simulator must compute $\vx(t)$ from $\dot{\vx} = f(\vx, t)$ and $\vx(0)$. It 
   \item[Explicit Euler.] Follow the present slope for one step: $\vx_{k+1} = \vx_k + h\,f(\vx_k, t_k)$.
   \item[Implicit Euler.] Use the slope at the \emph{end} of the step: $\vx_{k+1} = \vx_k + h\,f(\vx_{k+1}, t_{k+1})$, an equation to be solved for $\vx_{k+1}$ at every step.
   \item[Semi-implicit (symplectic) Euler.] For a mechanical system $\dot x = v$, $\dot v = a(x, v)$: update the velocity first, then the position with the \emph{new} velocity: $v_{k+1} = v_k + h\,a(x_k, v_k)$, $x_{k+1} = x_k + h\,v_{k+1}$.
-  \item[Runge–Kutta of order four (RK4).] Evaluate the slope four times within the step — at the start, twice at the middle, at the end — and advance with their weighted mean, $\vx_{k+1} = \vx_k + \tfrac{h}{6}(\symbf k_1 + 2\symbf k_2 + 2\symbf k_3 + \symbf k_4)$.
+  \item[Runge–Kutta of order four (RK4).] Evaluate the slope four times within the step — at the start, twice at the middle, at the end — and advance with their weighted mean, $\vx_{k+1} = \vx_k + \tfrac{h}{6}(\symbf k_1 + 2\symbf k_2 + 2\symbf k_3 + \symbf k_4)$.\index{Runge–Kutta method}
 \end{description}
 \end{definition}
 

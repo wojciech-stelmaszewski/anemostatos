@@ -2,7 +2,7 @@
 \label{les:state}
 
 \lead{\setupcard{\setuprow{Level}{L1}\setuprow{Controller}{P and D, with $K_p = 10$ and the critical $K_d = 6.3$; I is off}\setuprow{Setpoint}{a square wave of $\pm\SI{0.5}{m}$, a step every \SI{4}{s}}\setuprow{Chart}{the phase portrait}\setuprow{Goal}{overshoot below 1\,\%, settling within \SI{1.5}{s}}}%
-Welcome to the second semester. Part~I built its controllers around the error: how large it is, how long it has lasted, how fast it changes. This lesson changes the point of view. The drone's future depends on two numbers — where it is and how fast it moves — and a PD controller turns out to be a rule that maps those two numbers to a thrust. Drawn as a point in a plane, the pair moves along curves whose shape tells everything about the loop at a glance. Every controller of Part~II starts from this picture.}
+Welcome to the second semester. Part~I built its controllers around the error: how large it is, how long it has lasted, how fast it changes. This lesson changes the point of view. The drone's future depends on two numbers — where it is and how fast it moves — and a PD controller turns out\index{PD controller} to be a rule that maps those two numbers to a thrust. Drawn as a point in a plane, the pair moves along curves whose shape tells everything about the loop at a glance. Every controller of Part~II starts from this picture.}
 
 \section{From the error to the state}
 
@@ -123,7 +123,7 @@ A state feedback $\symbf u = -K\vx$ needs two things: a matrix $K$, and the stat
 \predict{with $K_p = 10$ and $K_d = 2$, the first crossing of the vertical axis lies at $e = -0.31$. Where will the second crossing of the \emph{horizontal} axis on the positive side lie?}
 \end{trythis}
 
-\section{The engineer's view: state feedback}
+\section{The engineer's view: state feedback}\index{state feedback}
 
 \subsection{What a state feedback can do}
 For a plant with $n$ states and $p$ inputs, $K$ is a $p \times n$ matrix — $pn$ numbers to choose.\tip{Read $K$ as a table: one row per actuator, one column per state. Each entry says how hard that actuator pushes per unit of that state.} \Cref{thm:damper-placement} says what they can buy: if the plant is controllable, the $n$ eigenvalues of $A - BK$ can be put anywhere (with complex ones in conjugate pairs). For one input the choice of the eigenvalues fixes $K$ completely; for several inputs there are more numbers than eigenvalues, and the extra freedom shapes the eigenvectors too — which modes are excited by what, and how they look.

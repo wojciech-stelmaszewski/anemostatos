@@ -10,7 +10,7 @@ The question of the second half of Part~II — \emph{how to know the state} (\le
 
 \begin{itemize}
   \item The \textbf{barometer} measures the altitude, with an error of \SI{5}{cm} that is new at every reading, fifty times per second. Its average is right; each reading is not.
-  \item The \textbf{accelerometer} measures the specific force, from which the acceleration follows by subtracting gravity (Prelude). It reads at the controller's rate, with \SI{0.3}{m/s^2} of noise — and with a \emph{bias} of \SI{0.2}{m/s^2}: a constant error that does not average out.
+  \item The \textbf{accelerometer}\index{accelerometer} measures the specific force, from which the acceleration follows by subtracting gravity (Prelude). It reads at the controller's rate, with \SI{0.3}{m/s^2} of noise — and with a \emph{bias} of \SI{0.2}{m/s^2}: a constant error that does not average out.
 \end{itemize}
 
 Integrate the accelerometer twice to get the altitude, and the noise becomes a random walk while the bias becomes a parabola: \SI{0.2}{m/s^2} for ten seconds is \SI{2}{m/s} of velocity error and \SI{10}{m} of altitude error. Differentiate the barometer to get the speed, and the noise is divided by $\Delta t$ (\lessonref{les:noise}): $\sqrt2 \cdot 0.05/0.02 = \SI{3.5}{m/s}$ at the barometer's rate. Each sensor is good exactly where the other is bad — the accelerometer over short times, the barometer over long ones.\innumbers{A phone's barometer resolves about \SI{10}{cm} of height; its accelerometer drifts by metres within seconds when integrated. Together they tell which floor of a building you are on.}\recall{Appendix~E: a quantity obtained by integrating noise is a random walk; its error grows like $\sqrt t$, and a bias makes it grow like $t^2$.}
@@ -136,7 +136,7 @@ This is what engineers call a \term{complementary filter}: a low-pass filter on 
 The Kalman filter is the best estimator there is — under assumptions. If the system is linear, the noises are white, Gaussian and of known covariance, then its estimate is the conditional mean of the state given every measurement so far, and no estimator, linear or not, has a smaller mean squared error. If the noises are white but not Gaussian, it is still the best \emph{linear} estimator. If they are coloured, biased or of unknown size, it is merely a good filter — and the art of applying it is to add states until the assumptions hold: a bias is not white noise, so it became a state.
 
 \subsection{The mirror image of the LQR}
-The covariance recursion \eqref{eq:kalman-Ppredict}–\eqref{eq:kalman-update} is a Riccati equation, and not by coincidence the same one as the LQR's, with the roles exchanged.
+The covariance recursion \eqref{eq:kalman-Ppredict}–\eqref{eq:kalman-update} is a Riccati\index{Riccati equation!in the Kalman filter} equation, and not by coincidence the same one as the LQR's, with the roles exchanged.
 
 \begin{theorem}[Duality]
 \label{thm:kalman-duality}
@@ -179,7 +179,7 @@ The hypotheses fail in instructive ways. Without the bias random walk ($Q_{bb} =
 \begin{itemize}[leftmargin=1.2em]
   \item An LQR fed by a Kalman filter is the LQG controller. Its margins can be arbitrarily small (Lesson~III.10), and observability decides what can be estimated at all (III.9).
   \item An observer that also estimates the \emph{disturbance} is the next lesson: ADRC treats everything it does not know as one more state.
-  \item The attitude of a drone is estimated from gyroscopes and accelerometers in the same spirit, first by a complementary filter (Lesson~III.22), then by a Kalman filter on rotations (III.23); for a nonlinear model the filter is linearised at every step (the extended Kalman filter, III.24).
+  \item The attitude of a drone is estimated from gyroscopes and accelerometers in the same spirit, first by a complementary filter (Lesson~III.22), then by a Kalman filter on rotations (III.23); for a nonlinear model the filter is linearised at every step (the extended Kalman\index{Kalman filter!extended} filter, III.24).
   \item In Part~IV the filter navigates: inertial navigation with satellite fixes (IV.26), the unscented and particle filters for strongly nonlinear problems (IV.27, IV.28), and smoothing after the fact (IV.29).
 \end{itemize}
 \end{lookahead}

@@ -27,7 +27,7 @@ Where does the \SI{1.4}{kg} drone hover when asked for \SI{2}{m}, with $K_p = 10
 
 This situation is the rule, not the exception. Real models are always a little wrong: the mass changes with the payload, the thrust per unit command falls as the battery drains, a constant wind adds a drag force.\didyouknow{A hovering quadrotor loses thrust as its battery sags: from a full to an empty lithium cell the voltage falls by a quarter. No pilot notices, because the integral makes it up.} Each of these is a constant, or slowly varying, load that the feedforward does not know. We want a controller that removes the resulting error \emph{without} knowing its cause.
 
-\section{Why the integral must win}
+\section{Why the integral must win}\index{PID controller!integral term}
 
 Add the integral term, $I(t) = K_i\int_0^t e\,\dd\tau$, so that $\dot I = K_i\,e$. Suppose the closed loop comes to rest somewhere. At rest every signal is constant, so in particular $\dot I = 0$, which means
 \begin{equation}
@@ -66,7 +66,7 @@ Find the three poles for $m = 1.4$, $K_p = 10$, $K_d = 7$, $K_i = 5$, and predic
 
 \textbf{Step 2 — is it stable?} \Cref{thm:spring-routh}\,(ii): all coefficients are positive, and $a_2a_1 = 7 \cdot 10 = 70$ exceeds $a_3a_0 = 1.4 \cdot 5 = 7$. Stable.
 
-\textbf{Step 3 — the real root.} A cubic with real coefficients has at least one real root. For a stable one it is negative; try $s = -3$: $p(-3) = -37.8 + 63 - 30 + 5 = 0.2$, close to zero. Improve it with Newton's method,\recall{Newton's method: to solve $p(s) = 0$, repeat $s \leftarrow s - p(s)/p'(s)$. Near a simple root every step roughly doubles the number of correct digits.} $s \leftarrow s - p(s)/p'(s)$ with $p'(s) = 4.2\,s^2 + 14\,s + 10$: $p'(-3) = 5.8$, so $s = -3 - 0.2/5.8 = -3.034$; one more step gives $s_1 = -3.033$.
+\textbf{Step 3 — the real root.} A cubic with real coefficients has at least one real root. For a stable one it is negative; try $s = -3$: $p(-3) = -37.8 + 63 - 30 + 5 = 0.2$, close to zero. Improve it with Newton's method,\index{Newton's method}\recall{Newton's method: to solve $p(s) = 0$, repeat $s \leftarrow s - p(s)/p'(s)$. Near a simple root every step roughly doubles the number of correct digits.} $s \leftarrow s - p(s)/p'(s)$ with $p'(s) = 4.2\,s^2 + 14\,s + 10$: $p'(-3) = 5.8$, so $s = -3 - 0.2/5.8 = -3.034$; one more step gives $s_1 = -3.033$.
 
 \textbf{Step 4 — divide it out.} $p(s) = (s + 3.033)(1.4\,s^2 + b\,s + c)$. Comparing coefficients: $b = 7 - 1.4 \cdot 3.033 = 2.753$ and $c = 5/3.033 = 1.648$.
 
@@ -85,7 +85,7 @@ For small $K_i$ the picture is different: one pole is real and close to $-K_i/K_
 \label{ex:integral-limit}
 Find the largest stable $K_i$ for the \SI{1.4}{kg} drone, and what happens there.
 
-\textbf{Step 1 — Routh–Hurwitz.} With positive gains, \cref{thm:spring-routh}\,(ii) requires $a_2a_1 > a_3a_0$:
+\textbf{Step 1 — Routh–Hurwitz.} With positive gains, \cref{thm:spring-routh}\,(ii) requires $a_2a_1 > a_3a_0$:\index{Routh–Hurwitz criterion!examples}
 \begin{equation}\label{eq:integral-routh}
   K_d\,K_p > m\,K_i \qquad\Longleftrightarrow\qquad K_i < \frac{K_p K_d}{m} = \frac{70}{1.4} = 50 .
 \end{equation}
@@ -101,7 +101,7 @@ The limit of 50 is sixty times the default $K_i = 0.8$. That is a generous margi
 
 \simfig{integral_locus}{The root locus of the integral gain. At $K_i = 0$ (circles) the poles are those of the P–D loop and one at the origin — the integrator itself. A small $K_i$ moves that pole slowly to the left: the creep. A larger one makes it meet one of the others and leave the real axis; at $K_i = 50$ the pair crosses into the unstable half-plane.}{fig:integral-locus}
 
-\section{The price: overshoot you cannot avoid}
+\section{The price: overshoot you cannot avoid}\index{overshoot!caused by the integral}
 
 In the payload experiment the $K_i = 5$ run arrives at the setpoint without overshooting. So is integral action free, as long as it is stable? Look instead at a \emph{setpoint} step with an unchanged load (\cref{fig:integral-area}), and you will find a surprising rule.
 
@@ -243,7 +243,7 @@ This is the simplest case of the internal model principle (Francis and Wonham, 1
 \begin{itemize}[leftmargin=1.2em]
   \item The integrator as one more state, with a gain chosen together with the others by an optimisation, is Lesson~II.3. A \emph{disturbance observer} does the same job ten times faster by estimating the load from the motion (Lessons~II.5–II.8), and an adaptive law does it with a guarantee on the transient (II.18).
   \item \Cref{fig:integral-locus} becomes a live chart in Lesson~III.2: drag $K_i$ and watch the three poles move.
-  \item The area rule is a first example of a \emph{conservation law} of feedback: what is gained in one place is paid for in another. Lesson~III.5 proves the most famous one, Bode's sensitivity integral.
+  \item The area rule is a first example of a \emph{conservation law} of feedback: what is gained in one place is paid for in another. Lesson~III.5 proves the most famous one, Bode's sensitivity integral\index{Bode's sensitivity integral}.
   \item What the integral does while the motors are at their limit is the next lesson.
   \item A satellite's reaction wheels integrate too: a constant disturbance torque, from sunlight or the thin atmosphere, makes their speed grow steadily until they must be unloaded (Lesson~IV.19). An aircraft holds its altitude against a change of weight with the integral of its autopilot, and its \emph{trim} is that integral moved by hand (IV.11).
 \end{itemize}
@@ -262,7 +262,7 @@ This is the simplest case of the internal model principle (Francis and Wonham, 1
 \begin{curiosity}{How a battleship taught PID}
 \photo{newmexico}{USS New Mexico (BB-40) in 1920. In 1923 Nicolas Minorsky's automatic steering was tested on board.}
 \sidephoto{minorsky}{34mm}{Nicolas Minorsky (1885–1970).}
-In the early 1920s the US Navy asked a Russian-born engineer, Nicolas Minorsky, to look at automatic ship steering. He did something unusual: he watched helmsmen. A good helmsman, he noticed, does not just turn the wheel in proportion to how far the ship is off course. He also watches how fast the bow is swinging and anticipates it; and if a steady wind or current keeps pushing the ship to one side, he learns to hold a little extra rudder to compensate.
+In the early 1920s the US Navy asked a Russian-born engineer, Nicolas Minorsky, to look at automatic ship steering.\index{Minorsky, Nicolas}\index{PID controller!history} He did something unusual: he watched helmsmen. A good helmsman, he noticed, does not just turn the wheel in proportion to how far the ship is off course. He also watches how fast the bow is swinging and anticipates it; and if a steady wind or current keeps pushing the ship to one side, he learns to hold a little extra rudder to compensate.
 
 In his 1922 paper \emph{Directional stability of automatically steered bodies}, Minorsky turned these three habits into mathematics: a rudder angle proportional to the heading error, to its rate of change, and to its integral. He analysed the stability of the resulting loop with a linearised model of the ship — the method of this book — and in 1923 his controller steered the battleship USS New Mexico, holding the heading to within a few degrees.
 

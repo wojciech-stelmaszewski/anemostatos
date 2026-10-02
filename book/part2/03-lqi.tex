@@ -41,7 +41,7 @@ It is still linear, so the whole machinery of Lesson~II.2 applies: add a weight 
 \begin{equation}\label{eq:lqi-law}
   u = -k_1\,x - k_2\,v - k_i\,\xi .
 \end{equation}
-This is the \term{linear–quadratic regulator with integral action}, LQI. It is a PID — $k_1$ a $K_p$, $k_2$ a $K_d$ on the measurement, $k_i$ a $K_i$ — but one whose three gains were chosen together, by one cost.\tip{To read an LQI as a PID: $K_p = k_1$, $K_d = k_2$ on the measurement, $K_i = k_i$. The info card shows them under these names.}\recall{\Cref{thm:integral-imp}: a controller that removes every constant load must contain an integrator. LQI is that theorem put into the state.}
+This is the \term{linear–quadratic regulator with integral action}, LQI. It is a PID\index{PID controller!as an optimal controller} — $k_1$ a $K_p$, $k_2$ a $K_d$ on the measurement, $k_i$ a $K_i$ — but one whose three gains were chosen together, by one cost.\tip{To read an LQI as a PID: $K_p = k_1$, $K_d = k_2$ on the measurement, $K_i = k_i$. The info card shows them under these names.}\recall{\Cref{thm:integral-imp}: a controller that removes every constant load must contain an integrator. LQI is that theorem put into the state.}
 
 \begin{example}[The three gains of the LQI]
 \label{ex:lqi-gains}

@@ -29,7 +29,7 @@ One sample later the setpoint is constant again and the spike is gone.
 \textbf{Step 4 — the limit of $\Delta t \to 0$.} The spike grows without bound while its area stays \SI{7}{N.s}: in continuous time the derivative of a step is an \emph{impulse}, the Dirac delta,\recall[-75pt]{The Dirac delta $\delta(t)$ is zero except at $t = 0$ and has the area one. It is the limit of ever taller and narrower spikes, and the derivative of a unit step.} and the D term is $K_d\,\Delta r\,\delta(t)$.
 \end{example}
 
-This spike is called the \term{derivative kick}.\aside{A setpoint step also makes the P term jump, by $K_p\,\Delta r = \SI{10}{N}$. That jump is finite and usually harmless; if it is not, the cure is the same (\emph{setpoint weighting}, below).}
+This spike is called the \term{derivative kick}.\aside{A setpoint step also makes the P term jump, by $K_p\,\Delta r = \SI{10}{N}$. That jump is finite and usually harmless; if it is not, the cure is the same (\emph{setpoint weighting}\index{setpoint weighting}, below).}
 
 \section{What the kick does}
 
@@ -72,7 +72,7 @@ The D term passes through the first-order filter $D_k = \alpha D_{k-1} + (1-\alp
 
 \simfig{kick_predict}{Left: the D term after a setpoint step, sample by sample, on a logarithmic scale — without a filter (one sample of \SI{1750}{N}) and with a \SI{5}{Hz} filter (dots), against the geometric decay of Example~\ref{ex:kick-filter} (dashed). Right: a unit step with the setpoint entering P and I (PI-D: simulator in green, the model of Example~\ref{ex:kick-weights} dashed) and entering the integral alone (I-PD, from the model).}{fig:kick-predict}
 
-\section{Derivative on measurement}
+\section{Derivative on measurement}\index{PID controller!derivative on measurement}
 
 The cure follows from what we wanted in the first place: a damper. Keep the drone's part of \cref{eq:kick-split} and drop the setpoint's part:
 \begin{equation}\label{eq:kick-dom}

@@ -117,7 +117,14 @@ export class BangBangController implements Controller {
       ];
     } else {
       unsaturated = s > 0 ? l.tMax : 0;
-      parts = [{ key: 'bang', label: s > 0 ? 'full thrust' : 'motors off', value: unsaturated - ff, like: 'p' }];
+      parts = [
+        {
+          key: 'bang',
+          label: s > 0 ? 'full thrust' : 'motors off',
+          value: unsaturated - ff,
+          like: 'p',
+        },
+      ];
       parts.push({ key: 'ff', label: 'm̂·g', value: ff, ff: true, like: 'ff' });
     }
     const output = clamp(unsaturated, 0, l.tMax);

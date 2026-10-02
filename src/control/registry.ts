@@ -3,6 +3,8 @@ import { AdrcController } from './adrc';
 import { AltitudeController } from './altitude';
 import { FaultTolerantController } from './fault';
 import { BacksteppingController } from './backstepping';
+import { BangBangController } from './bangbang';
+import { DpController } from './dp';
 import { HinfController } from './hinf';
 import { MracController } from './mrac';
 import { SlidingModeController } from './smc';
@@ -52,7 +54,11 @@ export function makeController(p: Params): Controller {
                       ? new MracController()
                       : kind === 'backstepping'
                         ? new BacksteppingController()
-                        : new AltitudeController();
+                        : kind === 'bangbang'
+                          ? new BangBangController()
+                          : kind === 'dp'
+                            ? new DpController()
+                            : new AltitudeController();
       return p.control.l1.estimator === 'kalman' ? new WithAltitudeKalman(c) : c;
     }
     case 2:

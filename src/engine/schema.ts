@@ -215,6 +215,8 @@ export const SCHEMA: Group[] = [
           { value: 'smc', label: 'sliding mode' },
           { value: 'mrac', label: 'MRAC (adaptive)' },
           { value: 'backstepping', label: 'backstepping' },
+          { value: 'bangbang', label: 'bang-bang (time-optimal)' },
+          { value: 'dp', label: 'dynamic programming' },
         ],
         levels: [1],
         help: 'Which control law flies the drone. PID: three hand-tuned gains. LQR: gains computed from a model and a cost. ADRC: an observer estimates everything the model misses and cancels it.',

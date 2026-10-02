@@ -3,11 +3,15 @@ import { qConj, qFromAxisAngle, qMul, qRotate, type Quat } from '@/math/quat';
 import { add, clone, v3, type Vec3 } from '@/math/vec3';
 import { AttitudeFilter, type AttitudeGains } from '@/estimation/attitude';
 import { LowPass2 } from '@/estimation/filters';
+import { Mekf } from '@/estimation/mekf';
+import { NavEkf } from '@/estimation/navekf';
 import type { DroneState } from './dynamics';
 import {
   GRAVITY,
   type AhrsParams,
   type DroneParams,
+  type MekfParams,
+  type NavEkfParams,
   type SensorParams,
   type VibrationParams,
 } from './params';
@@ -54,9 +58,27 @@ export interface ImuContext {
   sensors: SensorParams;
   vibration: VibrationParams;
   drone: DroneParams;
-  /** Settings of the attitude filter, which runs on the IMU's output. */
+  /** Settings of the attitude filters and the navigation filter, which run on the IMU's output. */
   ahrs: AhrsParams;
+  mekf: MekfParams;
+  navEkf: NavEkfParams;
   dt: number;
+}
+
+const DEG = Math.PI / 180;
+/** Inclination of the earth's field: it points 65° below the horizon (central Europe). */
+const DIP = 65 * DEG;
+const UP = v3(0, 1, 0);
+const NORTH = v3(1, 0, 0);
+
+/** Where the sensors stand in the estimation chain, for the charts. */
+export interface EstimationState {
+  /** NIS of the last magnetometer and accelerometer update of the MEKF, and whether it was used. */
+  magNis: number;
+  magUsed: boolean;
+  /** NIS of the last GPS fix of the navigation filter, and whether it was used. */
+  gpsNis: number;
+  gpsUsed: boolean;
 }
 
 /** Gains of the selected attitude filter: the complementary filter is Mahony's without bias or gate. */
@@ -64,6 +86,14 @@ export const attitudeGains = (kind: SensorParams['attitude'], a: AhrsParams): At
   kind === 'mahony'
     ? { kp: a.kp, ki: a.ki, gate: a.gate }
     : { kp: 1 / Math.max(a.tau, 1e-3), ki: 0, gate: 0 };
+
+/** The part of `v` perpendicular to `up`, as a unit vector. */
+function horizontal(v: Vec3, up: Vec3): Vec3 {
+  const k = v.x * up.x + v.y * up.y + v.z * up.z;
+  const h = v3(v.x - k * up.x, v.y - k * up.y, v.z - k * up.z);
+  const l = Math.hypot(h.x, h.y, h.z) || 1;
+  return v3(h.x / l, h.y / l, h.z / l);
+}
 
 export class Sensors {
   private vib = new Vibration();
@@ -75,6 +105,12 @@ export class Sensors {
   /** The attitude filter of the flight computer; it runs while `sensors.attitude` asks for it. */
   readonly ahrs = new AttitudeFilter();
   private ahrsOn = false;
+  readonly mekf = new Mekf();
+  readonly nav = new NavEkf();
+  private navOn = false;
+  private steps = 0;
+  private nextGps = 0;
+  readonly est: EstimationState = { magNis: 0, magUsed: true, gpsNis: 0, gpsUsed: true };
   private history: Measurement[] = [];
   private head = 0;
   private rng: Rng;
@@ -106,10 +142,22 @@ export class Sensors {
     const { imuRateHz, aaFilterHz, gyroBias: b } = c.sensors;
     const biased = b.x !== 0 || b.y !== 0 || b.z !== 0;
     const estimating = c.sensors.attitude !== 'truth';
+    const navigating = c.sensors.nav === 'ekf';
     if (!estimating) this.ahrsOn = false;
-    if (!shaking && !biased && !estimating && imuRateHz <= 0 && aaFilterHz <= 0) return;
+    if (!navigating) this.navOn = false;
+    this.steps++;
+    if (!shaking && !biased && !estimating && !navigating && imuRateHz <= 0 && aaFilterHz <= 0)
+      return;
     let omega = m.omega;
     let acc = m.acc;
+    if (estimating || navigating) {
+      // The filters see the sensors' noise; the controller then reads the same noisy samples.
+      const r = this.rng;
+      const g = c.sensors.gyroNoise * DEG;
+      const a = c.sensors.accNoise;
+      if (g > 0) omega = add(omega, v3(g * r.normal(), g * r.normal(), g * r.normal()));
+      if (a > 0) acc = add(acc, v3(a * r.normal(), a * r.normal(), a * r.normal()));
+    }
     if (biased) {
       const k = Math.PI / 180;
       omega = add(omega, v3(b.x * k, b.y * k, b.z * k));
@@ -143,13 +191,97 @@ export class Sensors {
     m.acc = clone(acc);
     if (estimating) {
       // Start from the truth (a drone is levelled before take-off), then run on the IMU alone,
-      // with an ideal compass for the heading.
-      if (!this.ahrsOn) this.ahrs.reset(s.q);
+      // with an ideal compass for the heading unless the magnetometer is on.
+      const kind = c.sensors.attitude;
+      if (!this.ahrsOn) {
+        this.ahrs.reset(s.q);
+        this.mekf.reset(s.q);
+      }
       this.ahrsOn = true;
-      const north = qRotate(qConj(s.q), v3(1, 0, 0));
-      const g = attitudeGains(c.sensors.attitude, c.ahrs);
-      m.q = { ...this.ahrs.update(omega, acc, north, g, GRAVITY, c.dt) };
+      const mag = c.sensors.magnetometer ? this.magnetometer(s, c) : null;
+      const qEst = kind === 'mekf' ? this.mekf.q : this.ahrs.q;
+      // North as the filter sees it: the horizontal part of the field, in the body frame.
+      const north = mag ? horizontal(mag, qRotate(qConj(qEst), UP)) : qRotate(qConj(s.q), NORTH);
+      if (kind === 'mekf') {
+        const k = c.mekf;
+        const set = {
+          gyroSigma: k.gyroDeg * DEG,
+          biasWalk: k.biasWalkDeg * DEG,
+          accSigma: k.accDeg * DEG,
+          magSigma: k.magDeg * DEG,
+          gate: k.gate,
+        };
+        this.mekf.propagate(omega, set, c.dt);
+        // The vector sensors are read 100 times a second.
+        if (this.steps % 10 === 0) {
+          const an = Math.hypot(acc.x, acc.y, acc.z);
+          if (an > 1e-6)
+            this.mekf.lastAcc = this.mekf.updateVector(
+              v3(acc.x / an, acc.y / an, acc.z / an),
+              UP,
+              set.accSigma,
+              set.gate,
+            );
+          // Heading only, one degree of freedom: its gate is the 3-dof quantile less about 5.
+          const up = qRotate(qConj(this.mekf.q), UP);
+          const g1 = set.gate > 0 ? Math.max(set.gate - 5, 1) : 0;
+          const u = this.mekf.updateHeading(north, up, set.magSigma, g1);
+          this.mekf.lastMag = u;
+          this.est.magNis = u.nis;
+          this.est.magUsed = u.accepted;
+        }
+        m.q = { ...this.mekf.q };
+      } else {
+        const g = attitudeGains(kind, c.ahrs);
+        m.q = { ...this.ahrs.update(omega, acc, north, g, GRAVITY, c.dt) };
+      }
     }
+    if (navigating) {
+      const sp = c.sensors;
+      const set = {
+        accSigma: c.navEkf.accSigma,
+        biasWalk: c.navEkf.biasWalk,
+        gpsSigma: Math.max(sp.gpsNoise, 1e-3),
+        baroSigma: Math.max(sp.baroNoise, 1e-3),
+        gate: c.navEkf.gate,
+      };
+      if (!this.navOn) {
+        this.nav.reset(s.pos);
+        this.nextGps = 0;
+      }
+      this.navOn = true;
+      this.nav.propagate(acc, m.q, GRAVITY, set, c.dt);
+      const t = this.steps * c.dt;
+      const r = this.rng;
+      if (t >= this.nextGps) {
+        this.nextGps = t + 1 / Math.max(sp.gpsRateHz, 0.1);
+        const n = sp.gpsNoise;
+        const fix = v3(
+          s.pos.x + n * r.normal() + sp.gpsGlitch,
+          s.pos.y + n * r.normal(),
+          s.pos.z + n * r.normal(),
+        );
+        const u = this.nav.gps(fix, set);
+        this.est.gpsNis = u.nis;
+        this.est.gpsUsed = u.accepted;
+      }
+      if (this.steps % 20 === 0) this.nav.baro(s.pos.y + sp.baroNoise * r.normal(), set);
+      m.pos = this.nav.pos;
+      m.vel = this.nav.vel;
+    }
+  }
+
+  /** The magnetometer: the field, turned by the local disturbance, seen from the body, unit. */
+  private magnetometer(s: DroneState, c: ImuContext): Vec3 {
+    const d = c.sensors.magDisturbDeg * DEG;
+    const h = Math.cos(DIP);
+    const field = v3(h * Math.cos(d), -Math.sin(DIP), -h * Math.sin(d));
+    const b = qRotate(qConj(s.q), field);
+    const n = c.sensors.magNoiseDeg * DEG;
+    const r = this.rng;
+    const v = v3(b.x + n * r.normal(), b.y + n * r.normal(), b.z + n * r.normal());
+    const l = Math.hypot(v.x, v.y, v.z);
+    return v3(v.x / l, v.y / l, v.z / l);
   }
 
   /** Delayed, biased, noisy reading of the recorded state at simulation time t. */
@@ -162,7 +294,10 @@ export class Sensors {
     const gyro = (p.gyroNoise * Math.PI) / 180;
     let pos: Vec3;
     let posFresh = true;
-    if (p.posDropout && this.lastPos) {
+    const filtered = p.attitude !== 'truth' || p.nav === 'ekf';
+    if (p.nav === 'ekf') {
+      pos = clone(truth.pos); // the navigation filter's estimate
+    } else if (p.posDropout && this.lastPos) {
       pos = clone(this.lastPos);
       posFresh = false;
     } else if (p.posRateHz > 0 && this.heldPos && t < this.nextPosT - 1e-9) {
@@ -182,15 +317,16 @@ export class Sensors {
     }
     if (posFresh) this.lastPos = clone(pos);
     let q = truth.q;
-    if (gyro > 0) {
+    if (gyro > 0 && p.attitude === 'truth') {
       // Small attitude jitter consistent with the gyro noise level.
       const e = v3(r.normal(), r.normal(), r.normal());
       q = qMul(q, qFromAxisAngle(e, gyro * 0.01));
     }
-    const vel = noisy(truth.vel, p.velNoise);
-    let omega = noisy(truth.omega, gyro);
+    const vel = p.nav === 'ekf' ? clone(truth.vel) : noisy(truth.vel, p.velNoise);
+    // With a filter in the chain the IMU's noise is already in the recorded samples.
+    let omega = filtered ? clone(truth.omega) : noisy(truth.omega, gyro);
     if (p.imuYawDeg !== 0) omega = rotateAboutUp(omega, (p.imuYawDeg * Math.PI) / 180);
-    const acc = noisy(truth.acc, p.accNoise);
+    const acc = filtered ? clone(truth.acc) : noisy(truth.acc, p.accNoise);
     acc.y += p.accBias;
     const motors: Measurement['motors'] =
       p.motorFeedback && truth.motors ? [...truth.motors] : null;
@@ -209,5 +345,11 @@ export class Sensors {
     this.imuAge = 0;
     this.ahrs.reset();
     this.ahrsOn = false;
+    this.mekf.reset();
+    this.nav.reset();
+    this.navOn = false;
+    this.steps = 0;
+    this.nextGps = 0;
+    Object.assign(this.est, { magNis: 0, magUsed: true, gpsNis: 0, gpsUsed: true });
   }
 }

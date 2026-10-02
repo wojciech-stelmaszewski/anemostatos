@@ -10,7 +10,7 @@ import {
   loopGain,
   sensitivities,
 } from '@/analysis/loop';
-import type { Simulation } from '@/engine/simulation';
+import { Simulation as SimulationCtor, type Simulation } from '@/engine/simulation';
 import { cabs } from '@/math/complex';
 import { logspace, margins, type Margins } from '@/math/margins';
 import { robustTest } from '@/analysis/uncertainty';
@@ -84,6 +84,43 @@ const turnExcess = (p: Params): number => {
 
 /** The faults of lesson III.28 and the end of its flight, s. */
 const FDI = { stuck: 20, unstuck: 25, healthyAgain: 28, rotor: 40, end: 44 };
+/** Lesson III.23: the steel the drone hovers next to, s and degrees. */
+const MAG = { on: 6, off: 16, deg: 40 };
+/** Lesson III.24: one bad fix, metres off along x, at this time. */
+const GLITCH = { at: 8, m: 6 };
+/** RMS distance from the setpoint between two times, m. */
+const hoverRms = (sim: Simulation, from: number, to: number): number => {
+  const keys = ['pos.x', 'pos.y', 'pos.z', 'sp.x', 'sp.y', 'sp.z'];
+  const { t, series } = sim.telemetry.window(keys, from);
+  let sq = 0;
+  let n = 0;
+  for (let i = 0; i < t.length; i++) {
+    if (t[i]! > to) break;
+    const e = Math.hypot(
+      series[0]![i]! - series[3]![i]!,
+      series[1]![i]! - series[4]![i]!,
+      series[2]![i]! - series[5]![i]!,
+    );
+    if (Number.isFinite(e)) {
+      sq += e * e;
+      n++;
+    }
+  }
+  return n ? Math.sqrt(sq / n) : NaN;
+};
+/** The same flight on the true position: the baseline of lesson III.24, cached per setting. */
+let truthCache: { key: string; rms: number } | null = null;
+const truthHoverRms = (p: Params): number => {
+  const q = structuredClone(p);
+  q.sensors.nav = 'truth';
+  const key = JSON.stringify([q.wind, q.drone, q.control, q.sensors, q.sim, q.setpoint]);
+  if (truthCache?.key === key) return truthCache.rms;
+  const sim = new SimulationCtor(q);
+  for (let k = 0; k < 20000; k++) sim.step();
+  truthCache = { key, rms: hoverRms(sim, 4, 20) };
+  return truthCache.rms;
+};
+
 /** When lesson III.27 takes the propeller off motor 2, s. */
 const ROTOR_LOSS_S = 5;
 /** Spin rate on three rotors: the yaw torque of two diagonal motors carrying m·g, over the drag. */
@@ -1160,6 +1197,164 @@ export const PART_THREE: Lesson[] = [
           middle of a manoeuvre has nothing to learn from. And a gate cannot help in a turn that
           never ends. For that the filter needs to know the acceleration itself, from a velocity
           measurement, which is what a navigation filter adds (lesson III.24).
+        </Notice>
+      </>
+    ),
+  },
+  {
+    id: 'mekf',
+    n: 23,
+    part: 3,
+    chapter: I,
+    title: 'Four numbers, three unknowns',
+    level: 3,
+    chart: 'heading',
+    loop: 'att.yaw',
+    setup: (p) => {
+      calm(p);
+      p.sensors.attitude = 'mahony';
+      p.sensors.magnetometer = true;
+      p.sensors.gyroNoise = 0.3;
+      p.sensors.accNoise = 0.2;
+      p.sensors.gyroBias = { x: 0.3, y: 0.5, z: -0.2 };
+    },
+    events: (sim) => {
+      setAt(sim, MAG.on, 'sensors.magDisturbDeg', MAG.deg);
+      setAt(sim, MAG.off, 'sensors.magDisturbDeg', 0);
+    },
+    goal: {
+      text: 'Fly past the steel (a 40° magnetic disturbance from 6 s to 16 s) with the estimated heading never more than 3° off.',
+      check: ({ sim }) => {
+        if (sim.params.sensors.attitude === 'truth') return 'fly on an estimate, not the truth';
+        if (!sim.params.sensors.magnetometer)
+          return 'keep the magnetometer: the heading must come from it';
+        if (sim.t < MAG.off + 4) return sim.t < MAG.on ? 'flying…' : 'past the steel…';
+        const { series } = sim.telemetry.window(['ahrs.headErr'], 3);
+        const worst = Math.max(...series[0]!.filter((v) => !Number.isNaN(v)));
+        return worst < 3 || `largest heading error ${worst.toFixed(1)}°: press R to fly again`;
+      },
+    },
+    solution: (p) => {
+      p.sensors.attitude = 'mekf';
+      p.control.mekf.gate = 16.3;
+    },
+    body: (
+      <>
+        <p>
+          The heading comes from a <b>magnetometer</b>: it measures the earth's field, which points
+          north and steeply down. It also measures every piece of steel nearby, and from 6 to 16
+          seconds the drone hovers next to some. The field it sees turns by 40°, and nothing in the
+          reading says so.
+        </p>
+        <p>
+          Mahony's filter trusts the magnetometer at its fixed gain and turns with it. A Kalman
+          filter could do better: it knows how sure it is, and can ask whether a reading is
+          believable. But attitude is a rotation, and a quaternion has four numbers for three
+          degrees of freedom. A Kalman filter on all four would carry a singular covariance.
+        </p>
+        <p>
+          The <b>multiplicative EKF</b> [Markley 2003], the standard attitude filter of spacecraft,
+          keeps the quaternion <M>{'\\hat q'}</M> outside the filter and estimates only a small
+          rotation away from it, plus the gyro bias: six numbers, a 6 × 6 covariance <M>{'P'}</M>.
+          After each correction the small rotation is folded into <M>{'\\hat q'}</M>:
+        </p>
+        <M display>
+          {
+            '\\hat q \\leftarrow \\hat q \\otimes \\delta q(\\delta\\boldsymbol\\theta), \\qquad \\delta\\boldsymbol\\theta \\leftarrow 0'
+          }
+        </M>
+        <p>
+          Each reading is tested first. Its normalised innovation squared{' '}
+          <M>{'\\nu^\\top S^{-1}\\nu'}</M>, the innovation measured in units of what the filter
+          expects, follows a χ² distribution while the sensor tells the truth. A reading far beyond
+          it is rejected.
+        </p>
+        <Try>
+          Watch the heading error as the drone passes the steel. Switch <b>Attitude from</b> to the{' '}
+          <b>multiplicative EKF</b> and press <b>R</b>: without a gate it is fooled too. Then set
+          the <b>MEKF: χ² gate</b> and fly again, and watch the dashed 2σ line while the
+          magnetometer is shut out.
+        </Try>
+        <Notice>
+          While the gate holds the magnetometer out, the heading rests on the gyro alone, and the
+          filter's 2σ grows to say so: the filter is not only right, it knows how right it is, which
+          Mahony's cannot. The yaw bias of the gyro was learned from the magnetometer before the
+          steel; without that, ten seconds on the gyro would cost five degrees. Rejecting readings
+          is a bet that the disturbance ends before the uncertainty grows to cover it: the gate
+          opens again by itself when it does.
+        </Notice>
+      </>
+    ),
+  },
+  {
+    id: 'ekf',
+    n: 24,
+    part: 3,
+    chapter: I,
+    title: 'Fly on beliefs',
+    level: 3,
+    chart: 'nav',
+    loop: 'pos.x',
+    setup: (p) => {
+      p.wind.gustsOn = false;
+      p.wind.turbSigma = 0.8;
+      p.sensors.accNoise = 0.2;
+      p.sensors.nav = 'ekf';
+      p.sensors.gpsNoise = 0.1;
+      p.control.navEkf.gate = 0;
+    },
+    events: (sim) => {
+      setAt(sim, GLITCH.at, 'sensors.gpsGlitch', GLITCH.m);
+      setAt(sim, GLITCH.at + 0.1, 'sensors.gpsGlitch', 0);
+    },
+    goal: {
+      text: 'Hover through the receiver glitch at 8 s with a position RMS (4 – 20 s) no more than twice what the drone achieves flying on the true position.',
+      check: ({ sim }) => {
+        if (sim.params.sensors.nav !== 'ekf') return 'fly on the navigation filter, not the truth';
+        if (sim.t < 20) return sim.t < GLITCH.at ? 'hovering…' : 'after the glitch…';
+        const rms = hoverRms(sim, 4, 20);
+        const truth = truthHoverRms(sim.params);
+        return (
+          rms <= 2 * truth ||
+          `RMS ${(rms * 100).toFixed(1)} cm, against ${(truth * 100).toFixed(1)} cm on the truth: press R to fly again`
+        );
+      },
+    },
+    solution: (p) => {
+      p.control.navEkf.gate = 16.3;
+    },
+    body: (
+      <>
+        <p>
+          Until now the controller knew where the drone was. Here it knows only what a GPS-like
+          receiver says ten times a second (10 cm of noise), what a barometer says about the height,
+          and what the accelerometer feels. A <b>navigation EKF</b> fuses them: the accelerometer,
+          turned into the world frame by the attitude, predicts position and velocity between fixes,
+          and each fix corrects the prediction. Its state is position, velocity and the
+          accelerometer's bias, nine numbers.
+        </p>
+        <p>
+          At 8 s the receiver delivers one bad fix, six metres off: a reflection from a building, a
+          satellite in a bad place. The filter cannot know that a fix is bad. It can know that it is{' '}
+          <i>unlikely</i>: the normalised innovation squared
+        </p>
+        <M display>
+          {
+            '\\varepsilon = \\nu^\\top S^{-1} \\nu \\;\\sim\\; \\chi^2_3 \\quad\\text{for an honest fix}'
+          }
+        </M>
+        <p>exceeds 16.3 for one honest fix in a thousand. This fix scores in the thousands.</p>
+        <Try>
+          Watch the lower chart at 8 s, and what the drone does a moment later. Then set{' '}
+          <b>Navigation → EKF: χ² gate</b> and fly again (<b>R</b>). Try a gate so tight that honest
+          fixes are thrown away too, and watch the estimate's 2σ widen.
+        </Try>
+        <Notice>
+          The ungated filter believes the glitch and moves its estimate two metres at once, and the
+          controller flies the drone off to "correct" an error that does not exist: a navigation
+          fault becomes a flight-control incident. The gate costs one in a thousand honest fixes,
+          and the filter barely notices. Every flight navigation system tests its measurements this
+          way; the hard part is the gate's size, the trade between missed outliers and lost data.
         </Notice>
       </>
     ),

@@ -771,7 +771,38 @@ portrait.
   1 g. A gate just under that value fails, because the reading passes
   through every length on the way into and out of the turn.
 
-**Still to build:** III.18, III.19, III.23–III.26.
+**Built (2026-10-02): III.23 and III.24.**
+
+- `estimation/mekf.ts`: the multiplicative EKF, a reference quaternion
+  plus a 6-state error filter (small rotation, gyro bias), propagated at
+  1 kHz; gravity and north are read at 100 Hz, each through a χ² gate on
+  its NIS. The magnetometer corrects the heading only (one degree of
+  freedom about the estimated vertical): used as a full vector, a
+  disturbed reading also tilted the estimate.
+- The magnetometer (`sensors.magnetometer`, `magNoiseDeg`,
+  `magDisturbDeg`) sees the field at 65° of dip, turned by the local
+  disturbance. Mahony and the complementary filter take north from its
+  horizontal part; without it they keep the ideal compass of III.22.
+- With an attitude or navigation filter in the chain, the IMU's noise is
+  added before the filters (the controller reads the same samples), not
+  after; with the default noise of 0 nothing earlier changes.
+- III.23 hovers past steel (40°, 6–16 s): Mahony 46° of heading error,
+  the complementary filter 40°, the MEKF without a gate 51°, with a gate
+  of 16.3 under 2°. The rejections show as shading and the filter's 2σ on
+  yaw grows while it flies on the gyro.
+- `estimation/navekf.ts`: position, velocity and accelerometer bias,
+  propagated with the accelerometer turned by the believed attitude,
+  corrected by GPS-like fixes (`sensors.gpsRateHz`, `gpsNoise`) and a
+  50 Hz barometer, gated on the NIS. `sensors.nav: 'ekf'` makes the L3
+  controller fly on it.
+- III.24 uses 10 cm of receiver noise: with 30 cm the estimate alone
+  quadruples the tracking error and the plan's "2× of flying on truth"
+  cannot be met by any gate. One fix 6 m off at 8 s: ungated the
+  estimate jumps over 2 m and the RMS doubles; gated (16.3) it stays
+  under 2× of the truth, which the goal computes by flying the same
+  setting on the true position.
+
+**Still to build:** III.18, III.19, III.25, III.26.
 
 First pass: vibration model, IMU sample rate and anti-alias pole, notch
 and RPM notch bank, `attitude.ts`, gyro bias, magnetometer. Second pass:

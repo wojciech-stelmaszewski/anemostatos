@@ -33,6 +33,8 @@ const EXTRA: { value: ExtraChart; label: string }[] = [
   { value: 'dispersion', label: 'Monte Carlo campaign' },
   { value: 'fault', label: 'after a rotor loss' },
   { value: 'fdi', label: 'fault detection' },
+  { value: 'heading', label: 'heading estimate' },
+  { value: 'nav', label: 'navigation filter' },
 ];
 /** What can stand in the motor chart's place. */
 const SECOND: { value: AnalysisChart | 'motors'; label: string }[] = [
@@ -41,6 +43,19 @@ const SECOND: { value: AnalysisChart | 'motors'; label: string }[] = [
   { value: 'nyquist', label: 'Nyquist plot' },
   { value: 'poles', label: 'pole map' },
   { value: 'covariance', label: 'filter uncertainty' },
+];
+/** Lesson III.23: the heading error, and the MEKF's own 2σ for it. */
+const HEADING: SeriesSpec[] = [
+  { key: 'ahrs.headErr', label: 'heading error', color: SIGNAL.error, width: 2 },
+  { key: 'mekf.sigma2.yaw', label: 'MEKF 2σ', color: SIGNAL.measurement, dash: [4, 3], width: 1.5 },
+];
+/** Lesson III.24: how far the navigation estimate is from the truth, and its NIS. */
+const NAV_ERR: SeriesSpec[] = [
+  { key: 'nav.err', label: 'estimate error', color: SIGNAL.error, width: 2 },
+  { key: 'nav.sigma2', label: 'EKF 2σ', color: SIGNAL.measurement, dash: [4, 3], width: 1.5 },
+];
+const NAV_NIS: SeriesSpec[] = [
+  { key: 'nav.gpsNis', label: 'NIS of each fix', color: SIGNAL.measurement, width: 1.5 },
 ];
 /** The two tests of the fault monitor (lesson III.28). */
 const NIS: SeriesSpec[] = [{ key: 'fdi.nis', label: 'NIS', color: SIGNAL.measurement, width: 2 }];
@@ -120,7 +135,8 @@ export function ChartsPanel() {
     extra === 'mimo' ||
     extra === 'spectrum' ||
     extra === 'dispersion' ||
-    extra === 'fdi';
+    extra === 'fdi' ||
+    extra === 'nav';
   const ctrlKey = useParams((s) => controllerKey(s.params));
   const loopOptions = useMemo(
     () => loopsFor(useParams.getState().params).map((l) => ({ value: l.id, label: l.name })),
@@ -250,6 +266,31 @@ export function ChartsPanel() {
           <div className="row-span-2 min-h-0">
             {extra === 'lyapunov' ? (
               <PhasePortrait meta={meta} lyapunov />
+            ) : extra === 'nav' ? (
+              <div className="flex h-full min-h-0 flex-col gap-1.5">
+                <div className="min-h-0 flex-1">
+                  <TimeChart
+                    title="Navigation: estimate against truth (shaded: fix rejected)"
+                    unit="m"
+                    series={NAV_ERR}
+                    shadeKey="nav.gpsRejected"
+                    includeZero
+                  />
+                </div>
+                <div className="min-h-0 flex-1">
+                  <TimeChart
+                    title="NIS of the GPS fixes (χ², 3 degrees of freedom)"
+                    series={NAV_NIS}
+                    includeZero
+                    logY
+                    hlines={() =>
+                      sim.params.control.navEkf.gate > 0
+                        ? [{ value: sim.params.control.navEkf.gate, label: 'gate' }]
+                        : []
+                    }
+                  />
+                </div>
+              </div>
             ) : extra === 'fdi' ? (
               <div className="flex h-full min-h-0 flex-col gap-1.5">
                 <div className="min-h-0 flex-1">
@@ -312,6 +353,14 @@ export function ChartsPanel() {
             title="Thrust axis: error from its target"
             unit="°"
             series={FAULT}
+            includeZero
+          />
+        ) : extra === 'heading' ? (
+          <TimeChart
+            title="Heading error (shaded: magnetometer rejected)"
+            unit="°"
+            series={HEADING}
+            shadeKey="mekf.magRejected"
             includeZero
           />
         ) : extra === 'attitude' ? (

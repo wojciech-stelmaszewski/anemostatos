@@ -73,3 +73,16 @@ export function tiltError(truth: Quat, estimate: Quat): number {
   const c = dot(qRotate(truth, UP), qRotate(estimate, UP));
   return Math.acos(Math.min(1, Math.max(-1, c)));
 }
+
+/** Heading difference between two attitudes, rad: the angle between the projections of the body's
+ *  forward axes (x) on the horizontal plane. */
+export function headingError(truth: Quat, estimate: Quat): number {
+  const f = (q: Quat) => {
+    const x = qRotate(q, v3(1, 0, 0));
+    return Math.atan2(-x.z, x.x);
+  };
+  let d = f(estimate) - f(truth);
+  while (d > Math.PI) d -= 2 * Math.PI;
+  while (d < -Math.PI) d += 2 * Math.PI;
+  return Math.abs(d);
+}

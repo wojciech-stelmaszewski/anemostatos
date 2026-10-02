@@ -1,6 +1,6 @@
 import { controllerKey, makeController } from '@/control/registry';
 import type { Controller, LoopTerms, Setpoint } from '@/control/types';
-import { tiltError } from '@/estimation/attitude';
+import { headingError, tiltError } from '@/estimation/attitude';
 import { qFromAxisAngle, qRotate, qToEuler, type Quat } from '@/math/quat';
 import { clone, length, scale, sub, add, v3, type Vec3 } from '@/math/vec3';
 import { ARM_LENGTH, FOOT_HEIGHT } from '@/sim/drone';
@@ -319,6 +319,8 @@ export class Simulation {
       vibration: p.vibration,
       drone: p.drone,
       ahrs: p.control.ahrs,
+      mekf: p.control.mekf,
+      navEkf: p.control.navEkf,
       dt,
     });
 
@@ -465,14 +467,39 @@ export class Simulation {
       tl.set('fdi.cusum', Math.max(...f.cusum));
       tl.set('fdi.motor', f.motor + 1);
     }
+    if (this.level === 3 && this.params.sensors.attitude === 'mekf') {
+      const k = this.sensors.mekf;
+      tl.set('mekf.sigma.yaw', k.sigma(1) * DEG);
+      tl.set('mekf.sigma2.yaw', 2 * k.sigma(1) * DEG);
+      tl.set('mekf.magNis', this.sensors.est.magNis);
+      tl.set('mekf.magRejected', this.sensors.est.magUsed ? 0 : 1);
+    }
     if (this.level === 3 && this.params.sensors.attitude !== 'truth') {
-      const f = this.sensors.ahrs;
+      const qh =
+        this.params.sensors.attitude === 'mekf' ? this.sensors.mekf.q : this.sensors.ahrs.q;
+      tl.set('ahrs.headErr', headingError(s.q, qh) * DEG);
+    }
+    if (this.level === 3 && this.params.sensors.nav === 'ekf') {
+      const n = this.sensors.nav;
+      const e = n.pos;
+      tl.set('nav.err', Math.hypot(e.x - s.pos.x, e.y - s.pos.y, e.z - s.pos.z));
+      tl.set('nav.sigma', Math.hypot(n.sigma(0), n.sigma(1), n.sigma(2)));
+      tl.set('nav.sigma2', 2 * Math.hypot(n.sigma(0), n.sigma(1), n.sigma(2)));
+      tl.set('nav.gpsNis', this.sensors.est.gpsNis);
+      tl.set('nav.gpsRejected', this.sensors.est.gpsUsed ? 0 : 1);
+    }
+    if (this.level === 3 && this.params.sensors.attitude !== 'truth') {
+      const mekf = this.params.sensors.attitude === 'mekf';
+      const f = mekf ? this.sensors.mekf : this.sensors.ahrs;
       tl.set('ahrs.err', tiltError(s.q, f.q) * DEG);
       tl.set('ahrs.tilt', Math.acos(Math.min(1, qRotate(s.q, v3(0, 1, 0)).y)) * DEG);
       tl.set('ahrs.tiltHat', Math.acos(Math.min(1, qRotate(f.q, v3(0, 1, 0)).y)) * DEG);
       tl.set('ahrs.bias.x', f.bias.x * DEG);
       tl.set('ahrs.bias.z', f.bias.z * DEG);
-      tl.set('ahrs.gated', f.trusted ? 0 : 1);
+      tl.set(
+        'ahrs.gated',
+        mekf ? (this.sensors.mekf.lastAcc.accepted ? 0 : 1) : this.sensors.ahrs.trusted ? 0 : 1,
+      );
     }
     if (this.measurement) {
       const m = this.measurement;

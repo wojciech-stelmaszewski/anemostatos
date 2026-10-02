@@ -81,7 +81,22 @@ export interface SensorParams {
    * Where the attitude the controller flies on comes from (L3): the true one, or an estimate
    * from the gyro and the accelerometer (docs/analysis.md §3.4).
    */
-  attitude: 'truth' | 'complementary' | 'mahony';
+  attitude: 'truth' | 'complementary' | 'mahony' | 'mekf';
+  /** A magnetometer gives the heading instead of an ideal compass (L3, attitude filters). */
+  magnetometer: boolean;
+  /** Direction noise of the magnetometer, degrees. */
+  magNoiseDeg: number;
+  /** Local disturbance: the field the magnetometer sees is turned about the vertical, degrees. */
+  magDisturbDeg: number;
+  /** Where position and velocity come from (L3): the truth, or a navigation EKF on GPS and baro. */
+  nav: 'truth' | 'ekf';
+  /** GPS-like receiver: fixes per second and position noise σ, m. */
+  gpsRateHz: number;
+  gpsNoise: number;
+  /** Barometric altitude noise σ, m (50 readings a second). */
+  baroNoise: number;
+  /** A glitch: every fix is off by this much along x while it is not 0, m. */
+  gpsGlitch: number;
 }
 
 /** Flight after the loss of a rotor (src/control/fault.ts, lesson III.27). */
@@ -112,6 +127,27 @@ export interface FdiParams {
   /** CUSUM of the motor torque residual: tolerated deviation, N·m, and alarm level, N·m·s. */
   cusumDrift: number;
   cusumThreshold: number;
+}
+
+/** The multiplicative EKF (src/estimation/mekf.ts): what it assumes, in degrees. */
+export interface MekfParams {
+  /** Gyro noise, °/s, and how fast its bias may wander, °/s per √s. */
+  gyroDeg: number;
+  biasWalkDeg: number;
+  /** Direction noise of gravity from the accelerometer and of north from the magnetometer, °. */
+  accDeg: number;
+  magDeg: number;
+  /** χ² gate on each vector measurement (3 degrees of freedom); 0 = accept everything. */
+  gate: number;
+}
+
+/** The navigation EKF (src/estimation/navekf.ts). Receiver and baro noise come from the sensors. */
+export interface NavEkfParams {
+  /** Accelerometer noise the filter assumes, m/s², and bias wander, m/s² per √s. */
+  accSigma: number;
+  biasWalk: number;
+  /** χ² gate on a GPS fix (3 degrees of freedom); 0 = accept every fix. */
+  gate: number;
 }
 
 /** Settings of the attitude filters (src/estimation/attitude.ts). */
@@ -198,6 +234,8 @@ export interface ControlParams {
   model: ModelParams;
   gyroFilter: GyroFilterParams;
   ahrs: AhrsParams;
+  mekf: MekfParams;
+  navEkf: NavEkfParams;
   fault: FaultParams;
   fdi: FdiParams;
   l1: { kind: L1Kind; estimator: L1Estimator };
@@ -441,6 +479,14 @@ export const defaultParams = (): Params => ({
     aaFilterHz: 0,
     gyroBias: { x: 0, y: 0, z: 0 },
     attitude: 'truth',
+    magnetometer: false,
+    magNoiseDeg: 1,
+    magDisturbDeg: 0,
+    nav: 'truth',
+    gpsRateHz: 10,
+    gpsNoise: 0.3,
+    baroNoise: 0.1,
+    gpsGlitch: 0,
   },
   vibration: { gyroDeg: 0, acc: 0, hoverHz: 110 },
   control: {
@@ -449,6 +495,8 @@ export const defaultParams = (): Params => ({
     model: { mass: 1.0, inertiaScale: 1, motorTau: 0.03, imuYawDeg: 0 },
     gyroFilter: { lpfHz: 0, notch: 'off', notchHz: 110, notchQ: 4 },
     ahrs: { tau: 1, kp: 1, ki: 0.3, gate: 0.05 },
+    mekf: { gyroDeg: 0.5, biasWalkDeg: 0.02, accDeg: 3, magDeg: 2, gate: 0 },
+    navEkf: { accSigma: 0.5, biasWalk: 0.01, gate: 0 },
     fault: {
       enabled: false,
       posKp: 2,

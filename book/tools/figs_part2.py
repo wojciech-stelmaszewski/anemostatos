@@ -587,3 +587,33 @@ def flatness_eight():
     b.set_xlabel("time in the lap [s]", loc="right")
     b.grid(True, which="major", axis="both")
     save(f, "flatness_eight")
+
+
+@fig
+def minsnap_square():
+    f, (a, b) = plt.subplots(1, 2, figsize=(TEXT_W, 62 * MM), gridspec_kw=dict(wspace=0.32))
+    for tag, col, lab, t0 in (
+        ("corners", C["err"], "set-point steps", 31.81),
+        ("minsnap", C["meas"], "minimum-snap plan", 32.0),
+    ):
+        d = win(load(f"snap-{tag}"), t0 - 0.2, t0 + 8)
+        e = win(d, t0 - 0.2, t0 + 2.4)
+        a.plot(e.t - t0, e["sp.x"], color=col, lw=0.8, ls=(0, (3, 2)))
+        a.plot(e.t - t0, e["pos.x"], color=col, lw=1.0, label=lab)
+        d = win(d, t0, 40)
+        rate = np.sqrt(d["rate.roll.meas"] ** 2 + d["rate.pitch.meas"] ** 2)
+        b.plot(d.t - t0, rate, color=col, lw=0.9, label=lab)
+    a.set_xlim(-0.2, 2.4)
+    a.set_ylim(-0.3, 3.3)
+    a.set_title("One side: set-point (dashed) and drone")
+    a.set_ylabel("x [m]")
+    a.set_xlabel("time [s]", loc="right")
+    a.legend(loc="upper right", fontsize=6.2)
+    b.axhline(150, color=C["I"], lw=0.7, ls=(0, (4, 2.5)))
+    b.text(2.3, 158, "goal: 150 °/s", fontsize=6.2, color=C["I"])
+    b.set_xlim(0, 8)
+    b.set_ylim(0, 330)
+    b.set_title("Body rate over the lap")
+    b.set_ylabel("deg/s")
+    b.set_xlabel("time in the lap [s]", loc="right")
+    save(f, "minsnap_square")

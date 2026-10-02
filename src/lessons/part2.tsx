@@ -851,7 +851,7 @@ export const PART_TWO: Lesson[] = [
         <Try>
           Set <i>Setpoint → Automatic motion → square: min-snap trajectory</i>. Same corners, same
           schedule, half the peak body rate — and the drone is exactly where the plan says, at every
-          moment. Then shorten the period to 7 s and look at the info card: the plan now needs 45°
+          moment. Then shorten the period to 7 s and look at the info card: the plan now needs 37°
           of tilt, over the 35° limit. The trajectory tells you it is infeasible <i>before</i> you
           fly it.
         </Try>

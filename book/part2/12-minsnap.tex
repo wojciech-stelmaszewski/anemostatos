@@ -1,0 +1,173 @@
+\lesson{II.12}{Plan the motion}{A step tells the drone where to be and leaves it to find out how. A plan tells it where to be at every instant — and whether that is possible at all.}{3}{minsnap}{Part II · Beyond PID}
+\label{les:minsnap}
+
+\lead{\setupcard{\setuprow{Level}{L3}\setuprow{Controller}{geometric tracking with flatness feedforward}\setuprow{Set-point}{a square of \SI{3}{m}, at \SI{3}{m} altitude; the set-point jumps to the next corner every \SI{2}{s}}\setuprow{Goal}{over the last lap, follow the set-point within \SI{10}{cm} RMS with body rates below \SI{150}{\degree/s}}}%
+The drone flies a square, two seconds per side. As the lesson starts, the set-point simply jumps to the next corner, and the controller does the rest as hard as it can: it tilts to its limit, whips round at almost \SI{250}{\degree/s} and stops. This lesson plans the same motion instead, as the polynomial path that minimises the snap — the fourth derivative, which by the previous lesson is what the motors' torques must produce. The plan needs half the body rate, the drone follows it within \SI{6}{cm}, and the plan says in advance, from a formula, when a schedule is impossible.}
+
+\section{What a step asks for}
+
+At $t = 0$ the set-point moves \SI{3}{m}. The geometric law of \lessonref{les:flatness} answers with $K_p \cdot \SI{3}{m} = \SI{27}{m/s^2}$, four times what the tilt limit of $35^\circ$ allows ($g\tan35^\circ = \SI{6.9}{m/s^2}$). The command saturates, and for a while the drone simply accelerates as hard as it may, then brakes when the velocity term takes over.\recall{Lesson~I.7: a step in the set-point is the hardest input a loop can get. Part~I softened it with a rate limit on the set-point; this lesson replaces it with a plan.}
+
+\begin{example}[The step, in numbers]
+\label{ex:minsnap-step}
+Estimate the fastest possible move over \SI{3}{m} from rest to rest with the tilt limit, and compare with the flight.
+
+\textbf{Step 1 — bang-bang.} Accelerate at $a = \SI{6.9}{m/s^2}$ for half the distance, brake for the other half: each half takes $\sqrt{L/a} = \sqrt{3/6.9} = \SI{0.66}{s}$, the whole move \SI{1.32}{s}, with a peak speed of $\sqrt{La} = \SI{4.5}{m/s}$.
+
+\textbf{Step 2 — what it costs.} The switch from full acceleration to full braking is a reversal of the tilt by $70^\circ$; done in a tenth of a second it needs \SI{700}{\degree/s}. Bang-bang is the limit of what a drone with unlimited body rates could do.\didyouknow[-75pt]{Bang-bang control is time-optimal for a double integrator with bounded acceleration: always at full force, one switch. Pontryagin's maximum principle proves it (Lessons~IV.1--IV.4).}
+
+\textbf{Step 3 — the flight.} The controller is gentler than bang-bang — its gains, the rate limit and the motors smooth the reversal — and it arrives within \SI{10}{cm} of the corner after \SI{1.7}{s}, at a peak speed of \SI{3.7}{m/s}. The body rate peaks at \SI{247}{\degree/s} and the tilt at $38^\circ$, beyond the limit by the overshoot of the attitude loop.
+
+\textbf{Step 4 — the score.} \enquote{Follow the set-point within \SI{10}{cm}} is impossible with steps: for most of each side the set-point is metres away. The RMS distance is \SI{1.76}{m}. A step is not a path to follow; it is a wish.
+\end{example}
+
+\section{The smoothest path for the motors}
+
+A path for the controller to follow must say where the drone should be at every instant, and its derivatives must be ones the drone can produce. The previous lesson listed them: the acceleration sets the tilt, the jerk the body rate, the snap the torque. A path with small snap asks for small changes of torque, which is what the motors find easiest.\innumbers{\enquote{Snap}, the fourth derivative of position, is in \si{m/s^4}. For the planned square it peaks at $840L/T^4 \approx \SI{160}{m/s^4}$, at the ends of each side.} Mellinger and Kumar (2011) proposed to plan the path that minimises
+\begin{equation}\label{eq:minsnap-cost}
+  J = \int_0^T \big\|\vec p^{(4)}(t)\big\|^2\,\dd t
+\end{equation}
+subject to passing through the waypoints at the given times.
+
+\begin{result}[Rest-to-rest minimum snap]
+Between two points a distance $L$ apart, in the time $T$, starting and ending at rest (velocity, acceleration and jerk zero), the minimum-snap path is
+\begin{equation}\label{eq:minsnap-poly}
+  x(t) = L\,\big(35s^4 - 84s^5 + 70s^6 - 20s^7\big), \qquad s = t/T .
+\end{equation}
+Its peaks are $v_{max} = 2.19\,L/T$ at the middle, $a_{max} = 7.51\,L/T^2$ at $s = 0.28$ and $0.72$, and $j_{max} = 52.5\,L/T^3$ at the middle.
+\end{result}
+
+\begin{example}[The square, planned]
+\label{ex:minsnap-plan}
+Plan each side of the square ($L = \SI{3}{m}$, $T = \SI{2}{s}$) and predict what it asks of the drone.
+
+\textbf{Step 1 — the polynomial.} The path must satisfy eight conditions: the position at both ends, and the velocity, acceleration and jerk zero at both ends. A seventh-order polynomial has eight coefficients, and \cref{thm:minsnap-el} below shows that the minimiser is a seventh-order polynomial. So the eight conditions fix it: \cref{eq:minsnap-poly}.
+
+\textbf{Step 2 — the peaks.} $v_{max} = 2.19 \cdot 3/2 = \SI{3.3}{m/s}$; $a_{max} = 7.51 \cdot 3/4 = \SI{5.6}{m/s^2}$, a tilt of $\arctan(5.6/9.81) = 30^\circ$; $j_{max} = 52.5 \cdot 3/8 = \SI{19.7}{m/s^3}$, at the middle of the side, where the acceleration is zero and the thrust is $mg$: a body rate of $19.7/9.81 = \SI{2.0}{rad/s} = \SI{115}{\degree/s}$.
+
+\textbf{Step 3 — the flight.} Peak speed \SI{3.2}{m/s}, body rate \SI{127}{\degree/s}, RMS distance from the plan \SI{6.0}{cm}: the goal is met. The tilt reaches $36^\circ$, six degrees over the plan, where the feedback adds to the feedforward.
+
+\textbf{Step 4 — read it.} The plan arrives at each corner exactly at \SI{2}{s}; the steps arrived within \SI{10}{cm} after \SI{1.7}{s}. Planning did not make the drone faster. It made the motion predictable to the centimetre and halved the body rate.
+\end{example}
+\tip{Judge a tracking controller by its distance from a plan the drone can fly, not from a step. A step makes every controller look bad and tells you nothing.}
+
+\simfig{minsnap_square}{Left: one side of the square. With steps (red) the set-point jumps at once and the drone chases it; with the plan (blue) the set-point moves smoothly and the drone stays on it. The two motions are surprisingly alike — the difference is in the details. Right: the body rate over a lap; every corner of the step version costs a peak of 210--\SI{250}{\degree/s}.}{fig:minsnap-square}
+
+\begin{keyidea}[A plan is a promise the drone can keep]
+A step specifies only the destination; a plan specifies the motion, and through flatness every input the motion needs. The plan can be checked before it is flown, followed by feedforward, and judged by how far the drone strays from it.
+\end{keyidea}
+
+\section{Feasible before flying}
+
+Because the inputs follow from the plan, the limits can be checked in advance. With \cref{eq:minsnap-poly} it is one line.
+
+\begin{example}[The shortest feasible schedule]
+\label{ex:minsnap-feasible}
+How fast may the square be flown with the tilt limit of $35^\circ$?
+
+\textbf{Step 1 — the tilt.} $a_{max} = 7.51L/T^2 \le g\tan35^\circ = \SI{6.87}{m/s^2}$.
+
+\textbf{Step 2 — solve.} $T \ge \sqrt{7.51 \cdot 3/6.87} = \SI{1.81}{s}$ per side: a period of at least \SI{7.25}{s}.
+
+\textbf{Step 3 — check against the app.} With a period of \SI{7}{s}, $T = \SI{1.75}{s}$, the plan needs $a = \SI{7.4}{m/s^2}$ and $37^\circ$. The app's information card shows the same number before the flight starts. At a period of \SI{6}{s} it is $46^\circ$.
+
+\textbf{Step 4 — compared with bang-bang.} The minimum-snap side takes \SI{1.81}{s} at the limit where bang-bang needed \SI{1.32}{s}: smoothness costs about 40\,\% of time. Other costs — minimum jerk, minimum acceleration, or snap with a penalty on the total time — trade the two differently.
+\end{example}
+\pitfall{A plan that violates a limit is not flown slower; it is flown wrongly. The controller saturates, the drone falls behind the plan, and the feedforward then pushes in the wrong direction.}
+
+\screen[0 0 495 998]{minsnap}{Lesson II.12 in the app with the minimum-snap plan. The information card lists what the plan asks for — peak speed, acceleration and tilt — before it is flown; the trajectory is drawn ahead of the drone.}{fig:minsnap-screen}
+
+\begin{inapp}
+\begin{itemize}[leftmargin=1.2em]
+  \item The switch is \ui{Setpoint\then Automatic motion\then square: min-snap trajectory} (\param{setpoint.profile = 'minsnap'}); the steps are \texttt{corners}. The side is $2\times$\param{setpoint.profileAmplitude}, a lap takes \param{setpoint.profilePeriod}.
+  \item The planner is \texttt{minSnap} in \src{src/math/poly.ts}: it writes the conditions on the polynomial coefficients as one linear system and solves it. \texttt{evalSpline} returns the derivatives up to the snap, which feed the flatness feedforward.
+  \item The demand on the information card is \texttt{profileDemand} in \src{src/engine/reference.ts}: the peak speed, acceleration and tilt over one lap.
+\end{itemize}
+\end{inapp}
+
+\begin{trythis}
+\begin{enumerate}
+  \item Fly a lap with steps and watch the body rate. Then switch to the minimum-snap plan.
+  \item Shorten the period to \SI{7}{s} and read the information card. Fly it: what happens to the tracking error?
+  \item Lengthen the period to \SI{12}{s}. By how much does the body rate fall?
+\end{enumerate}
+\predict{by \cref{eq:minsnap-poly}, how does the peak body rate scale with the period? What is it at \SI{12}{s}?}
+\end{trythis}
+
+\section{The engineer's view: smooth by design}
+
+\subsection{Everywhere motion is planned}
+Machines that carry people or delicate loads do not take steps. A lift accelerates along an \enquote{S-curve} with limited jerk, because the passengers' comfort depends on the jerk as much as on the acceleration; a machine tool plans its path so that the cutter's acceleration never excites the frame's resonances; a robot arm plans joint paths of minimum jerk, which, it turns out, is also how a human arm reaches for a cup.\didyouknow{Lifts in tall buildings limit the jerk to about \SI{1}{m/s^3}: passengers notice a change of acceleration sooner than the acceleration itself.}
+
+\begin{example}[A lift between floors]
+\label{ex:minsnap-lift}
+A lift must travel \SI{3.5}{m}, one floor, from rest to rest. Comfort limits are about \SI{1}{m/s^2} of acceleration and \SI{1.5}{m/s^3} of jerk. Plan it with a rest-to-rest polynomial of minimum jerk, $x = L(10s^3 - 15s^4 + 6s^5)$, which has $a_{max} = 5.77L/T^2$ and $j_{max} = 60L/T^3$ (at the ends).
+
+\textbf{Step 1 — acceleration.} $5.77 \cdot 3.5/T^2 \le 1$: $T \ge \SI{4.5}{s}$.
+
+\textbf{Step 2 — jerk.} $60 \cdot 3.5/T^3 \le 1.5$: $T \ge \SI{5.2}{s}$. The jerk decides.
+
+\textbf{Step 3 — the result.} One floor in \SI{5.2}{s}, at a peak speed of $1.875 \cdot 3.5/5.2 = \SI{1.26}{m/s}$. Real lifts use a profile with a constant-acceleration middle and jerk-limited corners, which reaches the floor somewhat sooner within the same limits.
+
+\textbf{Step 4 — read it.} The same reasoning as for the drone: a polynomial plan, its peaks from a formula, the time from the tightest limit. For the drone the binding limit was the tilt; for the lift, the passengers' stomachs.
+\end{example}
+
+\subsection{In formal terms}
+
+\begin{theorem}[The minimiser of the snap]
+\label{thm:minsnap-el}
+Among all functions $x(t)$ on $[0, T]$ with given values of $x, \dot x, \ddot x, \dddot x$ at both ends, the minimiser of $\int_0^T (x^{(4)})^2\,\dd t$ satisfies $x^{(8)} = 0$: it is a polynomial of degree at most seven. With interior waypoints at fixed times, it is a polynomial of degree seven on each segment, and its derivatives up to the sixth are continuous at the waypoints.
+\end{theorem}
+\begin{proof}
+Let $x$ be the minimiser and $\eta$ any smooth function with $\eta, \dot\eta, \ddot\eta, \dddot\eta$ zero at both ends. Then $x + \epsilon\eta$ satisfies the same conditions, and the derivative of the cost with respect to $\epsilon$ at $\epsilon = 0$ must vanish: $\int_0^T x^{(4)}\eta^{(4)}\,\dd t = 0$. Integrating by parts four times, the boundary terms vanish and $\int_0^T x^{(8)}\eta\,\dd t = 0$ for every such $\eta$, hence $x^{(8)} = 0$. At an interior waypoint only the position is prescribed, so $\eta$ there is zero but its derivatives are free; the boundary terms of the integration by parts then require the jumps of $x^{(4)}, \dots, x^{(7)}$ to vanish. Together with the continuity of $x, \dots, \dddot x$ that a finite cost demands, the derivatives up to the sixth are continuous. The cost is convex, so the stationary path is the minimum. This is the Euler--Lagrange equation of the calculus of variations, the subject of Appendix~L.
+\end{proof}
+\tip{Fix the times first and the path follows from one linear solve; optimising the times as well makes the problem nonlinear. Practical planners alternate the two.}
+
+For each segment the eight coefficients enter the conditions linearly, so a path through $N$ segments is one linear system of $8N$ equations — the system \texttt{minSnap} solves. For the single segment of the square, the solution is \cref{eq:minsnap-poly}; Exercise~\ref{ex:minsnap-derive} derives it.
+
+\begin{lookahead}
+\begin{itemize}[leftmargin=1.2em]
+  \item The plan here is fixed before the flight. Model predictive control (Lesson~II.13) replans at every step, from where the drone actually is, and puts the limits into the optimisation instead of checking them afterwards.
+  \item A safety filter that edits a plan in flight, so that it never enters a forbidden region, is Lesson~II.17.
+  \item Planning around obstacles, and time-optimal paths for racing drones, belong to the later volumes.
+\end{itemize}
+\end{lookahead}
+
+\begin{remember}
+\begin{itemize}
+  \item A step is a wish, not a path: the controller tilts to its limit and spins at \SI{250}{\degree/s}, and \enquote{following} it is meaningless.
+  \item Minimum snap: $\min\int\|\vec p^{(4)}\|^2$; the minimiser is a seventh-order polynomial per segment, $C^6$ at waypoints, found by one linear solve.
+  \item Rest-to-rest: $x = L(35s^4 - 84s^5 + 70s^6 - 20s^7)$; $v_{max} = 2.19L/T$, $a_{max} = 7.51L/T^2$, $j_{max} = 52.5L/T^3$.
+  \item On the square: half the body rate (\SI{127}{\degree/s}), \SI{6}{cm} RMS from the plan, arrival exactly on schedule.
+  \item Feasibility is checked before flying: $T \ge \sqrt{7.51L/(g\tan\theta_{max})}$, \SI{1.81}{s} per \SI{3}{m} side here.
+\end{itemize}
+\end{remember}
+
+\begin{curiosity}{How a hand reaches for a cup}
+In 1985 Tamar Flash and Neville Hogan recorded people moving a hand from one point to another on a table, and found that the paths had a striking regularity: nearly straight, with a bell-shaped speed profile that hardly changed from person to person. They asked what the brain might be optimising, and found that a single principle predicted the measurements remarkably well: the hand moves along the path of \emph{minimum jerk} — the polynomial of fifth order of Example~\ref{ex:minsnap-lift}.
+
+Why jerk? The muscles do not produce positions or velocities; they produce forces, and forces change at a finite rate. A movement with small jerk asks for gentle changes of force, is easy to repeat precisely, and keeps the arm's own vibrations quiet. It is the same argument as for the drone's snap, one derivative lower, because the arm's force is one derivative closer to its position than the drone's torque is.
+
+The idea has travelled back from biology to engineering. Robot arms that move among people plan minimum-jerk paths, partly because they look natural, and so are easier to anticipate and safer to work beside.
+\end{curiosity}
+
+\begin{exercises}
+\exercise[1] For a rest-to-rest minimum-snap move of \SI{2}{m} in \SI{1.5}{s}, find the peak speed and the peak tilt.
+\answer{$v = 2.19 \cdot 2/1.5 = \SI{2.9}{m/s}$; $a = 7.51 \cdot 2/2.25 = \SI{6.7}{m/s^2}$, tilt $34^\circ$.}
+\exercise[1] How do the peak speed, acceleration and jerk of \cref{eq:minsnap-poly} scale when the time $T$ is doubled?
+\answer{By $1/2$, $1/4$ and $1/8$.}
+\exercise[1] By Example~\ref{ex:minsnap-plan}, what peak body rate does the square need with a period of \SI{12}{s}?
+\answer{$T = \SI{3}{s}$: $j = 52.5 \cdot 3/27 = \SI{5.8}{m/s^3}$, $\SI{0.59}{rad/s} = \SI{34}{\degree/s}$.}
+\exercise[2]\exkind{derive}\label{ex:minsnap-derive} Derive \cref{eq:minsnap-poly}: write $x = L\sum_{k=0}^7 c_k s^k$, impose $x(0) = 0$, $x(1) = L$ and the first three derivatives zero at both ends, and solve for the coefficients.
+\answer{At $s = 0$: $c_0 = c_1 = c_2 = c_3 = 0$. At $s = 1$: $c_4 + c_5 + c_6 + c_7 = 1$, $4c_4 + 5c_5 + 6c_6 + 7c_7 = 0$, $12c_4 + 20c_5 + 30c_6 + 42c_7 = 0$, $24c_4 + 60c_5 + 120c_6 + 210c_7 = 0$. Solution $(35, -84, 70, -20)$.}
+\exercise[2]\exkind{derive} Show that the peak speed of \cref{eq:minsnap-poly} is $\tfrac{35}{16}L/T$ and occurs at $s = 1/2$, using the symmetry $x(1 - s) = L - x(s)$.
+\answer{$\dot x = (L/T)\,140\,s^3(1 - s)^3$ (factorise the derivative), maximal at $s = 1/2$: $140/64 = 35/16 = 2.1875$. The symmetry makes $\dot x$ symmetric about $s = 1/2$.}
+\exercise[2]\exkind{derive} Repeat Example~\ref{ex:minsnap-feasible} for a body-rate limit of \SI{150}{\degree/s} instead of the tilt limit. Which limit binds for the \SI{3}{m} side?
+\answer{$52.5 \cdot 3/T^3 \le 9.81 \cdot 2.62$: $T \ge \SI{1.83}{s}$ — the body rate binds, just before the tilt (\SI{1.81}{s}).}
+\exercise[2]\exkind{fly} In Lesson~II.12, with the minimum-snap plan, switch the trajectory feedforward off (\param{control.geometric.feedforward}). How large does the tracking error become? Use Lesson~II.11 to estimate it before flying.
+\answer{Feedback alone lags by about $K_v/K_p = \SI{0.56}{s}$; at a peak speed of \SI{3.3}{m/s} the error grows to the order of a metre, and the goal is lost. The plan and the feedforward belong together.}
+\exercise[2]\exkind{code} \texttt{minSnap} in \src{src/math/poly.ts} builds $8N$ equations for $N$ segments. Count them: how many come from the waypoints, how many from the ends, and how many from continuity?
+\answer{$2N$ from the waypoints (each segment's two ends), 6 from the ends (velocity, acceleration, jerk at both), and $6(N - 1)$ from continuity of derivatives 1 to 6: $2N + 6 + 6N - 6 = 8N$.}
+\exercise[3]\exkind{derive} Minimum jerk instead of minimum snap. Show that the minimiser of $\int(\dddot x)^2$ with position, velocity and acceleration given at both ends is a fifth-order polynomial, derive $x = L(10s^3 - 15s^4 + 6s^5)$, and compare its peak acceleration with that of minimum snap.
+\answer{The Euler--Lagrange equation is $x^{(6)} = 0$. The six conditions give $(c_3, c_4, c_5) = (10, -15, 6)$. Peak acceleration $5.77L/T^2$ (at $s = 0.21$) against $7.51L/T^2$: minimum jerk needs less acceleration but a jump in jerk at the ends — a step in body rate, which the drone cannot produce.}
+\end{exercises}

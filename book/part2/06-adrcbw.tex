@@ -71,7 +71,7 @@ simulator [N] & 0.058 & 0.371 & 0.923 & 1.81 & 3.09 & 4.76\\
 \end{center}
 The thrust jitter is the noise, through a linear filter, and nothing else.
 
-\textbf{Step 5 — where it stops.} At $\omega_o = 40$ the prediction is \SI{9.7}{N} and the simulator shows \SI{8.6}{N}. A jitter of that size swings the thrust from zero to the motor limit: the motors clip, the clipped noise has a non-zero mean (\lessonref{les:noise}, rectification), and the altitude error jumps from \SI{0.6}{cm} at $\omega_o = 30$ to \SI{4.4}{cm}, \SI{16}{cm} at 50 and \SI{55}{cm} at 70. The drone is not unstable; it is being shaken by its own observer.\innumbers{At $\omega_o = 70$ the thrust jitters by \SI{15}{N} — more than the drone's weight — for a sensor error of two centimetres.}
+\textbf{Step 5 — where it stops.} At $\omega_o = 40$ the prediction is \SI{9.7}{N} and the simulator shows \SI{8.6}{N}. A jitter of that size swings the thrust from zero to the motor limit: the motors clip, the clipped noise has a non-zero mean (\lessonref{les:noise}, rectification), and the altitude error jumps from \SI{0.6}{cm} at $\omega_o = 30$ to \SI{4.4}{cm}, \SI{16}{cm} at 50 and \SI{55}{cm} at 70. The drone is not unstable; it is being shaken by its own observer.\innumbers[-36pt]{At $\omega_o = 70$ the thrust jitters by \SI{15}{N} — more than the drone's weight — for a sensor error of two centimetres.}
 \end{example}
 
 \section{The disturbance side, and the best compromise}

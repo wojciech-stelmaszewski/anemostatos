@@ -55,7 +55,7 @@ Account for the \SI{1.4}{m} lost with the quaternion law, and for the extra \SI{
 
 \textbf{Step 3 — braking.} The speed peaks at \SI{3.5}{m/s} at \SI{0.31}{s} and the full thrust of \SI{24}{N} then brakes at about \SI{10}{m/s^2}; the drone stops after another \SI{0.35}{s} and $\tfrac12 \cdot 3.5 \cdot 0.35 = \SI{0.6}{m}$. With the transition between, $0.48 + 0.23 + 0.6 \approx \SI{1.3}{m}$; measured: \SI{1.39}{m}, lowest at \SI{0.66}{s}.
 
-\textbf{Step 4 — the Euler law.} Its thrust returns only at \SI{0.335}{s}: the drone is then at \SI{4.5}{m/s} and \SI{0.95}{m} down, and braking from $4.5$ takes $4.5^2/(2 \cdot 10) \approx \SI{1}{m}$ more. It then overshoots the level by $23^\circ$, and the total is \SI{2.55}{m}, lowest at \SI{0.94}{s}. Every tenth of a second in the dark costs about a metre per second of speed and the height needed to brake it.\didyouknow{Racing and freestyle pilots flip their drones on purpose. Their controllers run the rate loop only — the pilot commands body rates directly — so no attitude error is ever computed.}
+\textbf{Step 4 — the Euler law.} Its thrust returns only at \SI{0.335}{s}: the drone is then at \SI{4.5}{m/s} and \SI{0.95}{m} down, and braking from $4.5$ takes $4.5^2/(2 \cdot 10) \approx \SI{1}{m}$ more. It then overshoots the level by $23^\circ$, and the total is \SI{2.55}{m}, lowest at \SI{0.94}{s}. Every tenth of a second in the dark costs about a metre per second of speed and the height needed to brake it.\didyouknow[-16pt]{Racing and freestyle pilots flip their drones on purpose. Their controllers run the rate loop only — the pilot commands body rates directly — so no attitude error is ever computed.}
 \end{example}
 
 \begin{keyidea}[Control the rotation, not its coordinates]

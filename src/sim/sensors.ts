@@ -95,6 +95,9 @@ function horizontal(v: Vec3, up: Vec3): Vec3 {
   return v3(h.x / l, h.y / l, h.z / l);
 }
 
+/** Step of a position sensor that reads 10 m in this many bits, m. */
+export const posQuantStep = (bits: number): number => 10 / 2 ** bits;
+
 export class Sensors {
   private vib = new Vibration();
   /** Anti-alias filters: gyro x, y, z and accelerometer x, y, z. */
@@ -286,7 +289,11 @@ export class Sensors {
 
   /** Delayed, biased, noisy reading of the recorded state at simulation time t. */
   read(p: SensorParams, physDt: number, t = 0): Measurement {
-    const lag = Math.min(this.history.length - 1, Math.round(p.delayMs / 1000 / physDt));
+    const jitter =
+      p.jitterMs > 0
+        ? Math.floor(this.rng.next() * (Math.round(p.jitterMs / 1000 / physDt) + 1))
+        : 0;
+    const lag = Math.min(this.history.length - 1, Math.round(p.delayMs / 1000 / physDt) + jitter);
     const truth = this.history[(this.head - 1 - lag + HISTORY) % HISTORY]!;
     const r = this.rng;
     const noisy = (v: Vec3, s: number): Vec3 =>
@@ -309,6 +316,10 @@ export class Sensors {
       } else {
         pos = noisy(truth.pos, p.posNoise);
         pos.y += p.altBias;
+        if (p.posQuantBits > 0) {
+          const q = posQuantStep(p.posQuantBits);
+          pos = v3(Math.round(pos.x / q) * q, Math.round(pos.y / q) * q, Math.round(pos.z / q) * q);
+        }
       }
       if (p.posRateHz > 0) {
         this.heldPos = clone(pos);

@@ -28,6 +28,8 @@ export interface DroneParams {
    */
   yawDamping: number;
   crashSpeed: number;
+  /** Rate limit of each motor's thrust, N/s: how fast a rotor can spin up or down. 0 = none. */
+  motorSlew: number;
   /** Fraction of the commanded thrust each motor actually delivers (faults, worn props). */
   motorEfficiency: [number, number, number, number];
   /** Rotor drag: horizontal body-plane force −k·T·v_rel, s/m (L3). 0 = off. */
@@ -69,6 +71,13 @@ export interface SensorParams {
   posDropout: boolean;
   /** The position sensor is stuck: it repeats its last fix and says it is fresh. */
   posStuck: boolean;
+  /**
+   * Resolution of the position sensor: its range of 10 m is read in this many bits, so a reading
+   * moves in steps of 10 m / 2^bits. 0 = exact.
+   */
+  posQuantBits: number;
+  /** Timing jitter: each sample is taken late by a random 0 … this many ms. 0 = none. */
+  jitterMs: number;
   /** The gyro is mounted rotated about the body's up-axis by this angle, degrees (L3). */
   imuYawDeg: number;
   /** Sample rate of the gyro and accelerometer, Hz; readings are held in between. 0 = every step. */
@@ -456,6 +465,7 @@ export const defaultParams = (): Params => ({
     angularDamping: 0.002,
     yawDamping: 0.002,
     crashSpeed: 3,
+    motorSlew: 0,
     motorEfficiency: [1, 1, 1, 1],
     rotorDrag: 0,
   },
@@ -486,6 +496,8 @@ export const defaultParams = (): Params => ({
     motorFeedback: true,
     posDropout: false,
     posStuck: false,
+    posQuantBits: 0,
+    jitterMs: 0,
     imuYawDeg: 0,
     imuRateHz: 0,
     aaFilterHz: 0,

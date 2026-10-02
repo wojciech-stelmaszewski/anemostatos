@@ -2,6 +2,7 @@ import { criticalDiveSpeed } from '@/analysis/attraction';
 import { dragLimitCycle } from '@/analysis/describing';
 import { analyseRateLoop, type RateLoopAnalysis } from '@/analysis/mimo';
 import { aliasHz, ghostRate, motorJitter } from '@/analysis/spectrum';
+import { quantisationCycle, ratePm } from '@/analysis/quantisation';
 import { cleanRunsNeeded, finishedCampaign, passRateBound } from '@/analysis/dispersion';
 import {
   bandwidthHz,
@@ -69,6 +70,12 @@ const criticalGyroDelay = (p: Params): number => {
   q.sensors.delayMs = 0;
   q.control.model.imuYawDeg = 0;
   return (analyseRateLoop(q, 300)?.both.delayMargin ?? NaN) * 1000;
+};
+
+/** Lesson III.18: a racing tune of the rate and attitude loops, whose crossover is near 10 Hz. */
+const racingTune = (p: Params) => {
+  p.control.l3.rateRP = { ...p.control.l3.rateRP, kp: 100, kd: 1.5 };
+  p.control.l3.attKpRP = 20;
 };
 
 /** The IMU rate lesson III.20 starts with, Hz: too slow for rotors at 110 Hz. */
@@ -1112,6 +1119,152 @@ export const PART_THREE: Lesson[] = [
           a good shape the same method reaches 3.5 Hz, where no PID passes the test. The method has
           flown in helicopter and jump-jet flight-control research, among others on a Bell 205 and
           the VAAC Harrier.
+        </Notice>
+      </>
+    ),
+  },
+  {
+    id: 'rate',
+    n: 18,
+    part: 3,
+    chapter: I,
+    title: 'How slow can you go?',
+    level: 3,
+    chart: 'mimo',
+    loop: 'rate.roll',
+    setup: (p) => {
+      calm(p);
+      racingTune(p);
+    },
+    goal: {
+      text: 'Find the lowest rate for the rate loop that still leaves 45° of phase margin. (The loop runs on the 1 kHz physics clock, so it can run at 1000, 500, 333, 250, 200, … Hz.)',
+      check: ({ sim }) => {
+        const p = sim.params;
+        const steps = Math.round(1000 / p.control.l3.hzRate);
+        const here = ratePm(p, 1000 / steps);
+        const slower = ratePm(p, 1000 / (steps + 1));
+        if (!(here >= 45))
+          return `at ${(1000 / steps).toFixed(0)} Hz: PM ${Number.isFinite(here) ? here.toFixed(1) + '°' : 'none'}, below 45°`;
+        return (
+          !(slower >= 45) ||
+          `${(1000 / steps).toFixed(0)} Hz keeps ${here.toFixed(1)}°: a slower rate would still do`
+        );
+      },
+    },
+    solution: (p) => {
+      p.control.l3.hzRate = 250;
+    },
+    body: (
+      <>
+        <p>
+          The flight computer of a racing drone runs its rate loop very fast: here, at 1000 Hz, and
+          with gains to match. Every loop of a digital controller samples, computes and then holds
+          its output until the next sample. A hold of <M>{'T'}</M> seconds is, on average, a delay
+          of half a sample, and a delay costs phase at crossover:
+        </p>
+        <M display>{'\\Delta\\varphi \\approx \\omega_c\\,\\frac{T}{2}'}</M>
+        <p>
+          The derivative term, computed from two samples <M>{'T'}</M> apart, costs about as much
+          again. The cost grows with <M>{'T'}</M>: each halving of the rate costs twice what the
+          last one did.
+        </p>
+        <Try>
+          Lower <b>Rate PID — roll/pitch → Loop rate</b> step by step and read the phase margin on
+          the chart: 1000, 500, 250, 125 Hz. Find the lowest rate that keeps 45°. Then go to 62.5 Hz
+          and press <b>R</b>; then try 50 Hz. At 62.5 Hz add <b>Sensors → Timing jitter</b>
+          of 4 ms and then 8 ms; then go back to 1000 Hz, set <b>Physics → Motor rate limit</b> to
+          30 N/s and move the setpoint by half a metre, then by three.
+        </Try>
+        <Notice>
+          The rate a loop needs is set by its crossover, not by habit: ten to twenty samples per
+          period of the crossover frequency is the usual rule, and this loop crosses near 10 Hz.
+          Jitter costs like a delay of half its size: 4 ms of it at 62.5 Hz is survived, 8 ms shakes
+          the drone, as a fixed 2 ms and 4 ms do. A motor rate limit does nothing to a small command
+          and everything to a large one: the loop that flew a half-metre step cleanly loses control
+          on a three-metre step, because the limit adds a lag that grows with the amplitude. In
+          aircraft that mechanism, with the pilot in the loop, is pilot-induced oscillation.
+        </Notice>
+      </>
+    ),
+  },
+  {
+    id: 'quant',
+    n: 19,
+    part: 3,
+    chapter: I,
+    title: 'The computer cannot count',
+    level: 1,
+    chart: 'bode',
+    setup: (p) => {
+      calm(p);
+      p.sensors.posQuantBits = 8;
+    },
+    predict: {
+      label: 'Amplitude of the hunting at 8 bits',
+      unit: 'mm',
+      truth: (p) => {
+        const q = structuredClone(p);
+        q.sensors.posQuantBits = 8;
+        return (quantisationCycle(q)?.amplitude ?? NaN) * 1000;
+      },
+      tolerance: 0.2,
+    },
+    goal: {
+      text: 'Predict the amplitude of the hunting from the gain margin. Then choose the resolution so that the drone holds its altitude within 1 cm, with at most 10 bits.',
+      check: ({ sim, prediction }) => {
+        const p = sim.params;
+        if (prediction == null)
+          return 'first the prediction: read the gain margin, and use A = 2q/(π·GM)';
+        const q = structuredClone(p);
+        q.sensors.posQuantBits = 8;
+        const truth = (quantisationCycle(q)?.amplitude ?? NaN) * 1000;
+        if (Math.abs(prediction - truth) / truth > 0.2)
+          return 'not within 20 %: q is 10 m / 2⁸, and GM as a ratio, not in dB';
+        const bits = p.sensors.posQuantBits;
+        if (bits <= 0 || bits > 10) return 'use a sensor of 1 to 10 bits';
+        if (sim.t < 20) return 'settling…';
+        const { series } = sim.telemetry.window(['pos.y', 'sp.y'], sim.t - 8);
+        let worst = 0;
+        for (let i = 0; i < series[0]!.length; i++)
+          worst = Math.max(worst, Math.abs(series[0]![i]! - series[1]![i]!));
+        return worst < 0.01 || `altitude off by up to ${(worst * 100).toFixed(1)} cm`;
+      },
+    },
+    solution: (p) => {
+      p.sensors.posQuantBits = 10;
+    },
+    body: (
+      <>
+        <p>
+          This altimeter reads its 10 m range in 8 bits: a step of <M>{'q = 10/2^8 = 3.9'}</M> cm.
+          Between two steps its reading does not change. The PID wants the reading to equal the
+          setpoint, and it cannot: 2 m lies between two steps. So the integral moves the drone until
+          the reading flips, and back, for ever. The drone ends up resting on the boundary between
+          the two steps nearest the setpoint, up to <M>{'q/2'}</M> away from it, and shaking around
+          it.
+        </p>
+        <p>
+          How much it shakes, a <b>describing function</b> predicts. Held at a boundary, the
+          quantiser switches between two levels like a relay of <M>{'\\pm q/2'}</M>. For a sine of
+          amplitude <M>{'A'}</M> at its input its fundamental has the gain
+        </p>
+        <M display>{'N(A) = \\frac{4\\,(q/2)}{\\pi A} = \\frac{2q}{\\pi A}'}</M>
+        <p>
+          The loop oscillates where its phase is −180° and the gain around it is one,{' '}
+          <M>{'N(A)\\,|L(j\\omega_{180})| = 1'}</M>. With <M>{'|L(j\\omega_{180})| = 1/GM'}</M>:
+        </p>
+        <M display>{'A = \\frac{2q}{\\pi\\,GM}'}</M>
+        <Try>
+          Read the gain margin on the Bode chart, compute <M>{'A'}</M> in millimetres and enter it.
+          Watch the altitude chart: the offset and the fast ripple. Then raise{' '}
+          <b>Sensors → Position resolution</b> one bit at a time.
+        </Try>
+        <Notice>
+          A bigger gain margin shrinks the hunting, and so does every extra bit: each halves{' '}
+          <M>{'q'}</M>, the offset and the amplitude. The integral cannot fix what the sensor cannot
+          see; only resolution can. The same reasoning covers a quantised motor command or a
+          fixed-point computation: a quantiser in a loop with an integrator makes a limit cycle, and
+          the describing function says how large.
         </Notice>
       </>
     ),

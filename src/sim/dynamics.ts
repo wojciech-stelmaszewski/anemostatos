@@ -112,7 +112,9 @@ export function stepDynamics(
   } else {
     for (let i = 0; i < 4; i++) {
       const cmd = Math.min(Math.max(act.motorCmd[i]!, 0), fmax);
-      s.rotors[i] = s.rotors[i]! + (cmd - s.rotors[i]!) * lag;
+      let step = (cmd - s.rotors[i]!) * lag;
+      if (p.motorSlew > 0) step = Math.max(-p.motorSlew * dt, Math.min(p.motorSlew * dt, step));
+      s.rotors[i] = s.rotors[i]! + step;
       s.motors[i] = s.rotors[i]! * p.motorEfficiency[i]!;
     }
   }

@@ -829,6 +829,18 @@ for (const h of [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.8, 1, 1.5, 2])
     },
     events: (s) => at(s, 8, 'setpoint.y', 3.95),
   });
+// II.14: the lesson's 2 s horizon with the QP capped at 5 ADMM iterations per solve.
+add({
+  name: 'horizon-cap5',
+  seconds: 20,
+  setup: (p) => {
+    ceiling(p);
+    p.control.l1.kind = 'mpc';
+    p.control.mpc.horizon = 2;
+    p.control.mpc.iterations = 5;
+  },
+  events: (s) => at(s, 8, 'setpoint.y', 3.95),
+});
 for (const [tag, outer, indi] of [
   ['mpc', 'mpc', false],
   ['mpc-indi', 'mpc', true],
@@ -853,6 +865,8 @@ for (const [tag, outer, lambda] of [
   ['geo', 'geometric', 0],
   ['mppi', 'mppi', 0],
   ['mppi-l50', 'mppi', 50],
+  ['mppi-l0.2', 'mppi', 0.2],
+  ['mppi-l500', 'mppi', 500],
 ] as const)
   add({
     name: `mppi-${tag}`,

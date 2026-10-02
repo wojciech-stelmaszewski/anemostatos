@@ -1,0 +1,210 @@
+\lesson{II.16}{A thousand futures}{A quadratic program cannot say \enquote{left or right}. Sample many futures, fly each one on a model, and let the cheap ones vote.}{3}{mppi}{Part II · Beyond PID}
+\label{les:mppi}
+
+\lead{\setupcard{\setuprow{Level}{L3}\setuprow{Controller}{the geometric outer stage of Lesson~II.10; then MPPI: 256 samples of \SI{1.5}{s} in 30 steps, re-planned at \SI{50}{Hz}, temperature $\lambda = 1$}\setuprow{Scene}{no wind; a virtual pillar of radius \SI{0.6}{m} at $x = \SI{3}{m}$, $z = \SI{0.15}{m}$; the drone hovers at $x = 0$, \SI{2}{m} up}\setuprow{Event}{at $t = \SI{10}{s}$ the set-point jumps to $x = \SI{6}{m}$, behind the pillar}\setuprow{Goal}{come within \SI{0.2}{m} of the new set-point without entering the pillar}}%
+The target jumps to the far side of a pillar. The geometric controller flies straight at it, spends \SI{0.21}{s} inside the pillar and comes out \SI{45}{cm} deep at the worst: it has no idea the pillar is there. The MPC of the last lessons would not do better, and not for lack of a model. A pillar is a hole in the space of allowed positions, and the quadratic programs of Lesson~II.13 can only describe allowed sets without holes. The controller of this lesson does not solve an optimisation problem at all. At every step it flies 256 random variations of its current plan forward on a model, scores each, and averages them, weighting the cheap ones heavily. It goes around the pillar, \SI{52}{cm} clear of it, and is within \SI{0.2}{m} of the target \SI{2.65}{s} after the jump.}
+
+\section{A cost with a hole in it}
+
+\begin{example}[Left plus right is straight ahead]
+\label{ex:mppi-convex}
+Two paths avoid the pillar: one passes at $z = \SI{-1.0}{m}$, the other at $z = \SI{+1.4}{m}$, both at $x = \SI{3}{m}$. Show that their average does not avoid it, and say what that means for a QP.
+
+\textbf{Step 1 — the average.} The midpoint of the two passing points is $(3, 0.2)$. Its distance from the pillar's axis at $(3, 0.15)$ is \SI{0.05}{m}: deep inside the radius of \SI{0.6}{m}.
+
+\textbf{Step 2 — convexity.} A set is \term{convex} if it contains the segment between any two of its points. The positions outside the pillar are not: both ends of the segment are outside, its middle is inside.
+
+\textbf{Step 3 — the QP.} The constraints of a QP are linear inequalities, and the set they allow is always convex (Appendix~J). A QP can keep the drone on one side of a plane, or inside a box, but it cannot say \enquote{outside this disk}: that would need \enquote{left \emph{or} right}, and a convex set has no \enquote{or}.
+
+\textbf{Step 4 — the ways out.} Choose the side in advance and give the QP a plane on that side, which needs someone to choose; search over the choices, which is a combinatorial problem; or give up on convexity and on QPs altogether. Sampling does the last.
+\end{example}
+\recall{Appendix~J: a convex problem has no local minima other than the global one, which is why QPs are fast and reliable. The pillar breaks exactly that property.}
+
+\section{Sample, score, average}
+
+\begin{definition}{Model predictive path integral control}
+At every re-plan, \term{MPPI} keeps a nominal input sequence $\symbf u_0, \dots, \symbf u_{N-1}$. It draws $K$ perturbations $\boldsymbol\varepsilon^{(i)}_k$ from a Gaussian, simulates the model from the measured state with each perturbed sequence, computes each rollout's cost $S_i$, and replaces the nominal sequence by
+\begin{equation}\label{eq:mppi-update}
+  \symbf u_k \leftarrow \symbf u_k + \frac{\sum_i w_i\,\boldsymbol\varepsilon^{(i)}_k}{\sum_i w_i}, \qquad w_i = \exp\!\Big(-\frac{S_i - S_{min}}{\lambda}\Big).
+\end{equation}
+It applies $\symbf u_0$, shifts the sequence and repeats. The \term{temperature} $\lambda > 0$ sets how strongly cheap rollouts outweigh expensive ones (Williams et al., 2017).
+\end{definition}
+
+In the simulator the model is the point mass of Lesson~II.15, $\ddot{\vec p} = \vec a$, with the same tilt and thrust limits; the inputs are accelerations, perturbed with $\sigma = \SI{4}{m/s^2}$ horizontally and half that vertically. The horizon is \SI{1.5}{s} in 30 steps of \SI{50}{ms}. The cost of a rollout adds, over its steps,
+\begin{equation}\label{eq:mppi-cost}
+  S = \sum_k \Big(q_p\,\|\vec p_k - \vec r_k\|^2 + 0.01\,\|\vec a_k\|^2\Big)\Delta t \;+\; \sum_{k:\,\delta_k < 0} W\,(1 + 10\,\delta_k^2)\,\Delta t,
+\end{equation}
+with $q_p = 20$, $W = 3000$, and $\delta_k$ the distance from the pillar's surface minus a margin of \SI{0.35}{m}. Nothing about \cref{eq:mppi-cost} needs to be smooth or convex: the penalty switches on at the margin like a step. The method only ever evaluates the cost; it never differentiates it.\tip{Sample 0 in the code is the nominal sequence itself, unperturbed: the current plan always takes part in the vote, and when it is the cheapest rollout it gets the largest weight.}
+
+\begin{example}[What the pillar costs]
+\label{ex:mppi-costs}
+Compare, at the moment of the jump, the cost of standing still with the cost of a path that grazes the pillar.
+
+\textbf{Step 1 — standing still.} The target is \SI{6}{m} away; for 30 steps of \SI{50}{ms}, $S = 30 \cdot 20 \cdot 6^2 \cdot 0.05 = 1080$. In a Monte Carlo of the controller's cost at that state, done with formulas and not flown, the cheapest of 256 rollouts costs about 810 and the median about 1080: random sequences are, on average, no better than standing still.
+
+\textbf{Step 2 — inside the margin.} Each step within \SI{0.35}{m} of the pillar adds at least $3000 \cdot 0.05 = 150$. A rollout that cuts through spends half a second there: ten steps, at least 1500.
+
+\textbf{Step 3 — the comparison.} A path through the pillar is worse than not moving at all. A path around it costs a little more tracking than the straight one and no penalty. The weights $e^{-S/\lambda}$ turn these differences into votes: with $\lambda = 1$, a difference of 150 is a factor $e^{-150}$, so a rollout that touches the margin for a single step has, in practice, no vote at all.
+
+\textbf{Step 4 — the side.} Nothing in the cost prefers left to right. The side is decided by which random rollouts happen to be cheap in the first re-plans, and once the plan leans one way, the next re-plans start from it. In the recorded flight with $\lambda = 1$ the drone passes at $z = \SI{-1.00}{m}$.
+\end{example}
+
+\simfig{mppi_paths}{The jump behind the pillar. Left: the paths seen from above, from the jump to six seconds after it. The geometric controller flies straight through the pillar (shaded; dashed: the margin of \SI{0.35}{m}); MPPI with $\lambda = 1$ passes below, with $\lambda = 50$ above. Right: the distance to the target. With $\lambda = 50$ the drone gets around but never settles.}{fig:mppi-paths}
+
+\screen[0 500 495 300]{mppi}{Lesson II.16 in the app half a second after the jump, with MPPI. The coloured cloud is a subset of the sampled rollouts, green for cheap and red for expensive, each reaching \SI{1.5}{s} ahead.}{fig:mppi-screen}
+
+How many of the random rollouts find a way around? That depends on how far the noise can push a rollout sideways before it reaches the pillar.
+
+\begin{example}[Will any sample go around?]
+\label{ex:mppi-odds}
+Suppose the nominal plan flies straight at the pillar and reaches it one second ahead. What fraction of the 256 perturbed rollouts clears it?
+
+\textbf{Step 1 — the spread.} In the code each step does $v \mathrel{+}= a\Delta t$, then $p \mathrel{+}= v\Delta t$. After $n$ steps a perturbation $\varepsilon_j$ at step $j$ has moved the position by $(n - j + 1)\Delta t^2\varepsilon_j$, so the sideways offset has the variance $\sigma^2\Delta t^4\sum_{m=1}^{n}m^2 = \sigma^2\Delta t^4\,n(n+1)(2n+1)/6$.
+
+\textbf{Step 2 — the numbers.} With $\sigma = 4$, $\Delta t = 0.05$ and $n = 20$: $\sum m^2 = 2870$ and the standard deviation is $4 \cdot 0.0025 \cdot \sqrt{2870} = \SI{0.54}{m}$.
+
+\textbf{Step 3 — clearing.} The pillar plus margin spans $z$ from $0.15 - 0.95 = -0.80$ to $0.15 + 0.95 = \SI{1.10}{m}$. With $Z \sim \mathcal N(0, 0.54^2)$: $P(Z < -0.80) = \Phi(-1.49) = 0.068$ and $P(Z > 1.10) = \Phi(-2.05) = 0.020$. About 9\,\% of the rollouts clear the pillar, two dozen of 256, most of them on the side nearer the straight line.
+
+\textbf{Step 4 — read it.} Two dozen survivors are enough: the weighted average follows them, the next plan starts from there, and the next re-plan's rollouts are centred on a path that already bends. Halve $\sigma$ and the spread halves too: the same calculation gives 0.1\,\% of the rollouts, a third of one sample, and the plan may never find the way around (Exercise~\ref{ex:mppi-sigma}).
+\end{example}
+
+\section{The temperature}
+
+\Cref{eq:mppi-update} is a soft minimum. When $\lambda$ is small, only the cheapest rollouts carry weight and the update copies them; when $\lambda$ is large, all weights approach one and the update is the plain average of the perturbations, which is zero on average. A useful measure is the \term{effective number of samples}
+\begin{equation}\label{eq:mppi-keff}
+  K_{eff} = \frac{\big(\sum_i w_i\big)^2}{\sum_i w_i^2},
+\end{equation}
+which is 1 when a single rollout has all the weight and $K$ when all weights are equal.
+
+\begin{example}[Temperature is relative]
+\label{ex:mppi-keff}
+Find $K_{eff}$ for $\lambda = 0.2$, 1, 50 and 500, at hover on the target and at the moment of the jump. The values come from a Monte Carlo of the controller's cost, computed with formulas and not flown.
+
+\textbf{Step 1 — at the jump.} The costs of the 256 rollouts spread over a few hundred (standard deviation about 245). The median $K_{eff}$ is 1.0 for $\lambda = 0.2$ and for $\lambda = 1$, 24 for $\lambda = 50$ and 242 for $\lambda = 500$.
+
+\textbf{Step 2 — at hover.} Every perturbation only moves the drone away from where it should be, and the costs spread over about 11. Now $\lambda = 0.2$ still gives 1.0, but $\lambda = 1$ gives 15, $\lambda = 50$ gives 246 and $\lambda = 500$ gives 256: all of them.
+
+\textbf{Step 3 — what it means.} The same $\lambda = 50$ is selective after the jump, when the costs differ by hundreds, and indiscriminate at hover, when they differ by ten. The temperature acts on cost \emph{differences}, and those depend on the situation.
+
+\textbf{Step 4 — the flights.} Before the jump, hovering, the RMS distance from the set-point is \SI{0.12}{m} with $\lambda = 0.2$, \SI{0.25}{m} with 1, \SI{0.50}{m} with 50 and \SI{4.6}{m} with 500. Where the update is a plain average of noise, the plan does a random walk: nothing pulls it back.
+\end{example}
+
+The flights after the jump follow the same order. With $\lambda = 0.2$ the drone passes below the pillar and comes within \SI{0.2}{m} of the target after \SI{2.31}{s}; with $\lambda = 1$ after \SI{2.65}{s}. With $\lambda = 50$ it passes above, at $z = \SI{1.40}{m}$, but never comes within \SI{0.3}{m}: six seconds after the jump it is still \SI{0.60}{m} away. With $\lambda = 500$ it wanders off and ends \SI{7.2}{m} from the target. None of the MPPI flights enters the pillar or its margin. The lesson's text in the app describes $\lambda = 50$ as hesitating in front of the pillar; in the recorded flight it hesitates at the target instead.\pitfall{The temperature has the units of the cost. A $\lambda$ tuned for one cost function means nothing for another; rescale the cost, and $\lambda$ must be rescaled with it.}
+
+\begin{keyidea}[Optimisation by voting]
+MPPI replaces solving by sampling: many possible futures, each simulated and scored, averaged with weights that favour the cheap ones. It needs no gradient and no convexity, so costs with holes and steps are allowed, and it finds a way around an obstacle that no QP can describe. It pays with computation, and with noise: an average of finitely many random samples is itself random.
+\end{keyidea}
+
+\section{What it costs}
+
+Every re-plan simulates $256 \times 30 = 7680$ steps of the point mass, each with a cost evaluation and a distance to the pillar: \num{384000} rollout steps per second at \SI{50}{Hz}, \num{12800} futures per second. That is far more arithmetic than the QPs of Lesson~II.15 (the meter in the chart header shows it), and it is why MPPI was long a method for offline studies. But no rollout depends on another: they can be computed at once on as many processors as there are samples. On a graphics processor, thousands of rollouts per re-plan are routine, which is why MPPI is used for off-road driving and agile flight.\innumbers{256 samples, 30 steps, 50 re-plans a second: \num{384000} simulated steps per second of flight, for a model of six numbers.}
+
+\begin{watchout}
+The noise shows even when nothing happens. Hovering with $\lambda = 1$ the drone stays \SI{0.25}{m} from its set-point, RMS, where the geometric controller stays exactly on it, and the thrust of the four motors changes from one recorded sample to the next by \SI{0.64}{N}, RMS, against zero. More samples, a lower $\sigma$ or a filter on the plan reduce it; each has its price in computing time, exploration or delay.
+\end{watchout}
+
+\begin{inapp}
+\begin{itemize}[leftmargin=1.2em]
+  \item The switch is \ui{Controller\then Outer stage\then MPPI (sampling)} (\param{control.l3.outer = 'mppi'}); its parameters are \param{control.mppi.samples}, \param{horizon}, \param{steps}, \param{sigma}, \param{lambda}, \param{qPos}, \param{zoneWeight}, \param{margin} and \param{hz}.
+  \item The algorithm is \texttt{MppiOuter} in \src{src/control/mppi.ts}, seeded so that runs repeat; the pillar's distance function is \texttt{zoneDistance} in \src{src/sim/world.ts}, and the time spent inside is \texttt{zone.inside} in the telemetry.
+  \item The flights are the experiments \texttt{mppi-*} in \src{scripts/book-data.ts}.
+\end{itemize}
+\end{inapp}
+
+\begin{trythis}
+\begin{enumerate}
+  \item Watch the geometric controller fly through the pillar. Switch the outer stage to MPPI and reset.
+  \item Set $\lambda$ to 0.2, then 50, then 500, resetting each time. Watch the cloud and the hover before the jump.
+  \item Lower the samples to 16, then raise them to 1024, and watch the computing time.
+\end{enumerate}
+\predict{with 16 samples, will the drone still get around the pillar? Use Example~\ref{ex:mppi-odds} to estimate how many of them clear it.}
+\end{trythis}
+
+\section{The engineer's view: sampling as optimisation}
+
+\subsection{From solitaire to rally cars}
+Estimating by sampling is as old as computing. Stanisław Ulam, convalescing in 1946, wondered whether laying out a game of solitaire a hundred times and counting the successes might not beat combinatorics, and saw at once that the same trick could follow neutrons through a bomb (Eckhardt, 1987; Metropolis and Ulam, 1949). Using sampling to \emph{control} came much later. Kappen (2005) showed that for a class of stochastic optimal-control problems the optimal cost-to-go can be written as an expectation over paths, a path integral as in Feynman's quantum mechanics, and estimated by sampling them. Williams and colleagues turned this into MPPI and drove a small autonomous rally car with it on a dirt track, at the limits of grip (Williams et al., 2016, 2017).
+
+\subsection{In formal terms}
+
+Two terms from statistical physics and information theory carry the argument. For a cost $S$ of a random input sequence $V$ with distribution $p$, and $\lambda > 0$, the \term{free energy} is $F = -\lambda\ln\E_p\big[e^{-S(V)/\lambda}\big]$. For two distributions $q \ll p$ (every event impossible under $p$ is impossible under $q$), the \term{Kullback–Leibler divergence} is $\mathrm{KL}(q\,\|\,p) = \E_q[\ln(\dd q/\dd p)]$; it is non-negative, and zero only for $q = p$, because $-\ln$ is strictly convex: by Jensen's inequality $\E_q[-\ln(\dd p/\dd q)] \ge -\ln\E_q[\dd p/\dd q] = -\ln 1 = 0$.
+
+
+\begin{theorem}[The Gibbs variational principle]
+\label{thm:mppi-gibbs}
+For every distribution $q \ll p$, $\;F \le \E_q[S] + \lambda\,\mathrm{KL}(q\,\|\,p)$, with equality exactly for $q^*$ with density $\dd q^*/\dd p = e^{-S/\lambda}/\E_p[e^{-S/\lambda}]$.
+\end{theorem}
+\begin{proof}
+Write $Z = \E_p[e^{-S/\lambda}]$, so $F = -\lambda\ln Z$. For any $q \ll p$: $\mathrm{KL}(q\,\|\,q^*) = \E_q[\ln(\dd q/\dd p)] - \E_q[\ln(\dd q^*/\dd p)] = \mathrm{KL}(q\,\|\,p) + \E_q[S]/\lambda + \ln Z$. The left side is non-negative and zero only for $q = q^*$; multiplying by $\lambda$ gives $\E_q[S] + \lambda\,\mathrm{KL}(q\,\|\,p) - F \ge 0$.
+\end{proof}
+
+The theorem says what MPPI aims at: the distribution $q^*$ that trades low cost against staying close to the sampling distribution, with $\lambda$ as the exchange rate. Its mean is the plan. MPPI estimates that mean from samples drawn from $p$, weighting each by $e^{-S_i/\lambda}$: this is \cref{eq:mppi-update}, and subtracting $S_{min}$ only rescales all weights by the same factor (Williams et al., 2017).
+
+\begin{theorem}[Self-normalised importance sampling]
+\label{thm:mppi-is}
+Let $V_1, \dots, V_K$ be independent samples from $p$, and let $\E_p[\|V\|e^{-S/\lambda}]$ be finite. Then $\sum_i w_iV_i/\sum_i w_i \to \E_{q^*}[V]$ almost surely as $K \to \infty$, with $w_i = e^{-S(V_i)/\lambda}$. The estimator is biased for finite $K$; its variance grows as $K_{eff}$ falls (Robert and Casella, 2004, ch.~3).
+\end{theorem}
+\begin{proof}
+Numerator and denominator, divided by $K$, converge almost surely to $\E_p[Ve^{-S/\lambda}]$ and $\E_p[e^{-S/\lambda}] > 0$ by the strong law of large numbers; their ratio is $\E_{q^*}[V]$ by the definition of $q^*$.
+\end{proof}
+
+The two limits of the temperature follow from \cref{eq:mppi-update} directly: as $\lambda \to 0$ the weight of the cheapest sample tends to one and all others to zero, so the update copies the best rollout; as $\lambda \to \infty$ all weights tend to one and the update is the plain mean of the perturbations. Neither theorem holds exactly in the simulator. $K = 256$ is finite, and at the jump $K_{eff}$ is about 1 for $\lambda \le 1$: the estimate of the mean is a single sample, with the variance of a single sample, which is the noise of the watch-out box. The model is a point mass, so the plan is again only as good as the inner loops of Lesson~II.15 make it. And the sampling distribution is moved by every update, so successive re-plans are not independent; the method is a stochastic iteration whose convergence the theorems above do not cover.
+
+\begin{example}[A car and a stalled truck]
+\label{ex:mppi-car}
+A car's MPPI plans its lateral acceleration over \SI{2}{s} in 20 steps of \SI{0.1}{s}, with a perturbation of $\sigma = \SI{1}{m/s^2}$ per step. A stalled truck blocks the lane two seconds ahead; to pass, a rollout must be at least \SI{2}{m} to the side by then. What fraction of the rollouts finds the way, and how many samples does the car need?
+
+\textbf{Step 1 — the spread.} As in Example~\ref{ex:mppi-odds}: $\sum_{m=1}^{20}m^2 = 2870$, standard deviation $1 \cdot 0.1^2 \cdot \sqrt{2870} = \SI{0.54}{m}$.
+
+\textbf{Step 2 — the odds.} \SI{2}{m} is $3.7$ standard deviations: $P(|Y| > 2) = 2\Phi(-3.7) \approx 2 \times 10^{-4}$.
+
+\textbf{Step 3 — the samples.} With 256 rollouts the expected number that pass is 0.06: almost always none. To expect ten, the car needs about \num{50000} rollouts per re-plan, or a larger $\sigma$, or a nominal plan that already starts to swerve.
+
+\textbf{Step 4 — read it.} Sampling finds only what the noise can reach. Practical MPPI controllers therefore shape the noise, start from a sensible nominal plan, or run several nominal plans side by side, one per way around.
+\end{example}
+
+\begin{lookahead}
+\begin{itemize}[leftmargin=1.2em]
+  \item Lesson~II.17 keeps any controller out of the pillar with a safety filter, a QP with a single constraint; whether the drone then gets around the pillar is a question that lesson takes up.
+  \item Sampled rollouts return as the data of the learned policy in Lesson~II.20, and the stochastic gradient of Appendix~J replaces the weighted average there. Part~IV treats optimal control under uncertainty, of which the path integral is one form.
+  \item Example~\ref{ex:mppi-car} repeats the odds of a way around for a car on a road.
+\end{itemize}
+\end{lookahead}
+
+\begin{remember}
+\begin{itemize}
+  \item The space outside an obstacle is not convex; a QP cannot represent \enquote{left or right}. The geometric controller flies through the pillar, \SI{45}{cm} deep.
+  \item MPPI samples perturbed plans, simulates and scores them, and averages them with weights $e^{-(S - S_{min})/\lambda}$: no gradients, no convexity. Here 256 rollouts of \SI{1.5}{s}, 50 times a second.
+  \item The temperature acts on cost differences: $\lambda = 50$ selects after the jump and averages noise at hover. Recorded: within \SI{0.2}{m} after \SI{2.31}{s} ($\lambda = 0.2$) and \SI{2.65}{s} ($\lambda = 1$); never settled at 50; lost at 500.
+  \item Sampling finds only what the noise reaches, and its average is noisy: \SI{0.25}{m} RMS at hover with $\lambda = 1$.
+  \item In formal terms MPPI estimates the mean of the distribution that minimises cost plus $\lambda$ times its divergence from the sampling distribution.
+\end{itemize}
+\end{remember}
+
+\begin{curiosity}{The machine that played at neutrons}
+\sidephoto{fermiac}{0.36\linewidth}{Stanisław Ulam with the FERMIAC.}
+Stanisław Ulam was born in Lwów in 1909 and learned his mathematics among the Lwów school of Stefan Banach, in the cafés where problems were written on the marble tables. By 1946 he was at Los Alamos, recovering from an illness and playing solitaire. He later recalled the question that came to him: what are the chances that a game of Canfield solitaire comes out? After trying to compute them by combinatorics, he wondered whether it would not be more practical to lay the game out a hundred times and simply count. He saw at once that the same idea could follow neutrons through fissile material, one random history at a time, and he described it to John von Neumann, who began to plan the calculations for the new electronic computer, the ENIAC (Eckhardt, 1987).
+
+Nicholas Metropolis suggested a name for the method, \enquote{not unrelated to the fact that Stan had an uncle who borrowed money from relatives because he \enquote{just had to go to Monte Carlo}}. He also recorded that Enrico Fermi had been using statistical sampling, privately, years earlier in Rome, and that while the ENIAC was out of service, being moved, Fermi had a small mechanical device built to do it by hand: the FERMIAC, built by his collaborator Percy King, which drew the genealogies of neutrons in a plane, choosing the site of each next collision at random and making a new choice whenever a neutron crossed into another material (Metropolis, 1987).
+
+The photograph shows Ulam holding it. Every neutron the FERMIAC drew was one possible future of one particle, and the answer was the average over many. MPPI does the same with the futures of a drone: two hundred and fifty-six of them, fifty times a second, each one drawn, scored and averaged, so that the drone can go around a pillar no formula told it how to avoid.
+\end{curiosity}
+
+\begin{exercises}
+\exercise[1] How many rollout steps per second does MPPI simulate with 1024 samples, a \SI{1}{s} horizon in 20 steps and re-planning at \SI{25}{Hz}?
+\answer{$1024 \times 20 \times 25 = \num{512000}$.}
+\exercise[1] Compute the cost of \cref{eq:mppi-cost} for a rollout that stands still \SI{3}{m} from the target for the whole horizon, and for one that stands still at the target but spends two steps \SI{0.1}{m} inside the margin.
+\answer{$30 \cdot 20 \cdot 9 \cdot 0.05 = 270$; $2 \cdot 3000 \cdot (1 + 10 \cdot 0.01) \cdot 0.05 = 330$.}
+\exercise[2]\exkind{derive} Show that $K_{eff}$ of \cref{eq:mppi-keff} lies between 1 and $K$, and find when each bound is reached. What is $K_{eff}$ when $m$ samples have weight 1 and the rest weight 0?
+\answer{By Cauchy–Schwarz $(\sum w_i)^2 \le K\sum w_i^2$, equality for equal weights; and $(\sum w_i)^2 \ge \sum w_i^2$ for non-negative weights, equality when only one is non-zero. With $m$ equal non-zero weights, $K_{eff} = m^2/m = m$.}
+\exercise[2]\exkind{derive} Derive the optimal distribution of \cref{thm:mppi-gibbs} for a finite set of input sequences $V_1, \dots, V_n$ with probabilities $p_j$, by minimising $\sum_j q_jS_j + \lambda\sum_j q_j\ln(q_j/p_j)$ subject to $\sum_j q_j = 1$ with a Lagrange multiplier.
+\answer{Stationarity: $S_j + \lambda(\ln(q_j/p_j) + 1) + \mu = 0$, so $q_j \propto p_je^{-S_j/\lambda}$; normalising gives $q_j = p_je^{-S_j/\lambda}/\sum_l p_le^{-S_l/\lambda}$.}
+\exercise[2]\exkind{derive}\label{ex:mppi-sigma} Repeat Example~\ref{ex:mppi-odds} with $\sigma = \SI{2}{m/s^2}$, and with $\sigma = 4$ but a pillar reached after \SI{0.5}{s}. How many of the 256 rollouts clear the pillar in each case?
+\answer{$\sigma = 2$: standard deviation \SI{0.27}{m}; $\Phi(-2.99) + \Phi(-4.1) \approx 0.0014$, about 0.4 rollouts. Pillar at \SI{0.5}{s} ($n = 10$, $\sum m^2 = 385$): standard deviation $0.01\sqrt{385} = \SI{0.20}{m}$; $\Phi(-4.1) + \ldots \approx 2\times10^{-5}$: none. The plan must start bending early, and it does: the rollouts are re-drawn around a plan that already bends at every re-plan.}
+\exercise[2]\exkind{fly} In the lesson with MPPI, set $\lambda$ to 0.2 and then to 50. Compare the hover before the jump and the arrival after it.
+\answer{Recorded (experiments \texttt{mppi-*}): hover RMS \SI{0.12}{m} and \SI{0.50}{m}; with 0.2 within \SI{0.2}{m} of the target after \SI{2.31}{s}, passing below the pillar; with 50 passing above and still \SI{0.60}{m} away after \SI{6}{s}.}
+\exercise[2]\exkind{code} At the end of \texttt{MppiOuter.update} (\src{src/control/mppi.ts}) the plan is shifted by \texttt{max(1, round(1/hz/dt))} steps. Evaluate this for the default parameters. By how much does the plan advance per re-plan, compared with the time that passes? Propose a fix.
+\answer{$dt = 1.5/30 = \SI{50}{ms}$, $1/hz = \SI{20}{ms}$: \texttt{round(0.4)} is 0, so the shift is 1 step, \SI{50}{ms} of plan per \SI{20}{ms} of time; the plan runs 2.5 times faster than the clock, and the warm start is not the previous plan seen from now. Fixes: choose the steps so that $dt = 1/hz$ (75 steps for \SI{1.5}{s}), re-plan every \SI{50}{ms}, or shift by a fractional step with interpolation.}
+\exercise[3] Repeat Example~\ref{ex:mppi-car} for a car that plans \SI{3}{s} ahead in 30 steps with $\sigma = \SI{1}{m/s^2}$, the truck three seconds ahead. What changes, and why does a longer horizon help sampling here?
+\answer{$\sum_{m=1}^{30}m^2 = 9455$, standard deviation $0.01\sqrt{9455} = \SI{0.97}{m}$; $2\Phi(-2.06) \approx 0.04$: about ten of 256 rollouts pass. The offset grows like $n^{3/2}$: the earlier the obstacle enters the horizon, the more of the random rollouts can reach around it.}
+\end{exercises}

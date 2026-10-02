@@ -1,0 +1,206 @@
+\lesson{II.15}{MPC on top, INDI below}{A planner is only as good as its model. Put a loop underneath that makes the model true, and the plans come true as well.}{3}{mpc-l3}{Part II · Beyond PID}
+\label{les:mpcl3}
+
+\lead{\setupcard{\setuprow{Level}{L3}\setuprow{Controller}{outer stage: MPC on a point mass, one QP per axis, \SI{1}{s} ahead at \SI{50}{Hz}, $q_p = 20$, $q_v = 4$, $r_u = 0.1$; inner stages: attitude P and rate PID; no disturbance compensation}\setuprow{Scene}{a figure-8 of \SI{2}{m} amplitude and \SI{6}{s} period at \SI{3}{m}; gusty wind, seed 4242}\setuprow{Switch}{rate INDI and acceleration INDI}\setuprow{Goal}{RMS position error below \SI{2.5}{cm} over the last lap}}%
+MPC now flies the whole quadrotor. It looks one second ahead along the figure-8 and plans the acceleration on three axes, with the tilt and speed limits as constraints. In the gusty wind it is \SI{8.5}{cm} off the path, on average, over the last lap of a thirty-second flight. Add the INDI loops of Lessons~II.7 and II.8 underneath, change nothing in the MPC, and the same lap is flown to \SI{2.3}{cm}. Swap the MPC for the geometric controller of Lesson~II.10 and the numbers are \SI{12.7}{cm} without INDI and \SI{2.9}{cm} with it. The loop underneath decides more than the planner on top. And once, at \SI{14.5}{s}, a gust arrives that none of the four can follow.}
+
+\section{Three QPs on a point mass}
+
+The quadrotor is not a point mass. It must tilt to push sideways, its motors lag, its attitude loop takes time. The outer stage ignores all that: for each axis it plans as if the drone were a mass whose acceleration it could choose,
+\begin{equation}\label{eq:mpcl3-model}
+  \ddot p = a, \qquad p \in \{x, y, z\},
+\end{equation}
+with the solver and the prediction matrices of Lesson~II.13 and the reference positions taken from the planned figure-8 one second ahead. What the quadrotor cannot do enters as constraints on $a$ and on the speed.\recall{Lesson~I.12: to accelerate sideways at $a_h$ while holding altitude, the drone must tilt by $\theta$ with $\tan\theta = a_h/g$.}
+
+\begin{example}[The acceleration budget]
+\label{ex:mpcl3-budget}
+Find the limits the MPC is given, and how much of them the figure-8 uses.
+
+\textbf{Step 1 — sideways.} The tilt is limited to \SI{35}{\degree}. Holding altitude, that allows $a_h \le g\tan 35^\circ = 9.81 \cdot 0.700 = \SI{6.87}{m/s^2}$. The planner uses this as a box on $a_x$ and on $a_z$ separately, and the code scales the pair down when their norm exceeds it.
+
+\textbf{Step 2 — vertically.} Upward, the motors' \SI{24.4}{N} on \SI{1}{kg} leave $24.4 - 9.81 = \SI{14.6}{m/s^2}$; downward the planner allows $0.8g = \SI{7.85}{m/s^2}$. The speeds are limited to \SI{4}{m/s} horizontally and \SI{2}{m/s} vertically.
+
+\textbf{Step 3 — the path.} The figure-8 is $x = 2\sin\omega t$, $z = \sin 2\omega t$ with $\omega = 2\pi/6 = \SI{1.047}{rad/s}$. Its acceleration is at most $2\omega^2 = \SI{2.19}{m/s^2}$ along $x$ and $(2\omega)^2 = \SI{4.39}{m/s^2}$ along $z$; together never more than \SI{4.66}{m/s^2}, a tilt of \SI{25}{\degree}. Its speed peaks at \SI{2.96}{m/s}.
+
+\textbf{Step 4 — the margin.} Of the \SI{6.87}{m/s^2} the tilt allows, the path needs up to 4.66. What is left, \SI{2.2}{m/s^2}, is all there is for correcting errors and resisting the wind: on a \SI{1}{kg} drone, a horizontal push of \SI{2.2}{N}.
+\end{example}
+
+\section{Where the point mass is wrong}
+
+A gust is a force that \cref{eq:mpcl3-model} does not contain. The MPC sees it only through what it does: an error in position and speed, which the next plan corrects. Near the path no constraint is active, and by \cref{thm:mpc-linear} the MPC's first move is a PD law on the error. That gives a prediction.
+
+\begin{example}[The MPC's stiffness against a push]
+\label{ex:mpcl3-stiff}
+Predict the position error that a horizontal disturbance force $d(t)$ causes under the MPC alone, and the offset under a steady push of \SI{1}{N}.
+
+\textbf{Step 1 — the gains.} For the weights of this lesson ($q_p = 20$, $q_v = 4$, $r_u = 0.1$, \SI{1}{s} of \SI{20}{ms} steps), the unconstrained first move, computed as in Lesson~II.14, is $a = -12.5\,e - 7.65\,\dot e$ plus the reference's own acceleration.
+
+\textbf{Step 2 — the error equation.} If the inner loops deliver the acceleration the planner asks for, the error obeys $\ddot e + 7.65\,\dot e + 12.5\,e = d/m$: a mass on a spring and damper, pushed by the gust. Its roots are $-5.29$ and $\SI{-2.36}{rad/s}$.
+
+\textbf{Step 3 — a steady push.} At rest $12.5\,e = d/m$: \SI{1}{N} on \SI{1}{kg} holds the drone $1/12.5 = \SI{8}{cm}$ off the path. The MPC has no integral; like the P controller of Lesson~I.3, it needs an error to push.
+
+\textbf{Step 4 — the gusty wind.} Over the last lap the recorded disturbance force along $x$ has an RMS of \SI{1.1}{N}. Passing the recorded force through the error equation predicts an RMS error along $x$ of \SI{7.5}{cm}; the flight measured \SI{7.3}{cm}, and the two curves follow each other (\cref{fig:mpcl3-gust}, bottom). Along $z$: \SI{3.7}{cm} predicted, \SI{3.3}{cm} measured.
+\end{example}
+
+\simfig{mpcl3_gust}{Top: the distance from the path, on a logarithmic scale, for the four combinations, in the same wind. The shaded stretch holds the strongest gusts of the flight, up to \SI{10}{m/s}. Bottom: the error along $x$ over the last eight seconds. Blue: MPC alone; dashed: its prediction from the recorded gust force through the PD law of Example~\ref{ex:mpcl3-stiff}; green: MPC with INDI underneath.}{fig:mpcl3-gust}
+
+So the MPC alone is a spring. A stiffer spring would help, and the weights could be raised. But the stiffer the outer law, the more it relies on the inner loops delivering each acceleration at once, and they do not: the attitude must turn first. Lesson~I.14 showed what happens when an outer loop outruns its inner loop. Stiffness is the wrong tool.\pitfall{Raising the MPC's weights to fight the wind treats a model error with gain. It works until the outer loop is faster than the attitude loop can follow.}
+
+\section{Make the model true}
+
+Acceleration INDI does something else. It measures the acceleration the drone actually has, compares it with the one the planner asked for, and changes the thrust vector by the difference (Lesson~II.8):
+\begin{equation}\label{eq:mpcl3-indi}
+  \vec F = \vec F_0 + \hat m\,(\vec a_{sp} - \vec a_0).
+\end{equation}
+Whatever force the gust adds shows up in $\vec a_0$ and is removed in the next step. The drone then accelerates as the planner said, and \cref{eq:mpcl3-model} becomes true, up to the delay of the measurement and its filter.
+
+\begin{example}[What is left of the gust]
+\label{ex:mpcl3-left}
+Estimate the error that remains with INDI underneath, from the recorded flight.
+
+\textbf{Step 1 — the cancellation.} Over the last lap, the disturbance that INDI implies, $\hat m\vec a_0 - \vec F_0 - \hat m\vec g$, differs from the true one by \SI{0.11}{N} RMS along $x$ and \SI{0.08}{N} along $z$, against a true disturbance of \SI{1.25}{N} and \SI{0.64}{N}. About 90\,\% of the gust is removed before it can move the drone (\cref{thm:indiwind-residual}).
+
+\textbf{Step 2 — the remainder through the spring.} By Example~\ref{ex:mpcl3-stiff} the MPC turns a push into an error with a gain of $1/12.5 = \SI{8}{cm/N}$ at low frequency. \SI{0.11}{N} RMS of residual gives about \SI{0.9}{cm}.
+
+\textbf{Step 3 — the measurement.} The flight's RMS error over the last lap is \SI{1.6}{cm} along $x$, \SI{1.5}{cm} along $z$ and \SI{0.7}{cm} in altitude: \SI{2.3}{cm} in all, against \SI{8.5}{cm} without INDI.
+
+\textbf{Step 4 — the rest.} The residual gust explains about half of what remains. The other half is the point mass's other error, the time the attitude takes to turn: the planner asks for a new direction of thrust, and the drone points it there a moment later. The rate INDI makes that delay short and repeatable; it cannot make it zero.
+\end{example}
+
+\begin{keyidea}[Plan on a simple model, enforce it underneath]
+An outer planner can afford a rich objective and constraints only on a simple model. An inner loop that measures what the model leaves out, here the acceleration, and corrects it at once makes the plant behave like that model. Then the planner's predictions hold, and its plans come true. The inner loop's quality limits the whole stack.
+\end{keyidea}
+
+The geometric controller shows the same thing from the other side. With INDI underneath it flies the last lap to \SI{2.9}{cm}, close to the MPC's \SI{2.3}{cm}; without, \SI{12.7}{cm}, against the MPC's 8.5. Per lap of six seconds, from \SI{6}{s} on:
+
+\begin{center}\sffamily\small
+\begin{tabular}{lrrrr}
+  RMS error, cm & 6--12\,s & 12--18\,s & 18--24\,s & 24--30\,s\\\hline
+  MPC & 11.8 & 34.2 & 5.5 & 8.5\\
+  MPC + INDI & 2.6 & 72.0 & 30.3 & 2.3\\
+  geometric & 12.2 & 37.5 & 8.5 & 12.7\\
+  geometric + INDI & 2.8 & 57.4 & 15.9 & 2.9\\
+\end{tabular}
+\end{center}
+The figure-8 starts when the take-off ends, between \SI{3.6}{s} and \SI{4.6}{s} depending on the controller, so the same gust meets each drone at a different point of its path. Where the wind is within the budget, INDI divides the error by four. In the second lap it does the opposite.
+
+\section{When the gust is bigger than the budget}
+
+\begin{example}[The gust at fourteen seconds]
+\label{ex:mpcl3-edge}
+Explain why, between \SI{14}{s} and \SI{19}{s}, the drones with INDI leave the path by up to \SI{1.85}{m} (MPC) and \SI{1.54}{m} (geometric), while the drones without INDI stay within \SI{0.77}{m}.
+
+\textbf{Step 1 — the force.} At \SI{14.6}{s} the wind reaches \SI{10}{m/s}. The recorded disturbance on the INDI-flown drone reaches \SI{9.2}{N} horizontally, more than four times the \SI{2.2}{N} margin of Example~\ref{ex:mpcl3-budget}. The demanded tilt sits at its \SI{35}{\degree} limit for \SI{2.5}{s} of the five. No controller can follow the path through that: the acceleration it needs does not exist.
+
+\textbf{Step 2 — the vertical push.} The same gusts push the drone upwards, by up to \SI{9.8}{N}: about its weight. INDI cancels that too. Between \SI{16.18}{s} and \SI{16.57}{s} it cuts the total thrust below \SI{2}{N}, to \SI{0.59}{N} at the least, and the altitude stays within \SI{4}{cm} of \SI{3}{m}.
+
+\textbf{Step 3 — the price of the altitude.} With the tilt capped at \SI{35}{\degree}, the horizontal force is at most $\tan 35^\circ = 0.70$ times the vertical one. Below \SI{1}{N} of thrust there is almost no horizontal force left, and for those four tenths of a second the drone cannot follow the path at all. It falls behind; afterwards the planner, which knows only the fixed box of Step~1 of Example~\ref{ex:mpcl3-budget}, chases the path at full tilt and overshoots it.
+
+\textbf{Step 4 — without INDI.} The MPC alone lets the gust lift the drone by \SI{38}{cm}, to \SI{3.38}{m}, keeps at least \SI{2.4}{N} of thrust, and with it some horizontal authority. It gives up altitude to keep its position. INDI, asked to deliver every acceleration exactly, spends the whole budget on the vertical axis and has none left for the horizontal one.
+\end{example}
+\didyouknow{Sun et al. (2022) flew a nonlinear MPC and a flatness-based controller on real racing quadrotors. They report that the nonlinear MPC, with the full rigid-body model and the motors' real limits inside its problem, tracked infeasible trajectories better, and that an INDI inner loop made both controllers markedly more robust.}
+
+The planner of this lesson cannot see the problem coming. Its constraints are fixed numbers: \SI{6.87}{m/s^2} sideways whatever the wind. In the gust the real budget shrinks, because part of the thrust is spent against the disturbance, and the planner keeps planning with the old one. A planner that knew the disturbance, the one INDI measures, could subtract it from its limits and plan a path that is still feasible. That is the step from this linear point-mass MPC to the nonlinear MPC of the racing literature.
+
+\screen[0 0 495 998]{mpcl3}{Lesson II.15 in the app at $t = \SI{20}{s}$, MPC alone. The error chart (bottom left) still shows the excursion left by the gusts around \SI{16}{s}; the wind chart (bottom right) shows them. The information card lists what the planned figure-8 needs: \SI{2.96}{m/s}, \SI{4.66}{m/s^2}, a tilt of \SI{25}{\degree} against the \SI{35}{\degree} limit.}{fig:mpcl3-screen}
+
+\begin{inapp}
+\begin{itemize}[leftmargin=1.2em]
+  \item The outer stage is \ui{Controller\then Outer stage\then MPC} (\param{control.l3.outer = 'mpc'}); INDI is \param{control.l3.inner = 'indi'} and \param{control.l3.compensation = 'indi'}. The MPC's weights and horizon are \param{control.mpc.*}, the limits \param{control.l3.maxTiltDeg}, \param{vMaxH} and \param{vMaxV}.
+  \item \texttt{MpcOuter} in \src{src/control/mpc.ts} builds the three axis problems from the planned trajectory and scales the horizontal pair to the tilt limit. Its output, a desired acceleration, goes through \texttt{AccelIndi} and \texttt{RateIndi} in \src{src/control/stages.ts}, the same stages that serve every outer controller.
+  \item The four flights are the experiments \texttt{mpcl3-*} in \src{scripts/book-data.ts}.
+\end{itemize}
+\end{inapp}
+
+\begin{trythis}
+\begin{enumerate}
+  \item Fly the lesson as it starts, MPC alone. Then add rate INDI and acceleration INDI and reset.
+  \item Switch the outer stage to \emph{geometric tracking}, keeping INDI.
+  \item Press \key{G} for an extra gust while the drone is in a turn of the figure-8, with and without INDI.
+\end{enumerate}
+\predict{which of the four combinations has the smallest error over the last lap, and which loses the path furthest in the strong gusts? Are they the same?}
+\end{trythis}
+
+\section{The engineer's view: hierarchies}
+
+\subsection{Layers that run at different speeds}
+Every serious control system is a stack. In a refinery, an economic optimiser sets the plant's targets, an MPC moves the set-points of the regulatory loops, and those PID loops move the valves, each layer acting less often and looking further ahead than the one below it (Qin and Badgwell, 2003). In an airliner, the flight management system plans the route, the autopilot holds the path, and the fly-by-wire laws turn the pilot's or autopilot's demand into surface deflections. Each layer works on a simplified model of everything below it and trusts the layer below to make that model true. The design question is always the same: is the inner layer fast and faithful enough for the outer one's model to hold?\didyouknow{Lesson~I.13 met the rule of thumb for cascades: each loop several times faster than the one around it. A hierarchy of optimisers obeys the same rule.}
+
+\begin{example}[An aircraft's turn budget]
+\label{ex:mpcl3-aircraft}
+An aircraft's guidance plans a path and asks the inner loops for a bank angle; to turn without losing height it must bank by $\phi$, and its lateral acceleration is then $g\tan\phi$. Assume a speed of \SI{50}{m/s} and a bank limit of \SI{30}{\degree}. What is the tightest turn the planner may plan, and how does a crosswind gust change it?
+
+\textbf{Step 1 — the budget.} $a_{lat} = g\tan 30^\circ = 9.81 \cdot 0.577 = \SI{5.66}{m/s^2}$: the same formula as the quadrotor's $g\tan 35^\circ$.
+
+\textbf{Step 2 — the turn.} Radius $V^2/a_{lat} = 2500/5.66 = \SI{442}{m}$; turn rate $a_{lat}/V = \SI{0.113}{rad/s}$, a full circle in \SI{56}{s}.
+
+\textbf{Step 3 — the gust.} A planner that uses the whole budget for the turn has none left for a gust. If the guidance plans turns at, say, two-thirds of the bank limit, the inner loops keep a third for disturbances: the margin of Example~\ref{ex:mpcl3-budget} in another vehicle.
+
+\textbf{Step 4 — read it.} The outer layer decides how much of the physical limit it promises to the path; the inner layer needs the rest. A stack fails at the edge when the outer layer promises more than the whole.
+\end{example}
+
+\subsection{In formal terms}
+
+\begin{definition}{Hierarchical control}
+In \term{hierarchical} (cascaded) control an outer controller computes a reference for a virtual input $v$ of a simplified model of the plant, and an inner controller drives the plant so that $v$ is realised. The outer design assumes the inner loop is ideal; the closed loop is analysed by bounding how far it is from ideal.
+\end{definition}
+
+\begin{theorem}[Ideal INDI realises the commanded acceleration]
+\label{thm:mpcl3-indi}
+Let the drone obey $m\ddot{\vec p} = \vec F + m\vec g + \vec d$, with an unknown disturbance $\vec d$, and apply \cref{eq:mpcl3-indi} with $\hat m = m$, where $\vec F_0$ and $\vec a_0$ are the thrust and acceleration at the previous instant. If the thrust is applied without lag and $\vec d$ does not change between the instants, then $\ddot{\vec p} = \vec a_{sp}$, whatever $\vec d$ is.
+\end{theorem}
+\begin{proof}
+At the previous instant $m\vec a_0 = \vec F_0 + m\vec g + \vec d$. Now $m\ddot{\vec p} = \vec F + m\vec g + \vec d = \vec F_0 + m(\vec a_{sp} - \vec a_0) + m\vec g + \vec d = m\vec a_{sp}$.
+\end{proof}
+
+\begin{theorem}[Two time scales (Tikhonov)]
+\label{thm:mpcl3-tikhonov}
+Consider $\dot{\vx} = f(\vx, \symbf z)$, $\varepsilon\dot{\symbf z} = g(\vx, \symbf z)$, where for each $\vx$ the fast system has an isolated equilibrium $\symbf z = h(\vx)$ that is exponentially stable, uniformly in $\vx$. If the reduced system $\dot{\vx} = f(\vx, h(\vx))$ is exponentially stable at the origin, then so is the full system for all $\varepsilon$ below some $\varepsilon^* > 0$, under smoothness conditions on $f$, $g$ and $h$ (Khalil, 2002, ch.~11).
+\end{theorem}
+
+Here $\vx$ is the position error, governed by the outer law; $\symbf z$ is the acceleration and attitude error, governed by the inner loops, and $\varepsilon$ is their time constant. \Cref{thm:mpcl3-indi} says the inner loop's equilibrium is $\ddot{\vec p} = \vec a_{sp}$, independent of the wind; \cref{thm:mpcl3-tikhonov} says that the stack then inherits the stability of the outer design, if the inner loop is fast enough. Both have hypotheses that fail in the flight. The thrust lags by \SI{30}{ms} and is filtered at \SI{10}{Hz}, so the cancellation leaves about a tenth of the gust (Example~\ref{ex:mpcl3-left}); and in the strong gusts the thrust saturates, the inner loop's equilibrium does not exist, and neither theorem says anything (Example~\ref{ex:mpcl3-edge}). The theory of hierarchies with saturating inner loops is the theory of feasibility of the previous lesson: an outer plan must stay within what the inner loop can deliver.
+
+\begin{lookahead}
+\begin{itemize}[leftmargin=1.2em]
+  \item Lesson~II.16 replaces the QP on top by sampling, with the same INDI-ready stages below; Lesson~II.17 adds a safety filter between the two.
+  \item Robustness of the stack to the model errors left here is the subject of Part~III; MPC with the disturbance estimate in its constraints, and nonlinear MPC on the full rigid body, return in Part~IV.
+  \item Example~\ref{ex:mpcl3-aircraft} repeats the budget of the outer layer on a fixed-wing aircraft.
+\end{itemize}
+\end{lookahead}
+
+\begin{remember}
+\begin{itemize}
+  \item The outer MPC plans on a point mass, with the tilt and speed limits as constraints: \SI{6.87}{m/s^2} sideways at \SI{35}{\degree}, of which the figure-8 needs up to 4.66.
+  \item Alone, the MPC resists the gusts like a spring of $k_p = 12.5$: \SI{8}{cm} per newton, and the recorded gusts predict its error to within a few millimetres.
+  \item Acceleration INDI makes the point-mass model true: last lap \SI{8.5}{cm} $\to$ \SI{2.3}{cm} with MPC, \SI{12.7}{cm} $\to$ \SI{2.9}{cm} with the geometric controller. The inner loop matters more than the outer one.
+  \item Beyond the budget no layer helps: in a \SI{10}{m/s} gust INDI holds the altitude, spends all the thrust doing so, and loses the path by up to \SI{1.85}{m}.
+\end{itemize}
+\end{remember}
+
+\begin{curiosity}{The controller that never touches a valve}
+\photo{refinery}{The control room of an early refinery installation.}
+In a refinery, the first industrial home of model predictive control, the MPC does not open or close anything. Below it sits a layer of ordinary PID loops, one per valve, pump or burner, each holding a flow, a pressure or a temperature at its set-point. Above them, the MPC looks much further ahead, at a model of how all these quantities affect one another and the products, and at regular intervals, far longer than the loops' own sampling, it moves the set-points of the PID loops. Above the MPC, an economic optimiser decides what the plant should be making today (Qin and Badgwell, 2003).
+
+The arrangement has practical reasons. The PID loops were there first, and the operators trust them; if the MPC fails, the plant keeps running on its last set-points. And it has the reason of this lesson: the MPC's model is a simple one, built from step tests on the plant, and it is accurate only because the loops below make the flows and temperatures follow their set-points, whatever the pumps and the weather do. A valve that sticks, a loop that is badly tuned, and the MPC's predictions stop coming true. Control engineers who maintain such plants spend much of their time not on the optimiser at the top but on the humble loops at the bottom.
+
+The racing quadrotor and the distillation column share the structure: a planner that can see far because it sees simply, standing on loops that make its simple view correct.
+\end{curiosity}
+
+\begin{exercises}
+\exercise[1] What sideways acceleration does a tilt limit of \SI{25}{\degree} allow while holding altitude? And \SI{45}{\degree}?
+\answer{$g\tan 25^\circ = \SI{4.57}{m/s^2}$; $g\tan 45^\circ = \SI{9.81}{m/s^2}$.}
+\exercise[1] For the figure-8 of the lesson with a period of \SI{5}{s} instead of 6, what are the peak accelerations along $x$ and $z$? Does the path still fit within \SI{35}{\degree}?
+\answer{$\omega = 1.257$: $2\omega^2 = \SI{3.16}{m/s^2}$ and $(2\omega)^2 = \SI{6.32}{m/s^2}$; the combined peak is \SI{6.71}{m/s^2}, within 6.87 but with \SI{0.16}{m/s^2} left for the wind.}
+\exercise[2]\exkind{derive} With the MPC's PD law of Example~\ref{ex:mpcl3-stiff}, find the error's amplitude for a sinusoidal push of \SI{1}{N} at \SI{1}{rad/s} and at \SI{5}{rad/s}. Which frequencies of the gust does the MPC alone resist worst?
+\answer{$|1/(12.5 - \omega^2 + 7.65j\omega)|$: at 1 rad/s, $1/|11.5 + 7.65j| = \SI{7.2}{cm}$; at 5 rad/s, $1/|-12.5 + 38.3j| = \SI{2.5}{cm}$. The response is largest at low frequency (\SI{8}{cm/N} at zero): slow pushes, which the missing integral cannot undo.}
+\exercise[2]\exkind{derive} Repeat \cref{thm:mpcl3-indi} with a mass estimate $\hat m = 0.8\,m$. Show that the drone's acceleration converges to $\vec a_{sp}$ from one instant to the next if the disturbance is constant, and find the factor by which the error shrinks per step.
+\answer{$m\vec a_1 = \vec F_0 + \hat m(\vec a_{sp} - \vec a_0) + m\vec g + \vec d = m\vec a_0 + \hat m(\vec a_{sp} - \vec a_0)$, so $\vec a_1 - \vec a_{sp} = (1 - \hat m/m)(\vec a_0 - \vec a_{sp})$: the error shrinks by $0.2$ per step.}
+\exercise[2]\exkind{fly} In the lesson with INDI below, switch the outer stage between MPC and geometric tracking and compare the error over the last lap. Then remove INDI from each. Which change moves the error more: the outer stage or the inner loop?
+\answer{Recorded: MPC + INDI \SI{2.3}{cm}, geometric + INDI \SI{2.9}{cm}; MPC \SI{8.5}{cm}, geometric \SI{12.7}{cm}. Changing the inner loop changes the error by a factor of four, changing the outer stage by less than a factor of 1.5.}
+\exercise[2]\exkind{code} In \texttt{MpcOuter.update} (\src{src/control/mpc.ts}) the $x$ and $z$ problems are solved separately with boxes of $\pm a_H$, and the result is scaled when its norm exceeds $a_H$. What does each axis's plan assume that is not true after the scaling? Propose a constraint that keeps the problems linear and respects the norm better.
+\answer{Each plan assumes it may use $a_H$ on its own axis at the same time as the other uses its own; after scaling, neither gets what it planned, and the predicted path is not the one flown. A polygon inscribed in the circle, $|a_x\cos\alpha_i + a_z\sin\alpha_i| \le a_H$ for a few directions $\alpha_i$, couples the axes in one QP and keeps the constraints linear.}
+\exercise[3]\exkind{derive} During the vertical push of Example~\ref{ex:mpcl3-edge}, write the largest horizontal acceleration available as a function of the upward disturbance $d_y$, with the tilt capped at $\theta_{max}$ and the altitude held. Evaluate it for $d_y = 0$, 5 and \SI{9.8}{N}, with $m = \SI{1}{kg}$.
+\answer{Holding altitude needs a vertical thrust $F_y = mg - d_y$; the horizontal thrust is at most $F_y\tan\theta_{max}$: $a_h \le (g - d_y/m)\tan\theta_{max}$. For $\theta_{max} = 35^\circ$: 6.87, 3.37 and \SI{0.01}{m/s^2}. Without the altitude constraint the drone could keep thrust and rise instead, as the MPC alone did.}
+\exercise[3] The refinery of the story: an MPC moves the set-point of a flow loop every minute. The flow loop is a first-order system with a time constant of \SI{20}{s}. How much of a set-point step has the flow reached when the MPC next looks? What should the MPC's model contain if the loop's time constant were \SI{5}{min}?
+\answer{$1 - e^{-60/20} = 95\,\%$: the MPC may treat the loop as nearly ideal. With \SI{5}{min} it reaches only 18\,\% in a minute; the loop's dynamics must then be part of the MPC's model, exactly as the attitude lag should be for the drone.}
+\end{exercises}

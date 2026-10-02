@@ -719,3 +719,122 @@ def mpc_horizon():
     b.legend(loc="lower left", fontsize=6.0)
     b.grid(True, which="major", axis="both")
     save(f, "mpc_horizon")
+
+
+def _mpc_fit_gains(h):
+    """Fit u0 = -kp·e - kd·v to the unsaturated first moves of a horizon flight (8-12 s).
+
+    The record is decimated to 10 ms and the controller samples between two records, so the state
+    is taken halfway between the record before and the record at each new first move."""
+    d = load(f"horizon-{h}")
+    tick = d["alt.part.u0"].diff().abs() > 1e-9
+    e = 0.5 * (d["alt.meas"] + d["alt.meas"].shift(1)) - 3.95
+    v = 0.5 * (d["vel.y"] + d["vel.y"].shift(1))
+    m = tick & (d.t >= 8.02) & (d.t < 12) & (d["alt.u"] < 24.3) & (d["alt.u"] > 0.1)
+    X = np.c_[e[m], v[m]]
+    kp, kd = np.linalg.lstsq(X, -d["alt.part.u0"][m].values, rcond=None)[0]
+    return kp, kd
+
+
+@fig
+def mpc_gains():
+    f, ax = plt.subplots(figsize=(TEXT_W, 52 * MM))
+    hm = np.geomspace(0.06, 2.2, 50)
+    g = np.array([_mpc_lin_gains(h) for h in hm])
+    hh = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.8, 1, 1.5, 2]
+    fit = np.array([_mpc_fit_gains(h) for h in hh])
+    for k, col, lab in ((0, C["P"], "$k_p$  [N/m]"), (1, C["D"], "$k_d$  [N·s/m]")):
+        ax.plot(hm, g[:, k], color=col, lw=0.9, ls=(0, (3, 2)))
+        ax.plot(hh, fit[:, k], "o", color=col, ms=3)
+        label_end(ax, 2.45, g[-1, k], lab, col)
+    for v in (27.83, 11.54):
+        ax.axhline(v, color=C["faint"], lw=0.5, ls=(0, (1, 2)))
+    ax.text(0.065, 29.0, "discrete LQR: 27.8 and 11.5", fontsize=6.0, color=C["muted"])
+    ax.set_xscale("log")
+    ax.set_xticks([0.1, 0.2, 0.5, 1, 2])
+    ax.set_xticklabels(["0.1", "0.2", "0.5", "1", "2"])
+    ax.minorticks_off()
+    ax.set_xlim(0.06, 4.6)
+    ax.set_ylim(0, 34)
+    ax.set_title("Gains of the first move, by horizon: dashed computed, dots fitted to the flights")
+    ax.set_xlabel("horizon [s]", loc="right")
+    save(f, "mpc_gains")
+
+
+# ─── Lesson II.15 ──────────────────────────────────────────────────────────
+@fig
+def mpcl3_gust():
+    f, (a, b) = plt.subplots(2, 1, figsize=(TEXT_W, 92 * MM), gridspec_kw=dict(hspace=0.45, height_ratios=[1.25, 1]))
+    runs = (("mpc", C["meas"], "MPC", 1.0, "-"), ("geo", C["ghost"], "geometric", 0.9, "-"),
+            ("mpc-indi", C["I"], "MPC + INDI", 1.0, "-"), ("geo-indi", C["D"], "geometric + INDI", 0.8, (0, (3, 1.5))))
+    for tag, col, lab, lw, ls in runs:
+        d = win(load(f"mpcl3-{tag}"), 6, 30)
+        a.plot(d.t, 100 * _poserr(d), color=col, lw=lw, ls=ls, label=lab)
+    a.axvspan(14.3, 17.0, color=C["sat"], alpha=0.7, lw=0)
+    a.text(14.4, 220, "gusts up to\n10 m/s", fontsize=6.0, color=C["err"], va="top")
+    a.set_yscale("log")
+    a.set_ylim(0.3, 300)
+    a.set_yticks([1, 10, 100])
+    a.set_yticklabels(["1", "10", "100"])
+    a.minorticks_off()
+    a.set_xlim(6, 30)
+    a.set_title("Position error on the 6 s figure-8, same wind")
+    a.set_ylabel("cm")
+    a.legend(loc="upper right", ncol=2, fontsize=6.0)
+    xlab_time(a)
+    from scipy.signal import lsim
+    kp, kd = _mpc_lin_gains(1.0, qp=20, qv=4, r=0.1)
+    d = win(load("mpcl3-mpc"), 6, 30)
+    _, pred, _ = lsim(([1], [1, kd, kp]), d["dist.x"].values / 1.0, d.t.values - d.t.values[0])
+    d, pred = d[d.t >= 22], pred[(d.t >= 22).values]
+    b.plot(d.t, 100 * (d["pos.x"] - d["sp.x"]), color=C["meas"], lw=1.0, label="MPC, measured")
+    b.plot(d.t, 100 * pred, color=C["ink"], lw=0.8, ls=(0, (3, 2)), label="predicted from the gust force and $k_p, k_d$")
+    e = win(load("mpcl3-mpc-indi"), 22, 30)
+    b.plot(e.t, 100 * (e["pos.x"] - e["sp.x"]), color=C["I"], lw=0.9, label="MPC + INDI, measured")
+    b.set_xlim(22, 30)
+    b.set_ylim(-22, 30)
+    b.set_title("Error along $x$, enlarged")
+    b.set_ylabel("cm")
+    b.legend(loc="upper left", ncol=3, fontsize=5.8, handlelength=1.3, columnspacing=1.0)
+    xlab_time(b)
+    save(f, "mpcl3_gust")
+
+
+# ─── Lesson II.16 ──────────────────────────────────────────────────────────
+@fig
+def mppi_paths():
+    f, (a, b) = plt.subplots(1, 2, figsize=(TEXT_W, 60 * MM), gridspec_kw=dict(wspace=0.32, width_ratios=[1.35, 1]))
+    th = np.linspace(0, 2 * np.pi, 200)
+    a.fill(3 + 0.6 * np.cos(th), 0.15 + 0.6 * np.sin(th), color=C["sat"], lw=0)
+    a.plot(3 + 0.95 * np.cos(th), 0.15 + 0.95 * np.sin(th), color=C["err"], lw=0.5, ls=(0, (2, 2)))
+    a.text(3, 0.15, "pillar", fontsize=6.0, color=C["err"], ha="center", va="center")
+    runs = (("geo", C["ghost"], "geometric", 1.2), ("mppi", C["meas"], "MPPI, $\\lambda = 1$", 1.0),
+            ("mppi-l50", C["FF"], "MPPI, $\\lambda = 50$", 0.9))
+    for tag, col, lab, lw in runs:
+        d = win(load(f"mppi-{tag}"), 10, 16)
+        a.plot(d["pos.x"], d["pos.z"], color=col, lw=lw, label=lab, zorder=4 if tag == "geo" else 3)
+        e = np.sqrt((d["pos.x"] - 6) ** 2 + (d["pos.y"] - 2) ** 2 + d["pos.z"] ** 2)
+        b.plot(d.t - 10, e, color=col, lw=lw, label=lab)
+    a.plot([0, 6], [0, 0], "o", color=C["ink"], ms=2.5)
+    a.text(0, 0.18, "start", fontsize=6.0, color=C["muted"], ha="center", va="bottom")
+    a.text(6, 0.18, "target", fontsize=6.0, color=C["muted"], ha="center", va="bottom")
+    a.set_aspect("equal")
+    a.set_xlim(-0.5, 6.7)
+    a.set_ylim(-1.4, 1.7)
+    a.set_title("Seen from above, after the jump")
+    a.set_xlabel("x [m]", loc="right")
+    a.set_ylabel("z [m]")
+    a.grid(True, axis="both")
+    b.axhline(0.2, color=C["I"], lw=0.7, ls=(0, (4, 2.5)))
+    b.text(3.0, 0.24, "goal: 0.2 m", fontsize=6.0, color=C["I"])
+    b.set_yscale("log")
+    b.set_ylim(0.02, 30)
+    b.set_yticks([0.1, 1])
+    b.set_yticklabels(["0.1", "1"])
+    b.minorticks_off()
+    b.set_xlim(0, 6)
+    b.legend(loc="upper right", fontsize=6.0)
+    b.set_title("Distance to the target")
+    b.set_ylabel("m")
+    b.set_xlabel("time after the jump [s]", loc="right")
+    save(f, "mppi_paths")

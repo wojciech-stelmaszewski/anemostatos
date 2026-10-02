@@ -1,0 +1,218 @@
+\lesson{II.14}{How far ahead?}{Planning further costs computing time. Planning too little costs more: a controller that cannot see where it will have to brake does not dare to hurry.}{1}{horizon}{Part II · Beyond PID}
+\label{les:horizon}
+
+\lead{\setupcard{\setuprow{Level}{L1}\setuprow{Controller}{the MPC of Lesson~II.13: $q_p = 50$, $q_v = 5$, $r_u = 0.05$, steps of \SI{20}{ms}, horizon \SI{2}{s} (100 steps)}\setuprow{Scene}{a ceiling at \SI{4}{m}; no wind}\setuprow{Event}{at $t = \SI{8}{s}$ the set-point jumps from 2 to \SI{3.95}{m}}\setuprow{Goal}{reach \SI{3.95}{m} within \SI{1.6}{s} of the jump with a horizon of \SI{0.6}{s} or less, never touching the ceiling}}%
+The MPC of the last lesson planned one second ahead. This one starts with two, and the drone arrives at \SI{3.95}{m} \SI{1.41}{s} after the jump, exactly as with one. Now shorten the horizon. At half a second the drone needs \SI{1.57}{s}; at a tenth of a second it needs \SI{6.81}{s}, five times longer, and it creeps up to the set-point as if the motors were weak. No flight touches the ceiling: the constraint is in every plan, however short. What a short plan loses is not safety but nerve. This lesson finds out why, how long a horizon must be, and what the extra length costs.}
+
+\section{Shorter plans, slower flights}
+
+\simfig{mpc_horizon}{The jump to \SI{3.95}{m} flown with ten horizons. Left: the altitude for five of them; none crosses the set-point, the short ones are slow. Right: the time to come within \SI{5}{cm} of the set-point. Dots: the flights. Dashed: the unconstrained MPC law of each horizon, flown on the double integrator with the thrust clipped to the motors' range.}{fig:horizon-sweep}
+
+\Cref{fig:horizon-sweep} shows the sweep. From two seconds down to one, nothing changes: \SI{1.41}{s} every time. Below one second the arrival slows, gently at first (\SI{1.44}{s} at \SI{0.8}{s}, \SI{1.49}{s} at \SI{0.6}{s}, \SI{1.57}{s} at \SI{0.5}{s}) and then steeply (\SI{2.13}{s} at \SI{0.3}{s}, \SI{3.16}{s} at \SI{0.2}{s}, \SI{6.81}{s} at \SI{0.1}{s}). The highest altitude of every flight is \SI{3.950}{m} or less.\recall{Lesson~II.13: the first move of each plan is applied, the rest is thrown away, and the plan is computed again \SI{20}{ms} later. The horizon is how far the plan reaches, not how long it is used.}
+
+\begin{definition}{Prediction horizon}
+The \term{prediction horizon} $T_h = N\Delta t$ is the stretch of the future over which the controller predicts the plant and sums the cost; $N$ is its number of steps. Here every step has its own input, so the \term{control horizon}, the number of free inputs, is also $N$.
+\end{definition}
+
+\begin{example}[The tenth-of-a-second plan]
+\label{ex:horizon-short}
+Explain the flight with $T_h = \SI{0.1}{s}$ ($N = 5$).
+
+\textbf{Step 1 — the first move.} Right after the jump the error is $e = \SI{-1.95}{m}$ and the drone is at rest. The recorded first move of the plan is $u_0 = \SI{7.29}{N}$ above the hover thrust: less than half of the \SI{14.6}{N} the motors could add. Divided by the error, that is a stiffness of $k_p = 7.29/1.95 = \SI{3.74}{N/m}$.
+
+\textbf{Step 2 — the law behind it.} With no constraint active the first move is linear in the state (\cref{thm:mpc-linear}): $u_0 = -k_p e - k_d v$. Computing the gains from the prediction matrices of Example~\ref{ex:mpc-condense} for $N = 5$ gives $k_p = 3.75$ and $k_d = 7.26$: a PD controller, and a very soft one.
+
+\textbf{Step 3 — the closed loop.} On the double integrator ($\hat m = \SI{1}{kg}$) this PD gives $s^2 + 7.26s + 3.75 = 0$, with roots $s = -6.70$ and $s = \SI{-0.56}{rad/s}$. The slow root dominates: the error shrinks like $e^{-0.56t}$.
+
+\textbf{Step 4 — the arrival time.} From \SI{1.95}{m} to \SI{5}{cm} takes $\ln(1.95/0.05)/0.56 = 3.66/0.56 = \SI{6.5}{s}$. The flight needed \SI{6.81}{s}; the difference is the fast root, the motors' \SI{30}{ms} lag and the \SI{20}{ms} hold between plans, none of which the estimate contains.
+\end{example}
+
+\section{What a short plan cannot see}
+
+Why is the short plan so timid? Its cost compares two things over the next tenth of a second: the error it can remove and the thrust it must pay for. In a tenth of a second the thrust can remove almost nothing.
+
+\begin{example}[What one newton buys]
+\label{ex:horizon-buys}
+Compare, for horizons of \SI{0.1}{s} and \SI{1}{s}, what an extra newton held over the whole horizon does to the altitude, and what it costs.
+
+\textbf{Step 1 — the effect.} With $\hat m = \SI{1}{kg}$, one newton held for $T_h$ raises the drone by $\tfrac12 T_h^2$ at the end of the plan: \SI{5}{mm} for \SI{0.1}{s}, \SI{0.5}{m} for \SI{1}{s}.
+
+\textbf{Step 2 — the price.} The input term of \cref{eq:mpc-qp} charges $r_u u^2 = \SI{0.05}{}$ per step and per newton squared, $0.05N$ for the whole plan: 0.25 for $N = 5$, 2.5 for $N = 50$.
+
+\textbf{Step 3 — the gain.} The tracking term is $q_p\sum_k e_k^2$. With an error of \SI{1.95}{m} the reduction from one newton is about $2q_p e\,\Delta y$ per step at which the rise $\Delta y$ has taken effect. Over \SI{0.1}{s} the rise averages about \SI{2}{mm}, so the five steps gain $5 \cdot 2 \cdot 50 \cdot 1.95 \cdot 0.002 \approx 2$. Over \SI{1}{s} the rise averages about \SI{0.17}{m} over fifty steps: $50 \cdot 2 \cdot 50 \cdot 1.95 \cdot 0.17 \approx 1700$.
+
+\textbf{Step 4 — read it.} The long plan gains about 700 times its price for each newton; the short plan gains about eight times. The optimum of each balances gain against price, and the short plan's balance lies at a few newtons. The weights did not change. What changed is how much of the newton's effect the plan can see.
+\end{example}
+
+As the horizon grows, the first move's gains grow with it, quickly at first, then less and less, until they stop changing (\cref{fig:horizon-gains}). The dots in the figure are the gains read back from the flights: a least-squares fit of the recorded first moves, when unsaturated, to the measured error and speed. They lie on the computed curves.
+
+\simfig{mpc_gains}{The stiffness $k_p$ and the damping $k_d$ of the first move, against the horizon. Dashed: computed from the prediction matrices. Dots: fitted to the first moves recorded in the ten flights. Dotted lines: the gains of the discrete-time LQR with the same weights. Beyond about \SI{0.8}{s} the plan is the LQR.}{fig:horizon-gains}
+
+\begin{example}[Where the gains stop]
+\label{ex:horizon-lqr}
+Find the limit of the gains for a long horizon, and estimate the horizon at which it is reached.
+
+\textbf{Step 1 — the limit.} An unconstrained plan of infinite length is the discrete-time LQR of Lesson~II.2 with the same weights, $Q = \diag(50, 5)$, $R = 0.05$, on the double integrator sampled at \SI{20}{ms} (\cref{thm:mpc-linear}). Solving its Riccati equation gives $K = [\,27.83 \;\; 11.54\,]$. The flight with $T_h = \SI{2}{s}$ fits $k_p = 27.95$, $k_d = 11.85$.
+
+\textbf{Step 2 — the closed loop.} With these gains $s^2 + 11.54s + 27.83 = 0$: roots $-8.10$ and $\SI{-3.43}{rad/s}$. The slow one is a time constant of $1/3.43 = \SI{0.29}{s}$.
+
+\textbf{Step 3 — how far the optimal plan matters.} After three time constants, \SI{0.87}{s}, the optimal unconstrained motion has decayed to $e^{-3} = 5\,\%$ of the error it started from. A plan longer than that adds terms that are almost zero whatever the first move is: they no longer change it.
+
+\textbf{Step 4 — check.} The computed $k_p$ is 25.75 at \SI{0.6}{s}, 27.27 at \SI{0.8}{s}, 27.68 at \SI{1}{s}: within 0.6\,\% of the limit at one second, which is where the arrival time stopped improving.
+\end{example}
+\didyouknow{The same three-time-constant rule sizes the window of a moving-horizon estimator, the dual of MPC: past data older than a few time constants of the error dynamics no longer change the estimate.}
+
+\begin{keyidea}[A horizon must cover the consequences]
+A plan can only value what it can see. If the horizon ends before the effect of the first move has played out, the controller underrates every input and acts timidly. Once the horizon covers the slowest part of the optimal response, a few of its time constants, extra length changes nothing.
+\end{keyidea}
+
+\screen[0 0 495 998]{horizon}{Lesson II.14 in the app at the start, with the \SI{2}{s} horizon. The information card reads 100 steps of \SI{20}{ms}; the chart header shows the controller's computing time per simulation step on the computer that took the picture.}{fig:horizon-screen}
+
+\section{The horizon must contain the brake}
+
+The ceiling makes a second demand on the horizon. The plan respects $y \le \SI{3.97}{m}$ only within its horizon; what happens after it, the plan does not know.
+
+\begin{example}[How long it takes to stop]
+\label{ex:horizon-brake}
+Find the shortest horizon for which the ceiling constraint alone is guaranteed to stop the drone in time, for the fastest climb of the sweep.
+
+\textbf{Step 1 — the fastest climb.} With $T_h \ge \SI{1}{s}$ the drone reaches \SI{3.48}{m/s}. The hardest braking the motors allow is to switch them off: a deceleration of $g$.
+
+\textbf{Step 2 — the stop.} From \SI{3.48}{m/s} at $g$: a time $3.48/9.81 = \SI{0.35}{s}$ and a distance $3.48^2/(2 \cdot 9.81) = \SI{0.62}{m}$.
+
+\textbf{Step 3 — what a plan sees.} A plan whose horizon is shorter than \SI{0.35}{s} predicts the drone's path for less time than it needs to stop. It may see nothing wrong in a state from which the ceiling can no longer be avoided: by the time the ceiling enters the horizon, braking at full strength comes too late.
+
+\textbf{Step 4 — why no flight crashed.} The short horizons never reached such a state, because they never climbed fast: \SI{0.92}{m/s} at most with \SI{0.1}{s}, \SI{2.57}{m/s} with \SI{0.3}{s}. Their timidity protected them. That is luck, not design: a plant pushed by a disturbance, or a heavier one, would not be so kind.
+\end{example}
+\pitfall{\enquote{The constraint is in the problem, so it is safe} is true only within the horizon. Safety needs the horizon to contain a way to stop, or a terminal constraint that says one exists.}
+
+\begin{watchout}
+The double integrator is forgiving: its short-horizon gains are small but positive, so every horizon flies, if slowly. For a plant that is unstable on its own, a short horizon without a terminal cost can give a first move too weak to stabilise it. The theorems below say when a long horizon, or the right terminal cost, removes that risk.
+\end{watchout}
+
+\section{What the horizon costs}
+
+\begin{example}[Counting the work]
+\label{ex:horizon-flops}
+Count the multiplications per solve for the horizons of \SI{2}{s} and \SI{0.5}{s}, from the code of \texttt{QpSolver} (\src{src/math/qp.ts}).
+
+\textbf{Step 1 — the size.} $N = 100$ inputs for \SI{2}{s}, $N = 25$ for \SI{0.5}{s}. The constraint matrix stacks the $N$ input bounds and the $N$ predicted altitudes: $2N$ rows of $N$ entries.
+
+\textbf{Step 2 — one ADMM iteration.} It multiplies by the constraint matrix and its transpose ($2 \cdot 2N^2$) and solves with the stored factorisation ($N^2$): about $5N^2$, that is \num{50000} for $N = 100$ and \num{3100} for $N = 25$.
+
+\textbf{Step 3 — one solve.} In the second after the jump the \SI{2}{s} plan needed 15.8 iterations on average, the warm start from the previous plan included: about $8 \times 10^5$ multiplications per solve, $4 \times 10^7$ per second at \SI{50}{Hz}.
+
+\textbf{Step 4 — the scaling.} Per iteration the cost grows with $N^2$: a quarter of the horizon is a sixteenth of the work. Building and factorising the matrix costs about $N^3$ more, but only once, because the matrices do not change from step to step.
+\end{example}
+\innumbers{Halving the horizon quarters the work per iteration. Going from \SI{2}{s} to \SI{0.6}{s} saves 91\,\% of it, and the arrival time grows from 1.41 to \SI{1.49}{s}.}
+
+The other way to bound the cost is to cap the iterations. With the \SI{2}{s} horizon and at most five iterations per solve, none of the solves in the two seconds after the jump reached the solver's tolerance, and 69\,\% of those in the twelve seconds after it. The thrust differed from the fully solved flight by up to \SI{1.5}{N}, the altitude by less than \SI{9}{mm}, and the drone still arrived after \SI{1.41}{s} without ever exceeding \SI{3.95}{m}. The warm start does most of the work: each plan begins from the previous one, shifted by a step, and that is already nearly optimal.
+
+
+\begin{inapp}
+\begin{itemize}[leftmargin=1.2em]
+  \item The horizon is \param{control.mpc.horizon} in seconds; with the re-planning rate \param{control.mpc.hz} it sets $N$ (\texttt{mpcTiming} in \src{src/control/mpc.ts}). The iteration cap is \param{control.mpc.iterations}.
+  \item The chart header shows \ui{controller … µs/step}: the time the controller took, averaged over the simulation steps. It depends on the computer; its ratio between two horizons does not.
+  \item The experiments of this chapter are \texttt{horizon-*} in \src{scripts/book-data.ts}; the gains of \cref{fig:horizon-gains} are computed and fitted in \texttt{book/tools/figs\_part2.py}.
+\end{itemize}
+\end{inapp}
+
+\begin{trythis}
+\begin{enumerate}
+  \item Shorten the horizon to 1, 0.5, 0.3 and \SI{0.1}{s}, resetting each time. Watch the computing time and the climb.
+  \item With \SI{0.1}{s}, set the set-point to \SI{3.95}{m} and wait. Does the drone ever arrive?
+  \item With \SI{2}{s}, cap the QP iterations at 5, then at 1.
+\end{enumerate}
+\predict{the shortest horizon that meets the goal is between two of the values in \cref{fig:horizon-sweep}. Which two, and how much computing time does it save compared with \SI{2}{s}?}
+\end{trythis}
+
+\section{The engineer's view: horizon and terminal cost}
+
+\subsection{The horizon in practice}
+Every MPC designer chooses $N$ and $\Delta t$ together: $N\Delta t$ must cover the slowest dynamics that matter, $\Delta t$ must resolve the fastest, and $N$ is what the processor pays for. The rule of this lesson, a few dominant time constants and at least the time to stop, is the usual starting point. Where the horizon must be short, the designer adds a \term{terminal cost}: a term that charges the plan's final state for everything the horizon leaves out. If that term is the cost-to-go of a controller that is known to work, the short plan behaves like a long one.
+
+\begin{example}[A car behind a stopped car]
+\label{ex:horizon-car}
+A car's MPC cruise control follows traffic at \SI{30}{m/s}. Assume it may brake at most at \SI{6}{m/s^2} and plans with steps of \SI{0.2}{s}. How long must its horizon be, and how many steps is that?
+
+\textbf{Step 1 — the stop.} $30/6 = \SI{5}{s}$ and $30^2/(2 \cdot 6) = \SI{75}{m}$.
+
+\textbf{Step 2 — the horizon.} As in Example~\ref{ex:horizon-brake}, a plan shorter than \SI{5}{s} can approach a stopped car without seeing that it can no longer stop: at least 25 steps of \SI{0.2}{s}.
+
+\textbf{Step 3 — the comparison.} The drone needed \SI{0.35}{s}: the car's horizon is fourteen times longer because its speed is nine times higher and its braking about two-thirds of the drone's.
+
+\textbf{Step 4 — the shortcut.} Many designs keep the horizon short and add a terminal constraint instead: the plan's last state must be one from which a full stop before the car ahead is still possible. That is the terminal set of the theorems below, made concrete.
+\end{example}
+
+\subsection{In formal terms}
+
+\begin{theorem}[A long enough horizon stabilises]
+\label{thm:horizon-long}
+Let $(A, B)$ be stabilisable and $(A, Q^{1/2})$ detectable, $R \succ 0$, and let $K_N$ be the first-move gain of the unconstrained MPC with horizon $N$ and no terminal cost. Then $K_N \to K_\infty$, the gain of the discrete-time LQR, and there is an $N_0$ such that $A - BK_N$ has all its eigenvalues inside the unit circle for every $N \ge N_0$.
+\end{theorem}
+\begin{proof}
+The first move of the $N$-step plan is the first move of finite-horizon LQR, $K_N = (R + B^\T P_{N-1}B)^{-1}B^\T P_{N-1}A$, where $P_{N-1}$ is obtained from $P_0 = Q$ by $N-1$ steps of the Riccati difference equation. Under the hypotheses, $P_k$ converges to the stabilising solution $P$ of the discrete algebraic Riccati equation (Anderson and Moore, 1990, ch.~3), so $K_N \to K_\infty$. The eigenvalues of $A - BK$ depend continuously on $K$, and those of $A - BK_\infty$ lie strictly inside the unit circle; hence they stay inside for $K$ close enough to $K_\infty$, that is, for $N$ large enough.
+\end{proof}
+
+\begin{theorem}[The right terminal cost makes any horizon optimal]
+\label{thm:horizon-terminal}
+Under the hypotheses of \cref{thm:horizon-long}, let the plan's cost be $\sum_{k=0}^{N-1}(\vx_k^\T Q\vx_k + \symbf u_k^\T R\symbf u_k)$ and add the terminal cost $\vx_N^\T P\vx_N$, with $P$ the stabilising solution of the discrete algebraic Riccati equation. Then, as long as no constraint is active, the first move of the $N$-step plan equals the LQR's, $\symbf u_0 = -K_\infty\vx_0$, for every $N \ge 1$.
+\end{theorem}
+\begin{proof}
+By dynamic programming the $N$-step problem is solved backwards: its cost-to-go at step $N$ is $\vx^\T P\vx$, and one Riccati step maps $P$ to itself, because $P$ is a fixed point of the Riccati equation. So the cost-to-go is $\vx^\T P\vx$ at every step, and every move, the first included, is the LQR's.
+\end{proof}
+
+\begin{theorem}[Terminal set: feasibility and stability with constraints]
+\label{thm:horizon-mayne}
+Suppose the terminal cost $V_f$ and a terminal set $\mathbb X_f$ satisfy: inside $\mathbb X_f$ some admissible feedback keeps the state in $\mathbb X_f$, respects all constraints and decreases $V_f$ by at least the stage cost. Then, if the MPC problem with the constraint $\vx_N \in \mathbb X_f$ is feasible once, it is feasible at every later step, and the optimal cost is a Lyapunov function of the closed loop (Mayne, Rawlings, Rao and Scokaert, 2000).
+\end{theorem}
+
+The simulator's MPC uses neither terminal cost nor terminal set, so \cref{thm:horizon-terminal,thm:horizon-mayne} do not apply to it. \Cref{thm:horizon-long} does, near the set-point: the measured gains converge as it predicts, and by \SI{0.8}{s} they are within 2\,\% of the LQR's. Far from the set-point the thrust limit is active for the first quarter of a second, the plan is no longer linear, and what replaces the theorem is Example~\ref{ex:horizon-brake}. The prediction of \cref{fig:horizon-sweep} is \SIrange{0.06}{0.12}{s} faster than the flights at every horizon: it is the linear law clipped to the motors' range, which ignores the motors' \SI{30}{ms} lag. In the flights with $T_h \ge \SI{1}{s}$ the command sits at \SI{24.4}{N} for \SI{0.24}{s}, but the thrust is above \SI{24.3}{N} for only \SI{0.09}{s}. Without terminal ingredients, long horizons also stabilise nonlinear and constrained plants under controllability conditions, with explicit bounds on how long is long enough (Grüne and Pannek, 2017).
+
+\begin{lookahead}
+\begin{itemize}[leftmargin=1.2em]
+  \item The next lesson flies MPC on all three axes of the quadrotor, with a \SI{1}{s} horizon over the planned figure-8; Lesson~II.16 plans \SI{1.5}{s} ahead by sampling instead of solving.
+  \item The terminal cost is the value function of dynamic programming, the subject of Lessons~IV.1--IV.4; the QP and the ADMM iteration counted in Example~\ref{ex:horizon-flops} are in Appendix~J.
+  \item The car of Example~\ref{ex:horizon-car} shows the rule on another vehicle: the horizon scales with the speed and inversely with the braking.
+\end{itemize}
+\end{lookahead}
+
+\begin{remember}
+\begin{itemize}
+  \item The horizon must cover the consequences of the first move: a few time constants of the optimal response. Here \SI{0.29}{s}, so beyond about \SI{0.8}{s} the plan is the LQR's.
+  \item A short horizon is timid, not unsafe: it underrates what thrust can do. At \SI{0.1}{s}, $k_p = 3.75$ instead of 27.8 and \SI{6.81}{s} to arrive instead of 1.41.
+  \item A state constraint protects only within the horizon: the horizon must contain the time to stop, \SI{0.35}{s} here, or a terminal set must stand in for it.
+  \item The work per iteration grows with $N^2$; warm starting makes a few iterations enough.
+  \item A terminal cost equal to the LQR's cost-to-go makes any horizon behave like an infinite one while no constraint is active.
+\end{itemize}
+\end{remember}
+
+\begin{curiosity}{The horizon effect}
+\sidephoto{deepblue}{0.3\linewidth}{A cabinet of IBM's Deep Blue at the Computer History Museum.}
+A chess program plays the way an MPC flies. From the current position it explores the moves it could make, the replies, its answers to the replies, down to a fixed depth; it scores the positions at the bottom of this tree with an evaluation function; it plays the first move of the best line, and when the opponent has replied, it searches again. The depth is its horizon, and the evaluation function is its terminal cost.
+
+Early programs had a characteristic weakness, which programmers called the \emph{horizon effect}. Faced with a loss it could not prevent, say a piece that was bound to be captured, a program with a fixed depth would make delaying moves, giving away pawns, until the capture fell beyond its horizon. The loss was still there; the program simply could no longer see it, and it paid for its blindness with the pawns. The remedies are the remedies of this lesson. Search deeper where it matters: a position in the middle of an exchange is searched until it is quiet. And make the terminal cost better: an evaluation that knows a trapped piece is lost needs no extra depth to see it.
+
+In May 1997 Deep Blue won a six-game match against the world champion Garry Kasparov. Its designers described a machine that combined a very fast search of the tree, carried by special-purpose chips, with extensions that searched forcing lines much deeper than the rest (Campbell, Hoane and Hsu, 2002). It is the same compromise the drone makes fifty times a second: look far enough to see the consequences, and no further than the computer can afford.
+\end{curiosity}
+
+\begin{exercises}
+\exercise[1] With steps of \SI{20}{ms}, how many decision variables and constraints does the QP have for the goal's horizon of \SI{0.6}{s}? By what factor is one ADMM iteration cheaper than with \SI{2}{s}?
+\answer{30 variables, 30 input bounds and 30 altitude bounds; $(100/30)^2 \approx 11$ times cheaper.}
+\exercise[1] The flight with $T_h = \SI{0.3}{s}$ climbs at up to \SI{2.57}{m/s}. How long and how far does it take to stop at $g$? Is \SI{0.3}{s} enough to see it?
+\answer{$2.57/9.81 = \SI{0.26}{s}$ and $2.57^2/19.62 = \SI{0.34}{m}$; \SI{0.3}{s} just covers the stop at that speed, but not at the \SI{3.48}{m/s} of the long horizons.}
+\exercise[2]\exkind{derive} For $T_h = \SI{0.2}{s}$ the computed gains are $k_p = 10.25$, $k_d = 9.51$. Find the roots of the closed loop and estimate the arrival time within \SI{5}{cm} as in Example~\ref{ex:horizon-short}. Compare with the flight's \SI{3.16}{s}.
+\answer{$s^2 + 9.51s + 10.25 = 0$: $s = -8.28$ and $-1.24$. $\ln(39)/1.24 = \SI{2.95}{s}$, about 7\,\% faster than the flight, for the same reasons as in the example.}
+\exercise[2]\exkind{derive}\label{ex:horizon-block} Move blocking. Restrict the \SI{0.1}{s} plan to a single input $u$ held over all five steps, ignore the velocity term, and minimise $\sum_{k=1}^{5} q_p(e + \tfrac12\tau_k^2u)^2 + 5r_uu^2$ with $\tau_k = k\Delta t$. Show that $u = -k e$ with $k = \tfrac12 q_p\sum\tau_k^2/(5r_u + \tfrac14 q_p\sum\tau_k^4)$ and evaluate it. Why is it smaller than the 3.75 of the full plan?
+\answer{Setting the derivative to zero gives the formula. $\sum\tau_k^2 = 0.022$, $\sum\tau_k^4 = 1.57\times10^{-4}$: $k = 0.55/(0.25 + 0.002) = 2.2$. A held input cannot spend more early, where it buys more; the free plan puts its largest move first, and only the first move is applied.}
+\exercise[2]\exkind{derive} Using the held input of Exercise~\ref{ex:horizon-block} with $N$ steps, show that its stiffness tends to zero as $T_h \to 0$, and find how fast.
+\answer{With $N$ steps, $\sum\tau_k^2 = \Delta t^2N(N+1)(2N+1)/6 \approx NT_h^2/3$ and $\sum\tau_k^4 \approx NT_h^4/5$. For small $T_h$ the input cost $Nr_u$ dominates the denominator, so $k \approx \tfrac12 q_p(NT_h^2/3)/(Nr_u) = q_pT_h^2/(6r_u)$: the stiffness vanishes like the square of the horizon (1.7 for \SI{0.1}{s} with these weights).}
+\exercise[2]\exkind{fly} In the lesson, with the \SI{2}{s} horizon, cap \param{control.mpc.iterations} at 5. Does the drone still respect the ceiling? Does it arrive later? Then try 1.
+\answer{With 5 iterations (experiment \texttt{horizon-cap5}): arrival after \SI{1.41}{s} as before, never above \SI{3.95}{m}; none of the solves in the first two seconds converges, the thrust differs by up to \SI{1.5}{N}, the altitude by less than \SI{9}{mm}. With 1 iteration the plan barely moves from its warm start: expect a slower, rougher climb; the clip to the input bounds still holds, but the altitude constraint is no longer guaranteed.}
+\exercise[2]\exkind{code} Add a terminal cost to \texttt{AxisMpc} (\src{src/control/mpc.ts}): a weight $\vx_N^\T P\vx_N$ on the last predicted position and velocity, with $P$ from the discrete Riccati equation. Which two quantities in \texttt{build} and \texttt{solve} change? What should the \SI{0.1}{s} horizon then do?
+\answer{The Hessian \texttt{h} gains $2\,[g_{p,N}\;g_{v,N}]^\T P\,[g_{p,N}\;g_{v,N}]$ from the last rows of \texttt{gp} and \texttt{gv}; the linear term \texttt{q} gains $2\,[g_{p,N}\;g_{v,N}]^\T P\,(\bar{\vx}_N - \vx_{ref,N})$. By \cref{thm:horizon-terminal} the short plan then flies like the LQR while unconstrained, and arrives in about \SI{1.4}{s}.}
+\exercise[3]\exkind{derive} Prove \cref{thm:horizon-terminal} for $N = 1$ directly: minimise the stage cost $\vx_0^\T Q\vx_0 + \symbf u_0^\T R\symbf u_0$ plus the terminal cost $\vx_1^\T P\vx_1$ over $\symbf u_0$, and show that the minimiser is $-K_\infty\vx_0$ and the minimum $\vx_0^\T P\vx_0$.
+\answer{Minimise $\symbf u^\T R\symbf u + (A\vx_0 + B\symbf u)^\T P(A\vx_0 + B\symbf u)$: the gradient gives $\symbf u = -(R + B^\T PB)^{-1}B^\T PA\vx_0 = -K_\infty\vx_0$, the LQR gain by definition; the Riccati equation guarantees that the resulting cost is $\vx_0^\T P\vx_0$.}
+\exercise[3] Repeat Example~\ref{ex:horizon-car} for a truck at \SI{25}{m/s} braking at \SI{4}{m/s^2}, with an MPC that has a budget of 40 steps. What step length must it use, and what does it lose?
+\answer{Stop in \SI{6.25}{s} and \SI{78}{m}; 40 steps then need $\Delta t \ge \SI{0.16}{s}$. Longer steps resolve fast events (a cut-in, the brake's own lag) less well; the alternative is a terminal constraint with a shorter horizon.}
+\end{exercises}

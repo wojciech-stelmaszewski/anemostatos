@@ -65,6 +65,9 @@ PHOTOS = {
     "ingenuity-shadow": "File:Ingenuity's First Black-and-White Image From the Air.jpg",
     "ingenuity-wright": "File:PIA24438-MarsIngenuityHelicopter-WrightBros1stPlaneSwatch-20210406.jpg",
     "ingenuity-blade": "File:PIA26243-MarsIngenuity-DamagedRotorBladeShadow-20240118.jpg",
+    "deepblue": "File:IBM Deep Blue at Computer History Museum (9361685537).jpg",
+    "refinery": "File:Control room at an early ACS petroleum refinery installation.jpg",
+    "fermiac": "File:STAN ULAM HOLDING THE FERMIAC.jpg",
 }
 
 # Fractions to trim (left, top, right, bottom): scan borders and printed captions.

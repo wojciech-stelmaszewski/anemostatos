@@ -471,5 +471,38 @@
    2200,
    1631
   ]
+ },
+ "deepblue": {
+  "title": "File:IBM Deep Blue at Computer History Museum (9361685537).jpg",
+  "artist": "Anton Chiang from Cupertino, CA, USA",
+  "credit": "Computer History Museum",
+  "license": "CC BY 2.0",
+  "page": "https://commons.wikimedia.org/wiki/File:IBM_Deep_Blue_at_Computer_History_Museum_(9361685537).jpg",
+  "size": [
+   1067,
+   1600
+  ]
+ },
+ "refinery": {
+  "title": "File:Control room at an early ACS petroleum refinery installation.jpg",
+  "artist": "Gerryrkirk",
+  "credit": "Own work",
+  "license": "CC BY-SA 4.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Control_room_at_an_early_ACS_petroleum_refinery_installation.jpg",
+  "size": [
+   2000,
+   1329
+  ]
+ },
+ "fermiac": {
+  "title": "File:STAN ULAM HOLDING THE FERMIAC.jpg",
+  "artist": "Los Alamos National Laboratory, report LA-UR-00-2532 (uploaded by Deer*lake)",
+  "credit": "Originally uploaded on en.wikipedia",
+  "license": "Public domain",
+  "page": "https://commons.wikimedia.org/wiki/File:STAN_ULAM_HOLDING_THE_FERMIAC.jpg",
+  "size": [
+   549,
+   627
+  ]
  }
 }

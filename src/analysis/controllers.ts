@@ -8,7 +8,7 @@ import type { PidGains } from '@/control/pid';
 import { periodSteps } from '@/control/types';
 import { PHYS_DT } from '@/engine/simulation';
 import { esoMatrices } from '@/estimation/eso';
-import { series, type Lti } from '@/math/lti';
+import { gain, series, type Lti } from '@/math/lti';
 import { shapingLti } from './shaping';
 import { lowPassAlpha } from '@/math/util';
 import type { Params } from '@/sim/params';
@@ -165,6 +165,14 @@ export function l1ControllerModel(p: Params): Lti | null {
       return lqrModel(p, T);
     case 'adrc':
       return adrcModel(p, T);
+    case 'smc': {
+      // Inside the boundary layer |s| < φ: u = m̂·λ·(−v) + (k/φ)·(λ·(r − y) − v).
+      const c = p.control.smc;
+      if (!(c.phi > 0)) return null;
+      const g = c.k / c.phi;
+      const mHat = p.control.model.mass;
+      return gain([[-g * c.lambda, -(g + mHat * c.lambda), 0, g * c.lambda]], T);
+    }
     case 'hinf': {
       // Inputs (y, r) of the design spread over the four inputs of the loop: (y, v, F, r).
       const g = hinfControllerLti(designHinf(p, T));

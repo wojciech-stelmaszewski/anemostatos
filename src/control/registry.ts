@@ -3,6 +3,8 @@ import { AdrcController } from './adrc';
 import { AltitudeController } from './altitude';
 import { FaultTolerantController } from './fault';
 import { HinfController } from './hinf';
+import { MracController } from './mrac';
+import { SlidingModeController } from './smc';
 import { CascadeController } from './cascade';
 import { WithAltitudeKalman } from './estimated';
 import { L1AdaptiveController } from './l1ac';
@@ -42,7 +44,11 @@ export function makeController(p: Params): Controller {
                 ? new L1AdaptiveController()
                 : kind === 'hinf'
                   ? new HinfController()
-                  : new AltitudeController();
+                  : kind === 'smc'
+                    ? new SlidingModeController()
+                    : kind === 'mrac'
+                      ? new MracController()
+                      : new AltitudeController();
       return p.control.l1.estimator === 'kalman' ? new WithAltitudeKalman(c) : c;
     }
     case 2:

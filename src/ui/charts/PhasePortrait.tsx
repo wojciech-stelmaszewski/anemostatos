@@ -212,6 +212,31 @@ export function PhasePortrait({ meta, lyapunov = false }: { meta: LoopMeta; lyap
         ctx.fillText('floor', X(rg.h) - 4 * dpr, 24 * dpr);
       }
 
+      // Sliding mode: the line s = ė + λ·e = 0, and the boundary layer |s| < φ around it.
+      const P = sim.params;
+      if (P.sim.level === 1 && P.control.l1.kind === 'smc' && meta.id === 'alt') {
+        const { lambda, phi } = P.control.smc;
+        const line = (off: number) => {
+          ctx.beginPath();
+          ctx.moveTo(X(-span.e), Y(lambda * span.e + off));
+          ctx.lineTo(X(span.e), Y(-lambda * span.e + off));
+          ctx.stroke();
+        };
+        ctx.strokeStyle = 'rgba(57,135,229,0.85)';
+        ctx.lineWidth = 1.5 * dpr;
+        line(0);
+        if (phi > 0) {
+          ctx.setLineDash([3 * dpr, 3 * dpr]);
+          ctx.lineWidth = dpr;
+          line(phi);
+          line(-phi);
+          ctx.setLineDash([]);
+        }
+        ctx.fillStyle = INK;
+        ctx.textAlign = 'left';
+        ctx.fillText('s = 0', X(-span.e * 0.92), Y(lambda * span.e * 0.92) + 12 * dpr);
+      }
+
       if (ghost) {
         ctx.strokeStyle = SIGNAL.ghost;
         ctx.lineWidth = 1.2 * dpr;

@@ -3,7 +3,7 @@ import { defaultGains, type PidGains } from '@/control/pid';
 export type Level = 1 | 2 | 3;
 
 /** Controller families selectable per level (docs/beyond-pid.md §3.2). Part II adds more. */
-export type L1Kind = 'pid' | 'lqr' | 'adrc' | 'mpc' | 'l1ac' | 'hinf';
+export type L1Kind = 'pid' | 'lqr' | 'adrc' | 'mpc' | 'l1ac' | 'hinf' | 'smc' | 'mrac';
 /** State estimator in front of the L1 controller. */
 export type L1Estimator = 'none' | 'kalman';
 export type L3Outer = 'pid-cascade' | 'geometric' | 'mpc' | 'mppi' | 'policy';
@@ -298,6 +298,24 @@ export interface ControlParams {
    * (the lead is off while ω_z is 0) and γ/γ_min.
    */
   hinf: { k: number; wi: number; wz: number; wp: number; gammaFactor: number };
+  /**
+   * Sliding mode (src/control/smc.ts): slope λ of the line s = ė + λe (1/s), switching force k
+   * (N) and the boundary layer φ (m/s; 0 = pure sign).
+   */
+  smc: { lambda: number; k: number; phi: number };
+  /**
+   * MRAC (src/control/mrac.ts): the reference model ÿ = kp·(r − y) − kd·ẏ; γ (with a weight per
+   * gain) adapts the two feedback gains, γ_g the hover thrust; σ of the σ-modification (0 = none).
+   */
+  mrac: {
+    kp: number;
+    kd: number;
+    gamma: number;
+    gammaP: number;
+    gammaD: number;
+    gammaG: number;
+    sigma: number;
+  };
   /** L3 INDI (rate stage and acceleration compensation). */
   indi: {
     /** α_des = K·(ω_sp − ω), 1/s. */
@@ -562,6 +580,8 @@ export const defaultParams = (): Params => ({
     },
     shaping: { leadZHz: 0, leadPHz: 0, lagZHz: 0, lagPHz: 0, notchHz: 0, notchQ: 2 },
     hinf: { k: 15, wi: 1, wz: 0, wp: 0, gammaFactor: 1.05 },
+    smc: { lambda: 3, k: 6, phi: 0 },
+    mrac: { kp: 9, kd: 6, gamma: 1, gammaP: 1, gammaD: 1, gammaG: 10, sigma: 0 },
     adrc: { wc: 3, wo: 15 },
     l1ac: { as: 20, filterHz: 5, wc: 3 },
     residual: { forgetting: 0.995, filterHz: 10 },

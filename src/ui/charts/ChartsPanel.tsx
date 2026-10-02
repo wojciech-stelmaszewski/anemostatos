@@ -36,6 +36,7 @@ const EXTRA: { value: ExtraChart; label: string }[] = [
   { value: 'fdi', label: 'fault detection' },
   { value: 'heading', label: 'heading estimate' },
   { value: 'nav', label: 'navigation filter' },
+  { value: 'mrac', label: 'MRAC parameters' },
   { value: 'describing', label: 'describing function' },
 ];
 /** What can stand in the motor chart's place. */
@@ -45,6 +46,12 @@ const SECOND: { value: AnalysisChart | 'motors'; label: string }[] = [
   { value: 'nyquist', label: 'Nyquist plot' },
   { value: 'poles', label: 'pole map' },
   { value: 'covariance', label: 'filter uncertainty' },
+];
+/** Lesson III.17: the adapted parameters of MRAC. */
+const MRAC_THETA: SeriesSpec[] = [
+  { key: 'mrac.theta.p', label: 'θ̂ position gain', color: SIGNAL.p, width: 2 },
+  { key: 'mrac.theta.d', label: 'θ̂ velocity gain', color: SIGNAL.d, width: 2 },
+  { key: 'mrac.theta.g', label: 'θ̂ hover thrust', color: SIGNAL.i, width: 2 },
 ];
 /** Lesson III.23: the heading error, and the MEKF's own 2σ for it. */
 const HEADING: SeriesSpec[] = [
@@ -360,6 +367,8 @@ export function ChartsPanel() {
             series={FAULT}
             includeZero
           />
+        ) : extra === 'mrac' ? (
+          <TimeChart title="MRAC: the adapted parameters" series={MRAC_THETA} includeZero />
         ) : extra === 'heading' ? (
           <TimeChart
             title="Heading error (shaded: magnetometer rejected)"

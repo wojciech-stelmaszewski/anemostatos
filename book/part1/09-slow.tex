@@ -104,7 +104,7 @@ How much sensor delay can the default altitude loop take?
   T_{max} = \frac{\mathrm{PM}}{\omega_c} = \frac{1.094}{7.04} = \SI{0.155}{s}.
 \end{equation}
 
-\textbf{Step 4 — what happens at the limit.} The loop oscillates at the crossover frequency,\tip{At the edge of stability a loop rings at its crossover frequency. Time the ringing of a badly behaved loop and you have measured $\omega_c$.} $\omega_c = \SI{7.04}{rad/s}$: a period of $2\pi/7.04 = \SI{0.89}{s}$.
+\textbf{Step 4 — what happens at the limit.} The loop oscillates at the crossover frequency,\tip[-45pt]{At the edge of stability a loop rings at its crossover frequency. Time the ringing of a badly behaved loop and you have measured $\omega_c$.} $\omega_c = \SI{7.04}{rad/s}$: a period of $2\pi/7.04 = \SI{0.89}{s}$.
 
 \textbf{Step 5 — check} (\cref{fig:slow-predict}, left). Flown with 130, 150, 170 and \SI{200}{ms} of delay, the step responses ring with periods of 0.79, 0.86, 0.92 and \SI{1.08}{s}; the model predicts 0.82, 0.88, 0.94 and \SI{1.03}{s}. At \SI{130}{ms} the ringing decays; at \SI{170}{ms} it grows until the motors saturate. The threshold lies between them, where \cref{eq:slow-dm} puts it.
 \end{example}

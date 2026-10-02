@@ -603,6 +603,17 @@ for (const wo of [4, 6, 8, 10, 15, 20, 25, 30, 40, 50, 60, 70])
       p.sensors.posNoise = 0.02;
     },
   });
+for (const wo of [40, 60, 100, 150, 250])
+  add({
+    name: `adrcbw-clean-wo${wo}`,
+    seconds: 20,
+    setup: (p) => {
+      calm(p);
+      p.control.l1.kind = 'adrc';
+      p.control.adrc.wo = wo;
+    },
+    events: (s) => at(s, 12, 'setpoint.y', 2.5),
+  });
 const damaged = (p: Params) => {
   l3(p);
   calm(p);

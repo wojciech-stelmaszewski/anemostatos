@@ -313,3 +313,79 @@ def adrc_payload():
     b.set_xlim(-2, 8)
     xlab_time(b, "time after the payload lands  [s]")
     save(f, "adrc_payload")
+
+
+# ─── Lesson II.6 ───────────────────────────────────────────────────────────
+def _adrc_loop(wo, wc=3.0, tau=0.03, dt=0.004):
+    """The sampled ADRC loop as matrices: plant with motor lag (ZOH), exact discrete ESO, law."""
+    def c2d(A, B):
+        n, m = A.shape[0], B.shape[1]
+        M = np.zeros((n + m, n + m))
+        M[:n, :n] = A * dt
+        M[:n, n:] = B * dt
+        E_ = expm(M)
+        return E_[:n, :n], E_[:n, n:]
+    Pd, Pb = c2d(np.array([[0, 1, 0], [0, 0, 1], [0, 0, -1 / tau]]), np.array([[0], [0], [1 / tau]]))
+    L = np.array([3 * wo, 3 * wo**2, wo**3])
+    Od, Ob = c2d(np.array([[-L[0], 1, 0], [-L[1], 0, 1], [-L[2], 0, 0]]),
+                 np.array([[0, L[0]], [1, L[1]], [0, L[2]]]))
+    return Pd, Pb, Od, Ob, np.array([wc * wc, 2 * wc, 1.0])
+
+
+def _adrc_noise_jitter(wo, sigma=0.02, N=4000):
+    """RMS change of the thrust over 10 ms caused by white altimeter noise, from the impulse response."""
+    Pd, Pb, Od, Ob, K = _adrc_loop(wo)
+    x = np.zeros(3)
+    z = np.zeros(3)
+    up = 0.0
+    h = []
+    for k in range(N):
+        y = x[0] + (1.0 if k == 0 else 0.0)
+        z = Od @ z + Ob[:, 0] * up + Ob[:, 1] * y
+        u = -K @ z
+        h.append(u)
+        x = Pd @ x + Pb[:, 0] * u
+        up = u
+    h = np.array(h)
+
+    def var_d(j):
+        d = np.r_[h, np.zeros(j)] - np.r_[np.zeros(j), h]
+        return (d**2).sum()
+    return sigma * np.sqrt(0.5 * var_d(2) + 0.5 * var_d(3))
+
+
+@fig
+def adrcbw_score():
+    wos = [4, 6, 8, 10, 15, 20, 25, 30, 40, 50, 60, 70]
+    rms, jit = [], []
+    for wo in wos:
+        d = load(f"adrcbw-wo{wo}")
+        m = d.t >= 20
+        e = (d["sp.y"] - d["pos.y"])[m].values
+        u = d["alt.u"][m].values
+        rms.append(100 * np.sqrt((e**2).mean()))
+        jit.append(np.sqrt((np.diff(u) ** 2).mean()))
+    rms, jit = np.array(rms), np.array(jit)
+    f, (a, b) = plt.subplots(1, 2, figsize=(TEXT_W, 62 * MM), gridspec_kw=dict(wspace=0.3))
+    wm = np.geomspace(4, 45, 60)
+    a.loglog(wos, jit, "o", color=C["P"], ms=3, label="thrust jitter [N]")
+    a.loglog(wm, [_adrc_noise_jitter(w) for w in wm], color=C["P"], lw=0.8, ls=(0, (3, 2)))
+    a.loglog(wos, rms, "o", color=C["meas"], ms=3, label="RMS error [cm]")
+    a.legend(loc="upper left")
+    a.set_title("The two halves of the score")
+    a.set_xlabel("$\\omega_o$  [rad/s]", loc="right")
+    a.grid(True, which="major", axis="both")
+    score = rms + 10 * jit
+    b.semilogy(wos, score, "o-", color=C["ink"], ms=3, lw=0.9)
+    b.axhline(7.5, color=C["I"], lw=0.7, ls=(0, (4, 2.5)))
+    b.text(45, 6.0, "goal: 7.5", fontsize=6.4, color=C["I"])
+    k = int(np.argmin(score))
+    b.plot(wos[k], score[k], "o", color=C["accent"], ms=4.5, zorder=5)
+    b.text(wos[k] * 1.1, score[k] * 0.62, f"best: $\\omega_o = {wos[k]}$", fontsize=6.4, color=C["accent"])
+    b.axvspan(35, 72, color=C["sat"], alpha=0.6, lw=0, zorder=0)
+    b.text(37, 120, "noise saturates\nthe motors", fontsize=6.2, color=C["err"])
+    b.set_xscale("log")
+    b.set_title("Score = error [cm] + 10 $\\times$ jitter [N]")
+    b.set_xlabel("$\\omega_o$  [rad/s]", loc="right")
+    b.grid(True, which="major", axis="both")
+    save(f, "adrcbw_score")

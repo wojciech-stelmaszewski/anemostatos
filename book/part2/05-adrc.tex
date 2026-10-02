@@ -10,7 +10,7 @@ Write Newton's law of the drone with the controller's belief $\hat m$ and gather
 \begin{equation}\label{eq:adrc-model}
   \ddot y = b_0\,(u - u_{known}) + f, \qquad b_0 = \frac{1}{\hat m}, \qquad u_{known} = \hat m g .
 \end{equation}
-The term $u_{known}$ is the feedforward of Part~I. Everything else that accelerates the drone is $f$, the \term{total disturbance}: the drag, the wind, the error in $\hat m$, the motor lag, a payload. If the model were perfect and the air still, $f$ would be zero. It never is, and ADRC does not care why.
+The term $u_{known}$ is the feedforward of Part~I. Everything else that accelerates the drone is $f$, the \term{total disturbance}: the drag, the wind, the error in $\hat m$, the motor lag, a payload. If the model were perfect and the air still, $f$ would be zero. It never is, and ADRC does not care why.\didyouknow{Many robust methods try to bound the unknown. ADRC estimates it instead — the difference between preparing for the worst and looking at what is happening.}
 
 The idea is to treat $f$ like a state. Not knowing how it will change, assume the simplest thing — that it stays constant, $\dot f = 0$ — and append it to the state of the plant. The \term{extended state}
 \begin{equation}\label{eq:adrc-ext}
@@ -28,7 +28,7 @@ An \term{observer} is a copy of the model that runs alongside the plant and is s
   \dot{\hat{\vx}} = A\hat{\vx} + B\,(u - u_{known}) + L\,(y - \hat y), \qquad
   L = \begin{pmatrix} 3\omega_o\\ 3\omega_o^2\\ \omega_o^3\end{pmatrix} .
 \end{equation}
-The first two terms are the model; the last pushes the copy towards the measured altitude, with three gains. Their particular values place all three poles of the observer at $-\omega_o$, as the next example shows. The single number $\omega_o$, the \term{observer bandwidth}, says how quickly the observer believes the sensor.
+The first two terms are the model; the last pushes the copy towards the measured altitude, with three gains. Their particular values place all three poles of the observer at $-\omega_o$, as the next example shows.\pitfall{\enquote{$\dot f = 0$} is a modelling assumption, not a fact. A disturbance that changes quickly — a sharp gust — is seen with a lag of a few $1/\omega_o$.} The single number $\omega_o$, the \term{observer bandwidth}, says how quickly the observer believes the sensor.
 
 \begin{example}[How fast the observer sees a new force]
 \label{ex:adrc-eso}
@@ -58,7 +58,7 @@ With $\hat f$ known, the control law subtracts it and controls what is left — 
 \end{equation}
 If the estimates were exact, inserting \cref{eq:adrc-law} into \cref{eq:adrc-model} would give $\ddot y = \omega_c^2(r - y) - 2\omega_c\dot y$: the loop $(s + \omega_c)^2$, critically damped by design, whatever $f$ is. In the units of Part~I the PD part has $K_p = \omega_c^2\hat m = \SI{9}{N/m}$ and $K_d = 2\omega_c\hat m = \SI{6}{N.s/m}$ — a slightly softer spring than the default PID's.
 
-Two knobs remain, both in radians per second and both with a meaning: how fast the loop should respond, $\omega_c$, and how fast the observer should believe the sensor, $\omega_o$. The model is a single number, $b_0$.\tip{A rule of thumb from the ADRC literature: $\omega_o$ three to ten times $\omega_c$. The observer must be quicker than the loop it serves — but not so quick that it believes the noise (Lesson~II.6).}
+Two knobs remain, both in radians per second and both with a meaning: how fast the loop should respond, $\omega_c$, and how fast the observer should believe the sensor, $\omega_o$. The model is a single number, $b_0$.\innumbers{The default tune: $\omega_c = 3$, $\omega_o = 15$. Five times faster to see a disturbance than to act on a setpoint.}\tip{A rule of thumb from the ADRC literature: $\omega_o$ three to ten times $\omega_c$. The observer must be quicker than the loop it serves — but not so quick that it believes the noise (Lesson~II.6).}
 
 \begin{example}[The payload, predicted]
 \label{ex:adrc-payload}
@@ -123,7 +123,7 @@ ADRC was born in industrial motion control. An electric motor with the inertia $
 
 \textbf{Step 4 — the dip.} Simulating plant and observer: the speed dips by \SI{0.32}{rad/s}, \SI{3}{ms} after the load appears, and returns to the setpoint within tens of milliseconds.
 
-\textbf{Step 5 — the alternative.} A proportional controller $u = \omega_cJ\,(r - \omega)$ has the same loop bandwidth and settles \SI{1}{rad/s} low for as long as the load stays, $0.5/(50 \cdot 0.01)$. Adding a PI would remove the offset in a few loop time constants; the observer removes it within a few observer time constants, four times faster here. This is why ADRC found its first large market in servo drives, where loads change abruptly and no model of them exists.
+\textbf{Step 5 — the alternative.} A proportional controller $u = \omega_cJ\,(r - \omega)$ has the same loop bandwidth and settles \SI{1}{rad/s} low for as long as the load stays, $0.5/(50 \cdot 0.01)$. Adding a PI would remove the offset in a few loop time constants; the observer removes it within a few observer time constants, four times faster here. This is why ADRC found its first large market in servo drives, where loads change abruptly and no model of them exists.\tip{For a first-order plant the observer has two states and two gains, $(2\omega_o, \omega_o^2)$. The order of the observer is the order of the model plus one.}
 \end{example}
 
 \subsection{In formal terms}

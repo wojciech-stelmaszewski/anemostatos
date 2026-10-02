@@ -156,7 +156,7 @@ While an actuator is saturated, the loop is open: the plant receives the same in
   \item Wait until it settles, then press \ui{Snapshot} (\key{S}).
   \item Set \ui{Anti-windup} to \ui{conditional integration}, press \key{R}. The grey ghost is the old run.
   \item Try \ui{back-calculation}, then change its gain $K_b$ from 2 to 0.3. Compare with \cref{tab:windup}.
-  \item Try \ui{integral limit} with limit 10, then 3. Then make the drone heavier (\ui{Physics\then Mass} = \SI{1.2}{kg}, which the controller does not know) with the limit at 1. What goes wrong?
+  \item Try \ui{integral limit} with limit 10, then 3. Then make the drone heavier (\ui{Physics\then True mass} = \SI{1.2}{kg}, which the controller does not know) with the limit at 1. What goes wrong?
 \end{enumerate}
 \predict{with anti-windup off, does a bigger $K_i$ make the overshoot bigger or smaller? By how much, for $K_i = 6$? (Step~6 of Example~\ref{ex:windup-size}.)}
 \end{trythis}\index{anti-windup|)}

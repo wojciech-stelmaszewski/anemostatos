@@ -178,7 +178,7 @@ Feedforward acts on what you know, before any error exists. Feedback acts on wha
 
 \begin{inapp}
 \begin{itemize}[leftmargin=1.2em]
-  \item The lesson sets \param{control.feedforward = false} and \param{control.alt.iOn = false}. The switch is \ui{Controller\then Gravity feedforward}; the assumed mass $\hat m$ is \param{control.model.mass}.
+  \item The lesson sets \param{control.feedforward = false} and \param{control.alt.iOn = false}. The switch is \ui{Altitude PID\then Gravity feedforward}; the assumed mass $\hat m$ is \param{control.model.mass}.
   \item The feedforward is added in \src{src/control/altitude.ts}: the altitude loop passes $\hat m g$ to the PID as its \texttt{ff} argument, and the PID reports it as its own coloured part, \FFt.
   \item The info card always prints the \ui{predicted e\_ss}: the part of the weight the feedforward does not carry, divided by $K_p$ — $mg/K_p$ without feedforward, $(m - \hat m)g/K_p$ with it — or \enquote{0 (I term on)}. It is computed in \src{src/ui/charts/InfoCard.tsx}, exactly as in Examples~\ref{ex:droop-ess} and \ref{ex:droop-ff}.
 \end{itemize}

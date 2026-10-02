@@ -145,7 +145,7 @@ The rule of thumb (\SI{6.5}{Hz}) and the exact calculation (\SI{5.9}{Hz}) agree 
 
 \begin{inapp}
 \begin{itemize}[leftmargin=1.2em]
-  \item \ui{Controller\then Controller rate} (\param{control.rateHz}) sets how often the L1/L2 controller runs; the simulation always steps at \SI{1}{kHz} and the command is held in between (\src{src/engine/simulation.ts}: the controller decides itself when to sample).
+  \item \ui{Altitude PID\then Controller rate} (\param{control.rateHz}) sets how often the L1/L2 controller runs; the simulation always steps at \SI{1}{kHz} and the command is held in between (\src{src/engine/simulation.ts}: the controller decides itself when to sample).
   \item \ui{Sensors\then Delay} (\param{sensors.delayMs}) returns readings from a ring buffer of past states (\src{src/sim/sensors.ts}).
   \item \key{.} (full stop) single-steps the simulation by one controller period while paused: at a low rate you can watch each new command appear.
 \end{itemize}

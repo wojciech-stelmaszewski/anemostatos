@@ -83,7 +83,7 @@ An observer can estimate anything that leaves a trace in the measurements. ADRC 
 
 \begin{inapp}
 \begin{itemize}[leftmargin=1.2em]
-  \item The switch is \ui{Controller\then L1 controller\then ADRC}; the bandwidths are \param{control.adrc.wc} and \param{control.adrc.wo}, and $b_0 = 1/\hat m$ comes from \param{control.model.mass}.
+  \item The switch is \ui{Controller\then Altitude controller\then ADRC}; the bandwidths are \param{control.adrc.wc} and \param{control.adrc.wo}, and $b_0 = 1/\hat m$ comes from \param{control.model.mass}.
   \item The observer is \src{src/estimation/eso.ts}, discretised exactly at the loop's rate with the matrix exponential (Appendix~D), so that high bandwidths remain numerically stable. The controller is \src{src/control/adrc.ts}.
   \item The observer is fed the thrust that was \emph{applied}, after the motor limits. Fed the command instead, it would interpret the thrust it did not get as a disturbance and wind up — ADRC's form of anti-windup (\lessonref{les:windup}).
   \item The true disturbance is recorded by the simulator as $\hat m\dot v - T + \hat mg$, the force the nominal model cannot explain (telemetry \texttt{dist.y}); the estimate is converted to the same definition (\texttt{est.dist.y}).

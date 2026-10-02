@@ -106,7 +106,7 @@ For the drone, \enquote{\SI{10}{cm} of error, \SI{1}{m/s} of speed and \SI{5}{N}
 \begin{inapp}
 \begin{itemize}[leftmargin=1.2em]
   \item The controller is \src{src/control/lqr.ts}. The function \texttt{designLqr} builds the model, discretises it exactly at the controller's period (\texttt{c2d} in \src{src/math/mat.ts}, Appendix~D) and solves the discrete Riccati equation by iteration (\texttt{dlqr} in \src{src/math/riccati.ts}).
-  \item The weights are \param{control.lqr.qPos}, \param{qVel} and \param{r}; the switch is \ui{Controller\then L1 controller\then LQR}. The gains are recomputed only when a weight, the model or the rate changes.
+  \item The weights are \param{control.lqr.qPos}, \param{qVel} and \param{r}; the switch is \ui{Controller\then Altitude controller\then LQR / LQI}. The gains are recomputed only when a weight, the model or the rate changes.
   \item The info card lists the gains, the closed-loop poles (the eigenvalues of the discrete $A - BK$, converted with $s = \ln z/\Delta t$) and the dominant $\omega_n$ and $\zeta$.
   \item The ghost is flown headlessly when the lesson starts, with the same seed; the goal compares the peak thrust with the ghost's.
 \end{itemize}

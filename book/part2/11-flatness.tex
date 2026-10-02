@@ -76,7 +76,7 @@ What remains is what the feedforward does not know: the motors' lag, the rotor d
 
 \begin{inapp}
 \begin{itemize}[leftmargin=1.2em]
-  \item The outer stage is \ui{Controller\then Outer loops\then geometric tracking} (\param{control.l3.outer = 'geometric'}); the switch is \ui{Geometric tracking\then Trajectory feedforward} (\param{control.geometric.feedforward}); the gains are \param{control.geometric.kp}, \param{kv} and \param{ki}.
+  \item The outer stage is \ui{Controller\then Outer stage\then geometric tracking (Lee)} (\param{control.l3.outer = 'geometric'}); the switch is \ui{Geometric tracking\then Trajectory feedforward} (\param{control.geometric.feedforward}); the gains are \param{control.geometric.kp}, \param{kv} and \param{ki}.
   \item The law is \texttt{GeometricOuter} in \src{src/control/geometric.ts}; \cref{eq:flatness-rates} is \texttt{flatnessRates} in the same file.
   \item The reference's derivatives up to the jerk come from \texttt{profileOffset} in \src{src/engine/reference.ts}, analytically for the figure-8.
 \end{itemize}

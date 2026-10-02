@@ -551,3 +551,39 @@ def geometric_flip():
     b.set_ylabel("m")
     b.set_xlabel("time after the flip [s]", loc="right")
     save(f, "geometric_flip")
+
+
+@fig
+def flatness_eight():
+    f, (a, b) = plt.subplots(1, 2, figsize=(TEXT_W, 64 * MM), gridspec_kw=dict(wspace=0.3, width_ratios=[1.15, 1]))
+    t0 = 40 - 8.9
+    ref = win(load("flat-geo-ff"), t0, 40)
+    a.plot(ref["sp.x"], ref["sp.z"], color=C["sp"], lw=2.2, alpha=0.5, label="reference")
+    runs = (
+        ("pid", C["ghost"], "PID cascade"),
+        ("geo", C["err"], "geometric, feedback only"),
+        ("geo-ff", C["meas"], "geometric + flatness feedforward"),
+    )
+    for tag, col, lab in runs:
+        d = win(load(f"flat-{tag}"), t0, 40)
+        a.plot(d["pos.x"], d["pos.z"], color=col, lw=0.9, label=lab)
+        e = np.sqrt((d["pos.x"] - d["sp.x"]) ** 2 + (d["pos.z"] - d["sp.z"]) ** 2 + (d["pos.y"] - d["sp.y"]) ** 2)
+        b.semilogy(d.t - t0, 100 * e, color=col, lw=0.9)
+    a.set_aspect("equal")
+    a.set_xlim(-2.6, 2.6)
+    a.set_ylim(-1.9, 1.9)
+    a.set_title("The last lap, seen from above")
+    a.set_xlabel("x [m]", loc="right")
+    a.set_ylabel("z [m]")
+    a.legend(loc="upper center", fontsize=5.8, ncol=2, bbox_to_anchor=(0.5, -0.2), frameon=False)
+    b.axhline(5, color=C["I"], lw=0.7, ls=(0, (4, 2.5)))
+    b.text(0.3, 6.2, "goal: 5 cm RMS", fontsize=6.2, color=C["I"])
+    b.set_xlim(0, 8.9)
+    b.set_ylim(0.3, 300)
+    b.set_yticks([1, 10, 100])
+    b.set_yticklabels(["1", "10", "100"])
+    b.set_title("Position error over the lap")
+    b.set_ylabel("cm")
+    b.set_xlabel("time in the lap [s]", loc="right")
+    b.grid(True, which="major", axis="both")
+    save(f, "flatness_eight")

@@ -1,0 +1,174 @@
+\lesson{II.11}{Feedforward from the future}{A controller that only sees errors is always late. Told where the path goes next, it can do now what the path will need.}{3}{flatness}{Part II · Beyond PID}
+\label{les:flatness}
+
+\lead{\setupcard{\setuprow{Level}{L3}\setuprow{Controller}{geometric tracking, feedforward off}\setuprow{Ghost}{the PID cascade}\setuprow{Set-point}{a figure-8, \SI{4}{m} by \SI{2}{m}, one lap in \SI{8.9}{s}, up to \SI{2}{m/s}; no wind}\setuprow{Goal}{RMS position error below \SI{5}{cm} over the last lap}}%
+The set-point now moves: it flies a figure-8 at up to two metres per second. The geometric tracking controller follows it with \SI{78}{cm} of RMS error, and the PID cascade with \SI{122}{cm}. Neither flies the wrong shape — both fly the right one, late. The cure is not more gain. A quadrotor is \emph{differentially flat}: from the path and its derivatives one can compute the thrust, the attitude and the body rates it needs at every instant. Fed those in advance, the controller follows the 8 within two centimetres, and feedback is left with only what the plan could not foresee.}
+
+\section{Following a moving point}
+
+The geometric tracking controller of Lee, Leok and McClamroch (2010) replaces the position and velocity loops of the cascade by one law for the desired acceleration,
+\begin{equation}\label{eq:flatness-geo}
+  \vec a = \vec a_{ref} - K_p\,(\vec p - \vec p_{ref}) - K_v\,(\vec v - \vec v_{ref}) - K_i\!\int(\vec p - \vec p_{ref})\,\dd t ,
+\end{equation}
+with $K_p = \SI{9}{s^{-2}}$, $K_v = \SI{5}{s^{-1}}$ and $K_i = \SI{0.5}{s^{-3}}$; the attitude and rate loops below turn $\vec a$ into a tilt and torques as before. With the feedforward off, $\vec v_{ref}$ and $\vec a_{ref}$ are zero and the law sees only the position error.
+
+The figure-8 is $x = 2\sin\omega t$, $z = \sin 2\omega t$ with $\omega = 2\pi/8.9 = \SI{0.706}{rad/s}$: two sine waves, one at $\omega$, the other at $2\omega$.\innumbers{The figure-8 is a Lissajous curve with the frequency ratio $1 : 2$. At its crossing the set-point moves at \SI{2}{m/s}, diagonally.}
+
+\begin{example}[Late by a constant time]
+\label{ex:flatness-lag}
+Predict the tracking error of the feedback-only law on the figure-8, assuming the inner loops are perfect, so that the drone's acceleration is the commanded $\vec a$.
+
+\textbf{Step 1 — the error's transfer function.} On one axis, $\ddot p = -K_p(p - r) - K_v\dot p - K_i\!\int(p - r)$. In Laplace form, with $e = r - p$:
+\begin{equation*}
+  \frac{E}{R} = \frac{s^3 + K_v s^2}{s^3 + K_v s^2 + K_p s + K_i} .
+\end{equation*}
+
+\textbf{Step 2 — the numbers.} At $s = j\cdot0.706$ the magnitude is 0.398, so the $x$ error has the amplitude $0.398 \cdot \SI{2}{m} = \SI{0.80}{m}$; at $s = j\cdot1.412$ it is 0.756 and the $z$ error is \SI{0.76}{m}. As RMS values, $0.80/\sqrt2 = \SI{0.56}{m}$ and \SI{0.53}{m}; measured: \SI{0.57}{m} and \SI{0.53}{m}.
+
+\textbf{Step 3 — what kind of error.} At low frequencies the loop $K_p/(s^2 + K_vs + K_p)$ is close to a pure delay of $T = K_v/K_p = \SI{0.56}{s}$: it lags by $22^\circ$ at $\omega$ and $45^\circ$ at $2\omega$, both \SI{0.56}{s}. The drone flies the figure-8 with the right shape, half a second behind the set-point.
+
+\textbf{Step 4 — the largest error.} A point \SI{0.56}{s} behind a set-point moving at \SI{2}{m/s} is $2 \cdot 0.56 = \SI{1.1}{m}$ away. Measured largest error: \SI{1.10}{m}. The top view (\cref{fig:flatness-eight}, left) shows the same: the three paths lie almost on top of each other; the errors are along the track.
+\end{example}
+\pitfall{A tracking error that is mostly along the path is a timing error, not a gain problem. Raising the gains shortens it only in proportion; telling the controller where the path goes removes it.}
+
+\simfig{flatness_eight}{The last lap of the figure-8. Left: the paths from above, with the reference in grey. All three follow nearly the same shape; the difference is \emph{when}. Right: the distance between the drone and the moving set-point; feedforward lowers it by a factor of forty.}{fig:flatness-eight}
+
+Raising the gains would shorten the delay, but $K_v/K_p$ cannot be made very small without making the loop too fast for the attitude below it (\lessonref{les:cascade}). A loop that waits for an error cannot follow a moving target without one. Part~I met the same fact for the altitude (\lessonref{les:inversion}), and the same cure: add what the target needs before the error appears.
+
+\section{The drone is flat}
+
+What does the figure-8 need? Newton's law gives the thrust vector at once: $T\hat b = m(\vec a_{ref} - \vec g)$. Its direction is the attitude (apart from the yaw), its length the thrust. Differentiating once more gives how fast the thrust axis must turn, which is the body rate. A system whose whole state and input can be computed\recall{Lesson~I.12: the thrust axis must point along $\vec a - \vec g$, which is how the cascade turns a desired acceleration into a tilt.} from some outputs and their derivatives, with no differential equation to solve, is called \term{differentially flat}, and those outputs \term{flat outputs}.
+
+\begin{result}[Flatness feedforward for the quadrotor]
+For a reference $\vec p_{ref}(t)$ and yaw $\psi_{ref}(t)$:
+\begin{align}
+  T\hat b &= \hat m\,(\vec a_{ref} - \vec g), &\text{thrust and thrust axis,}\label{eq:flatness-thrust}\\
+  \dot{\hat b} &= \frac{\hat m}{T}\big(\vec j_{ref} - (\vec j_{ref}\cdot\hat b)\,\hat b\big), \qquad \vec\omega_{ff} = \hat b \times \dot{\hat b}, &\text{body rates,}\label{eq:flatness-rates}
+\end{align}
+where $\vec j_{ref}$ is the jerk, the third derivative of the reference. The geometric law receives $\vec v_{ref}$ and $\vec a_{ref}$; the rate loop receives $\vec\omega_{ff}$ in addition to the attitude loop's command.
+\end{result}
+
+\begin{example}[The figure-8, read as attitudes]
+\label{ex:flatness-numbers}
+Compute the attitude and the feedforward rate at two points of the figure-8 ($\hat m = \SI{1}{kg}$).
+
+\textbf{Step 1 — the derivatives.} $\vec a = (-2\omega^2\sin\omega t,\ 0,\ -4\omega^2\sin2\omega t)$ and $\vec j = (-2\omega^3\cos\omega t,\ 0,\ -8\omega^3\cos2\omega t)$, with $\omega^2 = 0.498$ and $\omega^3 = 0.352$.
+
+\textbf{Step 2 — at the crossing}, $t = 0$. The acceleration is zero, so the thrust is $mg$ straight up and the drone is level. But the jerk is $(-0.70,\ 0,\ -2.82)\,\si{m/s^3}$, entirely horizontal: by \cref{eq:flatness-rates}, $|\dot{\hat b}| = 2.90/9.81 = \SI{0.30}{rad/s} = \SI{17}{\degree/s}$. The drone must already be rolling into the next loop while it is still level. The simulator's feedforward peaks at \SI{16.9}{\degree/s}.
+
+\textbf{Step 3 — at the far end}, $\omega t = \pi/2$, $x = \SI{2}{m}$. The acceleration is $(-1.0, 0, 0)$: the thrust axis leans back by $\arctan(1.0/9.81) = 5.8^\circ$. The largest acceleration on the lap, \SI{2.1}{m/s^2}, needs $12^\circ$ — the measured tilt reaches $12.5^\circ$.
+
+\textbf{Step 4 — read it.} The attitude follows from the acceleration and the body rate from the jerk. A feedback loop would produce each only after an error had appeared; here they are known exactly, a lap in advance.
+\end{example}
+\didyouknow{\enquote{Jerk} is the standard name for the third derivative of position, and \enquote{snap} for the fourth. The fifth and sixth are sometimes called \enquote{crackle} and \enquote{pop}.}
+
+\section{What feedforward leaves to feedback}
+
+With the feedforward on, the RMS error falls from \SI{78}{cm} to \SI{2.0}{cm}, the largest from \SI{110}{cm} to \SI{3.2}{cm}. The gains are unchanged: the feedback is as fast as before, but it now has almost nothing to do.
+
+\begin{keyidea}[Feedforward does the planned work, feedback the unplanned]
+If the model is right, feedforward alone would fly the path; feedback corrects only the difference between the model and the drone. Its speed then limits how well disturbances are rejected, not how well the path is followed.
+\end{keyidea}
+
+What remains is what the feedforward does not know: the motors' lag, the rotor drag, the filters of the rate loop. Each delays the actual thrust direction behind the planned one by a few hundredths of a second, and at \SI{2}{m/s} a delay of \SI{10}{ms} is \SI{2}{cm}. Feedforward needs a model, and its accuracy is the model's.\tip{Turn feedforward on first and tune feedback afterwards. With a good feedforward the feedback gains can often be lowered, which makes the loop quieter in the noise.}
+
+\screen[0 0 495 998]{flatness}{Lesson II.11 in the app with the flatness feedforward on. The position loop's chart shows the parts of \cref{eq:flatness-geo}: the feedforward $a_{ref}$ now carries almost all of the command, and the feedback terms are small.}{fig:flatness-screen}
+
+\begin{inapp}
+\begin{itemize}[leftmargin=1.2em]
+  \item The outer stage is \ui{Controller\then Outer loops\then geometric tracking} (\param{control.l3.outer = 'geometric'}); the switch is \ui{Geometric tracking\then Trajectory feedforward} (\param{control.geometric.feedforward}); the gains are \param{control.geometric.kp}, \param{kv} and \param{ki}.
+  \item The law is \texttt{GeometricOuter} in \src{src/control/geometric.ts}; \cref{eq:flatness-rates} is \texttt{flatnessRates} in the same file.
+  \item The reference's derivatives up to the jerk come from \texttt{profileOffset} in \src{src/engine/reference.ts}, analytically for the figure-8.
+\end{itemize}
+\end{inapp}
+
+\begin{trythis}
+\begin{enumerate}
+  \item Watch a lap with the feedforward off, from above. Is the drone off the path, or behind on it?
+  \item Switch \ui{Trajectory feedforward} on. Open the position loop's chart and compare the sizes of its parts.
+  \item With the feedforward off, double $K_p$ to 18. How does the error change, and how close is it to the prediction $T = K_v/K_p$?
+\end{enumerate}
+\predict{with $K_p = 18$ and $K_v = 5$, what is the delay of the feedback-only loop, and the largest error at \SI{2}{m/s}?}
+\end{trythis}
+
+\section{The engineer's view: plan the inputs, not only the outputs}
+
+\subsection{Flat systems}
+Flatness is the property that makes the inversion of Example~\ref{ex:flatness-numbers} possible. Many vehicles have it: the quadrotor with the position and the yaw as flat outputs; a car with the position of the middle of its rear axle; a crane with the position of its load. For each, a path for the flat outputs fixes everything else — and so a path is feasible exactly when the inputs computed from it are within the actuators' limits. This is what the next lesson uses to plan.\didyouknow{A crane is flat in the position of its load. Container cranes in ports move the trolley along paths computed from the load's planned path, so that the container arrives without swinging.}
+
+\begin{example}[An airliner entering a turn]
+\label{ex:flatness-aircraft}
+An airliner flies at \SI{120}{m/s} and must turn at the \enquote{standard rate} of \SI{3}{\degree/s}. What bank angle does the turn require, and what does flatness say about the entry?
+
+\textbf{Step 1 — the acceleration.} A turn at the rate $\Omega$ at the speed $V$ needs the centripetal acceleration $V\Omega = 120 \cdot 0.0524 = \SI{6.3}{m/s^2}$.
+
+\textbf{Step 2 — the bank.} Like the drone's thrust, the wing's lift must point along $\vec a - \vec g$: $\tan\varphi = V\Omega/g = 0.64$, a bank of $33^\circ$. (Pilots use $V/10 + 7$ with $V$ in knots: $233/10 + 7 = 30^\circ$.)
+
+\textbf{Step 3 — the entry.} If the turn rate jumped from 0 to $3^\circ/\si{s}$, the bank would have to jump too: an infinite roll rate. A flyable entry ramps the turn rate, and its derivative — the jerk of the path — sets the roll rate. Ramping over \SI{5}{s} needs about $33^\circ/5 = \SI{7}{\degree/s}$ of roll, a comfortable value.
+
+\textbf{Step 4 — read it.} The autopilot's lateral guidance computes its bank and roll rate from the planned path exactly as \cref{eq:flatness-thrust,eq:flatness-rates} do for the drone: the attitude from the acceleration, its rate from the jerk.
+\end{example}
+
+\keeptogether{12\baselineskip}
+\subsection{In formal terms}
+
+\begin{definition}{Differential flatness}
+A system $\dot{\vec x} = f(\vec x, \vec u)$ with $m$ inputs is \term{differentially flat} if there are $m$ outputs $\vec y = h(\vec x, \vec u, \dot{\vec u}, \dots)$ such that the state and the input can be written as functions of $\vec y$ and finitely many of its derivatives: $\vec x = \Phi(\vec y, \dot{\vec y}, \dots, \vec y^{(r)})$, $\vec u = \Psi(\vec y, \dot{\vec y}, \dots, \vec y^{(r+1)})$.
+\end{definition}
+
+\begin{theorem}[The quadrotor is flat]
+\label{thm:flatness-quad}
+For the rigid quadrotor with the thrust $T$ along the body axis $\hat b$ and the body torques as inputs, the position $\vec p$ and the yaw $\psi$ are flat outputs. Wherever $\vec a - \vec g \ne 0$: the thrust and the thrust axis follow from $\ddot{\vec p}$ by \cref{eq:flatness-thrust}; the attitude from $\hat b$ and $\psi$; the body rates from $\dddot{\vec p}$ and $\dot\psi$ by \cref{eq:flatness-rates}; and the torques from $\vec p^{(4)}$ and $\ddot\psi$ by Euler's equation.
+\end{theorem}
+\begin{proof}
+Newton's law $m\ddot{\vec p} = T\hat b + m\vec g$ gives $T = m\|\ddot{\vec p} - \vec g\|$ and $\hat b$. With $\hat b$ and the heading $\psi$, the attitude matrix is fixed: its third column is $\hat b$, and the other two are the heading direction projected perpendicular to $\hat b$, normalised, and their cross product. Differentiating $T\hat b = m(\ddot{\vec p} - \vec g)$: $\dot T\hat b + T\dot{\hat b} = m\dddot{\vec p}$; the component perpendicular to $\hat b$ gives \cref{eq:flatness-rates} for the two tilting rates, and the yaw rate follows from $\dot\psi$. Differentiating once more gives the angular acceleration from $\vec p^{(4)}$ and $\ddot\psi$, and the torque $J\dot{\vec\omega} + \vec\omega\times J\vec\omega$ (\cref{eq:H-euler-eq}). For a complete treatment see Mellinger and Kumar (2011); the general theory is due to Fliess, Lévine, Martin and Rouchon (1995).
+\end{proof}
+
+The theorem fixes how smooth a reference must be: the torques need the fourth derivative, the \emph{snap}. A path whose snap is finite can be flown with finite torques; a path with a jump in its acceleration needs an infinite body rate. That is the starting point of the next lesson, and the near-hover form of the same chain is \cref{thm:tilt-chain}: four integrators from torque to position.\tip{Check a planned path by computing its inputs from flatness before flying it. If the thrust, tilt or body rates exceed the limits anywhere, no controller will follow it.}
+
+\begin{lookahead}
+\begin{itemize}[leftmargin=1.2em]
+  \item The next lesson plans the path itself: polynomials that pass through waypoints with the least snap, so that the feedforward stays small and smooth.
+  \item Model predictive control (Lesson~II.13) plans the inputs by optimisation instead of by inversion, and handles limits that flatness ignores.
+  \item Flatness of the car and of the planar rocket returns in Part~IV.
+\end{itemize}
+\end{lookahead}
+
+\begin{remember}
+\begin{itemize}
+  \item Feedback alone follows a moving set-point late: near a delay of $K_v/K_p = \SI{0.56}{s}$ here, \SI{1.1}{m} behind at \SI{2}{m/s}.
+  \item The quadrotor is flat in its position and yaw: the acceleration gives the thrust and the attitude, the jerk the body rates, the snap the torques.
+  \item Flatness feedforward: $T\hat b = \hat m(\vec a_{ref} - \vec g)$, $\vec\omega_{ff} = \hat b \times \dot{\hat b}$, $\dot{\hat b} = (\hat m/T)\,\vec j_\perp$.
+  \item On the figure-8: \SI{78}{cm} RMS without feedforward, \SI{2.0}{cm} with it, same gains.
+  \item What feedforward leaves is the model's error: lags and forces it does not know.
+\end{itemize}
+\end{remember}
+
+\begin{curiosity}{Quadrotors that juggle}
+In the early 2010s two laboratories made the small quadrotor famous with films that looked impossible. At the University of Pennsylvania, Daniel Mellinger and Vijay Kumar flew quadrotors through narrow slots tilted almost on their side and perched them on walls; at ETH Zürich, in the Flying Machine Arena of Raffaello D'Andrea, quadrotors juggled balls, balanced inverted pendulums on their tops and threw and caught them between each other.
+
+The controllers were not exotic: cascades of the kind in this book, with gains of the kind in this book. What made the motion possible was the feedforward. Every manoeuvre was planned as a smooth path in position and yaw, the thrust, attitudes and body rates were computed from it by flatness, and the controller was told all of them before the manoeuvre began. Feedback only had to correct the small differences — which a motion capture system, measuring the vehicles hundreds of times a second, made smaller still.
+
+The same arena later trained quadrotors to learn the corrections themselves, flight after flight, until they flew a manoeuvre better than the model could predict — a step towards Lesson~II.19.
+\end{curiosity}
+
+\begin{exercises}
+\exercise[1] For the figure-8 of this lesson, what is the largest speed, and where on the lap is it reached?
+\answer{At the crossing, $t = 0$: $\vec v = (2\omega, 0, 2\omega) = (1.41, 0, 1.41)$, speed \SI{2.0}{m/s}.}
+\exercise[1] A drone accelerates horizontally at \SI{3}{m/s^2} with $m = \SI{1}{kg}$. Find the thrust and the tilt by \cref{eq:flatness-thrust}.
+\answer{$T = \sqrt{3^2 + 9.81^2} = \SI{10.3}{N}$, tilt $\arctan(3/9.81) = 17^\circ$.}
+\exercise[1] By Example~\ref{ex:flatness-lag}, what is the delay of the feedback-only loop with $K_p = 18$, $K_v = 5$, and the largest error at \SI{2}{m/s}?
+\answer{$T = 5/18 = \SI{0.28}{s}$, $2 \cdot 0.28 = \SI{0.56}{m}$. The simulator: \SI{58}{cm}, and \SI{41}{cm} RMS.}
+\exercise[2]\exkind{derive} Show that $K_p/(s^2 + K_vs + K_p) = 1 - (K_v/K_p)s + O(s^2)$, and therefore that it behaves like the delay $e^{-sK_v/K_p}$ at low frequencies. At which frequency does the phase of the true transfer function differ from that of the delay by $5^\circ$, for $K_p = 9$, $K_v = 5$ (solve numerically)?
+\answer{Expand $1/(1 + (K_v/K_p)s + s^2/K_p)$. The phases $\arctan(K_v\omega/(K_p - \omega^2))$ and $\omega K_v/K_p$ differ by $1^\circ$ at \SI{2.3}{rad/s} and by $5^\circ$ at \SI{2.9}{rad/s}; the figure-8's frequencies 0.71 and 1.41 lie well below, where the delay is almost exact.}
+\exercise[2]\exkind{derive} Derive \cref{eq:flatness-rates} from $T\hat b = m(\vec a - \vec g)$ by differentiating and taking the part perpendicular to $\hat b$. Why does $\dot T$ drop out?
+\answer{$\dot T\hat b + T\dot{\hat b} = m\vec j$. Since $\|\hat b\| = 1$, $\dot{\hat b} \perp \hat b$; projecting perpendicular to $\hat b$ removes $\dot T\hat b$ and leaves $T\dot{\hat b} = m\vec j_\perp$. The rate is $\vec\omega = \hat b \times \dot{\hat b}$ (plus any spin about $\hat b$, which is the yaw rate).}
+\exercise[2]\exkind{derive} For the airliner of Example~\ref{ex:flatness-aircraft}, what bank does a \SI{3}{\degree/s} turn need at \SI{250}{m/s}? Why do airliners turn at less than standard rate at cruise speed?
+\answer{$\tan\varphi = 250 \cdot 0.0524/9.81 = 1.33$, $53^\circ$ — too steep for comfort and for the load factor ($1/\cos53^\circ = 1.7\,g$). At cruise they limit the bank to about $25^\circ$ and turn more slowly.}
+\exercise[2]\exkind{fly} In Lesson~II.11, with the feedforward on, set \param{control.model.mass} to \SI{1.3}{kg} (the drone still weighs 1). What happens to the error, and which part of the controller removes most of the damage?
+\answer{The feedforward asks for 30\,\% too much thrust, \SI{2.9}{N} too much in hover. The drone first climbs \SI{27}{cm} above the path; the integral term then carries the difference, but it builds slowly ($K_i = 0.5$) and is bounded at \SI{3}{m/s^2}, just above what is needed. Over the last lap: \SI{6.1}{cm} RMS, almost all of it a vertical offset of about \SI{5}{cm}; the horizontal tracking is hardly affected, since the thrust still points the right way.}
+\exercise[2]\exkind{code} \texttt{flatnessRates} in \src{src/control/geometric.ts} uses the \emph{desired} force $\vec F_{des}$ for $\hat b$ and $T$, not the reference acceleration alone. What is the difference, and why is it the better choice inside a feedback controller?
+\answer{$\vec F_{des}$ includes the feedback terms; with it, the rate feedforward is consistent with the thrust direction actually commanded, so the two do not fight when the drone is off the path.}
+\exercise[3]\exkind{derive} The car. A car's rear-axle midpoint $(x, y)$ moves with the speed $v$ along its heading $\theta$, and the heading changes as $\dot\theta = (v/L)\tan\delta$, with $\delta$ the steering angle and $L$ the wheelbase. Show that $(x, y)$ are flat outputs: write $v$, $\theta$ and $\delta$ in terms of $\dot x, \dot y, \ddot x, \ddot y$. Where does the inversion fail?
+\answer{$v = \sqrt{\dot x^2 + \dot y^2}$, $\theta = \operatorname{atan2}(\dot y, \dot x)$, $\dot\theta = (\dot x\ddot y - \dot y\ddot x)/v^2$, $\tan\delta = L\dot\theta/v = L(\dot x\ddot y - \dot y\ddot x)/v^3$. It fails at $v = 0$, where the heading is not defined by the motion.}
+\end{exercises}

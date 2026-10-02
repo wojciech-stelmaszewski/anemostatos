@@ -768,6 +768,30 @@ for (const [tag, outer, ff] of [
       p.control.geometric.feedforward = ff;
     },
   });
+add({
+  name: 'flat-geo-kp18',
+  seconds: 40,
+  setup: (p) => {
+    l3(p);
+    calm(p);
+    figure8(8.9)(p);
+    p.control.l3.outer = 'geometric';
+    p.control.geometric.feedforward = false;
+    p.control.geometric.kp = 18;
+  },
+});
+add({
+  name: 'flat-geo-ff-mass1.3',
+  seconds: 40,
+  setup: (p) => {
+    l3(p);
+    calm(p);
+    figure8(8.9)(p);
+    p.control.l3.outer = 'geometric';
+    p.control.geometric.feedforward = true;
+    p.control.model.mass = 1.3;
+  },
+});
 for (const prof of ['corners', 'minsnap'] as const)
   add({
     name: `snap-${prof}`,

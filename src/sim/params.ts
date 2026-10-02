@@ -23,7 +23,41 @@ export type L1Kind =
   | 'mrac'
   | 'backstepping'
   | 'bangbang'
-  | 'dp';
+  | 'dp'
+  | 'transfer';
+/** Part V (docs/aerospace-gnc.md, Chapter P): the software around the control law. */
+export interface Part5Params {
+  /**
+   * Lesson V.3: a 16-bit fixed-point copy of the altitude PID runs beside the floating-point one
+   * on the same inputs, and the two outputs are compared (src/control/part5/fixedpoint.ts).
+   */
+  fixed: {
+    shadow: boolean;
+    /** Word length of the integrator, bits. */
+    intBits: 16 | 32;
+    /** Fractional bits of the integrator (its least significant bit is 2^−intFrac N). */
+    intFrac: number;
+  };
+  /** Lesson V.4: three altimeters and a voter in front of the L1 controller. */
+  voter: {
+    enabled: boolean;
+    /** single: altimeter A alone; mid: the middle of three; monitor: the middle, plus isolation. */
+    mode: 'single' | 'mid' | 'monitor';
+    /** Noise σ of each altimeter, m. */
+    noise: number;
+    /** Altimeter A freezes at this time, s. */
+    stuckAt: number;
+    /** Altimeter B starts to drift at this time, s, at `driftRate` m/s. */
+    driftAt: number;
+    driftRate: number;
+    /** Monitor: a channel this far from the reference, m, for `persistMs`, is isolated. */
+    threshold: number;
+    persistMs: number;
+  };
+  /** Lesson V.5: fly the PID, then hand over to the LQI at `at` s. */
+  transfer: { at: number; bumpless: boolean };
+}
+
 /** State estimator in front of the L1 controller. */
 export type L1Estimator = 'none' | 'kalman';
 export type L3Outer = 'pid-cascade' | 'geometric' | 'mpc' | 'mppi' | 'policy';
@@ -576,6 +610,8 @@ export interface Params {
   pdg: PdgSettings;
   /** The planned manoeuvre of lesson IV.6 (src/guidance/collocation.ts), flown as `setpoint.profile = 'plan'`. */
   plan: PlanParams;
+  /** Part V: the flight software around the controller (src/control/part5). */
+  part5: Part5Params;
 }
 
 /** Lesson IV.6: rest to rest along x past the pillar, planned by min-snap or by collocation. */
@@ -944,6 +980,20 @@ export const defaultParams = (): Params => ({
     distance: 6,
     accelFraction: 0.8,
     delay: 1,
+  },
+  part5: {
+    fixed: { shadow: false, intBits: 16, intFrac: 8 },
+    voter: {
+      enabled: false,
+      mode: 'single',
+      noise: 0.005,
+      stuckAt: 10,
+      driftAt: 20,
+      driftRate: -0.05,
+      threshold: 0.15,
+      persistMs: 200,
+    },
+    transfer: { at: 10, bumpless: false },
   },
 });
 

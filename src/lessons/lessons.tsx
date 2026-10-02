@@ -6,6 +6,7 @@ import { M } from './Math';
 import { PART_TWO } from './part2';
 import { PART_THREE } from './part3';
 import { PART_FOUR } from './part4';
+import { PART_FIVE } from './part5';
 import { setAt } from './script';
 import type { Lesson } from './types';
 
@@ -544,4 +545,10 @@ const PART_ONE: Lesson[] = [
   },
 ];
 
-export const LESSONS: Lesson[] = [...PART_ONE, ...PART_TWO, ...PART_THREE, ...PART_FOUR];
+export const LESSONS: Lesson[] = [
+  ...PART_ONE,
+  ...PART_TWO,
+  ...PART_THREE,
+  ...PART_FOUR,
+  ...PART_FIVE,
+];

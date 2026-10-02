@@ -22,7 +22,7 @@ export interface Prediction {
 }
 
 /** Part I = PID, Part II = beyond PID, Part III = why it works (analysis). One semester each. */
-export type Part = 1 | 2 | 3 | 4;
+export type Part = 1 | 2 | 3 | 4 | 5;
 
 export interface Lesson {
   id: string;

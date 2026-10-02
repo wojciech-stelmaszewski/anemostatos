@@ -68,6 +68,7 @@ const PARTS: { part: Part; label: string; prefix: string }[] = [
   { part: 2, label: 'Part II · Beyond PID', prefix: 'II.' },
   { part: 3, label: 'Part III · Why it works', prefix: 'III.' },
   { part: 4, label: 'Part IV · Aerospace GNC', prefix: 'IV.' },
+  { part: 5, label: 'Part V · From whiteboard to flight', prefix: 'V.' },
 ];
 const partOf = (l: Lesson): Part => l.part ?? 1;
 

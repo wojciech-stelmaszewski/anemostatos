@@ -180,6 +180,18 @@ export class LqrController implements Controller {
     this.xi = 0;
   }
 
+  /** The LQI's gain on ∫e, from the last design; 0 without the integral (lesson V.5). */
+  integralGain(p: Params): number {
+    const c = p.control.lqr;
+    if (!c.integral || !this.design) return 0;
+    return this.design.k[c.lagState ? 3 : 2] ?? 0;
+  }
+
+  /** Move the integrator state by `d`: the output moves by −kᵢ·d (bumpless transfer, V.5). */
+  shiftIntegral(d: number): void {
+    this.xi += d;
+  }
+
   private gains(p: Params, dt: number): Design {
     const c = p.control.lqr;
     const key = [c.qPos, c.qVel, c.qInt, c.r, c.integral, c.lagState, p.control.model.mass]

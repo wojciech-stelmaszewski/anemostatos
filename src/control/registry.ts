@@ -15,6 +15,9 @@ import { LqrController } from './lqr';
 import { MpcAltitudeController } from './mpc';
 import { PointMassController } from './pointmass';
 import type { Controller } from './types';
+import { WithFixedPoint } from './part5/shadow';
+import { TransferController } from './part5/transfer';
+import { WithVoter } from './part5/voter';
 
 /** Everything that selects which controller runs; a change restarts the simulation. */
 export const controllerKey = (p: Params): string => {
@@ -29,6 +32,8 @@ export const controllerKey = (p: Params): string => {
     l3.safety,
     p.control.fault.enabled,
     p.sim.vehicle ?? 'quadrotor',
+    p.part5.fixed.shadow,
+    p.part5.voter.enabled,
   ].join('|');
 };
 
@@ -58,8 +63,15 @@ export function makeController(p: Params): Controller {
                           ? new BangBangController()
                           : kind === 'dp'
                             ? new DpController()
-                            : new AltitudeController();
-      return p.control.l1.estimator === 'kalman' ? new WithAltitudeKalman(c) : c;
+                            : kind === 'transfer'
+                              ? new TransferController()
+                              : new AltitudeController();
+      // Part V: the flight software around the law. The fixed-point shadow sees what the law
+      // sees (after the filter); the voter picks the altitude everything downstream reads.
+      let w: Controller = p.part5.fixed.shadow ? new WithFixedPoint(c) : c;
+      if (p.control.l1.estimator === 'kalman') w = new WithAltitudeKalman(w);
+      if (p.part5.voter.enabled) w = new WithVoter(w, p.sim.seed);
+      return w;
     }
     case 2:
       return new PointMassController();

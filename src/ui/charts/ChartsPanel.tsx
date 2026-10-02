@@ -63,6 +63,8 @@ const EXTRA: { value: ExtraChart; label: string }[] = [
   { value: 'value', label: 'value function' },
   { value: 'describing', label: 'describing function' },
   { value: 'tvc', label: 'thrust-vector loop (Nyquist)' },
+  { value: 'backtoback', label: 'fixed point vs reference' },
+  { value: 'altimeters', label: 'three altimeters' },
 ];
 /** What can stand in the motor chart's place. */
 const SECOND: { value: AnalysisChart | 'motors'; label: string }[] = [
@@ -105,6 +107,19 @@ const CUSUM: SeriesSpec[] = [{ key: 'fdi.cusum', label: 'CUSUM', color: SIGNAL.e
 const INS: SeriesSpec[] = [
   { key: 'ins.err', label: 'navigator error', color: SIGNAL.error, width: 2 },
   { key: 'ins.pred', label: 'g·b·t³/6', color: SIGNAL.measurement, dash: [4, 3], width: 1.5 },
+];
+/** Lesson V.3: the integrator of the floating-point reference and of the fixed-point copy. */
+const BACK_TO_BACK: SeriesSpec[] = [
+  { key: 'fx.iref', label: 'reference I', color: SIGNAL.measurement, width: 2 },
+  { key: 'fx.ifixed', label: 'fixed-point I', color: SIGNAL.p, dash: [4, 3], width: 2 },
+];
+/** Lesson V.4: the three altimeters, the voted altitude and the truth. */
+const ALTIMETERS: SeriesSpec[] = [
+  { key: 'vote.a', label: 'A', color: SIGNAL.p, width: 1 },
+  { key: 'vote.b', label: 'B', color: SIGNAL.d, width: 1 },
+  { key: 'vote.c', label: 'C', color: SIGNAL.i, width: 1 },
+  { key: 'vote.out', label: 'voted', color: SIGNAL.output, width: 2 },
+  { key: 'vote.truth', label: 'true', color: SIGNAL.truth, dash: [4, 3], width: 1.5 },
 ];
 /** Lesson IV.27: the range-only filter's error against its own 2σ. */
 const BEACON_ERR: SeriesSpec[] = [
@@ -535,6 +550,15 @@ export function ChartsPanel() {
               { value: -sim.params.satellite.wheelMomentum, label: '' },
             ]}
           />
+        ) : extra === 'backtoback' ? (
+          <TimeChart
+            title="Integrator: floating point against fixed point"
+            unit="N"
+            series={BACK_TO_BACK}
+            includeZero
+          />
+        ) : extra === 'altimeters' ? (
+          <TimeChart title="Three altimeters and the voter" unit="m" series={ALTIMETERS} />
         ) : extra === 'ins' ? (
           <TimeChart
             title="Inertial navigator: position error (log scale)"

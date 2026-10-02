@@ -47,7 +47,8 @@ export interface Group extends Visibility {
 export const visible = (v: Visibility, p: Params): boolean =>
   (!v.levels || v.levels.includes(p.sim.level)) && (!v.when || v.when(p));
 
-const l1Pid = (p: Params) => p.sim.level === 2 || p.control.l1.kind === 'pid';
+const l1Pid = (p: Params) =>
+  p.sim.level === 2 || p.control.l1.kind === 'pid' || p.control.l1.kind === 'transfer';
 const l1Is = (kind: Params['control']['l1']['kind']) => (p: Params) => p.control.l1.kind === kind;
 
 /** Settings every L1 controller shares (repeated in each controller's group). */
@@ -505,6 +506,7 @@ export const SCHEMA: Group[] = [
           { value: 'backstepping', label: 'backstepping' },
           { value: 'bangbang', label: 'bang-bang (time-optimal)' },
           { value: 'dp', label: 'dynamic programming' },
+          { value: 'transfer', label: 'PID, then LQI (hand-over)' },
         ],
         levels: [1],
         help: 'Which control law flies the drone. PID: three hand-tuned gains. LQR: gains computed from a model and a cost. ADRC: an observer estimates everything the model misses and cancels it.',
@@ -799,7 +801,7 @@ export const SCHEMA: Group[] = [
     title: 'LQR',
     loop: 'alt',
     levels: [1],
-    when: l1Is('lqr'),
+    when: (p) => l1Is('lqr')(p) || l1Is('transfer')(p),
     fields: [
       {
         kind: 'number',
@@ -3794,6 +3796,149 @@ export const SCHEMA: Group[] = [
         max: 120,
         step: 1,
         when: (p) => p.probe.point !== 'none' && p.probe.signal === 'chirp',
+      },
+    ],
+  },
+  {
+    id: 'part5-fixed',
+    title: 'Flight software: fixed point',
+    levels: [1],
+    fields: [
+      {
+        kind: 'bool',
+        path: 'part5.fixed.shadow',
+        label: 'Fixed-point shadow',
+        help: 'Run an integer copy of the altitude PID beside the floating-point one, on the same inputs, and record both outputs (lesson V.3). The drone still flies on the floating-point PID.',
+      },
+      {
+        kind: 'number',
+        path: 'part5.fixed.intBits',
+        label: 'Integrator word',
+        unit: 'bits',
+        min: 16,
+        max: 32,
+        step: 16,
+        when: (p) => p.part5.fixed.shadow,
+        help: 'Signals are 32-bit integers (µm, µN) and gains Q8.8; only the integrator is chosen.',
+      },
+      {
+        kind: 'number',
+        path: 'part5.fixed.intFrac',
+        label: 'Integrator fractional bits',
+        min: 0,
+        max: 24,
+        step: 1,
+        when: (p) => p.part5.fixed.shadow,
+        help: 'Its smallest step is 2^−bits N, and it holds up to 2^(word − 1 − bits) N before it wraps round.',
+      },
+    ],
+  },
+  {
+    id: 'part5-voter',
+    title: 'Flight software: three altimeters',
+    levels: [1],
+    fields: [
+      {
+        kind: 'bool',
+        path: 'part5.voter.enabled',
+        label: 'Three altimeters',
+        help: 'Three altimeters of their own, read from the true altitude, and a voter in front of the controller (lesson V.4). A freezes, later B drifts.',
+      },
+      {
+        kind: 'select',
+        path: 'part5.voter.mode',
+        label: 'Voter',
+        options: [
+          { value: 'single', label: 'altimeter A alone' },
+          { value: 'mid', label: 'mid-value selection' },
+          { value: 'monitor', label: 'mid-value + monitor' },
+        ],
+        when: (p) => p.part5.voter.enabled,
+        help: 'The monitor isolates a channel that stays too far from the reference; with two channels left the reference is dead reckoning on the vertical speed.',
+      },
+      {
+        kind: 'number',
+        path: 'part5.voter.noise',
+        label: 'Altimeter noise',
+        unit: 'm',
+        min: 0,
+        max: 0.05,
+        step: 0.001,
+        when: (p) => p.part5.voter.enabled,
+      },
+      {
+        kind: 'number',
+        path: 'part5.voter.stuckAt',
+        label: 'A freezes at',
+        unit: 's',
+        min: 0,
+        max: 300,
+        step: 1,
+        when: (p) => p.part5.voter.enabled,
+      },
+      {
+        kind: 'number',
+        path: 'part5.voter.driftAt',
+        label: 'B starts to drift at',
+        unit: 's',
+        min: 0,
+        max: 300,
+        step: 1,
+        when: (p) => p.part5.voter.enabled,
+      },
+      {
+        kind: 'number',
+        path: 'part5.voter.driftRate',
+        label: 'B drifts at',
+        unit: 'm/s',
+        min: -0.5,
+        max: 0.5,
+        step: 0.01,
+        when: (p) => p.part5.voter.enabled,
+      },
+      {
+        kind: 'number',
+        path: 'part5.voter.threshold',
+        label: 'Monitor threshold',
+        unit: 'm',
+        min: 0.01,
+        max: 1,
+        step: 0.01,
+        when: (p) => p.part5.voter.enabled && p.part5.voter.mode === 'monitor',
+      },
+      {
+        kind: 'number',
+        path: 'part5.voter.persistMs',
+        label: 'Monitor persistence',
+        unit: 'ms',
+        min: 0,
+        max: 2000,
+        step: 10,
+        when: (p) => p.part5.voter.enabled && p.part5.voter.mode === 'monitor',
+        help: 'How long a channel must disagree before it is isolated: shorter catches faults sooner and noise more often.',
+      },
+    ],
+  },
+  {
+    id: 'part5-transfer',
+    title: 'Hand-over PID → LQI',
+    levels: [1],
+    when: (p) => p.control.l1.kind === 'transfer',
+    fields: [
+      {
+        kind: 'number',
+        path: 'part5.transfer.at',
+        label: 'Hand over at',
+        unit: 's',
+        min: 0,
+        max: 300,
+        step: 1,
+      },
+      {
+        kind: 'bool',
+        path: 'part5.transfer.bumpless',
+        label: 'Bumpless transfer',
+        help: "Preset the LQI's integrator so its first command equals the PID's last one.",
       },
     ],
   },

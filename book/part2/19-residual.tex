@@ -26,7 +26,7 @@ Estimate the force along the wind when the drone flies into it at \SI{2}{m/s}, w
 \end{example}
 \recall{Lesson~I.5: an integral removes a \emph{constant} error. Against a disturbance that keeps changing it is always behind, by roughly the change that happened during its own time constant.}
 
-An integrator holds one number. Here the number it should hold changes by \SI{3.5}{N} every three seconds, and the geometric controller's integral, whose gain is chosen for steadiness, cannot follow. Over the last lap the error is \SI{16.1}{cm} RMS and peaks at \SI{27}{cm} (\cref{fig:residual-eight}).\aside{The lesson's text in the app says \enquote{about 14\,cm}; the recorded flight gives 16.1\,cm over the last lap and 15.6\,cm over the last twenty seconds.}
+An integrator holds one number. Here the number it should hold changes by \SI{3.5}{N} every three seconds, and the geometric controller's integral, whose gain is chosen for steadiness, cannot follow. Over the last lap the error is \SI{16.1}{cm} RMS and peaks at \SI{27}{cm} (\cref{fig:residual-eight}).
 
 \section{Learn the shape, adapt the coefficients}
 
@@ -150,7 +150,7 @@ The flight was repeated with an accelerometer noise of \SI{3}{m/s^2} and \SI{30}
 \end{example}
 
 \begin{watchout}
-The lesson's note in the app says that with poor sensors the learned model's thrust is \enquote{7$\times$ smoother than L1's}. The recorded flights of Example~\ref{ex:residual-noisy} do not show this: the model and L1 are equally smooth, and it is INDI that is about seven times rougher. With the settings of this lesson, the learned model's real advantage is the one of Example~\ref{ex:residual-lambda}: it stays accurate with a slow adaptation, where an estimator of a constant cannot.
+With poor sensors, then, the learned model is not smoother than L1: in the flights of Example~\ref{ex:residual-noisy} the two are equally smooth, and it is INDI that is about seven times rougher. With the settings of this lesson, the learned model's real advantage is the one of Example~\ref{ex:residual-lambda}: it stays accurate with a slow adaptation, where an estimator of a constant cannot.
 \end{watchout}
 
 Neural-Fly's own experiments make the same point at full scale: a learned representation lets the adaptation be slow and smooth, and it beat nonlinear, INDI and L1 baselines in strong winds on a real drone (O'Connell et al., 2022). The difference from this lesson lies in the features: theirs are learned from flights in many winds; ours are written down from \cref{eq:residual-physics} and are partly wrong (the odd $|\vec v|v_x$ for an even $v_x^2$).

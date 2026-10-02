@@ -990,13 +990,14 @@ export const PART_TWO: Lesson[] = [
         <p>
           The MPC now flies the outer loop of the quadrotor: three small QPs (x, y, z) on a
           point-mass model, looking 1 s ahead along the planned figure-8, with the tilt and speed
-          limits as constraints. The amber line is its plan. In the gusty wind it tracks to about 4
-          cm.
+          limits as constraints. The amber line is its plan. In the gusty wind it tracks to about
+          8.5 cm (RMS over the last lap).
         </p>
         <Try>
           Add <i>Inner stage → rate INDI</i> and <i>Disturbance compensation → acceleration INDI</i>
           . Then switch the outer stage to <i>geometric tracking</i> for comparison — with INDI
-          underneath, both land around 1.5 cm.
+          underneath, both improve several times: about 2.3 cm with MPC on top, 2.9 cm with the
+          geometric controller.
         </Try>
         <Notice>
           This is the conclusion of Sun et al. (2022), comparing nonlinear MPC and flatness-based
@@ -1050,9 +1051,11 @@ export const PART_TWO: Lesson[] = [
           coloured cloud is those futures (green cheap, red expensive).
         </p>
         <Try>
-          <i>Outer stage → MPPI</i>, press <kbd>R</kbd>. Then play with the temperature λ: 0.2
-          follows the best sample (decisive), 50 averages many — and the average of "left" and
-          "right" is "straight into the pillar": it hesitates in front. At 500 it wanders.
+          <i>Outer stage → MPPI</i>, press <kbd>R</kbd>. Then play with the temperature λ (press{' '}
+          <kbd>R</kbd> after each change): 0.2 follows the few best samples — decisive, and the
+          fastest to the target. At 50 it averages so many that the plan blurs: it still goes round,
+          but slowly, and is about half a metre short six seconds after the jump. At 500 even the
+          hover drifts, and it never gets close.
         </Try>
         <Notice>
           Sampling is expensive (see the µs/step meter), but it is embarrassingly parallel — which
@@ -1117,12 +1120,14 @@ export const PART_TWO: Lesson[] = [
           try <i>Outer stage → MPPI</i> with the filter still on.
         </Try>
         <Notice>
-          Watch what happens when the setpoint is behind the pillar: the drone stops in front of it
-          and waits. A safety filter guarantees <b>safety, not progress</b> — it removes the part of
-          the command that approaches the boundary, but it does not plan a way around (a{' '}
-          <i>deadlock</i>). Going around is a planning problem: put MPPI on top (previous lesson)
-          and keep the filter as the last line of defence. The filter does not care what is above it
-          — PID, MPC, a learned policy or a human — which is why it is the usual way to add
+          Watch what happens when the setpoint stays behind the pillar. The filter removes only the
+          part of the command that approaches the boundary. Here the pillar stands a little off the
+          line of flight, so a part along the edge is left and the drone slides round — slowly. Put
+          the pillar exactly on the line and nothing is left: the drone stops in front of it for
+          good (a <i>deadlock</i>). A safety filter guarantees <b>safety, not progress</b>: it does
+          not plan a way around. Going around is a planning problem: put MPPI on top (previous
+          lesson) and keep the filter as the last line of defence. The filter does not care what is
+          above it — PID, MPC, a learned policy or a human — which is why it is the usual way to add
           "provably safe" to controllers that are not.
         </Notice>
       </>
@@ -1179,7 +1184,10 @@ export const PART_TWO: Lesson[] = [
           thrust calm down and the payload response get slower. The estimate itself stays just as
           fast — only what reaches the motors changes.
         </Try>
-        <Notice>For comparison the same payload costs the PID 28 cm and ADRC 12 cm.</Notice>
+        <Notice>
+          For comparison, the largest error after the payload lands (payload and gusts together) is
+          28 cm with the PID and 12 cm with ADRC.
+        </Notice>
       </>
     ),
   },
@@ -1218,7 +1226,7 @@ export const PART_TWO: Lesson[] = [
         <p>
           A fast figure-8 through a 3 m/s wind, with rotor drag on. The aerodynamic force now{' '}
           <i>changes with the drone's own velocity</i> — upwind, downwind, sideways, every second.
-          An integrator can only hold a constant: it is always chasing (≈ 14 cm here).
+          An integrator can only hold a constant: it is always chasing (≈ 16 cm here).
         </p>
         <p>
           <b>Neural-Fly</b> (O'Connell et al. 2022) learns the <i>shape</i> of the residual force as
@@ -1234,9 +1242,12 @@ export const PART_TWO: Lesson[] = [
         <Notice>
           Honest comparison: with this simulator's clean accelerometer, L1 adaptive and INDI do even
           better (≈ 2 cm) because they simply measure the force fast. The learned model's advantage
-          shows with poor sensors: with 3 m/s² accelerometer noise and 30 ms delay all three track
-          to ≈ 6–7 cm, but the learned model's thrust is 7× smoother than L1's. Neural-Fly's claim
-          is exactly that: a good model lets you adapt slowly, and slow is smooth.
+          is that it stays accurate while adapting slowly: with 20 s of memory it still tracks to
+          about 3 cm, where an estimator of a constant that slow gives 16 cm. With poor sensors (3
+          m/s² accelerometer noise, 30 ms delay) all three track to ≈ 5–6 cm; the model and L1 are
+          equally smooth, and INDI, which feeds the measured acceleration back at every step, works
+          the motors about 7× harder. Neural-Fly's claim is exactly that: a good model lets you
+          adapt slowly, and slow is smooth.
         </Notice>
       </>
     ),
@@ -1286,13 +1297,15 @@ export const PART_TWO: Lesson[] = [
         </p>
         <Notice>
           What to look for, compared with the geometric ghost: it flies and reacts quickly, but it
-          never quite settles — it keeps hunting around the target in a small limit cycle (about ±15
+          never quite settles — it keeps hunting around the target in a small limit cycle (about ±12
           cm), because nothing in its training rewarded perfect stillness and it has no integrator
-          (no memory of past errors). After the mass jump, far outside its training range, it gets
-          much worse. Careful comparisons of learned and classical controllers (Kunapuli et al.
-          2025) find the same division: learning helps in fast transients and in problems too hard
-          to model; classical control keeps its guarantees and its steady state. State-of-the-art
-          policies are far larger, see a history of observations, and train on millions of flights.
+          (no memory of past errors). After the mass jump, far outside its training range, it acts
+          like a spring: without an integrator it sags by Δm·g/k ≈ 55 cm and stays there, while the
+          geometric ghost wins part of it back with its integral. Careful comparisons of learned and
+          classical controllers (Kunapuli et al. 2025) find the same division: learning helps in
+          fast transients and in problems too hard to model; classical control keeps its guarantees
+          and its steady state. State-of-the-art policies are far larger, see a history of
+          observations, and train on millions of flights.
         </Notice>
       </>
     ),

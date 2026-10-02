@@ -21,6 +21,9 @@ export class MppiOuter {
   private best: Vec3[] = [];
   private t0 = 0;
   private held = v3();
+  /** Re-plan periods not yet shifted out of the plan, in plan steps (the period is usually
+   *  shorter than a step: 20 ms against 50 ms). */
+  private shiftDebt = 0;
   /** Effective number of samples that carried weight last time (1 = greedy … K = uniform). */
   effectiveSamples = 0;
 
@@ -33,6 +36,7 @@ export class MppiOuter {
     this.samples = [];
     this.best = [];
     this.held = v3();
+    this.shiftDebt = 0;
   }
 
   /** Re-plan and return the desired acceleration (m/s², gravity excluded). */
@@ -145,12 +149,17 @@ export class MppiOuter {
     }
     this.t0 = t;
     this.held = this.nominal[0]!;
-    // Receding horizon: shift the plan by one re-plan period for the next warm start.
-    const shift = Math.max(1, Math.round(1 / Math.max(c.hz, 1) / dt));
-    this.nominal = [
-      ...this.nominal.slice(shift),
-      ...Array.from({ length: shift }, () => this.nominal[steps - 1]!),
-    ];
+    // Receding horizon: shift the plan by one re-plan period for the next warm start. The period
+    // (20 ms) is usually a fraction of a plan step (50 ms), so whole steps are shifted only when
+    // the periods add up to one; rounding up to a step every time ran the plan 2.5 times too fast.
+    this.shiftDebt += 1 / Math.max(c.hz, 1) / dt;
+    const shift = Math.min(steps, Math.floor(this.shiftDebt + 1e-9));
+    this.shiftDebt -= shift;
+    if (shift > 0)
+      this.nominal = [
+        ...this.nominal.slice(shift),
+        ...Array.from({ length: shift }, () => this.nominal[steps - 1]!),
+      ];
     return this.held;
   }
 

@@ -498,9 +498,9 @@ integral** control (Williams et al. 2017) does not optimise, it samples:
 4. apply the first input, shift the plan, repeat.
 
 The **temperature** $\lambda$ sets how many samples count: small follows the
-best sample (decisive), large averages many — and the average of "left of
-the pillar" and "right of the pillar" is "into the pillar": the drone
-hesitates in front. It costs many rollouts (256 × 30 steps per plan here,
+best samples (decisive), large averages many, and the plan blurs: in the
+lesson's flights λ = 50 still goes round the pillar, but slowly, and hesitates
+at the target, half a metre short; at 500 even the hover drifts. It costs many rollouts (256 × 30 steps per plan here,
 ≈ 10 % of a CPU core in real time), but they are independent, which is why
 MPPI runs on GPUs in racing and off-road driving.
 

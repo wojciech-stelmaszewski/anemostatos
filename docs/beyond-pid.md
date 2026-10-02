@@ -430,8 +430,8 @@ lesson says so. Other findings:
   evolution strategies (40 iterations, gentle settings — the first,
   aggressive ES setting only made it worse). Validation: teacher 78 cm,
   imitation 89 cm, after ES 76 cm on demanding target jumps. In the lesson it
-  flies but hunts around targets in a ±15 cm limit cycle and degrades outside
-  its training range. Training bug found on the way: a parameter layout
+  flies but hunts around targets in a ±12 cm limit cycle; outside its
+  training range (mass 1.5 kg) it acts like a spring and sags by Δm·g/k ≈ 55 cm. Training bug found on the way: a parameter layout
   mismatch between unpacking and backprop (now one shared module).
 - **Geometric controller fix**: its integral wound up on large steps (10 cm
   offset for many seconds); it now uses conditional integration like Part I.

@@ -63,7 +63,7 @@ Explain the spread of the Figure-8 column, from \SI{0.3}{cm} to \SI{122}{cm}.
 
 \textbf{Step 3 — the best.} Adding INDI or L1 adaptive control removes what is left, the drag of the light turbulence: \SI{0.31}{cm} for both, a tie. MPC, which plans with a point-mass model, reaches 1.1 alone and \SI{0.6}{cm} with INDI.
 
-\textbf{Step 4 — the learned ones.} The neural policy, \SI{33.7}{cm}, saw figure-8s in training but optimised a cost dominated by target jumps; MPPI, \SI{15.1}{cm}, samples its inputs and never quite agrees with itself from one step to the next.
+\textbf{Step 4 — the learned ones.} The neural policy, \SI{33.7}{cm}, saw figure-8s in training but optimised a cost dominated by target jumps; MPPI, \SI{13.5}{cm}, samples its inputs and never quite agrees with itself from one step to the next.
 \end{example}
 
 \begin{keyidea}[Each column rewards one idea of Part~II]
@@ -80,7 +80,7 @@ Read the Noisy sensors column together with the motor jitter.
 
 \textbf{Step 2 — what the motors pay.} In this scenario the RMS change of total thrust between \SI{5}{ms} samples is \SI{0.027}{N} for the PID, \SI{0.039}{N} for the geometric controller, \SI{0.045}{N} for geometric with INDI and \SI{0.060}{N} for MPC with INDI. The more accurate the controller, the harder it works the motors.
 
-\textbf{Step 3 — over all scenarios.} The PID has the calmest motors, \SI{0.011}{N}, and wins that column; MPC with INDI, the most accurate, has \SI{0.025}{N}; MPPI has \SI{0.318}{N}, thirty times the PID's, because each of its steps averages a fresh set of random samples (\cref{fig:arena-payload}, right).
+\textbf{Step 3 — over all scenarios.} The PID has the calmest motors, \SI{0.011}{N}, and wins that column; MPC with INDI, the most accurate, has \SI{0.025}{N}; MPPI has \SI{0.308}{N}, nearly thirty times the PID's, because each of its steps averages a fresh set of random samples (\cref{fig:arena-payload}, right).
 
 \textbf{Step 4 — read it.} Reacting quickly to a disturbance and ignoring sensor noise are opposite requests; \cref{thm:arena-st} below says why no controller can grant both at the same frequency. The PID's calm is the other side of its slowness.
 \end{example}
@@ -147,7 +147,7 @@ Two tasks weigh the columns differently. A camera drone filming in gusty weather
 Entry $a$ \term{dominates} entry $b$ if $a$ is no worse than $b$ in every column and strictly better in at least one. An entry that no other dominates is \term{Pareto-optimal}.
 \end{definition}
 
-Over the six accuracy columns and the motor jitter, five of the nine entries are Pareto-optimal: the PID, geometric alone, geometric with INDI, geometric with L1 and MPC with INDI. Geometric with the learned residual is dominated by geometric with INDI; MPC alone by geometric with L1; the neural policy by three entries; MPPI by six.
+Over the six accuracy columns and the motor jitter, five of the nine entries are Pareto-optimal: the PID, geometric alone, geometric with INDI, geometric with L1 and MPC with INDI. Geometric with the learned residual is dominated by geometric with INDI; MPC alone by geometric with INDI and with L1; the neural policy by three entries; MPPI by six.
 
 \begin{theorem}[Weighted sums pick Pareto-optimal entries]
 \label{thm:arena-pareto}

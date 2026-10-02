@@ -94,6 +94,12 @@ const turnExcess = (p: Params): number => {
 
 /** The faults of lesson III.28 and the end of its flight, s. */
 const FDI = { stuck: 20, unstuck: 25, healthyAgain: 28, rotor: 40, end: 44 };
+/** Lesson III.15: the payload picked up mid-flight. */
+const PAYLOAD = { at: 12, kg: 0.3 };
+/** Steady sag of the sliding mode under the payload with a boundary layer φ, cm: F/(k·λ/φ). */
+const smcSag = (p: Params, phi: number): number =>
+  (100 * PAYLOAD.kg * GRAVITY * phi) / (p.control.smc.k * p.control.smc.lambda);
+
 /** Lesson III.23: the steel the drone hovers next to, s and degrees. */
 const MAG = { on: 6, off: 16, deg: 40 };
 /** Lesson III.24: one bad fix, metres off along x, at this time. */
@@ -1282,6 +1288,153 @@ export const PART_THREE: Lesson[] = [
           see; only resolution can. The same reasoning covers a quantised motor command or a
           fixed-point computation: a quantiser in a loop with an integrator makes a limit cycle, and
           the describing function says how large.
+        </Notice>
+      </>
+    ),
+  },
+  {
+    id: 'smc',
+    n: 15,
+    part: 3,
+    chapter: H,
+    title: 'Slide to the target',
+    level: 1,
+    chart: 'phase',
+    setup: (p) => {
+      p.control.l1.kind = 'smc';
+      p.control.smc = { lambda: 3, k: 6, phi: 0 };
+    },
+    events: (sim) => setAt(sim, PAYLOAD.at, 'drone.mass', 1 + PAYLOAD.kg),
+    predict: {
+      label: 'Sag after the payload with φ = 0.05 m/s',
+      unit: 'cm',
+      truth: (p) => smcSag(p, 0.05),
+      tolerance: 0.15,
+    },
+    goal: {
+      text: 'Predict the sag a boundary layer of 0.05 m/s leaves under the payload. Then stop the chatter (thrust jitter below 0.3 N) while keeping the altitude within 3 cm RMS from 14 s on, through the gusts and the payload.',
+      check: ({ sim, prediction }) => {
+        if (sim.params.control.l1.kind !== 'smc')
+          return 'this lesson is about the sliding-mode controller';
+        if (prediction == null)
+          return 'first the prediction: inside the layer the law is a PD — what is its Kp?';
+        const truth = smcSag(sim.params, 0.05);
+        if (Math.abs(prediction - truth) / truth > 0.15)
+          return 'not within 15 %: the payload weighs 0.3·g newtons, and Kp = k·λ/φ';
+        if (sim.t < 25) return sim.t < PAYLOAD.at ? 'hovering in gusts…' : 'carrying the payload…';
+        const jitter = thrustJitter(sim, 6);
+        const rms = hoverRms(sim, 14, sim.t);
+        return (
+          (jitter < 0.3 && rms < 0.03) ||
+          `thrust jitter ${jitter.toFixed(2)} N · altitude RMS ${(rms * 100).toFixed(1)} cm`
+        );
+      },
+    },
+    solution: (p) => {
+      p.control.smc.phi = 0.05;
+    },
+    body: (
+      <>
+        <p>
+          A <b>sliding-mode</b> controller chooses a line in the phase plane,
+        </p>
+        <M display>{'s = \\dot e + \\lambda e = 0,'}</M>
+        <p>
+          along which the error dies as <M>{'e^{-\\lambda t}'}</M>, and then drives the state onto
+          it with everything it has:
+        </p>
+        <M display>{'u = \\hat m\\,(g + \\lambda\\,\\dot e) + k\\,\\mathrm{sign}(s)'}</M>
+        <p>
+          The first term would keep <M>{'s'}</M> constant if the model were right. The second pushes
+          towards the line with a force <M>{'k'}</M>. Any disturbance force smaller than{' '}
+          <M>{'k'}</M> cannot push the state off the line again: once on it, the drone slides to the
+          target whatever the wind or the weight. The phase portrait draws the line.
+        </p>
+        <Try>
+          At 12 s the drone picks up 300 g, 2.9 N it was not designed for. Watch the altitude: the
+          sliding mode barely notices. Now look at the motor chart. Then set{' '}
+          <b>Sliding mode → Switching force k</b> to 2 N, below the payload's weight, and press{' '}
+          <b>R</b>. Back at 6 N, give the law a <b>Boundary layer φ</b>: inside{' '}
+          <M>{'|s| < \\varphi'}</M> the sign becomes a slope, and the law is a PD with{' '}
+          <M>{'K_p = k\\lambda/\\varphi'}</M>.
+        </Try>
+        <Notice>
+          With φ = 0 the sign flips on every sample: the thrust jumps by ±6 N 250 times a second.
+          The motors smooth it into a buzz, but a real motor and its battery would not thank you.
+          This is <b>chatter</b>, the price of a discontinuous law on a sampled, lagging plant. The
+          boundary layer removes it at the price of a steady error, k·λ/φ newtons per metre, which
+          an integral would remove in turn. With k below the disturbance the guarantee is gone, and
+          the drone sinks almost two metres before the law and the ground stop it.
+        </Notice>
+      </>
+    ),
+  },
+  {
+    id: 'mrac',
+    n: 17,
+    part: 3,
+    chapter: H,
+    title: 'Learning can diverge',
+    level: 1,
+    chart: 'mrac',
+    setup: (p) => {
+      calm(p);
+      p.control.l1.kind = 'mrac';
+      p.control.model.mass = 0.7;
+      p.control.mrac = { ...p.control.mrac, gamma: 20000, gammaG: 50, sigma: 0 };
+      p.sensors.delayMs = 20;
+      p.setpoint.profile = 'sine';
+      p.setpoint.profileAmplitude = 0.1;
+      p.setpoint.profilePeriod = 0.5;
+    },
+    goal: {
+      text: 'Keep the fast adaptation (γ at least 10 000) and stop the drift: from 30 s on, the drone must follow the reference model within 5 cm RMS.',
+      check: ({ sim }) => {
+        const c = sim.params.control;
+        if (c.l1.kind !== 'mrac') return 'this lesson is about MRAC';
+        if (c.mrac.gamma < 10000)
+          return 'keep γ at 10 000 or more: a slow adaptation hides the problem, it does not solve it';
+        if (sim.t < 40) return 'adapting…';
+        const { series } = sim.telemetry.window(['mrac.err'], 30);
+        const e = series[0]!.filter((v) => !Number.isNaN(v));
+        const rms = Math.sqrt(e.reduce((a, v) => a + v * v, 0) / Math.max(e.length, 1));
+        return rms < 0.05 || `model-following error ${(rms * 100).toFixed(1)} cm RMS`;
+      },
+    },
+    solution: (p) => {
+      p.control.mrac.sigma = 0.01;
+    },
+    body: (
+      <>
+        <p>
+          <b>Model-reference adaptive control</b> does not need to know the mass. It chooses a
+          reference model, the loop it wants (<M>{'\\ddot y_m = k_p(r - y_m) - k_d\\dot y_m'}</M>),
+          and adapts three numbers <M>{'\\hat\\theta'}</M> until the drone behaves like it. The
+          adaptation law comes out of a Lyapunov function [Ioannou 1996]:
+        </p>
+        <M display>{'\\dot{\\hat\\theta} = -\\Gamma\\,w\\,(B^\\top P x)'}</M>
+        <p>
+          with <M>{'x'}</M> the error between drone and model. The proof says the error goes to zero
+          for any adaptation gain <M>{'\\Gamma'}</M>, however large. The controller believes the
+          drone weighs 0.7 kg; it weighs 1.0 kg. The ideal gains are{' '}
+          <M>{'\\theta^* = m\\,(k_p, k_d, g) = (9, 6, 9.8)'}</M>.
+        </p>
+        <Try>
+          Watch the first seconds: the drone follows the model to a few millimetres, as the proof
+          promises. Then watch the velocity gain on the chart. Set <b>Sensors → Delay</b> to 0 and
+          press <b>R</b>. Then, with the delay back at 20 ms, try <b>MRAC → σ-modification</b>.
+        </Try>
+        <Notice>
+          The proof assumed a plant without delay and with instant motors. With 20 ms of delay the
+          velocity gain drifts from 4 to over 140, twenty times its ideal, and the motors spend 80 %
+          of the time at their limits: the error that the law was proven to remove grows to 15 cm.
+          Without the delay the gain still drifts (to about 55, nine times its ideal), but the
+          motors can follow. This is the Rohrs counterexample of 1985 on a drone: nothing in the
+          Lyapunov argument stops the parameters from wandering in directions the error does not
+          see, until the dynamics the proof ignored are excited. σ-modification pulls the gains back
+          towards the first guess and keeps them there, at the price of following the model a little
+          less exactly. The filter of L1 adaptive control in lesson II.18 is the same repair, made
+          in a different place.
         </Notice>
       </>
     ),

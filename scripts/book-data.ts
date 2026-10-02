@@ -14,6 +14,8 @@ type Exp = {
   seconds: number;
   setup?: (p: Params) => void;
   events?: (sim: Simulation) => void;
+  /** Keep every telemetry sample (5 ms) instead of every second one. */
+  full?: boolean;
 };
 
 const OUT = new URL('../book/data/', import.meta.url);
@@ -674,17 +676,44 @@ for (const m of [0.7, 1.5])
       p.control.model.mass = m;
     },
   });
-for (const sync of [false, true])
+// The same mismatch without any gyro noise: the wobble is an instability, not noise.
+add({
+  name: 'indisync-off-quiet',
+  seconds: 25,
+  full: true,
+  setup: (p) => {
+    l3(p);
+    calm(p);
+    square(1.5, 6, 'x')(p);
+    p.control.l3.inner = 'indi';
+    p.control.indi.filterHz = 5;
+    p.control.indi.syncFilters = false;
+  },
+});
+for (const [tag, sync, hz] of [
+  ['off', false, 5],
+  ['on', true, 5],
+  ['off-6hz', false, 6],
+  ['off-7hz', false, 7],
+  ['off-8hz', false, 8],
+  ['off-10hz', false, 10],
+  ['off-20hz', false, 20],
+  ['off-40hz', false, 40],
+  ['on-2hz', true, 2],
+  ['on-10hz', true, 10],
+  ['on-20hz', true, 20],
+] as const)
   add({
-    name: `indisync-${sync ? 'on' : 'off'}`,
+    name: `indisync-${tag}`,
     seconds: 25,
+    full: true,
     setup: (p) => {
       l3(p);
       calm(p);
       square(1.5, 6, 'x')(p);
       p.sensors.gyroNoise = 10;
       p.control.l3.inner = 'indi';
-      p.control.indi.filterHz = 5;
+      p.control.indi.filterHz = hz;
       p.control.indi.syncFilters = sync;
     },
   });
@@ -881,7 +910,7 @@ for (const e of E) {
     .map((n, i) => [n, series[i]!] as const)
     .filter(([, s]) => s.some((v) => Number.isFinite(v)));
   const rows = [`t,${keep.map(([n]) => n).join(',')}`];
-  for (let k = 0; k < t.length; k += 2) {
+  for (let k = 0; k < t.length; k += e.full ? 1 : 2) {
     const row = [t[k]!.toFixed(3)];
     for (const [, s] of keep) {
       const v = s[k]!;

@@ -472,3 +472,46 @@ def indi_gust():
     b.set_ylabel("N")
     xlab_time(b)
     save(f, "indi_gust")
+
+
+def _sync_jitter(tag):
+    d = load(f"indisync-{tag}")
+    m = d[d.t >= 15][[f"motor.{i}" for i in range(1, 5)]].values
+    return np.sqrt((np.diff(m, axis=0) ** 2).sum(1).mean())
+
+
+@fig
+def indisync():
+    f, (a, b) = plt.subplots(1, 2, figsize=(TEXT_W, 62 * MM), gridspec_kw=dict(wspace=0.32, width_ratios=[1.25, 1]))
+    for tag, col, lab in (("off", C["err"], "not synchronised"), ("on", C["meas"], "synchronised")):
+        d = win(load(f"indisync-{tag}"), 16, 17.5)
+        a.plot(d.t, d["motor.1"], color=col, lw=0.8, label=lab)
+    a.legend(loc="upper right", fontsize=6.2)
+    a.set_xlim(16, 17.5)
+    a.set_ylim(0, 7.5)
+    a.set_title("Motor 1, both filters at 5 Hz")
+    a.set_ylabel("N")
+    xlab_time(a)
+    off = [5, 6, 7, 8, 10, 20, 40]
+    on = [5, 10, 20]
+    jo = [_sync_jitter("off" if h == 5 else f"off-{h}hz") for h in off]
+    jn = [_sync_jitter("on" if h == 5 else f"on-{h}hz") for h in on]
+    b.axvspan(4, 6.9, color=C["sat"], alpha=0.7, lw=0, zorder=0)
+    b.text(4.25, 0.036, "unstable", fontsize=6.0, color=C["err"])
+    b.loglog(off, jo, "o-", color=C["err"], ms=3, lw=0.8, label="not synchronised")
+    b.loglog(on, jn, "o-", color=C["meas"], ms=3, lw=0.8, label="synchronised")
+    b.axhline(0.12, color=C["I"], lw=0.7, ls=(0, (4, 2.5)))
+    b.text(22, 0.095, "goal: 0.12 N", fontsize=6.2, color=C["I"])
+    b.set_xlim(4, 50)
+    b.set_ylim(0.03, 1.0)
+    b.set_xticks([5, 10, 20, 40])
+    b.set_xticklabels(["5", "10", "20", "40"])
+    b.set_yticks([0.05, 0.1, 0.2, 0.5, 1.0])
+    b.set_yticklabels(["0.05", "0.1", "0.2", "0.5", "1"])
+    b.minorticks_off()
+    b.legend(loc="lower right", fontsize=6.2)
+    b.set_title("Motor jitter against the filter")
+    b.set_xlabel("filter cutoff [Hz]", loc="right")
+    b.set_ylabel("N")
+    b.grid(True, which="major", axis="both")
+    save(f, "indisync")

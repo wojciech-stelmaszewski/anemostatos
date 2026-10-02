@@ -1,0 +1,196 @@
+\lesson{II.9}{Keep your filters in sync}{INDI subtracts two measurements. If they describe two different moments, the difference describes nothing — and the loop chases it.}{3}{indi-sync}{Part II · Beyond PID}
+\label{les:indisync}
+
+\lead{\setupcard{\setuprow{Level}{L3}\setuprow{Controller}{the cascade with rate INDI, filter at \SI{5}{Hz}, motor signal not filtered}\setuprow{Sensors}{a noisy gyroscope, \SI{10}{\degree/s}}\setuprow{Setpoint}{a square wave of $\pm\SI{1.5}{m}$ in $x$, period \SI{6}{s}; no wind}\setuprow{Goal}{over the last \SI{10}{s}, roll and pitch error below $8.5^\circ$ RMS and motor jitter below \SI{0.12}{N}}}%
+A noisy gyroscope forces a slow filter before the angular acceleration can be taken from it. The lesson starts with that filter on the gyroscope alone: the law compares the motors' torque of now with the drone's acceleration of some \SI{45}{ms} ago. The drone shakes at five hertz, never finishes its take-off and climbs away. One switch — the same filter on the motor signal — makes it fly. This lesson shows why the mismatch is an instability and not merely an error, predicts the cutoff below which it appears, and explains why the tempting cure, a faster filter, only trades the shaking for noise.}
+
+\section{Two halves of one difference}
+
+The INDI law of \lessonref{les:indi},
+\begin{equation*}
+  \tau = \tau_0 + \hat J\,(\alpha_{des} - \dot\omega_0),
+\end{equation*}
+is a difference in disguise: $\tau_0 - \hat J\dot\omega_0$ is the torque of the motors minus the torque the drone's acceleration shows, which is the disturbance with its sign changed (\lessonref{les:indiwind}). The two terms come from two sources. $\tau_0$ comes from the motors' speeds, which the controller knows almost exactly. $\dot\omega_0$ comes from differentiating the gyroscope, and a derivative of a noisy signal must be filtered.
+
+In this lesson's set-up the gyroscope's noise is \SI{10}{\degree/s} and the filter must come down to \SI{5}{Hz}. At low frequencies a second-order Butterworth filter at $f_c$ delays its input by $\sqrt2/(2\pi f_c)$: here \SI{45}{ms}. So the law subtracts the acceleration of \SI{45}{ms} ago from the torque of now. Whenever the torque changes, for \SI{45}{ms} the law sees a torque that has no acceleration to go with it, concludes that something is opposing it, and adds more.\innumbers{At \SI{5}{Hz} the filter's delay of \SI{45}{ms} is longer than the motors' lag of \SI{30}{ms}: the law hears about its own torque later than the drone feels it.}
+
+\begin{result}[Synchronised INDI]
+\begin{equation}\label{eq:indisync-law}
+  \tau = F[\tau_0] + \hat J\,\big(\alpha_{des} - F[\dot\omega]\big)
+\end{equation}
+$F[\cdot]$ is the same filter, with the same cutoff and the same discretisation, applied to both signals. The law then compares the torque and the acceleration of the same moment — both \SI{45}{ms} old — and the difference is a true estimate of the disturbance, only late.
+\end{result}
+\tip{Use the same filter \emph{object} type, the same cutoff and the same sample time for both paths, and update both on every cycle. Two filters that are \enquote{both \SI{5}{Hz}} but discretised differently are not synchronised.}
+
+\simfig{indisync}{Left: the thrust of one motor with both filters at \SI{5}{Hz}, from flights on the same set-up; without synchronisation the motor swings over almost its whole range at \SI{5}{Hz}. Right: the RMS change of the motors' thrusts from one \SI{5}{ms} sample to the next, for different filter cutoffs. The shaded region is where the unsynchronised loop is predicted to be unstable.}{fig:indisync}
+
+\section{Why the mismatch is unstable}
+
+\begin{example}[The hidden loop]
+\label{ex:indisync-loop}
+Find the closed loop of rate INDI with $\hat J = J$, the motors' lag $G(s) = 1/(\tau_m s + 1)$, $\tau_m = \SI{30}{ms}$, and the filter $F(s)$ on the gyroscope only.
+
+\textbf{Step 1 — what each term is.} The motors deliver $\tau_0 = G\tau$; the drone answers $J\dot\omega = G\tau + \tau_d$; the law sees $F\dot\omega$, but $\tau_0$ without the filter.
+
+\textbf{Step 2 — substitute.} $\tau = G\tau + J\alpha_{des} - F(G\tau + \tau_d)$, and collecting the terms in $\tau$:
+\begin{equation*}
+  \big(1 - G\,(1 - F)\big)\,\tau = J\alpha_{des} - F\tau_d .
+\end{equation*}
+With synchronised filters the first term would be $FG\tau$ instead of $G\tau$, and the bracket would be exactly 1 (\cref{thm:indi-loop} with $k = 1$).
+
+\textbf{Step 3 — read the bracket.} $G(1 - F)$ is a loop inside the law: the torque goes out through the motors and comes back through $1 - F$, the part of the signal the filter has not yet let through. At low frequencies $1 - F \approx 0$ and the loop is harmless; at high frequencies $G \approx 0$. In between, at $\omega = \SI{28.6}{rad/s}$ for the \SI{5}{Hz} filter, $|G| = 0.76$ and $|1 - F| = 1.18$ with phases $-41^\circ$ and $+40^\circ$, so $G(1 - F) = 0.89$ almost exactly in phase: the bracket is $|1 - 0.89| = 0.11$. Any torque at that frequency is amplified about nine times.\recall[-20pt]{A loop $L$ closed around a signal amplifies it by $1/|1 - L|$ when the feedback is positive, as here, or $1/|1 + L|$ when it is negative (\lessonref{les:edge}).}
+
+\textbf{Step 4 — close the rate loop.} With $\alpha_{des} = K(\omega_{sp} - \omega)$, $K = \SI{20}{s^{-1}}$, the loop is $s\omega = K G(\omega_{sp} - \omega)/(1 - G(1 - F))$. Its characteristic polynomial, with the millisecond of sampling delay of the \SI{1}{kHz} loop added, has the roots $s = 2.4 \pm 36.3\,j$: in the right half-plane. The loop oscillates at $36/(2\pi) = \SI{5.8}{Hz}$, growing until the motors run out of range.
+
+\textbf{Step 5 — check.} The flight (\cref{fig:indisync}) oscillates at \SI{5.1}{Hz}; the motors swinging over their whole range slow the oscillation a little, as saturation does. Without any gyroscope noise the oscillation is still there, with the same frequency: it is an instability, not a response to the noise.
+\end{example}
+
+\begin{keyidea}[A filter on one side only is a loop of its own]
+INDI cancels a signal with its own measurement. If the two paths differ by a filter, the difference $1 - F$ is not zero, and the law contains the feedback loop $G(1 - F)$ that the designer never drew. Synchronising the filters makes that loop vanish identically, for every cutoff.
+\end{keyidea}
+\pitfall{The symptom of unsynchronised filters looks like a gain that is too high: a fast oscillation of the rate loop. Lowering the gain or the filter cutoff makes it worse, not better.}
+
+\begin{example}[The edge, and the cutoff that seems to cure it]
+\label{ex:indisync-edge}
+For which cutoffs is the unsynchronised loop stable, and how well damped is it?
+
+\textbf{Step 1 — the roots for each cutoff.} Repeating Step 4 of Example~\ref{ex:indisync-loop} for other cutoffs, the least damped pair of roots has these damping ratios:
+
+\begin{center}\small\sffamily
+\begin{tabular}{lccccccc}
+\toprule
+filter cutoff [\si{Hz}] & 5 & 6 & 7 & 8 & 10 & 20 & 40\\
+\midrule
+not synchronised, $\zeta$ & $-0.07$ & $-0.03$ & $0.006$ & $0.05$ & $0.14$ & $0.66$ & $0.72$\\
+synchronised, $\zeta$ & 0.59 & 0.62 & 0.63 & 0.64 & 0.64 & 0.64 & 0.64\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{Step 2 — the edge.} The unsynchronised loop becomes stable at about \SI{6.9}{Hz}. The flights agree: at 5, 6 and \SI{7}{Hz} the motors swing over their range (at \SI{7}{Hz} the damping of 0.006 is too small to tell from an instability in the noise); at \SI{8}{Hz} the oscillation dies out; at \SI{10}{Hz} the flight rings at \SI{43}{rad/s}, near the predicted 47.
+
+\textbf{Step 3 — the synchronised loop.} Its damping does not depend on the filter, because the filter has left the loop: what remains is $\tau_m s^2 + s + K = 0$, with $\zeta = 1/(2\sqrt{K\tau_m}) = 0.65$. The filter now only decides how late the disturbance is cancelled (\cref{thm:indiwind-residual}).
+
+\textbf{Step 4 — the tempting cure.} A faster filter makes the unsynchronised loop stable. But it also lets more of the gyroscope's noise into the derivative: from \cref{fig:indisync}, the motor jitter is \SI{0.22}{N} at \SI{10}{Hz} and \SI{0.39}{N} at \SI{20}{Hz} — twice and four times the goal. The synchronised loop at \SI{5}{Hz} has \SI{0.085}{N}, and the attitude error is the same in both ($7.5^\circ$ and $7.7^\circ$ RMS, set by the square wave's steps, not by the controller).
+\end{example}
+
+\section{Why the drone climbs}
+
+Without synchronisation the drone does not only shake: it never ends its take-off and climbs at \SI{2.7}{m/s}, reaching \SI{64}{m} in 25 seconds. The altitude loop wants less thrust, and does not get it.
+
+\begin{example}[The mixer chooses the attitude]
+\label{ex:indisync-climb}
+The motors give at most $f_{max} = \SI{6.1}{N}$ each, and the drone weighs \SI{9.81}{N}. Explain the climb.
+
+\textbf{Step 1 — the demand.} The oscillating torques ask for thrust differences between the motors of about \SI{5.5}{N}: one side near zero while the other is near the top.
+
+\textbf{Step 2 — the mixer's priority.} The mixer of \lessonref{les:cascade} keeps every motor in $[0, f_{max}]$ by shifting the collective thrust before it gives up any attitude torque. When the differences span almost the whole range, there is only one collective thrust that fits: every motor centred near $f_{max}/2 \approx \SI{3}{N}$.
+
+\textbf{Step 3 — the result.} Four motors at about \SI{3}{N} give \SI{11.8}{N} on average (measured), \SI{2}{N} more than the weight, whatever the altitude loop asks.\didyouknow[-30pt]{Racing pilots call this mixer priority \enquote{air mode}: it keeps the drone controllable even at zero throttle, at the price that the throttle no longer has the last word.} The drone climbs until its drag balances the excess. The take-off never ends, so the square wave never starts.
+
+\textbf{Step 4 — read it.} The mixer's priority is right — losing the attitude is worse than losing the altitude — but it hides an attitude problem as an altitude problem. Without the noise the attitude swings are half as large, the mixer has room, and the drone stays at its altitude while it shakes.
+\end{example}
+
+\screen[0 0 495 998]{indisync}{Lesson II.9 in the app after the switch to synchronised filters. The rate loop's contributions now move together: the held torque and the measured acceleration describe the same moment.}{fig:indisync-screen}
+
+\begin{inapp}
+\begin{itemize}[leftmargin=1.2em]
+  \item The switch is \ui{INDI\then Synchronised filters} (\param{control.indi.syncFilters}); the cutoff is \param{control.indi.filterHz}, the gyroscope's noise \param{sensors.gyroNoise}.
+  \item In \texttt{RateIndi.torque} in \src{src/control/stages.ts} the motor torque passes through a second \texttt{Filter3} only when the switch is on; the filters are identical objects, so the two paths are the same to the last bit.
+  \item The goal's jitter is the RMS change of the four motor thrusts between consecutive \SI{5}{ms} telemetry samples, summed over the motors.
+\end{itemize}
+\end{inapp}
+
+\begin{trythis}
+\begin{enumerate}
+  \item Watch the start: the shaking, then the climb. Open the motor chart.
+  \item Raise \ui{INDI\then Gyro filter} in steps: 6, 7, 8, \SI{10}{Hz}. Where does the shaking stop? What happens to the motor chart?
+  \item Back at \SI{5}{Hz}, switch \ui{Synchronised filters} on and reset.
+  \item Set the gyroscope noise to zero and the filter back to \SI{5}{Hz}, unsynchronised. Does the drone still shake?
+\end{enumerate}
+\predict{with synchronised filters, does the shaking come back if you lower the cutoff to \SI{2}{Hz}? What does get worse?}
+\end{trythis}
+
+\section{The engineer's view: compare like with like}
+
+\subsection{A rule beyond INDI}
+Every estimator that subtracts a prediction from a measurement must make both describe the same moment. A Kalman filter fed with a satellite position that is \SI{0.2}{s} old must compare it with the state of \SI{0.2}{s} ago, not with the current one; flight software keeps a buffer of past states for exactly this.\didyouknow{PX4's navigation filter runs its estimate a fraction of a second in the past, on a delayed \enquote{fusion time horizon}, where all sensors' samples have arrived, and predicts forward to the present for the controller.} A disturbance observer subtracts a model's output from a measurement and must delay the model as the sensor is delayed. Even the derivative term of a PID, when its two samples are taken at irregular intervals, measures the wrong slope.
+
+\begin{example}[A delayed satellite fix in a car]
+\label{ex:indisync-gnss}
+A car drives at \SI{30}{m/s}. Its navigation filter receives satellite positions that are \SI{0.2}{s} old by the time they arrive. What does it conclude if it compares each fix with its current estimate, and what does the buffer change?
+
+\textbf{Step 1 — the innovation.} In \SI{0.2}{s} the car moves \SI{6}{m}. The fix lies \SI{6}{m} behind the current estimate, even when both are perfect. The filter takes this as an error and pulls its estimate back by its gain times \SI{6}{m}.
+
+\textbf{Step 2 — the bias.} At constant speed the pull is constant: the estimate settles behind the car, and with a velocity state the filter also learns a speed that is too low until the two errors balance. Nothing is wrong with the sensor or the filter; only their moments differ.
+
+\textbf{Step 3 — the buffer.} Keep the estimates of the last second. When a fix stamped $t - 0.2$ arrives, compare it with the estimate of $t - 0.2$, correct that estimate, and propagate the correction to now through the motion model. The innovation is then zero for perfect data, and only the real errors move the estimate.
+
+\textbf{Step 4 — read it.} INDI synchronises by delaying the fast signal to match the slow one; the navigation filter by remembering the past. Both make the two terms of a difference describe the same instant.
+\end{example}
+
+\subsection{In formal terms}
+
+\begin{theorem}[The increment loop with one filter]
+\label{thm:indisync-loop}
+In the setting of \cref{thm:indi-loop}, let $\dot\omega$ be measured through $F(s)$ but $\tau_0$ be used unfiltered. Then
+\begin{equation*}
+  \big(1 - G(s) + k\,F(s)G(s)\big)\,\tau = kJ\,\alpha_{des} - k\,F(s)\,\tau_d .
+\end{equation*}
+The increment loop is stable if and only if $1 - G + kFG$ has no zeros in the closed right half-plane. For $k = 1$ the bracket is $1 - G(1 - F)$, which differs from 1 unless $F = 1$; with synchronised filters it is exactly 1 for every $F$, and the closed loop does not depend on the filter.
+\end{theorem}
+\begin{proof}
+Insert $\tau_0 = G\tau$ unfiltered and $\hat J F\dot\omega = kF(G\tau + \tau_d)$ into \cref{eq:indi-law} and collect the terms in $\tau$. The stability statement is the definition for the transfer function from $\alpha_{des}$ to $\tau$; with the outer rate loop closed, the polynomial of Example~\ref{ex:indisync-loop} follows by substituting $\alpha_{des} = K(\omega_{sp} - \omega)$ and $s\omega = G\tau/J$. With $\tau_0$ filtered, \cref{thm:indi-loop} gives the bracket $1 + (k - 1)FG$, which is 1 at $k = 1$.
+\end{proof}
+
+The theorem makes the folklore precise. Synchronisation does not merely make the estimate \enquote{more correct}: it removes a feedback loop from the system. The published remedy for INDI's sensitivity to the filter is exactly this (Smeur, Chu and de Croon, 2016), and it is the reason the filter in every INDI implementation is applied to the actuator signal too.\tip{When a loop behaves worse after adding a filter, check every place where the filtered signal is compared with an unfiltered one.}
+
+\begin{lookahead}
+\begin{itemize}[leftmargin=1.2em]
+  \item Delayed measurements in the Kalman filter, with the buffer of Example~\ref{ex:indisync-gnss}, return in navigation (Part~III).
+  \item The gyroscope's noise is not white in a real frame: the motors shake it at their rotation frequency. Notch filters, and why they too must be applied to both sides, are Lessons~III.20 and III.21.
+  \item Chapter~C leaves disturbances aside and turns to the geometry of large rotations and to planning trajectories the drone can actually fly.
+\end{itemize}
+\end{lookahead}
+
+\begin{remember}
+\begin{itemize}
+  \item INDI subtracts the motors' torque and the measured acceleration. Both must pass through the same filter, so that they describe the same moment.
+  \item With the filter on one side only, the law contains the loop $G(1 - F)$; at \SI{5}{Hz} and \SI{30}{ms} of motor lag it makes the rate loop unstable at about \SI{6}{Hz}.
+  \item Synchronised, the loop is $\tau_m s^2 + s + K$ for every cutoff ($\zeta = 0.65$); the filter only decides how late disturbances are cancelled.
+  \item A faster filter stabilises the unsynchronised loop (from about \SI{7}{Hz}) but lets the noise into the motors: \SI{0.22}{N} of jitter at \SI{10}{Hz} against \SI{0.085}{N} synchronised at 5.
+  \item The mixer keeps attitude before altitude: a violent attitude oscillation forces the collective thrust to mid-range, and the drone climbs.
+  \item The rule is general: every difference between a measurement and a prediction must compare the same instant.
+\end{itemize}
+\end{remember}
+
+\begin{curiosity}{A third of a second at Dhahran}
+On 25 February 1991 a Patriot air-defence battery at Dhahran, in Saudi Arabia, failed to intercept an incoming Scud missile. The missile hit a barracks and killed 28 American soldiers. The investigation of the US General Accounting Office (1992) traced the failure to time.
+
+The system counted time in tenths of a second, as an integer, and converted it to seconds by multiplying by 0.1 stored in a 24-bit register. One tenth has no exact binary representation, and the stored value was short by about one ten-millionth of a second per tick. The battery had been running for about a hundred hours; the accumulated error was about a third of a second, in which a Scud travels more than half a kilometre.
+
+A clock that is uniformly wrong would not have mattered much: the system predicted where to look for the target from the difference of two radar times, and a common error cancels in a difference. But the software had been improved to convert time more accurately — in some places and not in others. One of the two times in the difference was converted the new way and the other the old way, so their errors no longer cancelled. The tracking gate was placed more than half a kilometre away from the missile, the radar saw nothing inside it, and the track was dropped.
+
+The fix — sent to the battery the day after — made the conversions agree. Two halves of one difference, out of step: the same lesson as this chapter's, at a far higher price.
+\end{curiosity}
+
+\begin{exercises}
+\exercise[1] What is the low-frequency delay $\sqrt2/(2\pi f_c)$ of the second-order Butterworth filter at 5, 7 and \SI{20}{Hz}?
+\answer{45, 32 and \SI{11}{ms}.}
+\exercise[1] The motors' torque on one axis steps up by \SI{0.05}{N.m} and the drone's inertia is $J = \SI{0.0082}{kg.m^2}$. With the gyroscope filtered at \SI{5}{Hz} and the motor torque unfiltered, what disturbance does the law believe in during the first \SI{45}{ms}?
+\answer{The torque rose by \SI{0.05}{N.m} but the filtered acceleration has not yet: the law sees $\tau_0 - J\dot\omega_0$ change by \SI{0.05}{N.m}, a disturbance of \SI{0.05}{N.m} opposing the motors, and adds that much more torque.}
+\exercise[1] In Example~\ref{ex:indisync-climb}, at what steady speed would the drone climb if its vertical drag were $c\,v$ with $c = \SI{0.75}{N.s/m}$?
+\answer{$v = \SI{2.0}{N}/0.75 = \SI{2.7}{m/s}$.}
+\exercise[2]\exkind{derive} Derive the bracket $1 - G(1 - F)$ of Example~\ref{ex:indisync-loop}, and evaluate it at \SI{28.6}{rad/s} for the \SI{5}{Hz} Butterworth filter and the \SI{30}{ms} motor lag.
+\answer{From $\tau = G\tau + J\alpha_{des} - F(G\tau + \tau_d)$. At $s = 28.6j$: $G = 0.76\angle{-41^\circ}$, $F = 0.70\angle{-63^\circ}$, $1 - F = 1.18\angle{40^\circ}$, $G(1 - F) = 0.89\angle{-1^\circ}$, bracket $\approx 0.11$.}
+\exercise[2]\exkind{derive} For the synchronised loop $\tau_m s^2 + s + K = 0$, find the natural frequency and the damping ratio for $K = 20$ and $\tau_m = \SI{30}{ms}$. Which gain would give $\zeta = 0.5$?
+\answer{$\omega_n = \sqrt{K/\tau_m} = \SI{25.8}{rad/s}$, $\zeta = 1/(2\sqrt{K\tau_m}) = 0.645$. $\zeta = 0.5$ for $K\tau_m = 1$: $K = 33$.}
+\exercise[2]\exkind{derive} Show that if the two filters are synchronised but the model inertia is wrong, $\hat J = kJ$, the bracket is $1 + (k - 1)FG$, and that a slower filter then lowers the edge in $k$. Why is this not a reason to leave the filters unsynchronised?
+\answer{\Cref{thm:indi-loop}. A slower $F$ adds phase lag to $FG$, so $FG$ reaches $-180^\circ$ at a lower frequency where $|FG|$ is larger, and $k < 1 + 1/|FG(j\omega_{180})|$ is tighter. Unsynchronised, the loop is already unstable at $k = 1$ for slow filters; synchronised, $k = 1$ is always stable and the margin in $k$ is a matter of tuning.}
+\exercise[2]\exkind{fly} In Lesson~II.9 synchronise the filters and lower the cutoff to 2 and then to \SI{1}{Hz}. Is the flight still stable? What gets worse, and why does the goal not measure it?
+\answer{Stable (the filter is out of the loop), and the jitter falls further: \SI{0.071}{N} at \SI{2}{Hz}, with the same $7.7^\circ$ of attitude error. What suffers is disturbance rejection: by \cref{thm:indiwind-residual} a disturbance is cancelled $\sqrt2/(2\pi f_c)$ late, \SI{0.11}{s} at \SI{2}{Hz}. The lesson has no wind, so the goal does not see it; with wind or a fault the slow filter would show.}
+\exercise[2]\exkind{code} In \src{src/control/stages.ts}, \texttt{RateIndi.torque} filters the gyroscope's rate and then differentiates it. Show that differentiating after the filter is the same as filtering the derivative, and explain why the code does it in this order.
+\answer{Linear time-invariant filters commute: $F(s)\,s\,\omega = s\,F(s)\,\omega$. Differentiating the raw noisy rate first would produce huge sample-to-sample values before the filter; filtering first keeps every intermediate value small, which matters for numerical range and for saturation inside a filter.}
+\exercise[3]\exkind{derive} The sampling delay. Repeat Example~\ref{ex:indisync-edge} for the \SI{7}{Hz} filter with and without the \SI{1}{ms} delay of the \SI{1}{kHz} loop, using $e^{-sT} \approx (1 - sT/2)/(1 + sT/2)$, and explain why a millisecond moves the edge by almost half a hertz.
+\answer{Without the delay the edge is at \SI{6.4}{Hz} and \SI{7}{Hz} has $\zeta \approx 0.02$; with it the edge is at \SI{6.9}{Hz} and $\zeta \approx 0.006$. At \SI{40}{rad/s} one millisecond is $2.3^\circ$ of phase, and the hidden loop $G(1 - F)$ has a gain close to 1 there: a few degrees decide stability.}
+\end{exercises}

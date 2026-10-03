@@ -68,7 +68,7 @@ export function LiveFormula() {
   });
 
   // The satellite of Chapter N has no PID to show: its law is in the lesson and the charts.
-  if (vehicle === 'satellite') return null;
+  if (vehicle === 'satellite' || vehicle === 'chaser') return null;
   if (!isPidParts(parts)) {
     // Any other controller: its output as the sum of its named contributions.
     return (

@@ -6,6 +6,7 @@ import { LowPass2 } from '@/estimation/filters';
 import { Mekf } from '@/estimation/mekf';
 import { NavEkf } from '@/estimation/navekf';
 import { Ins } from '@/estimation/ins';
+import { ParticleFilter } from '@/estimation/particle';
 import { RangeFilter, type Beacon } from '@/estimation/ukf';
 import type { DroneState } from './dynamics';
 import {
@@ -120,7 +121,10 @@ export class Sensors {
   readonly nav = new NavEkf();
   /** The inertial navigator of lesson IV.27 and the range-only filter of lesson IV.27. */
   readonly ins = new Ins();
-  rangeFilter = new RangeFilter('ekf');
+  rangeFilter: RangeFilter | ParticleFilter = new RangeFilter('ekf');
+  /** The noise of the velocity the particle filter moves its cloud by (lesson IV.28), m/s. */
+  static readonly FLOW_NOISE = 0.05;
+  private readonly seed: number;
   private nextBeacon = 0;
   private navOn = false;
   private steps = 0;
@@ -137,6 +141,7 @@ export class Sensors {
 
   constructor(seed: number) {
     this.rng = new Rng(seed ^ 0x27d4eb2f);
+    this.seed = seed;
   }
 
   /** Store the true state; call once per physics step. */
@@ -306,13 +311,22 @@ export class Sensors {
       const bf = c.beaconFilter!;
       if (t < bf.start) {
         this.nextBeacon = bf.start;
-        if (this.rangeFilter.kind !== bf.kind) this.rangeFilter = new RangeFilter(bf.kind);
-        this.rangeFilter.reset([s.pos.x + bf.guessX, s.pos.z + bf.guessZ, 0, 0], bf.sigma0, 0.5);
+        if (this.rangeFilter.kind !== bf.kind)
+          this.rangeFilter =
+            bf.kind === 'pf' ? new ParticleFilter(3000, this.seed) : new RangeFilter(bf.kind);
+        const guess = [s.pos.x + bf.guessX, s.pos.z + bf.guessZ, 0, 0];
+        if (this.rangeFilter instanceof ParticleFilter)
+          this.rangeFilter.reset(guess, 3 * bf.sigma0);
+        else this.rangeFilter.reset(guess, bf.sigma0, 0.5);
       } else if (t >= this.nextBeacon) {
         const dt = 1 / Math.max(c.sensors.beaconRateHz, 0.1);
         this.nextBeacon += dt;
         const f = this.rangeFilter;
-        f.predict(dt, 0.3);
+        if (f instanceof ParticleFilter) {
+          // The particle filter is told the drone's velocity (optical flow), not its position.
+          const nv = Sensors.FLOW_NOISE;
+          f.predict(dt, s.vel.x + nv * this.rng.normal(), s.vel.z + nv * this.rng.normal());
+        } else f.predict(dt, 0.3);
         const n = c.sensors.beaconNoise;
         const z = BEACONS.map(
           (b) => Math.hypot(s.pos.x - b.x, s.pos.z - b.z) + n * this.rng.normal(),

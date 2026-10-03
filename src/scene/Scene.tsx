@@ -10,6 +10,7 @@ import { AircraftRig } from './Aircraft';
 import { LandingPad, RocketRig, TvcRocketRig } from './Rocket';
 import { LanderScene } from './Lander';
 import { SatelliteRig } from './Satellite';
+import { RendezvousScene } from './Rendezvous';
 import { useParams } from '@/store/params';
 import { Grid } from './Grid';
 import { ForceArrows, TermArrows } from './overlays/ForceArrows';
@@ -92,6 +93,7 @@ function VehicleRig() {
   if (vehicle === 'aircraft') return <AircraftRig />;
   if (vehicle === 'satellite') return <SatelliteRig />;
   if (vehicle === 'lander') return <LanderScene />;
+  if (vehicle === 'chaser') return <RendezvousScene />;
   return vehicle === 'rocket' ? (
     <>
       <LandingPad />

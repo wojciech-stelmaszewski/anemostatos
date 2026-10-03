@@ -102,6 +102,12 @@ const SATELLITE: LoopMeta[] = [
   satAxis('z'),
 ];
 
+/** The chaser of lesson IV.25: each axis of the relative position, the thrust as the output. */
+const RENDEZVOUS: LoopMeta[] = [
+  { id: 'along', name: 'Along-track', unit: 'm', outUnit: 'mm/s²', outName: 'thrust' },
+  { id: 'radial', name: 'Radial', unit: 'm', outUnit: 'mm/s²', outName: 'thrust' },
+];
+
 /** Loops to offer in the inspector for these parameters. */
 /** The aircraft of Chapter M flies one loop: pitch attitude, through the elevator. */
 const PITCH: LoopMeta[] = [
@@ -119,6 +125,7 @@ export const loopsFor = (p: Params): LoopMeta[] => {
   if (p.sim.vehicle === 'tvc') return TVC_LOOPS;
   if (p.sim.vehicle === 'aircraft') return PITCH;
   if (p.sim.vehicle === 'satellite') return SATELLITE;
+  if (p.sim.vehicle === 'chaser') return RENDEZVOUS;
   if (p.sim.level !== 3) return LOOPS[p.sim.level];
   const geometric = p.control.l3.outer !== 'pid-cascade'; // geometric, MPC, MPPI
   // The geometric controller closes position and velocity in one law: no separate velocity loop,

@@ -13,7 +13,8 @@ import type { Params } from '../params';
  * The step is the simulator's own (semi-implicit Euler at the physics rate), so a linearisation
  * of it is exactly the discrete model the simulator flies, as `l1Plant` is for the quadrotor.
  */
-export type VehicleId = 'quadrotor' | 'rocket' | 'tvc' | 'aircraft' | 'satellite' | 'lander';
+export type VehicleId =
+  'quadrotor' | 'rocket' | 'tvc' | 'aircraft' | 'satellite' | 'lander' | 'chaser';
 
 /** What acts on the vehicle from outside: the air and any push from the user. */
 export interface Environment {

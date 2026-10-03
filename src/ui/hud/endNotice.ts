@@ -10,7 +10,14 @@ export function endNotice(s: Simulation): [string, string] | null {
     const v = s.rocket ? Math.abs(s.rocket.touchdown) : s.pdgLander!.touchdownSpeed;
     return [`Landed at ${v.toFixed(2)} m/s.`, LANDED];
   }
+  if (s.chaser?.docked)
+    return [`Docked at ${(s.chaser.contactSpeed * 100).toFixed(1)} cm/s.`, LANDED];
   if (!s.state.crashed) return null;
+  if (s.chaser)
+    return [
+      `Collision! Reached the target at ${(s.chaser.contactSpeed * 100).toFixed(1)} cm/s. ${reset}`,
+      CRASH,
+    ];
   if (s.rocket)
     return [
       `Crashed! Touched down at ${Math.abs(s.rocket.touchdown).toFixed(1)} m/s. ${reset}`,

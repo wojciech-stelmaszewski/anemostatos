@@ -1,3 +1,4 @@
+import type { RendezvousParams } from './vehicles/chaser';
 import type { TvcControlParams } from '@/control/tvc';
 import type { RocketParams } from './vehicles/rocket';
 import type { TvcParams } from './vehicles/tvc';
@@ -289,10 +290,16 @@ export interface UncertaintyParams {
   delayMs: number;
 }
 
-/** The filter on range-only beacons (src/estimation/ukf.ts, lesson IV.27). */
+/**
+ * The filter on range-only beacons (src/estimation/ukf.ts, lesson IV.27; the particle filter of
+ * src/estimation/particle.ts, lesson IV.28).
+ */
 export interface BeaconFilterParams {
-  kind: 'ekf' | 'ukf';
-  /** Where the filter starts, relative to the truth, m, and how unsure it says it is, m. */
+  kind: 'ekf' | 'ukf' | 'pf';
+  /**
+   * Where the filter starts, relative to the truth, m, and how unsure it says it is, m. The
+   * particle filter spreads its particles uniformly over ±3σ around that point.
+   */
   guessX: number;
   guessZ: number;
   sigma0: number;
@@ -612,6 +619,17 @@ export interface Params {
   plan: PlanParams;
   /** Part V: the flight software around the controller (src/control/part5). */
   part5: Part5Params;
+  /** Lesson IV.29: a flight-test reconstruction of the altitude after the flight (src/estimation/rts.ts). */
+  smoother: SmootherParams;
+  /** Lesson IV.25: the chaser near a target in orbit (src/sim/vehicles/chaser.ts). */
+  rendezvous: RendezvousParams;
+}
+
+/** The Kalman filter and RTS smoother run over the recorded altitude of lesson IV.29. */
+export interface SmootherParams {
+  enabled: boolean;
+  /** Process noise of the constant-velocity model, m/s² per √Hz. */
+  accelSigma: number;
 }
 
 /** Lesson IV.6: rest to rest along x past the pillar, planned by min-snap or by collocation. */
@@ -1004,6 +1022,23 @@ export const defaultParams = (): Params => ({
       persistMs: 200,
     },
     transfer: { at: 10, bumpless: false },
+  },
+  smoother: { enabled: false, accelSigma: 1 },
+  rendezvous: {
+    periodMin: 92.6,
+    warp: 120,
+    startX: 0,
+    startY: -100,
+    burn: 0.05,
+    accelMax: 0.01,
+    control: 'coast',
+    mpcStep: 60,
+    mpcHorizon: 60,
+    qPos: 1e-5,
+    qVel: 0.1,
+    rAcc: 1,
+    dockRadius: 0.3,
+    dockSpeed: 0.05,
   },
 });
 

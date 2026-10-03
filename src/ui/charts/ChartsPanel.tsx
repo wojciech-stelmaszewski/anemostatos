@@ -18,6 +18,9 @@ import { TvcChart } from '@/ui/analysis/TvcChart';
 import { PdgChart } from '@/ui/analysis/PdgChart';
 import { PlanChart } from '@/ui/analysis/PlanChart';
 import type { VehicleId } from '@/sim/vehicles/types';
+import { ParticleCloudChart } from '@/ui/analysis/ParticleCloudChart';
+import { SmootherChart } from '@/ui/analysis/SmootherChart';
+import { RendezvousChart } from '@/ui/analysis/RendezvousChart';
 import { useRaf } from '@/ui/hud/useRaf';
 import { partColor, SIGNAL } from '@/ui/colors';
 import { Select } from '@/ui/components/select';
@@ -68,6 +71,9 @@ const EXTRA: { value: ExtraChart; label: string }[] = [
   { value: 'tvc', label: 'thrust-vector loop (Nyquist)' },
   { value: 'backtoback', label: 'fixed point vs reference' },
   { value: 'altimeters', label: 'three altimeters' },
+  { value: 'cloud', label: 'particle cloud' },
+  { value: 'smoother', label: 'filter against smoother' },
+  { value: 'rendezvous', label: 'rendezvous, in the target’s frame' },
 ];
 /** What can stand in the motor chart's place. */
 const SECOND: { value: AnalysisChart | 'motors'; label: string }[] = [
@@ -147,6 +153,15 @@ const ALTITUDE: SeriesSpec[] = [
   { key: 'air.href', label: 'reference', color: SIGNAL.setpoint, dash: [4, 3], width: 1.5 },
   { key: 'air.h', label: 'altitude', color: SIGNAL.measurement, width: 2 },
 ];
+/** Lesson IV.25: the distance to the target. */
+const RV_RANGE: SeriesSpec[] = [
+  { key: 'rv.range', label: 'distance to the target', color: SIGNAL.measurement, width: 2 },
+];
+/** Lesson IV.29: the noisy altitude readings the reconstruction works from, and the truth. */
+const SMOOTH_ALT: SeriesSpec[] = [
+  { key: 'meas.y', label: 'altimeter', color: SIGNAL.measurement, width: 1 },
+  { key: 'pos.y', label: 'truth', color: SIGNAL.output, width: 1.5 },
+];
 const BEACON_NIS: SeriesSpec[] = [
   { key: 'rng.nis', label: 'NIS of each range', color: SIGNAL.measurement, width: 1.5 },
 ];
@@ -194,6 +209,12 @@ const ACTUATOR: Partial<
     series: [{ key: 'tvc.delta', label: 'gimbal', color: SIGNAL.output, width: 2 }],
   },
   aircraft: { label: 'elevator', title: 'Elevator', unit: '°', series: ELEVATOR },
+  chaser: {
+    label: 'Δv used',
+    title: 'Δv used',
+    unit: 'm/s',
+    series: [{ key: 'rv.dv', label: 'Δv', color: SIGNAL.output, width: 2 }],
+  },
   satellite: {
     label: 'wheel torque',
     title: 'Wheel torque',
@@ -311,7 +332,10 @@ export function ChartsPanel() {
     extra === 'pio' ||
     extra === 'pdg' ||
     extra === 'plan' ||
-    extra === 'cmg';
+    extra === 'cmg' ||
+    extra === 'cloud' ||
+    extra === 'smoother' ||
+    extra === 'rendezvous';
   const ctrlKey = useParams((s) => controllerKey(s.params));
   const loopOptions = useMemo(
     () => loopsFor(useParams.getState().params).map((l) => ({ value: l.id, label: l.name })),
@@ -502,6 +526,43 @@ export function ChartsPanel() {
               <PdgChart />
             ) : extra === 'plan' ? (
               <PlanChart />
+            ) : extra === 'rendezvous' ? (
+              <div className="flex h-full min-h-0 flex-col gap-1.5">
+                <div className="min-h-0 flex-1">
+                  <TimeChart
+                    title="Distance to the target (log scale)"
+                    unit="m"
+                    series={RV_RANGE}
+                    logY
+                  />
+                </div>
+                <div className="min-h-0 flex-[1.8]">
+                  <RendezvousChart />
+                </div>
+              </div>
+            ) : extra === 'smoother' ? (
+              <div className="flex h-full min-h-0 flex-col gap-1.5">
+                <div className="min-h-0 flex-1">
+                  <TimeChart title="Recorded altitude" unit="m" series={SMOOTH_ALT} />
+                </div>
+                <div className="min-h-0 flex-[1.6]">
+                  <SmootherChart />
+                </div>
+              </div>
+            ) : extra === 'cloud' ? (
+              <div className="flex h-full min-h-0 flex-col gap-1.5">
+                <div className="min-h-0 flex-1">
+                  <TimeChart
+                    title="Particle filter: error against its own 2σ (log scale)"
+                    unit="m"
+                    series={BEACON_ERR}
+                    logY
+                  />
+                </div>
+                <div className="min-h-0 flex-[1.6]">
+                  <ParticleCloudChart />
+                </div>
+              </div>
             ) : extra === 'hq' ? (
               <HqChart />
             ) : extra === 'envelope' ? (

@@ -40,12 +40,17 @@ import { Engagement, targetState } from '@/guidance/pronav';
 import { PdgGuidance } from '@/guidance/pdg';
 import { initialLander, stepLander, type LanderState } from '@/sim/vehicles/lander';
 import { insGyroError } from '@/estimation/ins';
+import { RendezvousMpc } from '@/control/rendezvous';
+import { initialChaser, stepChaser, type ChaserState } from '@/sim/vehicles/chaser';
 import { Tap } from './tap';
 import { Telemetry } from './telemetry';
 
 export const PHYS_DT = 0.001;
 /** Height at which the planar rocket of Chapter L is drawn, m. */
 export const TVC_HEIGHT = 8;
+/** Lesson IV.25: the target is drawn this high, and a scene metre stands for this many metres. */
+export const RV_HEIGHT = 20;
+export const RV_SCALE = 10;
 export const TELEMETRY_HZ = 200;
 const TELEMETRY_EVERY = Math.round(1 / (TELEMETRY_HZ * PHYS_DT));
 const HISTORY_SECONDS = 60;
@@ -112,6 +117,9 @@ export class Simulation {
   /** The satellite and its attitude control, while `params.sim.vehicle` is 'satellite' (Chapter N). */
   satellite: SatelliteState | null = null;
   satCtl = new SatelliteController();
+  /** The chaser of lesson IV.25 and its MPC, while `params.sim.vehicle` is 'chaser'. */
+  chaser: ChaserState | null = null;
+  rvMpc = new RendezvousMpc();
   /** Attitude knowledge from a gyro and a star tracker (lesson IV.22). */
   starNav = new StarNavigator();
   /** Largest attitude error since `satSince`, deg (lessons IV.19–IV.20 judge a window). */
@@ -263,6 +271,12 @@ export class Simulation {
       this.mirrorSatellite();
       this.takingOff = false;
     }
+    this.rvMpc.reset();
+    this.chaser = p.sim.vehicle === 'chaser' ? initialChaser(p.rendezvous) : null;
+    if (this.chaser) {
+      this.mirrorChaser();
+      this.takingOff = false;
+    }
     this.pdg.reset();
     this.pdgLoop = null;
     this.pdgLander = p.sim.vehicle === 'lander' ? initialLander(p.lander) : null;
@@ -387,6 +401,10 @@ export class Simulation {
     }
     if (this.pdgLander) {
       this.stepLander(dt);
+      return;
+    }
+    if (this.chaser) {
+      this.stepChaserSim(dt);
       return;
     }
 
@@ -559,6 +577,34 @@ export class Simulation {
     this.t += dt;
     this.stepIndex++;
     if (this.stepIndex % TELEMETRY_EVERY === 0) this.record();
+  }
+
+  /** The chaser of lesson IV.25: orbital time runs `warp` times faster than the simulator's. */
+  private stepChaserSim(dt: number): void {
+    const c = this.chaser!;
+    const rp = this.params.rendezvous;
+    while (this.scheduled.length && this.scheduled[0]!.t <= this.t)
+      this.scheduled.shift()!.fn(this);
+    const u = rp.control === 'mpc' && this.armed ? this.rvMpc.tick(c, rp) : { ax: 0, ay: 0 };
+    stepChaser(c, u, dt * rp.warp, rp);
+    this.mirrorChaser();
+    this.t += dt;
+    this.stepIndex++;
+    if (this.stepIndex % TELEMETRY_EVERY === 0) this.record();
+  }
+
+  /** Along-track is the scene's x and radial its y, at one tenth of the size, around the target. */
+  private mirrorChaser(): void {
+    const c = this.chaser!;
+    const s = this.state;
+    s.pos = v3(c.y / RV_SCALE, RV_HEIGHT + c.x / RV_SCALE, 0);
+    s.vel = v3(c.vy / RV_SCALE, c.vx / RV_SCALE, 0);
+    s.q = { w: 1, x: 0, y: 0, z: 0 };
+    s.landed = false;
+    s.crashed = c.hit;
+    s.motors = [0, 0, 0, 0];
+    s.rotors = [0, 0, 0, 0];
+    this.forces = { thrust: v3(), gravity: v3(), drag: v3(), external: v3(), net: v3() };
   }
 
   /** The satellite of Chapter N: its attitude mirrored into `state`, held 2 m above the floor. */
@@ -776,6 +822,11 @@ export class Simulation {
       tl.commit(this.t);
       return;
     }
+    if (this.chaser) {
+      this.recordChaser();
+      tl.commit(this.t);
+      return;
+    }
     const s = this.state;
     tl.set('pos.x', s.pos.x);
     tl.set('pos.y', s.pos.y);
@@ -950,6 +1001,29 @@ export class Simulation {
     const extras = this.controller.extras();
     for (const k in extras) tl.set(k, extras[k]!);
     tl.commit(this.t);
+  }
+
+  private recordChaser(): void {
+    const tl = this.telemetry;
+    const c = this.chaser!;
+    tl.set('rv.x', c.x);
+    tl.set('rv.y', c.y);
+    tl.set('rv.range', Math.hypot(c.x, c.y));
+    tl.set('rv.speed', Math.hypot(c.vx, c.vy));
+    tl.set('rv.dv', c.dv);
+    tl.set('rv.min', c.t / 60);
+    // Loops for the charts: each axis regulated to the target, the thrust as the output, mm/s².
+    const loop = (meas: number, out: number) => ({
+      setpoint: 0,
+      measurement: meas,
+      error: -meas,
+      parts: [],
+      unsaturated: out,
+      output: out,
+      saturated: Math.abs(out) >= this.params.rendezvous.accelMax * 1000 - 1e-9,
+    });
+    recordLoop(tl, 'along', loop(c.y, c.ay * 1000));
+    recordLoop(tl, 'radial', loop(c.x, c.ax * 1000));
   }
 
   private recordSatellite(): void {

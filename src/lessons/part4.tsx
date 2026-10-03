@@ -9,6 +9,7 @@ import {
 } from '@/analysis/aircraft';
 import { unshapedResidual } from '@/analysis/panel';
 import { pioFreeRate } from '@/analysis/pio';
+import { reconstructAltitude } from '@/analysis/smoother';
 import { analyseTvc, minPitchGain, wrongWayZero, type TvcAnalysis } from '@/analysis/tvc';
 import { bangBangLimits, minimumTime } from '@/control/bangbang';
 import { designLqr } from '@/control/lqr';
@@ -18,8 +19,10 @@ import { TELEMETRY_HZ, type Simulation } from '@/engine/simulation';
 import { manoeuvreFor } from '@/guidance/collocation';
 import { finishedLandings } from '@/guidance/pdgCampaign';
 import { GRAVITY, type Params } from '@/sim/params';
+import { BEACONS } from '@/sim/sensors';
 import { ignitionAltitude } from '@/sim/vehicles/rocket';
 import { panelFreeHz } from '@/sim/vehicles/satellite';
+import { driftPerOrbit, meanMotion } from '@/sim/vehicles/chaser';
 import { Notice, Try } from './Bits';
 import { M as Tex } from './Math';
 import { setAt } from './script';
@@ -358,6 +361,34 @@ const manoeuvreRecord = (sim: Simulation, from: number, to: number) => {
   });
   return { saturated, closest };
 };
+
+/** Lesson IV.28: calm air; a straight leg along z at `leg`, judged from `from` to `until`. */
+const IV28 = { leg: 15, legZ: 4, from: 30, until: 40, limit: 2 };
+/** Where the mirror image of the drone lies after a straight leg along z: across x = beacon x. */
+const ghostX = (p: Params): number => 2 * BEACONS[0]!.x - p.setpoint.x;
+/** The largest error and the largest σ of the beacon filter between `from` and `until`. */
+const worstCloud = (sim: Simulation, from: number, until: number) => {
+  const w = sim.telemetry.window(['rng.err', 'rng.sigma2'], from);
+  let err = 0;
+  let sigma = 0;
+  w.t.forEach((t, i) => {
+    if (t > until) return;
+    const e = w.series[0]![i]!;
+    const s2 = w.series[1]![i]!;
+    if (Number.isFinite(e)) err = Math.max(err, e);
+    if (Number.isFinite(s2)) sigma = Math.max(sigma, s2 / 2);
+  });
+  return { err, sigma };
+};
+
+/** Lesson IV.29: the altimeter's noise, the record's end, and what the smoother must reach. */
+const IV29 = { noise: 0.05, until: 30, ratio: 0.55, rms: 0.01, start: 100, good: 1 };
+
+/** Lesson IV.25: the Δv budget, m/s, and the time allowed, one orbit. */
+const IV25 = { budget: 0.3 };
+/** How much further behind one orbit of coasting leaves the chaser after its first burn, m. */
+const fallsBehind = (p: Params): number =>
+  -driftPerOrbit(p.rendezvous.burn, meanMotion(p.rendezvous));
 
 /** Lessons of Part IV, in plan order (by `n`). */
 export const PART_FOUR: Lesson[] = [
@@ -2445,6 +2476,81 @@ export const PART_FOUR: Lesson[] = [
     ),
   },
   {
+    id: 'rendezvous',
+    n: 25,
+    part: 4,
+    chapter: O,
+    title: 'Falling around together',
+    level: 1,
+    chart: 'rendezvous',
+    loop: 'along',
+    setup: (p) => {
+      p.sim.vehicle = 'chaser';
+      p.wind.enabled = false;
+    },
+    predict: {
+      label: 'How much further behind after one orbit of coasting',
+      unit: 'm',
+      truth: fallsBehind,
+      tolerance: 0.05,
+    },
+    goal: {
+      text: `Predict where the first burn leaves the chaser after one orbit, then dock: under 5 cm/s, within one orbit, on at most ${IV25.budget} m/s of Δv in all.`,
+      check: ({ sim, prediction }) => {
+        const c = sim.chaser;
+        if (!c) return 'fly the chaser';
+        const truth = fallsBehind(sim.params);
+        if (prediction == null) return 'first the prediction: y(t) = (4Δv/n)·sin nt − 3Δv·t';
+        if (Math.abs(prediction - truth) > 0.05 * Math.abs(truth))
+          return 'not within 5 %: put t = one period into the along-track term';
+        if (c.hit) return `it hit the target at ${(c.contactSpeed * 100).toFixed(0)} cm/s`;
+        const lap = sim.params.rendezvous.periodMin * 60;
+        if (!c.docked) return c.t > lap ? 'an orbit has gone by without docking' : 'approaching…';
+        if (c.t > lap) return 'docked, but it took more than an orbit';
+        if (c.dv > IV25.budget) return `docked on ${c.dv.toFixed(2)} m/s of Δv: over the budget`;
+        return true;
+      },
+    },
+    solution: (p) => {
+      p.rendezvous.burn = 0;
+      p.rendezvous.control = 'mpc';
+      p.rendezvous.rAcc = 1e6;
+    },
+    body: (
+      <>
+        <p>
+          A supply ship is 100 m behind a space station, in the same circular orbit, 400 km up. The
+          station is ahead, so the obvious move is to point at it and push: a burn of 5 cm/s
+          forwards, then coast, and it should arrive in half an hour. In the station’s own frame (x
+          up, y along the flight) the motion obeys the <b>Clohessy–Wiltshire</b> equations [Clohessy
+          1960], with n the orbital rate (one lap in 92.6 minutes):
+        </p>
+        <Tex
+          display
+        >{String.raw`\ddot x = 3n^2x + 2n\dot y + a_x, \qquad \ddot y = -2n\dot x + a_y`}</Tex>
+        <p>
+          Faster means a higher orbit, and a higher orbit is a slower one. From rest, a forward burn
+          Δv gives <Tex>{String.raw`x(t) = \tfrac{2\Delta v}{n}(1-\cos nt)`}</Tex> and{' '}
+          <Tex>{String.raw`y(t) = \tfrac{4\Delta v}{n}\sin nt - 3\Delta v\,t`}</Tex>: the ship
+          rises, slows down and falls behind. Time runs 120 times faster here, so one orbit takes 46
+          seconds.
+        </p>
+        <Try>
+          Predict how much further behind one orbit leaves it, and press <b>Start</b>. Then set{' '}
+          <b>After the burn</b> to MPC: every minute it plans the thrust for the next hour with the
+          same equations and applies the first minute. It docks, but look at the Δv. Raise the{' '}
+          <b>MPC thrust weight</b> by factors of 100, and drop the naive first burn.
+        </Try>
+        <Notice>
+          The equations are linear, so a rendezvous is a linear control problem, and an MPC from
+          Part II flies it: the hard part is the model, not the controller. A cheap plan uses the
+          orbit: it lets the drift carry the ship and pushes only for the difference. A very cheap
+          one is slow: with the naive burn still in, a weight of 10⁷ takes longer than an orbit.
+        </Notice>
+      </>
+    ),
+  },
+  {
     id: 'ins',
     n: 26,
     part: 4,
@@ -2570,6 +2676,170 @@ export const PART_FOUR: Lesson[] = [
           a confident wrong one flies the vehicle into the ground. Note what the NIS could not tell:
           a consistent innovation does not prove a consistent estimate, which only the truth (here,
           the simulator) or a second, independent measurement can check.
+        </Notice>
+      </>
+    ),
+  },
+  {
+    id: 'particle',
+    n: 28,
+    part: 4,
+    chapter: O,
+    title: 'Many guesses at once',
+    level: 3,
+    chart: 'cloud',
+    loop: 'pos.x',
+    setup: (p) => {
+      p.wind.enabled = false;
+      p.sensors.beacons = true;
+      // Centred on the beacon and ±15 m wide: the filter knows only that the drone is near it.
+      p.control.beaconFilter = {
+        kind: 'pf',
+        guessX: BEACONS[0]!.x,
+        guessZ: 0,
+        sigma0: 5,
+        start: 10,
+      };
+    },
+    events: (sim) => setAt(sim, IV28.leg, 'setpoint.z', IV28.legZ),
+    predict: {
+      label: 'x of the mirror image after the straight leg',
+      unit: 'm',
+      truth: ghostX,
+      tolerance: 0.05,
+    },
+    goal: {
+      text: `Predict where the second guess sits after the straight leg, then make the cloud settle on one: from ${IV28.from} s to ${IV28.until} s the estimate within ${IV28.limit} m of the truth and the cloud’s σ below ${IV28.limit} m.`,
+      check: ({ sim, prediction }) => {
+        const p = sim.params;
+        if (!p.sensors.beacons || p.control.beaconFilter.kind !== 'pf')
+          return 'keep the beacon and the particle filter';
+        if (prediction == null)
+          return 'first the prediction: mirror the drone in the line through the beacon along the leg';
+        if (Math.abs(prediction - ghostX(p)) > 1)
+          return 'not within 1 m: the line runs through the beacon, parallel to z';
+        if (sim.t < IV28.until) return 'filtering…';
+        const c = worstCloud(sim, IV28.from, IV28.until);
+        if (c.err > IV28.limit)
+          return `the estimate was ${c.err.toFixed(1)} m off: the cloud still holds more than one guess`;
+        if (c.sigma > IV28.limit) return `the cloud is still ${c.sigma.toFixed(1)} m wide`;
+        return true;
+      },
+    },
+    solution: (p) => {
+      p.setpoint.profile = 'circle';
+      p.setpoint.profileAmplitude = 1;
+      p.setpoint.profilePeriod = 20;
+    },
+    body: (
+      <>
+        <p>
+          The beacon of lesson IV.27 again, in calm air, but now the drone also knows its own
+          velocity (an optical-flow camera looking at the ground, good to 5 cm/s), not where it is.
+          A <b>particle filter</b> [Arulampalam 2002] does not keep a mean and a covariance. It
+          keeps three thousand guesses, the particles, spread at first over a 30 m square around the
+          beacon. Each step moves every particle by the measured velocity, and each range weights
+          them by how well they explain it. When a few carry most of the weight, the cloud is
+          redrawn from the weights.
+        </p>
+        <p>
+          While the drone hovers, every point at the right distance explains the ranges equally
+          well, and the cloud becomes a <b>ring</b> around the beacon. Its mean is near the beacon,
+          10 m off, and its σ says so: the filter does not pretend. At 15 s the drone flies a
+          straight leg of 4 m along z. Every particle moves the same way, and the ranges change
+          differently for each one, so most of the ring dies out. But not all: a particle at the{' '}
+          <b>mirror image</b> of the drone, across the line through the beacon along the leg, sees
+          exactly the same ranges. Two guesses survive, and the mean sits between them.
+        </p>
+        <Try>
+          Before the leg, predict the x of the mirror image (the drone hovers at x = 0; the beacon
+          is at x = 10). Then watch the cloud split. Set <b>Setpoint → Automatic motion</b> to a
+          circle and press <b>R</b>: a turn is not symmetric about any line, and the cloud keeps one
+          guess.
+        </Try>
+        <Notice>
+          The EKF of lesson IV.27 had to choose one point on the ring at the first range, and it
+          chose it by the shape of its prior, not by the data. The particles keep every hypothesis
+          the data allow until the data rule them out: a belief with two peaks is a belief a
+          Gaussian cannot hold. The price is three thousand range predictions per update instead of
+          one, and a cloud that can lose a hypothesis by chance when it is redrawn: watch the two
+          halves of the ring drift apart in weight while the drone hovers.
+        </Notice>
+      </>
+    ),
+  },
+  {
+    id: 'smoother',
+    n: 29,
+    part: 4,
+    chapter: O,
+    title: 'Hindsight',
+    level: 1,
+    chart: 'smoother',
+    setup: (p) => {
+      p.sensors.posNoise = IV29.noise;
+      p.smoother = { enabled: true, accelSigma: IV29.start };
+      p.setpoint.profile = 'square';
+      p.setpoint.profileAmplitude = 0.5;
+      p.setpoint.profilePeriod = 8;
+    },
+    predict: {
+      label: 'σ of the smoother ÷ σ of the filter, mid-record, slow model',
+      unit: '',
+      truth: () => 0.5,
+      tolerance: 0.05,
+    },
+    goal: {
+      text: `Predict how much smaller the smoother’s σ is than the filter’s in the middle of a long record, then tune the model so that over ${IV29.until} s the smoother’s RMS error is below ${IV29.rms * 100} cm and at most ${IV29.ratio * 100} % of the filter’s.`,
+      check: ({ sim, prediction }) => {
+        if (!sim.params.smoother.enabled) return 'keep the reconstruction on';
+        if (prediction == null)
+          return 'first the prediction: a line fitted to a record is surest in its middle';
+        if (Math.abs(prediction - 0.5) > 0.05)
+          return 'not within 5 %: compare the end of a fitted line with its middle';
+        if (sim.t < IV29.until) return 'recording…';
+        const r = reconstructAltitude(sim);
+        if (!r) return 'the altimeter must be noisy for this';
+        if (r.rmsS > IV29.rms)
+          return `the smoother is ${(r.rmsS * 100).toFixed(2)} cm RMS: the model follows the noise`;
+        if (r.rmsS > IV29.ratio * r.rmsF)
+          return `the smoother is ${((100 * r.rmsS) / r.rmsF).toFixed(0)} % of the filter`;
+        return true;
+      },
+    },
+    solution: (p) => {
+      p.smoother.accelSigma = IV29.good;
+    },
+    body: (
+      <>
+        <p>
+          After a test flight nobody is in a hurry. The recorded altimeter readings (5 cm of noise,
+          200 a second) can be read forwards and backwards, and the best estimate of the altitude at
+          12 s may use the readings at 13 s. A <b>Kalman filter</b> running forward knows only the
+          past; the <b>Rauch–Tung–Striebel smoother</b> [Rauch 1965; Simon 2006] then runs backward
+          over the filter’s results and adds what the future says about each instant. This is how
+          flight-test data are reconstructed.
+        </p>
+        <p>
+          Both use the same model: a constant velocity, bent by a random acceleration of a given
+          size. Small, and the model trusts a straight line through many readings; large, and it
+          follows every reading, noise and all. The chart below shows both errors against the truth,
+          each with its own σ dashed. The smoother’s σ is smaller everywhere except at the very end,
+          where there is no future to add.
+        </p>
+        <Try>
+          Predict the ratio first. A slow model is a straight line fitted to the readings around
+          each instant: the filter sees them only on one side, and a fitted line is least sure at
+          its end. The smoother sees both sides and evaluates the line in its middle. Then lower{' '}
+          <b>Model acceleration noise</b> from 100 towards 1 and watch both errors shrink; go on to
+          0.01 and watch the filter lag behind every step of the setpoint.
+        </Try>
+        <Notice>
+          For a slow model the ratio tends to ½ whatever the noise and the rate: it is geometry. For
+          a line fitted to N points the variance at its end is four times that in its middle, so the
+          σ is twice. The smoother cannot fly the drone, since it needs the future, but it is the
+          reference every filter is judged against, and how the truth is known after a flight that
+          had no truth to compare with.
         </Notice>
       </>
     ),

@@ -50,7 +50,15 @@ export interface Group extends Visibility {
 }
 
 /** Every vehicle: for the settings that do not depend on what flies. */
-const ALL_VEHICLES: VehicleId[] = ['quadrotor', 'rocket', 'tvc', 'aircraft', 'satellite', 'lander'];
+const ALL_VEHICLES: VehicleId[] = [
+  'quadrotor',
+  'rocket',
+  'tvc',
+  'aircraft',
+  'satellite',
+  'lander',
+  'chaser',
+];
 
 /** The vehicles a group or field is shown for: groups default to the drone, `drone.*` fields too. */
 const vehiclesOf = (v: Visibility): VehicleId[] | undefined =>
@@ -1597,6 +1605,7 @@ export const SCHEMA: Group[] = [
           { value: 'aircraft', label: 'aircraft (pitch plane, Part IV)' },
           { value: 'satellite', label: 'satellite (attitude only, Part IV)' },
           { value: 'lander', label: 'lander (3D, powered-descent guidance)' },
+          { value: 'chaser', label: 'chaser near a target in orbit (rendezvous)' },
         ],
         help: 'What flies. The rocket moves only up and down, burns its propellant, and lands on a pad (lesson IV.4). The pitch-plane rocket balances on a gimballed engine at one flight condition (Chapter L). The aircraft flies in the pitch plane (Chapter M). The satellite only turns, with reaction wheels or thrusters (Chapter N).',
       },
@@ -3632,9 +3641,10 @@ export const SCHEMA: Group[] = [
         options: [
           { value: 'ekf', label: 'extended Kalman filter' },
           { value: 'ukf', label: 'unscented Kalman filter' },
+          { value: 'pf', label: 'particle filter (knows its velocity)' },
         ],
         when: (p) => p.sensors.beacons,
-        help: 'The EKF replaces the curved distance function by its tangent at the estimate. The UKF pushes a few sigma points through the curve itself.',
+        help: 'The EKF replaces the curved distance function by its tangent at the estimate. The UKF pushes a few sigma points through the curve itself. The particle filter keeps three thousand guesses and is told the drone’s velocity.',
       },
       {
         kind: 'number',
@@ -4040,6 +4050,94 @@ export const SCHEMA: Group[] = [
         path: 'part5.transfer.bumpless',
         label: 'Bumpless transfer',
         help: "Preset the LQI's integrator so its first command equals the PID's last one.",
+      },
+    ],
+  },
+  {
+    id: 'smoother',
+    title: 'Flight-test reconstruction',
+    levels: [1],
+    when: (p) => p.smoother.enabled,
+    fields: [
+      {
+        kind: 'number',
+        path: 'smoother.accelSigma',
+        label: 'Model acceleration noise',
+        unit: 'm/s²/√Hz',
+        min: 0.001,
+        max: 1000,
+        step: 0.001,
+        log: true,
+        help: 'How far the constant-velocity model may bend. Small: the filter trusts a straight line and lags behind manoeuvres. Large: it follows every noisy reading.',
+      },
+    ],
+  },
+  {
+    id: 'rendezvous',
+    title: 'Rendezvous',
+    vehicles: ['chaser'],
+    levels: [1],
+    when: (p) => p.sim.vehicle === 'chaser',
+    fields: [
+      {
+        kind: 'select',
+        path: 'rendezvous.control',
+        label: 'After the burn',
+        options: [
+          { value: 'coast', label: 'coast' },
+          { value: 'mpc', label: 'model-predictive control' },
+        ],
+        help: 'Coast: nothing fires after the first burn and the orbit does the rest. MPC: plan the thrust over the horizon with the Clohessy–Wiltshire model, apply the first step, plan again.',
+      },
+      {
+        kind: 'number',
+        path: 'rendezvous.burn',
+        label: 'First burn, along-track',
+        unit: 'm/s',
+        min: -0.5,
+        max: 0.5,
+        step: 0.005,
+        help: 'A velocity change towards the target (forwards) at the start: the naive way to close 100 m.',
+      },
+      {
+        kind: 'number',
+        path: 'rendezvous.rAcc',
+        label: 'MPC thrust weight',
+        min: 0.01,
+        max: 1e9,
+        step: 0.01,
+        log: true,
+        when: (p) => p.rendezvous.control === 'mpc',
+        help: 'How much the plan dislikes using the thrusters, against how much it dislikes being away from the target. Small: fast and expensive. Large: it lets the orbit carry it, slowly and cheaply.',
+      },
+      {
+        kind: 'number',
+        path: 'rendezvous.mpcHorizon',
+        label: 'MPC horizon',
+        unit: 'steps of 60 s',
+        min: 5,
+        max: 120,
+        step: 1,
+        when: (p) => p.rendezvous.control === 'mpc',
+      },
+      {
+        kind: 'number',
+        path: 'rendezvous.accelMax',
+        label: 'Thruster limit',
+        unit: 'm/s²',
+        min: 0.001,
+        max: 0.1,
+        step: 0.001,
+      },
+      {
+        kind: 'number',
+        path: 'rendezvous.warp',
+        label: 'Time warp',
+        unit: '×',
+        min: 1,
+        max: 600,
+        step: 1,
+        help: 'Orbital seconds per simulated second. One orbit is 92.6 minutes.',
       },
     ],
   },

@@ -13,6 +13,7 @@ const OWN: Record<Exclude<VehicleId, 'quadrotor'>, string[]> = {
   aircraft: ['aircraft'],
   satellite: ['satellite'],
   lander: ['lander'],
+  chaser: ['rendezvous'],
 };
 /** Groups that belong to the drone only. */
 const DRONE = ['controller', 'setpoint', 'alt', 'kalman', 'uncertainty', 'probe', 'sensors'];

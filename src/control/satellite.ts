@@ -1,5 +1,5 @@
 import { qFromAxisAngle, qIdentity, type Quat } from '@/math/quat';
-import { v3, type Vec3 } from '@/math/vec3';
+import { cross, v3, type Vec3 } from '@/math/vec3';
 import {
   attitudeError,
   slewAxis,
@@ -8,6 +8,7 @@ import {
   type SatelliteParams,
   type SatelliteState,
 } from '@/sim/vehicles/satellite';
+import { steerCmg } from './cmg';
 
 const comps = ['x', 'y', 'z'] as const;
 
@@ -132,6 +133,8 @@ export class SatelliteController {
   command: Vec3 = v3();
   /** Time since the start, s (the shaper's clock). */
   private time = 0;
+  /** CMGs (lesson IV.23): the singularity measure det(AAᵀ)/h₀⁶ at the last tick. */
+  cmgMeasure = NaN;
 
   reset(): void {
     this.time = 0;
@@ -140,6 +143,7 @@ export class SatelliteController {
     this.fire = { x: 0, y: 0, z: 0 };
     this.fired = { x: 0, y: 0, z: 0 };
     this.command = v3();
+    this.cmgMeasure = NaN;
   }
 
   tick(s: SatelliteState, sp: SatelliteParams, dt: number): SatelliteInput {
@@ -203,6 +207,14 @@ export class SatelliteController {
       }
     }
     this.command = { ...wheel };
+    if (sp.actuator === 'cmg') {
+      // The body gets −ḣ − ω×h from the cluster: ask for ḣ = −τ − ω×h.
+      const wxh = cross(s.w, s.h);
+      const hdot = comps.map((c) => -wheel[c] - wxh[c]);
+      const st = steerCmg(s.gimbal, hdot, sp.cmg, this.time);
+      this.cmgMeasure = st.measure;
+      return { wheel: v3(), thrusters: v3(), gimbalRate: st.rates };
+    }
     return { wheel, thrusters };
   }
 }

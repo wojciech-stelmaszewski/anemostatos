@@ -1,16 +1,18 @@
 import {
   aircraftModes,
+  envelopeMargins,
   hqPoint,
   leastDamperGain,
   meetsPitchSpec,
   PITCH_SPEC,
+  trimSlope,
 } from '@/analysis/aircraft';
 import { unshapedResidual } from '@/analysis/panel';
 import { pioFreeRate } from '@/analysis/pio';
 import { analyseTvc, minPitchGain, wrongWayZero, type TvcAnalysis } from '@/analysis/tvc';
 import { bangBangLimits, minimumTime } from '@/control/bangbang';
 import { designLqr } from '@/control/lqr';
-import { limitCycleFuelRate } from '@/control/satellite';
+import { limitCycleFuelRate, profileTime } from '@/control/satellite';
 import { insGyroError } from '@/estimation/ins';
 import { TELEMETRY_HZ, type Simulation } from '@/engine/simulation';
 import { manoeuvreFor } from '@/guidance/collocation';
@@ -223,6 +225,17 @@ const fuelRate = (sim: Simulation): number => {
 
 /** Lesson IV.22: judged from `from` to `until`; the tracker is blind for 10 s from `outage`. */
 const IV22 = { from: 15, until: 40, limit: 10, outage: 25, drift: 30 };
+
+/** Lesson IV.23: 90° about x on a ±0.5 N·m profile, settled by 10 s, never near a singularity. */
+const IV23 = { deg: 90, torque: 0.5, h0: 1, deadline: 10, hold: 2, tol: 0.1, mMin: 0.1 };
+/** The momentum the slew needs at its midpoint: τ·T/2 = √(Θ·τ·J), N·m·s. */
+const slewMomentum = (p: Params): number =>
+  (p.satellite.profileTorque * profileTime(p.satellite)) / 2;
+/** The smallest singularity measure since the start. */
+const leastMeasure = (sim: Simulation): number => {
+  const w = sim.telemetry.window(['cmg.m'], -Infinity);
+  return Math.min(...w.series[0]!.filter((v) => Number.isFinite(v)));
+};
 /** With the tracker off and the bias not estimated, the estimate drifts at |b|: 1 °/h is 1″/s. */
 const unaidedDrift = (p: Params): number => {
   const b = p.satellite.gyroBiasDegH;
@@ -232,6 +245,25 @@ const unaidedDrift = (p: Params): number => {
 const worstKnowledge = (sim: Simulation): number => {
   const w = sim.telemetry.window(['st.err'], IV22.from);
   return Math.max(0, ...w.series[0]!.filter((v) => Number.isFinite(v)));
+};
+
+/** Lesson IV.14: how far, °, the flown loop's phase margin may differ from the table's. */
+const IV14 = { agree: 5 };
+/** The flown loop against the table's point designs across the envelope; cached per design. */
+let hiddenCache: {
+  key: string;
+  r: { gap: number; ok: boolean; worstPm: number; slowestWc: number };
+} | null = null;
+const hiddenGap = (p: Params) => {
+  const key = JSON.stringify([p.aircraft, { ...p.autopilot, thetaOffset: 0, elevatorOffset: 0 }]);
+  if (hiddenCache?.key !== key) {
+    const flown = envelopeMargins(p, 9);
+    const table = envelopeMargins(p, 9, true);
+    const gap = Math.max(...flown.map((f, i) => Math.abs(f.pmDeg - table[i]!.pmDeg)));
+    const spec = meetsPitchSpec(p);
+    hiddenCache = { key, r: { gap, ...spec } };
+  }
+  return hiddenCache.r;
 };
 
 /** Lesson IV.15: the model error the inversion must survive, either way. */
@@ -1399,7 +1431,117 @@ export const PART_FOUR: Lesson[] = [
           because the airframe's own short period gets faster; a real schedule is a table of
           designs, not one formula. Scheduling on a slow variable like q̄ is safe. Scheduling on a
           fast one, like the angle of attack, adds feedback that none of the point designs contained
-          (lesson IV.14 in the plan).
+          (lesson IV.14).
+        </Notice>
+      </>
+    ),
+  },
+  {
+    id: 'hidden',
+    n: 14,
+    part: 4,
+    chapter: M,
+    title: 'The trap in the table',
+    level: 1,
+    loop: 'pitch',
+    chart: 'envelope',
+    setup: (p) => {
+      flyAircraft(p);
+      p.aircraft.speed = 80;
+      p.autopilot = {
+        ...p.autopilot,
+        gain: 0.5,
+        kTheta: 2,
+        schedule: 'alpha',
+        scheduleTau: 0,
+        designSpeed: 80,
+        autothrottle: true,
+        speedTarget: 160,
+        speedRate: 2,
+      };
+    },
+    events: (sim) => {
+      for (const t of [6, 46]) {
+        setAt(sim, t, 'autopilot.thetaOffset', 2);
+        setAt(sim, t + 6, 'autopilot.thetaOffset', 0);
+      }
+    },
+    predict: {
+      label: 'Elevator the trim table adds per degree of α',
+      unit: '°/°',
+      truth: (p) => trimSlope(p.aircraft),
+      tolerance: 0.1,
+    },
+    goal: {
+      text: `Predict the slope of the trim table. Then keep the gain scheduled, but make the loop that flies the loop that was designed: at every speed from 80 to 160 m/s the flown phase margin within ${IV14.agree}° of the table's, and the requirement of lesson IV.13 met (phase margin ≥ ${PITCH_SPEC.pmDeg}°, crossover ≥ ${PITCH_SPEC.wc} rad/s).`,
+      check: ({ sim, prediction }) => {
+        const p = sim.params;
+        if (p.sim.vehicle !== 'aircraft' || p.autopilot.law !== 'classic')
+          return 'this lesson flies the aircraft on the classic pitch law';
+        if (prediction == null)
+          return 'first the prediction: how much elevator does the table add per degree of α?';
+        const truth = trimSlope(p.aircraft);
+        if (Math.abs(prediction - truth) > 0.1 * Math.abs(truth))
+          return 'not within 10 %: along the level-flight trims the pitching moment is zero, C_m0 + C_mα·α + C_mδe·δe = 0';
+        if (p.autopilot.schedule === 'none')
+          return 'keep the gain scheduled: a fixed gain fails IV.13';
+        if (!(p.autopilot.kTheta > 0)) return 'an attitude hold needs kθ above zero';
+        const r = hiddenGap(p);
+        if (r.gap > IV14.agree)
+          return `the flown phase margin differs from the table's by up to ${r.gap.toFixed(0)}°`;
+        return (
+          r.ok ||
+          `worst phase margin ${r.worstPm.toFixed(0)}°, slowest crossover ${r.slowestWc.toFixed(2)} rad/s`
+        );
+      },
+    },
+    solution: (p) => {
+      p.autopilot.schedule = 'qbar';
+    },
+    body: (
+      <>
+        <p>
+          A real schedule is not one formula but a table: a design at each of a few flight
+          conditions, the gain <i>and</i> the trim elevator, read off at the condition of the
+          moment. Which variable says where the aircraft is? In level flight the angle of attack
+          does: slow means a high α, fast a low one, and an α vane is a cheaper sensor than air
+          data. So this autopilot reads its table at the measured α. Every point design in it is the
+          scheduled design of lesson IV.13, and checked one point at a time it is the same: the
+          dashed line on the margins chart, 55° to 78°.
+        </p>
+        <p>
+          The table, though, is not frozen in flight. The trim column holds the elevator that makes
+          the pitching moment zero at each α,{' '}
+          <Tex>{'C_{m0} + C_{m\\alpha}\\alpha + C_{m\\delta_e}\\delta_e = 0'}</Tex>, and the
+          autopilot reads it at the α of the moment. When a gust or the short period moves α, the
+          trim elevator moves with it: a feedback from α to the elevator that none of the point
+          designs contained [Rugh 2000]. Here <Tex>{'C_{m\\alpha} = C_{m\\delta_e} = -1.2'}</Tex>.
+        </p>
+        <p>
+          The solid line is the loop as it flies. The margin is not worse, it is <i>different</i>:
+          85° instead of 55° at 80 m/s, and the crossover has fallen to 3.8 rad/s, below the
+          requirement. The short period has slowed from about 1.7 s to 3.9 s and is far more damped
+          than designed; the 2° step at 6 s now reaches 1.6° instead of 0.8°. The aircraft is no
+          longer the one the table was designed for.
+        </p>
+        <Try>
+          Work out the slope first: how much does <Tex>{'\\delta_{e,trim}'}</Tex> change per degree
+          of α, and what is left of <Tex>{'C_{m\\alpha}'}</Tex> once it has? Then remove the path:
+          give the scheduling variable a <b>low-pass on α</b> slower than the short period, or
+          schedule on <b>q̄</b>, which air data measure and which changes only as fast as the speed.
+        </Try>
+        <Notice>
+          The slope is <Tex>{'-C_{m\\alpha}/C_{m\\delta_e} = -1'}</Tex>: a degree of α moves the
+          trim elevator a degree the other way, and the moment that comes back is{' '}
+          <Tex>{'(C_{m\\alpha} + C_{m\\delta_e}\\cdot(-1))\\,\\Delta\\alpha = 0'}</Tex>. The table
+          has cancelled the aircraft's static stability exactly, at every speed: with the
+          autopilot's gain at zero, the short period breaks into a pole at 0 and one at −1.46 (the
+          pitch damping alone). All the stiffness now comes from the attitude loop, which is why the
+          steps follow better and the loop is slower. A low-pass of about a second puts the flown
+          margins back within a few degrees of the table near crossover, but below the filter the
+          cancellation is still there; the clean cure is a scheduling variable that the loop cannot
+          move quickly, q̄. Scheduling on a fast variable is only safe if the hidden terms are put
+          into the design, which is what dynamic inversion (next lesson) does on purpose.
         </Notice>
       </>
     ),
@@ -2121,6 +2263,115 @@ export const PART_FOUR: Lesson[] = [
           three more states, the filter learns it to a few tenths of a degree per hour within twenty
           seconds. Then the gyro carries the attitude through the outage almost as well as the stars
           do.
+        </Notice>
+      </>
+    ),
+  },
+  {
+    id: 'cmg',
+    n: 23,
+    part: 4,
+    chapter: N,
+    title: 'The singular direction',
+    level: 1,
+    loop: 'point',
+    chart: 'cmg',
+    setup: (p) => {
+      p.sim.vehicle = 'satellite';
+      p.satellite.actuator = 'cmg';
+      p.satellite.slewAxis = 'x';
+      p.satellite.slewDeg = IV23.deg;
+      p.satellite.profileTorque = IV23.torque;
+      p.satellite.kp = 4;
+      p.satellite.kd = 4;
+      p.satellite.cmg = { ...p.satellite.cmg, h0: IV23.h0, steering: 'pinv', parkDeg: 0 };
+    },
+    predict: {
+      label: 'Momentum the slew needs at its midpoint',
+      unit: 'N·m·s',
+      truth: slewMomentum,
+      tolerance: 0.05,
+    },
+    goal: {
+      text: `Predict the momentum the slew needs. Then, with the same four gyros and the same slew (${IV23.deg}° about x on a ±${IV23.torque} N·m profile), settle within ${IV23.tol}° by ${IV23.deadline} s and hold it for ${IV23.hold} s, with the singularity measure never below ${IV23.mMin}.`,
+      check: ({ sim, prediction }) => {
+        const p = sim.params;
+        const sp = p.satellite;
+        if (p.sim.vehicle !== 'satellite' || sp.actuator !== 'cmg')
+          return 'this lesson flies the satellite on its control-moment gyros';
+        if (prediction == null) return 'first the prediction: J·ω at the midpoint of the profile';
+        const truth = slewMomentum(p);
+        if (Math.abs(prediction - truth) > 0.05 * truth)
+          return 'not within 5 %: half the profile at τ gives J·ω = τ·T/2, with T = 2√(Θ·J/τ)';
+        if (
+          sp.slewAxis !== 'x' ||
+          Math.abs(sp.slewDeg) !== IV23.deg ||
+          sp.profileTorque < IV23.torque
+        )
+          return `keep the slew: ${IV23.deg}° about x at ${IV23.torque} N·m`;
+        if (sp.cmg.h0 !== IV23.h0) return `keep the gyros: h₀ = ${IV23.h0} N·m·s`;
+        const m = leastMeasure(sim);
+        if (m < IV23.mMin)
+          return `the gimbals came within m = ${m.toFixed(3)} of a singularity. Press R`;
+        if (sim.t < IV23.deadline + IV23.hold) return 'slewing…';
+        const since = settledSince(sim, IV23.tol);
+        if (Number.isNaN(since) || since > IV23.deadline)
+          return `not settled within ${IV23.tol}° by ${IV23.deadline} s. Press R`;
+        return true;
+      },
+    },
+    solution: (p) => {
+      p.satellite.cmg.parkDeg = 60;
+    },
+    body: (
+      <>
+        <p>
+          Wheels are gentle: 0.2 N·m here, enough for a telescope, far too little for a spacecraft
+          that has to turn quickly. A <b>control-moment gyro</b> spins its rotor at a constant speed
+          and turns it on a gimbal. Turning a momentum <Tex>{'h_0'}</Tex> at a rate{' '}
+          <Tex>{'\\dot\\delta'}</Tex> takes a torque <Tex>{'h_0\\dot\\delta'}</Tex>, so a small
+          gimbal motor commands a large torque on the body. Four of them stand on the faces of a
+          pyramid, tilted by <Tex>{'\\beta = 54.7°'}</Tex>, each with <Tex>{'h_0 = 1'}</Tex> N·m·s
+          [Wie 2008].
+        </p>
+        <p>
+          The cluster's momentum <Tex>{'h(\\delta)'}</Tex> depends on the four gimbal angles, and
+          the steering law has to find gimbal rates for the torque the quaternion feedback wants:{' '}
+          <Tex>{'\\dot h = A(\\delta)\\,\\dot\\delta'}</Tex>, with <Tex>{'A'}</Tex> a 3 × 4 matrix.
+          The pseudoinverse <Tex>{'\\dot\\delta = A^\\top(AA^\\top)^{-1}\\dot h'}</Tex> gives
+          exactly the torque asked for, as long as <Tex>{'A'}</Tex> has rank three. Where it does
+          not, the four rotors are lined up so that no gimbal motion makes torque along one
+          direction: a <b>singularity</b>. The lower chart shows{' '}
+          <Tex>{'m = \\det(AA^\\top)/h_0^6'}</Tex>, zero at one.
+        </p>
+        <p>
+          The task is a 90° slew about x on a profile at ±0.5 N·m: full torque one way, then the
+          other. At its midpoint the satellite turns fastest, and all of that momentum{' '}
+          <Tex>{'J\\omega'}</Tex> is stored in the gyros. Along x the pyramid can hold{' '}
+          <Tex>{'h_0(2 + 2\\cos\\beta) = 3.15'}</Tex> N·m·s: plenty. Press Start and watch the
+          momentum. It stops at 1.15, the measure falls to zero, the gimbals race at their rate
+          limit and the satellite falls behind its profile.
+        </p>
+        <Try>
+          Work out the momentum the slew needs. Then try the <b>CMG steering</b> options: the
+          singularity-robust inverse keeps the gimbal rates finite near the singularity by giving
+          less torque than asked; with a dither it is pushed out. Then leave the steering alone and
+          move the <b>Gimbals parked at s</b>: every <Tex>{'(s, -s, s, -s)'}</Tex> stores zero
+          momentum, so the satellite cannot feel the difference.
+        </Try>
+        <Notice>
+          The slew needs <Tex>{'\\sqrt{\\Theta\\tau J} = 1.77'}</Tex> N·m·s, between the 1.15 where
+          the gimbals stall and the 3.15 of the envelope. From <Tex>{'\\delta = 0'}</Tex> two rotors
+          point along x in opposite directions, and the symmetric path the pseudoinverse takes never
+          breaks their cancellation; the other two can give at most{' '}
+          <Tex>{'2h_0\\cos\\beta = 1.15'}</Tex>. That is an internal singularity, and the torque
+          asked for points exactly along its lost direction. The SR inverse cannot leave it (it only
+          stops the gimbals racing), and the dither leaves it too slowly: the slew still takes 14 to
+          18 s. Parked at s between 45° and 75°, the same pseudoinverse takes the momentum along a
+          path with no singularity on it (the measure stays above 0.5) and the slew is done in 7 s.
+          Moving the gimbals along the zero-momentum family is <b>null motion</b>; real steering
+          laws use it all the time, to keep the cluster away from the singular directions before
+          they are needed.
         </Notice>
       </>
     ),

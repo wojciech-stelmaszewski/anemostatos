@@ -257,7 +257,7 @@ export class Simulation {
     this.satCtl.reset();
     this.satPeak = 0;
     this.satSince = 0;
-    this.satellite = p.sim.vehicle === 'satellite' ? initialSatellite() : null;
+    this.satellite = p.sim.vehicle === 'satellite' ? initialSatellite(p.satellite) : null;
     if (this.satellite) {
       if (p.satellite.navigation) this.starNav.reset(this.satellite, p.satellite, p.sim.seed);
       this.mirrorSatellite();
@@ -969,6 +969,10 @@ export class Simulation {
     }
     tl.set('sat.fuel', s.fuel);
     if (sp.panel.inertia > 0) tl.set('sat.eta', s.eta * RAD_DEG);
+    if (sp.actuator === 'cmg') {
+      tl.set('cmg.m', this.satCtl.cmgMeasure);
+      s.gimbal.forEach((g, i) => tl.set(`cmg.d${i + 1}`, g * RAD_DEG));
+    }
     if (sp.navigation) {
       tl.set('st.err', this.starNav.error(s));
       tl.set('st.sigma2', this.starNav.sigma2());

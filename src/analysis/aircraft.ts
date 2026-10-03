@@ -1,7 +1,7 @@
 // Linear analysis of the aircraft of Chapter M (docs/aerospace-gnc.md §4): its modes, the
 // handling-qualities point of its short period, and the margins of the pitch autopilot, all from
 // the generic linearisation of the simulator's own step around a level-flight trim.
-import { ndiElevator, scheduledGain, type AutopilotParams } from '@/control/autopilot';
+import { alphaLookup, ndiElevator, scheduledGain, type AutopilotParams } from '@/control/autopilot';
 import { cabs, cdiv, csub, cx, type Complex } from '@/math/complex';
 import { eigenvalues, type Mat } from '@/math/mat';
 import { logspace, margins, type Margins } from '@/math/margins';
@@ -71,20 +71,70 @@ export function lawRow(p: Params, V: number, qbar: number): number[] {
 }
 
 /**
- * The closed loop δe = K·x(t − τ), with the delay as a first-order Padé approximant
- * (1 − sτ/2)/(1 + sτ/2) = −1 + 2a/(s + a), a = 2/τ: one extra state z, ż = −a·z + K·x.
+ * The feedback the frozen-point designs never saw (lesson IV.14): with the table indexed by the
+ * measured angle of attack, the trim elevator follows α along the level-flight trims, so
+ * Δδe = (dδe_trim/dα)·Δσ, σ the scheduling variable (α through a low-pass of `tau`). The gain's own
+ * dependence on α multiplies the loop's error, zero at the trim, and drops out of the linear model.
  */
-function closed(m: AircraftLinear, k: number[], tau: number): Mat {
+export interface HiddenPath {
+  gain: number;
+  tau: number;
+}
+
+export function hiddenPath(p: Params, V: number): HiddenPath | null {
+  if (p.autopilot.schedule !== 'alpha' || p.autopilot.law === 'ndi') return null;
+  const alpha = trimAircraft(p.aircraft, V, p.aircraft.altitude).state.alpha;
+  const h = 1e-4;
+  const gain =
+    (alphaLookup(p.aircraft, alpha + h).de - alphaLookup(p.aircraft, alpha - h).de) / (2 * h);
+  return { gain, tau: p.autopilot.scheduleTau };
+}
+
+/** The slope of the trim table, ° of elevator per ° of α: −C_mα/C_mδe for this airframe. */
+export const trimSlope = (a: AircraftParams): number => -a.cmAlpha / a.cmDe;
+
+/**
+ * The closed loop δe = K·x(t − τ), with the delay as a first-order Padé approximant
+ * (1 − sτ/2)/(1 + sτ/2) = −1 + 2a/(s + a), a = 2/τ: one extra state z, ż = −a·z + K·x. A hidden
+ * path adds k_h·σ inside the delay, with σ̇ = (α − σ)/τ_h (one more state), or k_h·α if τ_h = 0.
+ */
+function closed(
+  m: AircraftLinear,
+  k0: number[],
+  tau: number,
+  hidden: HiddenPath | null = null,
+): Mat {
   const n = m.a.length;
-  if (!(tau > 0) || k.every((v) => v === 0))
+  const k = [...k0];
+  const filt = hidden && hidden.tau > 0 ? hidden : null;
+  if (hidden && !filt) k[1] = k[1]! + hidden.gain;
+  const kh = filt ? filt.gain : 0;
+  if ((!(tau > 0) || k.every((v) => v === 0)) && !filt)
     return m.a.map((row, i) => row.map((v, j) => v + m.b[i]! * k[j]!));
-  const a = 2 / tau;
-  const out: Mat = m.a.map((row, i) => [
-    ...row.map((v, j) => v - m.b[i]! * k[j]!),
-    2 * a * m.b[i]!,
-  ]);
-  out.push([...k, -a]);
-  return out.slice(0, n + 1);
+  // States: x (n), then σ if filtered, then the Padé state z if delayed.
+  const delayed = tau > 0;
+  const a = delayed ? 2 / tau : 0;
+  const size = n + (filt ? 1 : 0) + (delayed ? 1 : 0);
+  const iS = n;
+  const iZ = filt ? n + 1 : n;
+  const out: Mat = Array.from({ length: size }, () => new Array<number>(size).fill(0));
+  // v = K·x + k_h·σ; u = v undelayed, or −v + 2a·z with ż = −a·z + v.
+  const sign = delayed ? -1 : 1;
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) out[i]![j] = m.a[i]![j]! + sign * m.b[i]! * k[j]!;
+    if (filt) out[i]![iS] = sign * m.b[i]! * kh;
+    if (delayed) out[i]![iZ] = 2 * a * m.b[i]!;
+  }
+  if (filt) {
+    out[iS]![1] = 1 / filt.tau;
+    out[iS]![iS] = -1 / filt.tau;
+  }
+  if (delayed) {
+    for (let j = 0; j < n; j++) out[iZ]![j] = k[j]!;
+    if (filt) out[iZ]![iS] = kh;
+    out[iZ]![iZ] = -a;
+  }
+  return out;
 }
 
 export interface Mode {
@@ -121,7 +171,8 @@ export function modesOf(a: Mat): Modes {
 export function aircraftModes(p: Params, withAutopilot = true, V = p.aircraft.speed): Modes {
   const m = aircraftLinear(p.aircraft, V);
   const k = withAutopilot ? lawRow(p, V, m.qbar) : KEEP.map(() => 0);
-  return modesOf(closed(m, k, p.autopilot.delayMs / 1000));
+  const h = withAutopilot ? hiddenPath(p, V) : null;
+  return modesOf(closed(m, k, p.autopilot.delayMs / 1000, h));
 }
 
 /** Lanchester's phugoid: period π·√2·V/g, s. */
@@ -155,7 +206,8 @@ export function hqLevel(zeta: number, cap: number): 1 | 2 | 3 {
 export function hqPoint(p: Params, withAutopilot = true): HqPoint | null {
   const m = aircraftLinear(p.aircraft, p.aircraft.speed);
   const k = withAutopilot ? lawRow(p, p.aircraft.speed, m.qbar) : KEEP.map(() => 0);
-  const sp = modesOf(closed(m, k, p.autopilot.delayMs / 1000)).shortPeriod;
+  const h = withAutopilot ? hiddenPath(p, p.aircraft.speed) : null;
+  const sp = modesOf(closed(m, k, p.autopilot.delayMs / 1000, h)).shortPeriod;
   if (!sp) return null;
   const cap = (sp.wn * sp.wn) / m.nAlpha;
   return { zeta: sp.zeta, wn: sp.wn, cap, level: hqLevel(sp.zeta, cap) };
@@ -179,15 +231,18 @@ export function leastDamperGain(p: Params): number {
 
 /**
  * The pitch loop broken at the elevator command: L(jω) = −K(jωI − A)⁻¹B, negative-feedback
- * convention, and its margins.
+ * convention, and its margins. `frozen` leaves out the hidden path of a schedule on α: the loop
+ * the table's point designs saw (lesson IV.14).
  */
 export function pitchLoopMargins(
   p: Params,
   V: number,
   w = logspace(0.5, 200, 400),
+  frozen = false,
 ): Margins & { qbar: number; stable: boolean; pitch: { pmDeg: number; wc: number } } {
   const m = aircraftLinear(p.aircraft, V);
   const k = lawRow(p, V, m.qbar);
+  const hidden = frozen ? null : hiddenPath(p, V);
   const n = m.a.length;
   const tau = p.autopilot.delayMs / 1000;
   const l = w.map((om) => {
@@ -229,6 +284,12 @@ export function pitchLoopMargins(
       re -= k[j]! * x[j]!.re;
       im -= k[j]! * x[j]!.im;
     }
+    if (hidden) {
+      // k_h·α/(1 + jωτ_h).
+      const f = cdiv(cx(hidden.gain), cx(1, om * hidden.tau));
+      re -= f.re * x[1]!.re - f.im * x[1]!.im;
+      im -= f.re * x[1]!.im + f.im * x[1]!.re;
+    }
     // The delay of the sensors and the computation: e^(−jωτ).
     const ph = -om * tau;
     return { re: re * Math.cos(ph) - im * Math.sin(ph), im: re * Math.sin(ph) + im * Math.cos(ph) };
@@ -238,7 +299,7 @@ export function pitchLoopMargins(
   // an attitude hold leaves to itself (with NDI the loop crosses 1 again near the phugoid).
   const top = mg.gainCrossovers[mg.gainCrossovers.length - 1];
   const wrap = (d: number) => d - 360 * Math.round(d / 360);
-  const stable = eigenvalues(closed(m, k, tau)).every((z) => z.re < 0);
+  const stable = eigenvalues(closed(m, k, tau, hidden)).every((z) => z.re < 0);
   const pitch = top
     ? { pmDeg: stable ? wrap(top.pmDeg) : -Math.abs(wrap(top.pmDeg)), wc: top.w }
     : { pmDeg: Infinity, wc: NaN };
@@ -248,12 +309,12 @@ export function pitchLoopMargins(
 /** The envelope of lesson IV.13: speeds at the start altitude. */
 export const ENVELOPE = { vMin: 80, vMax: 160 } as const;
 
-/** Phase margin and crossover of the pitch loop across the envelope. */
-export function envelopeMargins(p: Params, count = 9) {
+/** Phase margin and crossover of the pitch loop across the envelope (`frozen`: as the table saw it). */
+export function envelopeMargins(p: Params, count = 9, frozen = false) {
   const out: { V: number; pmDeg: number; wc: number; qbar: number }[] = [];
   for (let i = 0; i < count; i++) {
     const V = ENVELOPE.vMin + ((ENVELOPE.vMax - ENVELOPE.vMin) * i) / (count - 1);
-    const m = pitchLoopMargins(p, V);
+    const m = pitchLoopMargins(p, V, undefined, frozen);
     out.push({ V, pmDeg: m.pitch.pmDeg, wc: m.pitch.wc, qbar: m.qbar });
   }
   return out;

@@ -274,7 +274,7 @@ export function EnvelopeChart() {
             schedule: p.autopilot.schedule === 'qbar' ? ('none' as const) : ('qbar' as const),
           },
     };
-    const label = (q: Params) =>
+    const label = (q: Params): string =>
       q.autopilot.law === 'ndi'
         ? 'dynamic inversion'
         : q.autopilot.schedule === 'qbar'
@@ -282,6 +282,13 @@ export function EnvelopeChart() {
             ? 'scheduled on q̄ (same error)'
             : 'scheduled on q̄'
           : 'fixed gain';
+    // Lesson IV.14: on α, the other line is the same design as the table's point designs saw it.
+    if (!ndi && p.autopilot.schedule === 'alpha')
+      return {
+        now: envelopeMargins(p, 17),
+        other: envelopeMargins(p, 17, true),
+        labels: ['scheduled on α, as flown', 'the same, as the table saw it'] as const,
+      };
     return {
       now: envelopeMargins(p, 17),
       other: envelopeMargins(other, 17),

@@ -1,6 +1,7 @@
 import { qConj, qFromAxisAngle, qIntegrate, qMul, type Quat } from '@/math/quat';
 import { add, cross, normalize, v3, type Vec3 } from '@/math/vec3';
 import type { Params } from '../params';
+import { cmgMomentum, parkedGimbals, type CmgParams } from './cmg';
 import type { Environment, Vehicle } from './types';
 
 /**
@@ -30,8 +31,13 @@ export interface SatelliteParams {
   /** The commanded attitude: a rotation of `slewDeg` about this axis from the start. */
   slewAxis: 'x' | 'y' | 'z' | 'diagonal';
   slewDeg: number;
-  /** What holds the attitude: the wheels (quaternion feedback) or the thrusters (dead band). */
-  actuator: 'wheels' | 'thrusters';
+  /**
+   * What holds the attitude: the wheels (quaternion feedback), the thrusters (dead band), or a
+   * pyramid of control-moment gyros steered to give the quaternion feedback's torque (IV.23).
+   */
+  actuator: 'wheels' | 'thrusters' | 'cmg';
+  /** The control-moment gyros of lesson IV.23 (src/sim/vehicles/cmg.ts). */
+  cmg: CmgParams;
   /** Quaternion feedback τ = −kp·q_e − kd·ω, N·m and N·m·s. */
   kp: number;
   kd: number;
@@ -89,6 +95,8 @@ export interface SatelliteState {
   /** The panel's angle relative to the hub, rad, and its rate (zero without a panel). */
   eta: number;
   etaDot: number;
+  /** The four CMG gimbal angles, rad (lesson IV.23). */
+  gimbal: number[];
 }
 
 export interface SatelliteInput {
@@ -96,6 +104,8 @@ export interface SatelliteInput {
   wheel: Vec3;
   /** Each thruster pair: −1, 0 or +1. */
   thrusters: Vec3;
+  /** CMG gimbal rates, rad/s (lesson IV.23; only with the `cmg` actuator). */
+  gimbalRate?: number[];
 }
 
 const clamp = (x: number, m: number) => Math.max(-m, Math.min(m, x));
@@ -140,8 +150,16 @@ export function stepSatellite(
   const tw = v3();
   const tt = v3();
   let firing = 0;
+  // CMGs: the gimbals turn, the cluster's momentum moves, and the body gets −ḣ.
+  let hNext: Vec3 | null = null;
+  if (sp.actuator === 'cmg' && u.gimbalRate) {
+    const lim = (sp.cmg.rateMaxDeg * Math.PI) / 180;
+    s.gimbal = s.gimbal.map((g, i) => g + clamp(u.gimbalRate![i] ?? 0, lim) * dt);
+    const [hx, hy, hz] = cmgMomentum(s.gimbal, sp.cmg);
+    hNext = v3(hx, hy, hz);
+  }
   for (const c of comps) {
-    tw[c] = wheelTorque(u.wheel[c], s.h[c], sp);
+    tw[c] = hNext ? -(hNext[c] - s.h[c]) / dt : wheelTorque(u.wheel[c], s.h[c], sp);
     const f = Math.sign(u.thrusters[c]);
     tt[c] = f * sp.thrusterTorque;
     firing += Math.abs(f);
@@ -169,7 +187,8 @@ export function stepSatellite(
   s.fuel += firing * sp.thrusterFlow * dt;
 }
 
-export function initialSatellite(): SatelliteState {
+/** At rest at the identity attitude, wheels empty; CMG gimbals parked when `sp` is given. */
+export function initialSatellite(sp?: SatelliteParams): SatelliteState {
   return {
     q: { w: 1, x: 0, y: 0, z: 0 },
     w: v3(),
@@ -179,6 +198,7 @@ export function initialSatellite(): SatelliteState {
     fuel: 0,
     eta: 0,
     etaDot: 0,
+    gimbal: sp ? parkedGimbals(sp.cmg) : [0, 0, 0, 0],
   };
 }
 

@@ -46,7 +46,8 @@ export type ExtraChart =
   | 'pdg'
   | 'plan'
   | 'backtoback'
-  | 'altimeters';
+  | 'altimeters'
+  | 'cmg';
 /** The analysis views of Part III, which can also take the place of the motor chart. */
 export type AnalysisChart = 'bode' | 'nyquist' | 'poles' | 'covariance';
 /**

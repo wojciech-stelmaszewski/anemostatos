@@ -1,5 +1,6 @@
 import { useMemo, useRef } from 'react';
 import { controllerKey } from '@/control/registry';
+import { envelopeX, internalX } from '@/sim/vehicles/cmg';
 import { useParams } from '@/store/params';
 import { sim, useUi, type AnalysisChart, type ExtraChart } from '@/store/sim';
 import { AircraftPoles, EnvelopeChart, HqChart, PioChart } from '@/ui/analysis/AircraftCharts';
@@ -50,6 +51,7 @@ const EXTRA: { value: ExtraChart; label: string }[] = [
   { value: 'energy', label: 'aircraft: speed and altitude' },
   { value: 'pio', label: 'aircraft: pilot-induced oscillation' },
   { value: 'panel', label: 'satellite: panel vibration' },
+  { value: 'cmg', label: 'satellite: CMG momentum and singularity' },
   { value: 'lyapunovV', label: 'satellite: Lyapunov function' },
   { value: 'wheels', label: 'satellite: wheel momentum' },
   { value: 'startracker', label: 'satellite: attitude knowledge' },
@@ -151,6 +153,16 @@ const BEACON_NIS: SeriesSpec[] = [
 /** Lesson IV.18: the Lyapunov function of quaternion feedback. */
 const SAT_V: SeriesSpec[] = [
   { key: 'sat.V', label: 'V = ½ωᵀJω + 2kp(1 − q₀)', color: SIGNAL.measurement, width: 2 },
+];
+/** Lesson IV.23: the CMG cluster's momentum and how far it is from a singularity. */
+const CMG_H: SeriesSpec[] = (['x', 'y', 'z'] as const).map((c, i) => ({
+  key: `sat.h.${c}`,
+  label: `h ${c}`,
+  color: SIGNAL.windAxes[i]!,
+  width: 1.5,
+}));
+const CMG_M: SeriesSpec[] = [
+  { key: 'cmg.m', label: 'det(AAᵀ)/h₀⁶', color: SIGNAL.measurement, width: 2 },
 ];
 /** Lesson IV.19: the momentum stored in each reaction wheel. */
 const WHEELS: SeriesSpec[] = (['x', 'y', 'z'] as const).map((c, i) => ({
@@ -298,7 +310,8 @@ export function ChartsPanel() {
     extra === 'energy' ||
     extra === 'pio' ||
     extra === 'pdg' ||
-    extra === 'plan';
+    extra === 'plan' ||
+    extra === 'cmg';
   const ctrlKey = useParams((s) => controllerKey(s.params));
   const loopOptions = useMemo(
     () => loopsFor(useParams.getState().params).map((l) => ({ value: l.id, label: l.name })),
@@ -457,6 +470,32 @@ export function ChartsPanel() {
                 </div>
                 <div className="min-h-0 flex-[1.4]">
                   <PioChart />
+                </div>
+              </div>
+            ) : extra === 'cmg' ? (
+              <div className="flex h-full min-h-0 flex-col gap-1.5">
+                <div className="min-h-0 flex-1">
+                  <TimeChart
+                    title="CMG momentum"
+                    unit="N·m·s"
+                    series={CMG_H}
+                    includeZero
+                    hlines={() => {
+                      const c = sim.params.satellite.cmg;
+                      return [
+                        { value: envelopeX(c), label: 'envelope' },
+                        { value: internalX(c), label: 'stall from δ = 0' },
+                      ];
+                    }}
+                  />
+                </div>
+                <div className="min-h-0 flex-1">
+                  <TimeChart
+                    title="Singularity measure det(AAᵀ)/h₀⁶ (log scale)"
+                    unit=""
+                    series={CMG_M}
+                    logY
+                  />
                 </div>
               </div>
             ) : extra === 'pdg' ? (

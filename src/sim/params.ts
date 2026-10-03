@@ -914,6 +914,7 @@ export const defaultParams = (): Params => ({
     pilotGain: 0.5,
     pilotDelayMs: 250,
     modelError: 0,
+    scheduleTau: 0,
   },
   satellite: {
     inertia: { x: 4, y: 5, z: 3 },
@@ -947,6 +948,15 @@ export const defaultParams = (): Params => ({
     estimateBias: false,
     outageStart: 20,
     outageLength: 0,
+    cmg: {
+      h0: 1,
+      skewDeg: 54.74,
+      rateMaxDeg: 60,
+      steering: 'pinv',
+      parkDeg: 0,
+      lambda: 0.01,
+      dither: 0.01,
+    },
   },
   lander: {
     dryMass: 25,

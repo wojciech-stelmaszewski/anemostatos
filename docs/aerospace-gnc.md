@@ -1,9 +1,7 @@
 # Parts IV and V — Aerospace GNC and Engineering Practice
 
-> **Status (2026-10-02):** M19–M22 and M26 (all of Part V) are built; M23
-> lacks IV.14, M24 lacks IV.23, and M25 has IV.24, IV.26 and IV.27. Five
-> lessons remain, all **could**: IV.14, IV.23, IV.25, IV.28, IV.29. §5 lists
-> what was built and where it differs from this plan. Milestones
+> **Status (2026-10-03):** all of Parts IV and V are built (M19–M26). §5
+> lists what was built and where it differs from this plan. Milestones
 > M19–M26 in [roadmap.md](roadmap.md) point here. Part IV depends on Part III
 > ([analysis.md](analysis.md)): its lessons use the Bode, Nyquist, pole,
 > dispersion and covariance views built there.
@@ -603,6 +601,41 @@ transfer); panels in `ui/part5/`.
   built around that. Margins are measured by probe; the model check compares
   the measured plant with the controller's own m̂ and τ̂.
 
+### Built (2026-10-03, fourth round: the last five lessons and the UI)
+
+- IV.14 `hidden`: scheduling on α reads the trim column at the measured α,
+  which adds δe = −(C_mα/C_mδe)·α and here cancels the static stability
+  exactly. The hidden path changes the loop rather than destabilising it:
+  the flown phase margin is 85° against the table's 55°, the crossover drops
+  to 3.8 rad/s (IV.13's requirement fails) and the short period slows from
+  1.7 to 3.9 s. The student predicts the trim slope (−1 °/°). The aircraft
+  has no probe, so "measured in flight" is the full-law linearisation,
+  checked by flying steps. Scheduling on q̄ removes the gap; a 1 s filter on
+  α leaves 2.9°.
+- IV.23 `cmg`: a pyramid of four single-gimbal CMGs (h₀ 1 N·m·s, β 54.74°)
+  as a satellite actuator. From δ = 0 a 90° slew needs √(Θτ J) = 1.77 N·m·s
+  (the prediction) but stalls at 2h₀cos β = 1.155; pseudoinverse, SR and GSR
+  all stall, because the command points along the singular direction, and
+  null-motion gradient steering does nothing on that symmetric path. What
+  works is null-motion pre-positioning: parked gimbals settle in 6.9 s.
+- IV.25 `rendezvous` (`sim/vehicles/chaser.ts`, exact discrete CW model;
+  `control/rendezvous.ts`, a condensed QP on `qp.ts`): a 5 cm/s forward burn
+  leaves the chaser 6πΔv/n = 833 m behind after one orbit (the prediction).
+  Goal: dock below 5 cm/s within an orbit on 0.3 m/s; in-plane only, time
+  warped 120×, the target drawn at 1:10.
+- IV.28 `particle`: the filter is told the drone's velocity; with one beacon
+  and an unknown velocity any rotation of the path about the beacon fits, and
+  no motion could break the symmetry. Calm air (turbulence alone breaks the
+  ring). A straight leg leaves the mirror image (the prediction: its x,
+  20 m); only a turn resolves it.
+- IV.29 `smoother`: mid-record the smoother's σ is half the filter's for a
+  slow model (the prediction); "halve the RMS" holds for any reasonable q, so
+  the student tunes q down from a deliberately bad 100.
+- UI: a group or field now names the vehicles it belongs to (`vehicles`);
+  untagged groups and `drone.*` fields are the drone's and are hidden while a
+  Part IV vehicle flies. The end-of-flight message and the chart beside the
+  main one follow the vehicle.
+
 **Build order.** M19 first: nothing else in Part IV can start without the
 vehicle abstraction. Then the **must** lessons across M20–M25, then Part V,
 then the rest. Each vehicle is usable after its own milestone.
@@ -702,6 +735,9 @@ Priority: **must**, **should**, **could**.
 - [Rugh 2000] W. J. Rugh, J. S. Shamma, "Research on gain scheduling", _Automatica_ 36(10), 2000.
 - [Klyde 1997] D. H. Klyde, D. T. McRuer, T. T. Myers, "Pilot-induced oscillation analysis and prediction with actuator rate limiting", _Journal of Guidance, Control, and Dynamics_ 20(1), 1997.
 - [Lambregts 1983] A. A. Lambregts, "Vertical flight path and speed control autopilot design using total energy principles", AIAA paper 83-2239, 1983.
+- [Arulampalam 2002] M. S. Arulampalam, S. Maskell, N. Gordon, T. Clapp, "A tutorial on particle filters for online nonlinear/non-Gaussian Bayesian tracking", _IEEE Transactions on Signal Processing_ 50(2), 2002.
+- [Clohessy 1960] W. H. Clohessy, R. S. Wiltshire, "Terminal guidance system for satellite rendezvous", _Journal of the Aerospace Sciences_ 27(9), 1960.
+- [Rauch 1965] H. E. Rauch, F. Tung, C. T. Striebel, "Maximum likelihood estimates of linear dynamic systems", _AIAA Journal_ 3(8), 1965.
 - [Wie 2008] B. Wie, _Space Vehicle Dynamics and Control_, 2nd ed., AIAA, 2008.
 - [Markley 2014] F. L. Markley, J. L. Crassidis, _Fundamentals of Spacecraft Attitude Determination and Control_, Springer, 2014.
 - [Singer 1990] N. C. Singer, W. P. Seering, "Preshaping command inputs to reduce system vibration", _Journal of Dynamic Systems, Measurement, and Control_ 112(1), 1990.

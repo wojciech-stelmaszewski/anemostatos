@@ -171,7 +171,7 @@ motor lag.
 | III.29 | One flight proves nothing     | L3    | Monte Carlo: 300 dispersed flights, the failing corner, a pass rate with confidence                     |
 | III.30 | The robustness report card    | L1–L3 | margins, Monte Carlo and RMS for every controller: fast is not robust                                   |
 
-**Part IV — Aerospace GNC** (24 of 29)
+**Part IV — Aerospace GNC**
 
 | #     | Lesson                         | Level     | What you learn                                                                                                     |
 | ----- | ------------------------------ | --------- | ------------------------------------------------------------------------------------------------------------------ |
@@ -188,6 +188,7 @@ motor lag.
 | IV.11 | Two ways to wobble             | aircraft  | the short period and the phugoid, as pole pairs and in flight; Lanchester's estimate                               |
 | IV.12 | Level 1                        | aircraft  | a pitch damper moves the short period into the level-1 handling-qualities region                                   |
 | IV.13 | One gain does not fit all      | aircraft  | a fixed gain buzzes when fast; a schedule on dynamic pressure keeps the margin                                     |
+| IV.14 | The trap in the table          | aircraft  | scheduling on α adds a feedback path the point designs never saw; schedule on q̄ instead                            |
 | IV.15 | Invert the aeroplane           | aircraft  | dynamic inversion: a model error is a gain error; one design for the whole envelope                                |
 | IV.16 | The pilot in the loop          | aircraft  | a rate-limited elevator and a pilot lock into a PIO at the amplitude the describing function predicts              |
 | IV.17 | Throttle is energy             | aircraft  | total-energy control holds the speed in a climb where separate loops cannot                                        |
@@ -196,9 +197,13 @@ motor lag.
 | IV.20 | On or off                      | satellite | the dead-band limit cycle of on–off thrusters and its fuel rate                                                    |
 | IV.21 | Panels that wave               | satellite | a flexible panel rings after a slew; input shaping cancels it; a tip sensor destabilises it                        |
 | IV.22 | Stars and gyros                | satellite | the MEKF fuses a slow star tracker with a drifting gyro; the bias must be a state                                  |
+| IV.23 | The singular direction         | satellite | control-moment gyros stall in a singular direction; parked gimbals avoid it                                        |
 | IV.24 | Aim where it will be           | L3        | pure pursuit tail-chases; proportional navigation keeps the line of sight still and hits a weaving target          |
+| IV.25 | Falling around together        | chaser    | thrust forward and you drop behind: Clohessy–Wiltshire, and an MPC that docks gently                               |
 | IV.26 | Drift                          | L3        | an unaided inertial navigator: a gyro bias of 0.05 °/s is 38 m after 30 s, as g·b·t³/6 predicts                    |
 | IV.27 | When the tangent lies          | L3        | one range beacon: the EKF is confidently wrong, the UKF honestly unsure; a good NIS does not prove a good estimate |
+| IV.28 | Many guesses at once           | L3        | a particle cloud holds the ring of one beacon; only a turn removes the mirror image                                |
+| IV.29 | Hindsight                      | L1        | an RTS smoother halves the filter's error on a recorded flight                                                     |
 
 **Part V — From whiteboard to flight**
 

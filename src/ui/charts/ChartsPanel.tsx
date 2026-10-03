@@ -16,6 +16,7 @@ import { SpectrumChart } from '@/ui/analysis/SpectrumChart';
 import { TvcChart } from '@/ui/analysis/TvcChart';
 import { PdgChart } from '@/ui/analysis/PdgChart';
 import { PlanChart } from '@/ui/analysis/PlanChart';
+import type { VehicleId } from '@/sim/vehicles/types';
 import { useRaf } from '@/ui/hud/useRaf';
 import { partColor, SIGNAL } from '@/ui/colors';
 import { Select } from '@/ui/components/select';
@@ -158,6 +159,41 @@ const WHEELS: SeriesSpec[] = (['x', 'y', 'z'] as const).map((c, i) => ({
   color: SIGNAL.windAxes[i]!,
   width: 1.5,
 }));
+/** What stands in the motor chart's place while a Part IV vehicle flies: its own actuator. */
+const ACTUATOR: Partial<
+  Record<VehicleId, { label: string; title: string; unit: string; series: SeriesSpec[] }>
+> = {
+  rocket: {
+    label: 'engine thrust',
+    title: 'Engine thrust',
+    unit: 'N',
+    series: [{ key: 'rocket.thrust', label: 'thrust', color: SIGNAL.output, width: 2 }],
+  },
+  lander: {
+    label: 'engine thrust',
+    title: 'Engine thrust',
+    unit: 'N',
+    series: [{ key: 'pdg.thrust', label: 'thrust', color: SIGNAL.output, width: 2 }],
+  },
+  tvc: {
+    label: 'gimbal angle',
+    title: 'Gimbal angle',
+    unit: '°',
+    series: [{ key: 'tvc.delta', label: 'gimbal', color: SIGNAL.output, width: 2 }],
+  },
+  aircraft: { label: 'elevator', title: 'Elevator', unit: '°', series: ELEVATOR },
+  satellite: {
+    label: 'wheel torque',
+    title: 'Wheel torque',
+    unit: 'N·m',
+    series: (['x', 'y', 'z'] as const).map((c, i) => ({
+      key: `sat.tw.${c}`,
+      label: `wheel ${c}`,
+      color: SIGNAL.windAxes[i]!,
+      width: 1.5,
+    })),
+  },
+};
 /** Lesson IV.22: attitude knowledge from the gyro and the star tracker, against the filter's 2σ. */
 const STAR: SeriesSpec[] = [
   { key: 'st.err', label: 'knowledge error', color: SIGNAL.error, width: 2 },
@@ -231,6 +267,8 @@ function ComputeMeter() {
 
 export function ChartsPanel() {
   const level = useParams((s) => s.params.sim.level);
+  const vehicle = useParams((s) => s.params.sim.vehicle ?? 'quadrotor');
+  const actuator = ACTUATOR[vehicle];
   const loopId = useUi((s) => s.loop);
   const setLoop = useUi((s) => s.setLoop);
   const windowSec = useUi((s) => s.window);
@@ -369,7 +407,9 @@ export function ChartsPanel() {
         <Select
           value={second ?? 'motors'}
           onValueChange={(v) => setSecond(v === 'motors' ? null : (v as AnalysisChart))}
-          options={SECOND}
+          options={
+            actuator ? [{ value: 'motors', label: actuator.label }, ...SECOND.slice(1)] : SECOND
+          }
         />
         <span className="ml-auto text-[11px] text-muted">
           Hover a chart to read values; red shading = output saturated.
@@ -514,6 +554,14 @@ export function ChartsPanel() {
         />
         {second ? (
           analysisChart(second)
+        ) : actuator ? (
+          <TimeChart
+            key={vehicle}
+            title={actuator.title}
+            unit={actuator.unit}
+            series={actuator.series}
+            includeZero
+          />
         ) : (
           <TimeChart
             title="Motor thrust"

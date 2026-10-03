@@ -1,10 +1,16 @@
 import type { Level, Params } from '@/sim/params';
+import type { VehicleId } from '@/sim/vehicles/types';
 
 /** Visibility rules shared by fields and groups. */
 interface Visibility {
   levels?: Level[];
   /** Extra condition, e.g. "only while this controller is selected". */
   when?: (p: Params) => boolean;
+  /**
+   * The vehicles this is shown for. A group without it belongs to the drone (Parts I–III) and is
+   * hidden while a Part IV vehicle flies; a field without it follows its group.
+   */
+  vehicles?: VehicleId[];
 }
 
 /**
@@ -43,9 +49,21 @@ export interface Group extends Visibility {
   loop?: string;
 }
 
+/** Every vehicle: for the settings that do not depend on what flies. */
+const ALL_VEHICLES: VehicleId[] = ['quadrotor', 'rocket', 'tvc', 'aircraft', 'satellite', 'lander'];
+
+/** The vehicles a group or field is shown for: groups default to the drone, `drone.*` fields too. */
+const vehiclesOf = (v: Visibility): VehicleId[] | undefined =>
+  v.vehicles ??
+  ('fields' in v || ('path' in v && String(v.path).startsWith('drone.'))
+    ? ['quadrotor']
+    : undefined);
+
 /** Whether a field or group is shown for these parameters. */
 export const visible = (v: Visibility, p: Params): boolean =>
-  (!v.levels || v.levels.includes(p.sim.level)) && (!v.when || v.when(p));
+  (!v.levels || v.levels.includes(p.sim.level)) &&
+  (vehiclesOf(v)?.includes(p.sim.vehicle ?? 'quadrotor') ?? true) &&
+  (!v.when || v.when(p));
 
 const l1Pid = (p: Params) =>
   p.sim.level === 2 || p.control.l1.kind === 'pid' || p.control.l1.kind === 'transfer';
@@ -203,6 +221,7 @@ export const SCHEMA: Group[] = [
     title: 'Aircraft and pitch autopilot',
     levels: [1],
     when: (p) => p.sim.vehicle === 'aircraft',
+    vehicles: ['aircraft'],
     fields: [
       {
         kind: 'number',
@@ -1552,6 +1571,7 @@ export const SCHEMA: Group[] = [
   {
     id: 'physics',
     title: 'Physics',
+    vehicles: ALL_VEHICLES,
     fields: [
       {
         kind: 'select',
@@ -1624,6 +1644,8 @@ export const SCHEMA: Group[] = [
   {
     id: 'wind',
     title: 'Wind',
+    // The pitch-plane rocket flies through the same wind; the lander has its own push.
+    vehicles: ['quadrotor', 'tvc'],
     fields: [
       { kind: 'bool', path: 'wind.enabled', label: 'Wind' },
       {
@@ -2340,6 +2362,7 @@ export const SCHEMA: Group[] = [
     title: 'Rocket',
     levels: [1],
     when: (p) => p.sim.vehicle === 'rocket',
+    vehicles: ['rocket'],
     fields: [
       {
         kind: 'number',
@@ -2422,6 +2445,7 @@ export const SCHEMA: Group[] = [
     title: 'Pitch-plane rocket',
     levels: [1],
     when: (p) => p.sim.vehicle === 'tvc',
+    vehicles: ['tvc'],
     fields: [
       {
         kind: 'number',
@@ -2576,6 +2600,7 @@ export const SCHEMA: Group[] = [
     title: 'Thrust-vector control',
     levels: [1],
     when: (p) => p.sim.vehicle === 'tvc',
+    vehicles: ['tvc'],
     fields: [
       {
         kind: 'number',
@@ -2692,6 +2717,7 @@ export const SCHEMA: Group[] = [
     title: 'Satellite',
     levels: [1],
     when: (p) => p.sim.vehicle === 'satellite',
+    vehicles: ['satellite'],
     fields: [
       {
         kind: 'select',
@@ -3012,6 +3038,7 @@ export const SCHEMA: Group[] = [
     title: 'Lander and powered-descent guidance',
     levels: [1],
     when: (p) => p.sim.vehicle === 'lander',
+    vehicles: ['lander'],
     fields: [
       {
         kind: 'number',

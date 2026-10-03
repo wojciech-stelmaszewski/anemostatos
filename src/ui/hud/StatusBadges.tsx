@@ -1,5 +1,6 @@
 import { useRef } from 'react';
 import { sim } from '@/store/sim';
+import { endNotice } from './endNotice';
 import { useRaf } from './useRaf';
 
 /** Crash / motors-off / take-off / lagging notices over the viewport. */
@@ -7,14 +8,13 @@ export function StatusBadges() {
   const el = useRef<HTMLDivElement>(null);
   useRaf(() => {
     const msgs: [string, string][] = [];
-    if (sim.state.crashed)
-      msgs.push([
-        'Crashed! Hit the ground too hard. Press R to reset.',
-        'bg-[#e66767]/90 text-black',
-      ]);
+    const end = endNotice(sim);
+    if (end) msgs.push(end);
     else if (!sim.armed)
       msgs.push([
-        'Controller off — motors idle. Press M to switch it on.',
+        (sim.params.sim.vehicle ?? 'quadrotor') === 'quadrotor'
+          ? 'Controller off — motors idle. Press M to switch it on.'
+          : 'Controller off. Press M to switch it on.',
         'bg-[#c98500]/90 text-black',
       ]);
     else if (sim.takingOff)
